@@ -22,6 +22,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from pants.backend.terraform.utils import terraform_named_cache
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import external_tool
 from pants.core.util_rules.env_vars import environment_vars_subset
@@ -457,7 +458,9 @@ async def setup_terraform_process(
         path.append(user_path)
     extra_env_vars["PATH"] = os.pathsep.join(path)
 
-    tf_plugin_cache_dir = os.path.join(terraform.plugin_cache_dir, request.chdir)
+    tf_plugin_cache_dir = os.path.join(
+        terraform.plugin_cache_dir, terraform_named_cache(request.chdir)
+    )
     extra_env_vars["TF_PLUGIN_CACHE_DIR"] = os.path.join("{chroot}", tf_plugin_cache_dir)
 
     env = EnvironmentVars({**env, **extra_env_vars})
