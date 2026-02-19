@@ -108,6 +108,13 @@ async def add_prefix(add_prefix: AddPrefix) -> Digest:
 async def execute_process(
     process: Process, process_execution_environment: ProcessExecutionEnvironment
 ) -> FallibleProcessResult:
+    # Validate that stdin is not used with remote execution
+    # because the RBE API does not support stdin.
+    if process.stdin is not None and process_execution_environment.remote_execution:
+        raise ValueError(
+            f"Process '{process.description}' cannot use stdin with remote execution. "
+            "Configure the process to run locally or remove stdin."
+        )
     return await native_engine.execute_process(process, process_execution_environment)
 
 
