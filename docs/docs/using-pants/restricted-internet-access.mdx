@@ -76,7 +76,20 @@ repos = ["https://my.custom.repo/maven2"]
 
 ### Binary tools
 
-Pants downloads various binary tools from preset locations, and verifies them against a SHA. If you are not able to allowlist these locations, you can host the binaries yourself and instruct Pants to use the custom locations.
+Pants downloads various binary tools from preset locations, and verifies them against a SHA. There are two common issues with this process in a restricted internet access setting.
+
+First, Pants may be unable to access the location even though it is allowed by the internet restrictions. This is because the Pants daemon may not be populating the proper environment variables to understand and work through the internet restrictions. This can be solved with the following steps:
+
+- Run a Pants command that requires a tool download, such as `pants lint ::`
+- Observe that the command fails due to being unable to download a tool.
+- Run the command again using `--no-pantsd`. `pants --no-pantsd lint ::`
+- Observe that the tool is downloaded and the command executes successfully.
+- Run the command again with `pantsd`. `pants lint ::`
+- Observe that the command is again successful.
+    - Pants caches its downloaded tools. This means the tools will now run correctly even on the Pants daemon.
+- If the tool must be downloaded again (due to a manual version change, Pants upgrade causing a version change, or manual cache deletion), the `--no-pantsd` flag can be used again to run without the daemon and download the tool successfully.
+
+The second common issue is that your internet restrictions may not allow access to the tool download location. If you are not able to allowlist these locations, you can host the binaries yourself and instruct Pants to use the custom locations.
 
 You set these custom locations by setting the `url_template` option for the tool. In this URL template, Pants will replace `{version}` with the requested version of the tool and `{platform}`, with the platform name (e.g., `linux.x86_64`).
 
