@@ -1,9 +1,0 @@
-{
-  "name": "pkg",
-  "version": "0.0.1",
-  "type": "module",
-  "main": "./src/index.mjs",
-  "devDependencies": {
-    "mocha": "11.7.4"
-  }
-}

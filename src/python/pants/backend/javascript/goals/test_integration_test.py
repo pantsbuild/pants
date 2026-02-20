@@ -17,13 +17,13 @@ from pants.backend.javascript.goals.test import (
     JSTestRequest,
     TestMetadata,
 )
+from pants.backend.javascript.goals.testutil import load_js_test_project
 from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import (
     JSSourcesGeneratorTarget,
     JSTestsGeneratorTarget,
     JSTestTarget,
 )
-from pants.backend.javascript.testutil import load_js_test_project
 from pants.backend.tsx.target_types import (
     TSXSourcesGeneratorTarget,
     TSXTestsGeneratorTarget,
@@ -82,7 +82,10 @@ def rule_runner(package_manager: str) -> RuleRunner:
 
 @pytest.fixture
 def jest_dev_dependencies() -> dict[str, str]:
-    return {"@types/jest": "30.0.0", "jest": "30.2.0", "ts-jest": "29.4.5", "typescript": "5.9.3"}
+    pkg = json.loads(
+        (Path(__file__).parent / "test_resources/jest_project/package.json").read_text()
+    )
+    return cast(dict[str, str], pkg["devDependencies"])
 
 
 def make_source_to_test(passing: bool = True):

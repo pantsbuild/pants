@@ -6,16 +6,15 @@ This directory contains test project fixtures for the JavaScript backend tests.
 
 Each subdirectory represents a complete, working JavaScript project that can be used by tests:
 
-- `basic_package/` - Simple single-package project with no dependencies
 - `jest_project/` - Complete jest test project with source and test files
 - `mocha_project/` - Complete mocha test project with source and test files
 
 ## Usage
 
-Use `load_js_test_project()` from `pants.backend.javascript.testutil` to load test resources:
+Use `load_js_test_project()` from `pants.backend.javascript.goals.testutil` to load test resources:
 
 ```python
-from pants.backend.javascript.testutil import load_js_test_project
+from pants.backend.javascript.goals.testutil import load_js_test_project
 
 # Load all files for a specific package manager
 test_files = load_js_test_project("jest_project", package_manager="npm")
