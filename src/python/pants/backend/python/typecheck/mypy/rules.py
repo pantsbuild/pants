@@ -38,7 +38,13 @@ from pants.backend.python.util_rules.python_sources import (
     prepare_python_sources,
 )
 from pants.base.build_root import BuildRoot
-from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
+from pants.core.goals.check import (
+    REPORT_DIR,
+    CheckRequest,
+    CheckResult,
+    CheckResults,
+    CheckSubsystem,
+)
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import (
     CpBinary,
@@ -142,6 +148,7 @@ async def mypy_typecheck_partition(
     first_party_plugins: MyPyFirstPartyPlugins,
     build_root: BuildRoot,
     mypy: MyPy,
+    check_subsystem: CheckSubsystem,
     python_setup: PythonSetup,
     mkdir: MkdirBinary,
     mktemp: MktempBinary,
@@ -366,6 +373,7 @@ async def mypy_typecheck_partition(
             output_directories=(REPORT_DIR,),
             description=f"Run MyPy on {pluralize(len(python_files), 'file')}.",
             level=LogLevel.DEBUG,
+            cache_scope=check_subsystem.default_process_cache_scope,
             append_only_caches={"mypy_cache": named_cache_dir},
         ),
         **implicitly(),

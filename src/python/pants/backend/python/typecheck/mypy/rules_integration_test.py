@@ -783,3 +783,16 @@ def test_colors_and_formatting(rule_runner: PythonRuleRunner) -> None:
     # at least one escape sequence that sets text color (red)
     assert "\033[31m" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
+
+
+def test_force(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/f.py": GOOD_FILE,
+            f"{PACKAGE}/BUILD": "python_sources()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
+    result = run_mypy(rule_runner, [tgt], extra_args=["--check-force"])
+    assert len(result) == 1
+    assert result[0].exit_code == 0

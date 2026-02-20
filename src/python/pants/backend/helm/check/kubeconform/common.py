@@ -13,14 +13,14 @@ from pants.backend.helm.check.kubeconform.extra_fields import KubeconformFieldSe
 from pants.backend.helm.check.kubeconform.subsystem import KubeconformSubsystem
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.util_rules.renderer import RenderedHelmFiles
-from pants.core.goals.check import CheckRequest, CheckResult
+from pants.core.goals.check import CheckRequest, CheckResult, CheckSubsystem
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.external_tool import DownloadedExternalTool, download_external_tool
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, FileEntry
 from pants.engine.intrinsics import create_digest, execute_process
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.process import Process
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -67,7 +67,10 @@ async def setup_kube_conform(
 
 @rule
 async def run_kubeconform(
-    request: RunKubeconformRequest, setup: KubeconformSetup, kubeconform: KubeconformSubsystem
+    request: RunKubeconformRequest,
+    setup: KubeconformSetup,
+    kubeconform: KubeconformSubsystem,
+    check_subsystem: CheckSubsystem,
 ) -> CheckResult:
     tool_relpath = "__kubeconform"
     chart_relpath = "__chart"
@@ -126,7 +129,7 @@ async def run_kubeconform(
             append_only_caches=setup.append_only_caches,
             description=f"Validating Kubernetes manifests for {request.field_set.address}",
             level=LogLevel.DEBUG,
-            cache_scope=ProcessCacheScope.SUCCESSFUL,
+            cache_scope=check_subsystem.default_process_cache_scope,
         ),
         **implicitly(),
     )
