@@ -191,7 +191,7 @@ class CheckSubsystem(GoalSubsystem):
     only = OnlyOption("checker", "mypy", "javac")
     force = BoolOption(
         default=False,
-        help="Force checking to run, even if they could be satisfied from cache.",
+        help="Force checks to run, even if they could be satisfied from cache.",
     )
 
     @property
