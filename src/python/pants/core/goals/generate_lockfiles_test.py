@@ -79,6 +79,10 @@ def test_determine_tool_sentinels_to_generate() -> None:
     with pytest.raises(UnrecognizedResolveNamesError):
         assert_chosen({"fake"}, expected_user_resolves=[])
 
+    # "Did you mean?"
+    with pytest.raises(UnrecognizedResolveNamesError, match=r"Did you mean.*`u3`.*\(for `u33`\)"):
+        assert_chosen({"u33"}, expected_user_resolves=[])
+
     # Error if the same resolve name is used for multiple user lockfiles.
     with pytest.raises(AmbiguousResolveNamesError):
         determine_resolves_to_generate(
