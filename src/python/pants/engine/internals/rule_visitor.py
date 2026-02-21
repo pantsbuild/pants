@@ -6,13 +6,10 @@ import ast
 import inspect
 import itertools
 import logging
-import os
 import sys
-import warnings
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from functools import partial
 from types import ModuleType
 from typing import Any, get_type_hints
 
@@ -20,13 +17,9 @@ import typing_extensions
 
 from pants.base.exceptions import RuleTypeError
 from pants.engine.internals.selectors import (
-    Awaitable,
     AwaitableConstraints,
-    Effect,
-    GetParseError,
-    MultiGet,
+    concurrently,
 )
-from pants.util.docutil import doc_url
 from pants.util.memo import memoized
 from pants.util.strutil import softwrap
 
@@ -182,15 +175,6 @@ def _lookup_return_type(func: Callable, check: bool = False) -> Any:
     return ret
 
 
-def _returns_awaitable(func: Any) -> bool:
-    if not callable(func):
-        return False
-    ret = _lookup_return_type(func)
-    if not isinstance(ret, tuple):
-        ret = (ret,)
-    return any(issubclass(r, Awaitable) for r in ret if isinstance(r, type))
-
-
 class _AwaitableCollector(ast.NodeVisitor):
     def __init__(self, func: Callable):
         self.func = func
@@ -282,42 +266,9 @@ class _AwaitableCollector(ast.NodeVisitor):
         else:
             return input_nodes, [self._lookup(n) for n in input_nodes]
 
-    def _get_legacy_awaitable(self, call_node: ast.Call, is_effect: bool) -> AwaitableConstraints:
-        get_args = call_node.args
-        parse_error = partial(GetParseError, get_args=get_args, source_file_name=self.source_file)
-
-        if len(get_args) not in (1, 2, 3):
-            # TODO: fix parse error message formatting... (TODO: create ticket)
-            raise parse_error(
-                self._format(
-                    call_node,
-                    f"Expected one to three arguments, but got {len(get_args)} arguments.",
-                )
-            )
-
-        output_node = get_args[0]
-        output_type = self._lookup(output_node)
-
-        input_nodes, input_types = self._get_inputs(get_args[1:])
-
-        return AwaitableConstraints(
-            None,
-            self._check_constraint_arg_type(output_type, output_node),
-            0,
-            tuple(
-                self._check_constraint_arg_type(input_type, input_node)
-                for input_type, input_node in zip(input_types, input_nodes)
-            ),
-            is_effect,
-        )
-
     def _get_byname_awaitable(
         self, rule_id: str, rule_func: Callable | RuleDescriptor, call_node: ast.Call
     ) -> AwaitableConstraints:
-        parse_error = partial(
-            GetParseError, get_args=call_node.args, source_file_name=self.source_file
-        )
-
         if isinstance(rule_func, RuleDescriptor):
             # At this point we expect the return type to be defined, so its source code
             # must precede that of the rule invoking the awaitable that returns it.
@@ -345,11 +296,12 @@ class _AwaitableCollector(ast.NodeVisitor):
                 for input_type, input_node in zip(input_type_nodes, input_nodes)
             )
         else:
-            raise parse_error(
-                self._format(
-                    call_node,
-                    "Expected an `**implicitly(..)` application as the only keyword input.",
-                )
+            explanation = self._format(
+                call_node,
+                "Expected an `**implicitly(..)` application as the only keyword input.",
+            )
+            raise ValueError(
+                f"Invalid call. {explanation} failed in a call to {rule_id} in {self.source_file}."
             )
 
         return AwaitableConstraints(
@@ -357,35 +309,17 @@ class _AwaitableCollector(ast.NodeVisitor):
             output_type,
             explicit_args_arity,
             input_types,
-            # TODO: Extract this from the callee? Currently only intrinsics can be Effects, so need
-            # to figure out their new syntax first.
-            is_effect=False,
         )
 
     def visit_Call(self, call_node: ast.Call) -> None:
         func = self._lookup(call_node.func)
         if func is not None:
-            if isinstance(func, type) and issubclass(func, Awaitable):
-                # Is a `Get`/`Effect`.
-                self.awaitables.append(
-                    self._get_legacy_awaitable(call_node, is_effect=issubclass(func, Effect))
-                )
-                if os.environ.get("PANTS_DISABLE_GETS", "").lower() in {"1", "t", "true"}:
-                    raise Exception("Get() is disabled!")
-                else:
-                    lineno = call_node.lineno + self.func.__code__.co_firstlineno - 1
-                    warnings.warn(
-                        "Get() is deprecated, and will be removed in Pants 2.31.0. "
-                        f"Found a `Get() in {self.source_file}:{lineno}. See "
-                        f"{doc_url('docs/writing-plugins/the-rules-api/migrating-gets')} for how "
-                        "to migrate your plugins to use the new call-by-name idiom."
-                    )
-            elif (inspect.isfunction(func) or isinstance(func, RuleDescriptor)) and (
+            if (inspect.isfunction(func) or isinstance(func, RuleDescriptor)) and (
                 rule_id := getattr(func, "rule_id", None)
             ) is not None:
                 # Is a direct `@rule` call.
                 self.awaitables.append(self._get_byname_awaitable(rule_id, func, call_node))
-            elif inspect.iscoroutinefunction(func) or _returns_awaitable(func):
+            elif inspect.iscoroutinefunction(func):
                 # Is a call to a "rule helper".
                 self.awaitables.extend(collect_awaitables(func))
 
@@ -425,7 +359,7 @@ class _AwaitableCollector(ast.NodeVisitor):
                 continue
             if isinstance(node, ast.Call):
                 f = self._lookup(node.func)
-                if f is MultiGet:
+                if f is concurrently:
                     value = tuple(get.output_type for get in collected_awaitables)
                 elif f is not None:
                     value = _lookup_return_type(f)

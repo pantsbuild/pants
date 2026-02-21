@@ -248,7 +248,7 @@ pub trait OptionsSource: Send + Sync {
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String>;
 }
 
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, Hash, PartialEq)]
 pub enum Source {
     Default,
     Config { ordinal: usize, path: String }, // TODO: Should be a PathBuf
@@ -385,7 +385,10 @@ impl OptionParser {
     ) -> Result<OptionParser, String> {
         let has_provided_configs = config_sources.is_some();
 
-        let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
+        let buildroot = match buildroot {
+            Some(buildroot) => buildroot,
+            None => BuildRoot::find()?,
+        };
         let buildroot_string = buildroot.convert_to_string()?;
 
         let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
@@ -394,7 +397,7 @@ impl OptionParser {
         let fromfile_expander = FromfileExpander::relative_to(buildroot.clone());
 
         let mut seed_values =
-            HashMap::from_iter(env.env.iter().map(|(k, v)| (format!("env.{k}"), v.clone())));
+            BTreeMap::from_iter(env.env.iter().map(|(k, v)| (format!("env.{k}"), v.clone())));
 
         // We bootstrap options in several steps.
 

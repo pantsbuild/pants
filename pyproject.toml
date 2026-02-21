@@ -51,7 +51,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-markers = ["platform_specific_behavior", "call_by_type"]
+markers = ["platform_specific_behavior"]
 
 [tool.ruff]
 # Exclusions were copied from [tool.black]

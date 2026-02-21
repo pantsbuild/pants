@@ -147,7 +147,9 @@ class DockerfileInfoRequest:
 
 
 async def _natively_parse_dockerfile(address: Address, digest: Digest) -> DockerfileInfo:
-    result = await parse_dockerfile_info(NativeDependenciesRequest(digest))
+    results = await parse_dockerfile_info(NativeDependenciesRequest(digest))
+    assert len(results.path_to_infos) == 1
+    result = next(iter(results.path_to_infos.values()))
     return DockerfileInfo(
         address=address,
         digest=digest,
@@ -222,7 +224,7 @@ async def parse_dockerfile(
 
     if not dockerfile_parser.use_rust_parser:
         warn_or_error(
-            removal_version="2.32.0.dev1",
+            removal_version="2.33.0.dev1",
             entity="Using the old Dockerfile parser",
             hint=softwrap(
                 f"""

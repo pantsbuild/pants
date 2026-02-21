@@ -27,9 +27,6 @@ from typing_extensions import ParamSpec
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import AwaitableConstraints, Call
-from pants.engine.internals.selectors import Effect as Effect  # noqa: F401
-from pants.engine.internals.selectors import Get as Get  # noqa: F401
-from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
 from pants.engine.internals.selectors import concurrently as concurrently  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -242,8 +239,6 @@ class RuleDecoratorKwargs(TypedDict):
     `await base_rule(arg, other_arg)`
 
     will invoke `derived_rule(arg, other_arg)`
-
-    This is the call-by-name equivalent of Get(OutputType, UnionBase, union_member_instance).
     """
 
     _masked_types: NotRequired[Iterable[type[Any]]]
@@ -396,20 +391,9 @@ def validate_requirements(
         input_type_side_effecting = [
             it for it in awaitable.input_types if issubclass(it, SideEffecting)
         ]
-        if input_type_side_effecting and not awaitable.is_effect:
+        if input_type_side_effecting:
             raise ValueError(
-                f"A `Get` may not request side-effecting types ({input_type_side_effecting}). "
-                f"Use `Effect` instead: `{awaitable}`."
-            )
-        if not input_type_side_effecting and awaitable.is_effect:
-            raise ValueError(
-                f"An `Effect` should not be used with pure types ({awaitable.input_types}). "
-                f"Use `Get` instead: `{awaitable}`."
-            )
-        if cacheable and awaitable.is_effect:
-            raise ValueError(
-                f"A `@rule` that is not a @goal_rule ({func_id}) may not use an "
-                f"Effect: `{awaitable}`."
+                f"A `@rule` may not request side-effecting types ({input_type_side_effecting})."
             )
 
 
@@ -441,8 +425,8 @@ def rule(**kwargs: Unpack[RuleDecoratorKwargs]) -> Callable[[F], F]:
 def rule(_func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P, Coroutine[Any, Any, R]]:
     """Handles bare @rule decorators on async functions.
 
-    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `MultiGet`/`concurrently` use
-    coroutines directly.
+    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `concurrently` uses coroutines
+    directly.
     """
     ...
 
@@ -452,8 +436,8 @@ def rule(_func: Callable[P, R]) -> Callable[P, Coroutine[Any, Any, R]]:
     """Handles bare @rule decorators on non-async functions It's debatable whether we should even
     have non-async @rule functions, but keeping this to not break the world for plugin authors.
 
-    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `MultiGet`/`concurrently` use
-    coroutines directly.
+    Usage of Coroutine[...] (vs Awaitable[...]) is intentional, as `concurrently` uses coroutines
+    directly.
     """
     ...
 

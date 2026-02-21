@@ -15,7 +15,11 @@ from typing import TYPE_CHECKING, ClassVar, cast
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import (
+    DEFAULT_TEST_FILE_GLOBS,
+    DEFAULT_TESTUTIL_FILE_GLOBS,
+    PythonSetup,
+)
 from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
@@ -767,6 +771,59 @@ class ScieNameStyle(StrEnum):
     PLATFORM_FILE_SUFFIX = "platform-file-suffix"
 
 
+class PexScieBindResourcePathField(StringSequenceField):
+    alias = "scie_bind_resource_path"
+    default = None
+    help = help_text(
+        """ Specifies an environment variable to bind the path of a resource
+        in the PEX to in the form `<env var name>=<resource rel path>`. For
+        example `WINDOWS_X64_CONSOLE_TRAMPOLINE=pex/windows/stubs/uv-
+        trampoline-x86_64-console.exe` would lookup the path of the
+        `pex/windows/stubs/uv-trampoline-x86_64-console.exe` file on the
+        `sys.path` and bind its absolute path to the
+        WINDOWS_X64_CONSOLE_TRAMPOLINE environment variable.  N.B.: resource
+        paths must use the Unix path separator of `/`. These will be converted
+        to the runtime host path separator as needed.
+        """
+    )
+
+
+class PexScieExeField(StringField):
+    alias = "scie_exe"
+    default = None
+    help = help_text(
+        """
+        Specify a custom PEX scie entry point instead of using
+        the PEX's entrypoint. When specifying a custom entry
+        point additional args can be set via `scie_args` and
+        environment variables can be set via `scie_env`.
+        Scie placeholders can be used in `scie_exe`.
+        """
+    )
+
+
+class PexScieArgsField(StringSequenceField):
+    alias = "scie_args"
+    default = None
+    help = help_text(
+        """ Additional arguments to pass to the custom `scie_exe` entry
+        point. Scie placeholders can be used in `scie_args`,
+        """
+    )
+
+
+class PexScieEnvField(StringSequenceField):
+    alias = "scie_env"
+    default = None
+    help = help_text(
+        """
+        Environment variables to set when executing the custom
+        `scie_exe` entry point. Scie placeholders can be
+        used in `scie_env`.
+        """
+    )
+
+
 class PexScieLoadDotenvField(TriBoolField):
     alias = "scie_load_dotenv"
     required = False
@@ -988,6 +1045,10 @@ _PEX_BINARY_COMMON_FIELDS = (
 
 _PEX_SCIE_BINARY_FIELDS = (
     PexScieField,
+    PexScieBindResourcePathField,
+    PexScieExeField,
+    PexScieArgsField,
+    PexScieEnvField,
     PexScieLoadDotenvField,
     PexScieNameStyleField,
     PexScieBusyBox,
@@ -1319,7 +1380,7 @@ class PythonTestTarget(Target):
 
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
     expected_file_extensions = (".py", "")  # Note that this does not include `.pyi`.
-    default = ("test_*.py", "*_test.py", "tests.py")
+    default = DEFAULT_TEST_FILE_GLOBS
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['test_*.py', '*_test.py', 'tests.py']`"
     )
@@ -1406,7 +1467,7 @@ class PythonSourcesOverridesField(OverridesField):
 
 
 class PythonTestUtilsGeneratingSourcesField(PythonGeneratingSourcesBase):
-    default = ("conftest.py", "test_*.pyi", "*_test.pyi", "tests.pyi")
+    default = DEFAULT_TESTUTIL_FILE_GLOBS
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['conftest.py', 'test_*.pyi', '*_test.pyi', 'tests.pyi']`"
     )

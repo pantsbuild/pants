@@ -24,4 +24,3 @@ extend-ignore:
 [flake8:local-plugins]
 extension =
     PNT20 = dedent_use_checker:check_for_dedent_imports
-    PNT30 = await_in_loop:check_for_await_in_loop

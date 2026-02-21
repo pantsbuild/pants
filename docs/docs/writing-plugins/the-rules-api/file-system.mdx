@@ -137,7 +137,7 @@ from pants.engine.rules import rule
 @rule
 async def demo(...) -> Foo:
     ...
-    paths: Paths = await path_globs_to_paths(["**/*.txt", "!ignore_me.txt"]))
+    paths: Paths = await path_globs_to_paths(["**/*.txt", "!ignore_me.txt"])
     logger.info(paths.files)
 ```
 

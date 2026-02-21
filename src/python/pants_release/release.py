@@ -510,7 +510,7 @@ def build_pants_wheels() -> None:
 
     args = (
         "./pants",
-        # TODO(#9924).
+        # See https://github.com/pantsbuild/pants/issues/9924 for tty detection issues.
         "--no-dynamic-ui",
         # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run
         #  this script.

@@ -6,7 +6,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime
 from io import RawIOBase
-from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
+from pathlib import Path
+from typing import Any, ClassVar, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
     CreateDigest,
@@ -21,9 +22,9 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
-    NativeParsedDockerfileInfo,
-    NativeParsedJavascriptDependencies,
-    NativeParsedPythonDependencies,
+    NativeDockerfileInfo,
+    NativeJavascriptFileDependencies,
+    NativePythonFileDependencies,
 )
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import RunId, SessionValues
@@ -592,13 +593,13 @@ async def interactive_process(
 async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
 async def parse_dockerfile_info(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedDockerfileInfo: ...
+) -> tuple[tuple[str, NativeDockerfileInfo]]: ...
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedPythonDependencies: ...
+) -> tuple[tuple[str, NativePythonFileDependencies]]: ...
 async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedJavascriptDependencies: ...
+) -> tuple[tuple[str, NativeJavascriptFileDependencies]]: ...
 async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult: ...
 
 # ------------------------------------------------------------------------------
@@ -704,6 +705,7 @@ def py_bin_name() -> str: ...
 class PyOptionParser:
     def __init__(
         self,
+        buildroot: Path | None,
         args: Sequence[str] | None,
         env: dict[str, str],
         configs: Sequence[PyConfigSource] | None,
@@ -767,9 +769,8 @@ class InferenceMetadata:
     def __repr__(self) -> str: ...
 
 class NativeDependenciesRequest:
-    """A request to parse the dependencies of a file.
+    """A request to parse the dependencies of a set of files.
 
-    * The `digest` is expected to contain exactly one source file.
     * Depending on the implementation, a `metadata` structure
       can be passed. It will be supplied to the native parser, and
       it will be incorporated into the cache key.
@@ -862,10 +863,6 @@ def tasks_add_call(
     vtable_entries: Sequence[tuple[type, str]] | None,
     in_scope_types: Sequence[type] | None,
 ) -> None: ...
-def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None: ...
-def tasks_add_get_union(
-    tasks: PyTasks, output_type: type, input_types: Sequence[type], in_scope_types: Sequence[type]
-) -> None: ...
 def tasks_add_query(tasks: PyTasks, output_type: type, input_types: Sequence[type]) -> None: ...
 def execution_add_root_select(
     scheduler: PyScheduler,
@@ -929,9 +926,6 @@ def validate_reachability(scheduler: PyScheduler) -> None: ...
 def rule_graph_consumed_types(
     scheduler: PyScheduler, param_types: Sequence[type], product_type: type
 ) -> list[type]: ...
-def rule_graph_rule_gets(
-    scheduler: PyScheduler,
-) -> dict[Callable, list[tuple[type, list[type], Callable]]]: ...
 def rule_graph_visualize(scheduler: PyScheduler, path: str) -> None: ...
 def rule_subgraph_visualize(
     scheduler: PyScheduler, param_types: Sequence[type], product_type: type, path: str
@@ -953,7 +947,6 @@ _Input = TypeVar("_Input")
 class PyGeneratorResponseCall:
     rule_id: str
     output_type: type
-    input_types: Sequence[type]
     inputs: Sequence[Any]
 
     @overload
@@ -983,36 +976,6 @@ class PyGeneratorResponseCall:
         rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
-        input_arg0: type[_Input] | _Input,
-        input_arg1: _Input | None = None,
-    ) -> None: ...
-
-class PyGeneratorResponseGet(Generic[_Output]):
-    output_type: type[_Output]
-    input_types: Sequence[type]
-    inputs: Sequence[Any]
-
-    @overload
-    def __init__(self, output_type: type[_Output]) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: dict[Any, type],
-    ) -> None: ...
-    @overload
-    def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: type[_Input],
-        input_arg1: _Input,
-    ) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...

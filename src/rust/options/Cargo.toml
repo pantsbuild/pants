@@ -6,19 +6,21 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
+hashing = { path = "../hashing" }
 itertools = { workspace = true }
 log = { workspace = true }
 maplit = { workspace = true }
+parking_lot = { workspace = true }
 peg = { workspace = true }
-shellexpand = { workspace = true }
-toml = { workspace = true, features = ["preserve_order"] }
 regex = { workspace = true }
-whoami = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-parking_lot = { workspace = true }
+sha2 = { workspace = true }
+shellexpand = { workspace = true }
 shlex = { workspace = true }
+toml = { workspace = true, features = ["preserve_order"] }
+whoami = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

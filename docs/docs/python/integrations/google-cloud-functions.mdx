@@ -25,9 +25,9 @@ backend_packages.add = [
 ]
 ```
 
-This adds the new `python_google_cloud_function` target, which you can confirm by running `pants help python_google_cloud_function `
+This adds the new `python_google_cloud_function` target, which you can confirm by running `pants help python_google_cloud_function`
 
-## Step 2: Define a `python_google_cloud_function ` target
+## Step 2: Define a `python_google_cloud_function` target
 
 First, add your Cloud function in a Python file like you would [normally do with Google Cloud Functions](https://cloud.google.com/functions/docs/first-python), such as creating a function `def my_handler_name(event, context)` for event-based functions.
 
@@ -119,7 +119,7 @@ When building an Cloud function artifact, Pants and the underlying Pex tool need
         runtime="python312",
     )
     ```
-3. Inferred from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx): the interpreter constraints may unambiguously imply a value for the `runtime` and thus `complete_platforms` fields. For example, `interpreter_constaints = ["==3.12.*"]` implies `runtime="python312"`. This only works with interpreter constraints that cover all patch versions of a given minor release series: `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.0` is too specific (GCF's `python312` runtime may not use that exact patch version).
+3. Inferred from [the relevant interpreter constraints](../overview/interpreter-compatibility.mdx): the interpreter constraints may unambiguously imply a value for the `runtime` and thus `complete_platforms` fields. For example, `interpreter_constraints = ["==3.12.*"]` implies `runtime="python312"`. This only works with interpreter constraints that cover all patch versions of a given minor release series: `>=3.11,<3.13` is too wide (it covers both 3.11 and 3.12), while `==3.12.0` is too specific (GCF's `python312` runtime may not use that exact patch version).
 
     ```toml tab={"label":"pants.toml"}
     [python]

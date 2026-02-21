@@ -8,15 +8,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
-from pants.backend.python.target_types import PythonSourceField
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.internals.native_engine import NativeDependenciesRequest
 from pants.engine.intrinsics import create_digest, parse_python_deps
-from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
@@ -44,16 +42,31 @@ class ParsedPythonAssetPaths(DeduplicatedCollection[str]):
     # N.B. Don't set `sort_input`, as the input is already sorted
 
 
+# Map from argument of `pants: infer-dep(...)` to line number at which it appears.
+class ExplicitPythonDependencies(FrozenDict[str, int]):
+    """Dependencies provided via the # pants: infer-dep() pragma."""
+
+
+# TODO: Use the Native* eqivalents of these classes directly? Would require
+#  conversion to the component classes in Rust code. Might require passing
+#  the PythonInferSubsystem settings through to Rust and acting on them there.
+
+
 @dataclass(frozen=True)
-class ParsedPythonDependencies:
+class PythonFileDependencies:
     imports: ParsedPythonImports
     assets: ParsedPythonAssetPaths
+    explicit_dependencies: ExplicitPythonDependencies
+
+
+@dataclass(frozen=True)
+class PythonFilesDependencies:
+    path_to_deps: FrozenDict[str, PythonFileDependencies]
 
 
 @dataclass(frozen=True)
 class ParsePythonDependenciesRequest:
-    source: PythonSourceField
-    interpreter_constraints: InterpreterConstraints
+    source: SourceFiles
 
 
 @dataclass(frozen=True)
@@ -102,37 +115,41 @@ async def get_scripts_digest(scripts_package: str, filenames: Iterable[str]) -> 
 async def parse_python_dependencies(
     request: ParsePythonDependenciesRequest,
     python_infer_subsystem: PythonInferSubsystem,
-) -> ParsedPythonDependencies:
-    stripped_sources = await strip_source_roots(**implicitly(SourceFilesRequest([request.source])))
-    # We operate on PythonSourceField, which should be one file.
-    assert len(stripped_sources.snapshot.files) == 1
-
-    native_result = await parse_python_deps(
+) -> PythonFilesDependencies:
+    stripped_sources = await strip_source_roots(request.source)
+    native_results = await parse_python_deps(
         NativeDependenciesRequest(stripped_sources.snapshot.digest)
     )
-    imports = dict(native_result.imports)
-    assets = set()
 
-    if python_infer_subsystem.string_imports or python_infer_subsystem.assets:
-        for string, line in native_result.string_candidates.items():
-            if (
-                python_infer_subsystem.string_imports
-                and string.count(".") >= python_infer_subsystem.string_imports_min_dots
-                and all(part.isidentifier() for part in string.split("."))
-            ):
-                imports.setdefault(string, (line, True))
-            if (
-                python_infer_subsystem.assets
-                and string.count("/") >= python_infer_subsystem.assets_min_slashes
-            ):
-                assets.add(string)
+    path_to_deps = {}
+    for path, native_result in native_results.path_to_deps.items():
+        imports = dict(native_result.imports)
+        assets = set()
 
-    return ParsedPythonDependencies(
-        ParsedPythonImports(
-            (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
-        ),
-        ParsedPythonAssetPaths(sorted(assets)),
-    )
+        if python_infer_subsystem.string_imports or python_infer_subsystem.assets:
+            for string, line in native_result.string_candidates.items():
+                if (
+                    python_infer_subsystem.string_imports
+                    and string.count(".") >= python_infer_subsystem.string_imports_min_dots
+                    and all(part.isidentifier() for part in string.split("."))
+                ):
+                    imports.setdefault(string, (line, True))
+                if (
+                    python_infer_subsystem.assets
+                    and string.count("/") >= python_infer_subsystem.assets_min_slashes
+                ):
+                    assets.add(string)
+
+        explicit_deps = dict(native_result.explicit_dependencies)
+
+        path_to_deps[path] = PythonFileDependencies(
+            ParsedPythonImports(
+                (key, ParsedPythonImportInfo(*value)) for key, value in imports.items()
+            ),
+            ParsedPythonAssetPaths(sorted(assets)),
+            ExplicitPythonDependencies(FrozenDict(explicit_deps)),
+        )
+    return PythonFilesDependencies(FrozenDict(path_to_deps))
 
 
 def rules():

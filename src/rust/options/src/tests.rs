@@ -8,8 +8,8 @@ use crate::{
     OptionParser, Scope, Source, Val, munge_bin_name, option_id,
 };
 use itertools::Itertools;
-use maplit::{hashmap, hashset};
-use std::collections::HashMap;
+use maplit::{btreemap, hashmap, hashset};
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -71,7 +71,7 @@ fn with_setup(
             env: env
                 .into_iter()
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                .collect::<HashMap<_, _>>(),
+                .collect::<BTreeMap<_, _>>(),
         },
         Some(
             [config_path, extra_config_path]
@@ -590,7 +590,7 @@ fn test_do_not_load_pantsrc_if_configs_passed() {
     }
     fn mk_env() -> Env {
         Env {
-            env: HashMap::new(),
+            env: BTreeMap::new(),
         }
     }
 
@@ -679,7 +679,7 @@ fn test_config_path_discovery() {
         vec!["pants.other.toml"],
         OptionParser::new(
             Args::new(vec![format!("--pants-config-files=['{}']", config_path)]),
-            Env { env: hashmap! {} },
+            Env { env: btreemap! {} },
             None,
             false,
             false,
@@ -699,7 +699,7 @@ fn test_config_path_discovery() {
                 "--pants-config-files=[]".to_string(),
                 format!("--pants-config-files={}", config_path)
             ]),
-            Env { env: hashmap! {} },
+            Env { env: btreemap! {} },
             None,
             false,
             false,
@@ -717,7 +717,7 @@ fn test_config_path_discovery() {
         OptionParser::new(
             Args::new([]),
             Env {
-                env: hashmap! {"PANTS_CONFIG_FILES".to_string() => config_path.to_string()}
+                env: btreemap! {"PANTS_CONFIG_FILES".to_string() => config_path.to_string()}
             },
             None,
             false,
@@ -795,7 +795,7 @@ fn test_cli_alias_validation() {
     OptionParser::new(
         Args::new(vec![]),
         Env {
-            env: hashmap!{"PANTS_CLI_ALIAS".to_string() => "{\"foo\": \"fail_on_known_scope\"}".to_string()},
+            env: btreemap!{"PANTS_CLI_ALIAS".to_string() => "{\"foo\": \"fail_on_known_scope\"}".to_string()},
         },
         Some(vec![]),
         false,
@@ -825,7 +825,7 @@ fn test_spec_files() {
                 "--spec-files=extra_specs.txt".to_string(),
                 "some/initial/spec".to_string()
             ]),
-            Env { env: hashmap! {} },
+            Env { env: btreemap! {} },
             Some(vec![]),
             false,
             true,

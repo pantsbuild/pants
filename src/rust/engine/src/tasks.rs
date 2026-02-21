@@ -293,27 +293,6 @@ impl Tasks {
         }
     }
 
-    pub fn add_get(&mut self, output: TypeId, inputs: Vec<TypeId>) {
-        let gets = &mut self
-            .preparing
-            .as_mut()
-            .expect("Must `begin()` a task creation before adding gets!")
-            .gets;
-        gets.push(DependencyKey::new(output).provided_params(inputs));
-    }
-
-    pub fn add_get_union(&mut self, output: TypeId, inputs: Vec<TypeId>, in_scope: Vec<TypeId>) {
-        self.preparing
-            .as_mut()
-            .expect("Must `begin()` a task creation before adding a union get!")
-            .gets
-            .push(
-                DependencyKey::new(output)
-                    .provided_params(inputs)
-                    .in_scope_params(in_scope),
-            );
-    }
-
     pub fn task_end(&mut self) {
         // Move the task from `preparing` to the Rules map
         let task = self
