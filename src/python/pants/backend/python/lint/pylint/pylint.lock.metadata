@@ -1,10 +1,10 @@
 {
   "version": 5,
   "valid_for_interpreter_constraints": [
-    "CPython<3.15,>=3.9"
+    "CPython<3.15,>=3.10"
   ],
   "generated_with_requirements": [
-    "pylint<3,>=2.13.0"
+    "pylint<5,>=4.0.0"
   ],
   "manylinux": "manylinux2014",
   "requirement_constraints": [],

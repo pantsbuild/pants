@@ -30,7 +30,7 @@ from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
-_PBS_URL_TEMPLATE = "https://github.com/astral-sh/python-build-standalone/releases/download/20241008/cpython-3.11.10+20241008-{}-install_only.tar.gz"
+_PBS_URL_TEMPLATE = "https://github.com/astral-sh/python-build-standalone/releases/download/20251014/cpython-3.14.0+20251014-{}-install_only_stripped.tar.gz"
 
 
 class PythonBootstrapSubsystem(Subsystem):
@@ -49,23 +49,23 @@ class PythonBootstrapSubsystem(Subsystem):
         default={
             "linux_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-unknown-linux-gnu"),
-                "320635e957e13d2e10d70a3031563d032fae9e40e60e5ec32bc353643fae1335",
-                25925875,
+                "7dbb43b742c040835a277318355fb359b41e509dbf4fbb614da38005a9290e16",
+                29297561,
             ),
             "linux_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-unknown-linux-gnu"),
-                "ff121f14ed113c9da83a45f76c3cf41976fb4419fe406d5cc7066765761c6a4e",
-                29716764,
+                "493c477b4a88bb1ea2f6c6f57fa0e88ffbe55d9e7b1405c4699f2d41c04eb154",
+                34580370,
             ),
             "macos_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-apple-darwin"),
-                "ecdc9c042b8f97bff211fcf9425bc51c96acd4037df1565964e89816f2c9564d",
-                17795541,
+                "057476264b07222a2baeff68a733647f91a9d61c94f79beba46a44eb42101749",
+                16923076,
             ),
             "macos_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-apple-darwin"),
-                "a618c086e0514f681523947e2b66a4dc0c6560f91c36faa072fa6787455df9ea",
-                18165701,
+                "56dcb0cdafabac9d6d976690fb05d9ee92d20ce798c3aabe9049259ebe7d3e0d",
+                16905036,
             ),
         },
         help=softwrap(

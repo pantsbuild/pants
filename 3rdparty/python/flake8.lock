@@ -171,8 +171,8 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.57.0",
-  "pip_version": "25.2",
+  "pex_version": "2.69.1",
+  "pip_version": "25.3",
   "prefer_older_binary": false,
   "requirements": [
     "flake8-2020<2,>=1.7.0",
@@ -181,7 +181,7 @@
     "flake8<7,>=5.0.4"
   ],
   "requires_python": [
-    "CPython==3.11.*"
+    "CPython==3.14.*"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
