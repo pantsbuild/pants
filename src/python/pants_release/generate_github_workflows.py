@@ -3,9 +3,7 @@
 #
 # Editing Github Actions directly will fail in CI, instead edit this file and run:
 # `pants run src/python/pants_release/generate_github_workflows.py`
-
-# If this file is edited, run the following to update Github Action files:
-#  ./pants run src/python/pants_release/generate_github_workflows.py
+#
 
 from __future__ import annotations
 
