@@ -1,7 +1,7 @@
 {
   "version": 6,
   "valid_for_interpreter_constraints": [
-    "CPython==3.11.*"
+    "CPython==3.14.*"
   ],
   "generated_with_requirements": [
     "mypy-typing-asserts==0.1.1",

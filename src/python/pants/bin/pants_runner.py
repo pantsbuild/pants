@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 # First version with working Python 3.11 support:
 # https://github.com/pantsbuild/scie-pants/releases/tag/v0.12.2
+# TODO: Likely still need to update scie-pants
 MINIMUM_SCIE_PANTS_VERSION = Version("0.12.2")
 
 
