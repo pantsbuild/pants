@@ -10,6 +10,7 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
+from pants.backend.python.dependency_inference import rules as python_dependency_inference_rules
 from pants.backend.python.dependency_inference.rules import import_rules
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
@@ -21,16 +22,20 @@ from pants.backend.python.target_types import (
     PexEntryPointField,
     PexExecutableField,
     PexScriptField,
+    PythonDependenciesField,
     PythonDistribution,
     PythonRequirementsField,
     PythonRequirementTarget,
+    PythonResolveField,
     PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
     normalize_module_mapping,
 )
 from pants.backend.python.target_types_rules import (
+    DependencyValidationFieldSet,
     InferPexBinaryEntryPointDependency,
     InferPythonDistributionDependencies,
     PexBinaryEntryPointDependencyInferenceFieldSet,
@@ -40,10 +45,12 @@ from pants.backend.python.target_types_rules import (
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyError
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
+    DependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -610,3 +617,102 @@ def test_pex_binary_targets() -> None:
         gen_pex_binary_tgt("subdir.f.py", tags=["overridden"]),
         gen_pex_binary_tgt("subdir.f:main"),
     }
+
+
+def test_python_dependency_validation_with_parametrized_resolve_repro() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_types_rules.rules(),
+            *python_sources.rules(),
+            *python_dependency_inference_rules.rules(),
+            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
+            QueryRule(Addresses, [DependenciesRequest]),
+        ],
+        target_types=[PythonSourceTarget, PythonSourcesGeneratorTarget],
+        objects={"parametrize": Parametrize},
+    )
+    rule_runner.write_files(
+        {
+            "pants.toml": dedent(
+                """\
+                [python]
+                enable_resolves = true
+                default_resolve = "a"
+                interpreter_constraints = ["==3.11.*", "==3.14.*"]
+                interpreter_versions_universe = ["3.11", "3.14"]
+                default_to_resolve_interpreter_constraints = true
+
+                [python.resolves]
+                "a" = "a.lock"
+                "b" = "b.lock"
+
+                [python.resolves_to_interpreter_constraints]
+                "a" = ["==3.11.*"]
+                "b" = ["==3.14.*"]
+
+                [python-infer]
+                imports = true
+
+                [source]
+                root_patterns = ["/src/python"]
+                """
+            ),
+            "src/python/pkg/base.py": "class Base:\n    pass\n",
+            "src/python/pkg/derived.py": (
+                "from pkg.base import Base\n\nclass Derived(Base):\n    pass\n"
+            ),
+            "src/python/pkg/BUILD": dedent(
+                """\
+                python_sources(
+                    sources=["base.py", "derived.py"],
+                    **parametrize("b", resolve="b"),
+                    **parametrize("a", resolve="a"),
+                    overrides={
+                        "derived.py": {
+                            "dependencies": ["./base.py"],
+                        },
+                    },
+                )
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(["--pants-config-files=['pants.toml']"])
+    generated_targets = [
+        tgt
+        for tgt in rule_runner.request(
+            _TargetParametrizations,
+            [
+                _TargetParametrizationsRequest(
+                    Address("src/python/pkg"), description_of_origin="tests"
+                )
+            ],
+        ).parametrizations.values()
+        if isinstance(tgt, PythonSourceTarget)
+    ]
+    assert len(generated_targets) == 4
+    base_a = next(
+        tgt
+        for tgt in generated_targets
+        if tgt.address.relative_file_path == "base.py"
+        and tgt.address.parameters.get("parametrize") == "a"
+    )
+    derived_a = next(
+        tgt
+        for tgt in generated_targets
+        if tgt.address.relative_file_path == "derived.py"
+        and tgt.address.parameters.get("parametrize") == "a"
+    )
+
+    # The generated targets have the correct resolve.
+    assert base_a[PythonResolveField].value == "a"
+    assert derived_a[PythonResolveField].value == "a"
+    validation_field_set = DependencyValidationFieldSet.create(derived_a)
+    assert validation_field_set.resolve is not None
+    assert validation_field_set.resolve.value == "a"
+
+    resolved = rule_runner.request(
+        Addresses,
+        [DependenciesRequest(derived_a[PythonDependenciesField])],
+    )
+    assert tuple(resolved) == (base_a.address,)

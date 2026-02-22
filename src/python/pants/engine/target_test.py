@@ -643,6 +643,12 @@ def test_field_set() -> None:
         def opt_out(cls, tgt: Target) -> bool:
             return tgt.get(OptOutField).value is True
 
+    @dataclass(frozen=True)
+    class OptionalUnionFieldSet(FieldSet):
+        required_fields = ()
+
+        optional: OptionalField | None = None
+
     required_addr = Address("", target_name="required")
     required_tgt = TargetWithRequired({RequiredField.alias: "configured"}, required_addr)
     optional_addr = Address("", target_name="unrelated")
@@ -682,6 +688,9 @@ def test_field_set() -> None:
 
     assert OptionalFieldSet.create(optional_tgt).optional.value == "configured"
     assert OptionalFieldSet.create(no_fields_tgt).optional.value == OptionalField.default
+    assert OptionalUnionFieldSet.fields == FrozenDict({"optional": OptionalField})
+    assert OptionalUnionFieldSet.create(optional_tgt).optional.value == "configured"
+    assert OptionalUnionFieldSet.create(no_fields_tgt).optional.value == OptionalField.default
 
 
 # -----------------------------------------------------------------------------------------------
