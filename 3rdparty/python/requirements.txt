@@ -10,8 +10,7 @@ fasteners==0.20.0
 freezegun==1.5.5
 hdrhistogram==0.10.3
 ijson==3.4.0.post0
-libcst==1.8.5
-packaging==25.0
+packaging==26.0
 psutil==5.9.8
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
@@ -20,11 +19,11 @@ python-lsp-jsonrpc==1.1.2
 PyYAML>=6.0,<7.0
 requests[security]==2.32.5
 setproctitle==1.3.7
-setuptools>=63.1.0,<81.0
+setuptools>=63.1.0,<82.0
 toml==0.10.2
 types-PyYAML==6.0.12.20250915
-types-requests==2.32.4.20250913
-types-setuptools==80.9.0.20250822
+types-requests==2.32.4.20260107
+types-setuptools==82.0.0.20260210
 types-toml==0.10.8.20240310
 typing-extensions==4.15
 mypy-typing-asserts==0.1.1
@@ -35,8 +34,8 @@ node-semver==0.9.0
 elfdeps==0.2.0  # see: pants.backends.nfpm.native_libs.elfdeps
 # These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
 # and should never be imported.
-debugpy==1.8.16
-pydevd-pycharm==251.23536.40
+debugpy==1.8.20
+pydevd-pycharm==261.20362.36
 
 # These dependencies must only be used from the explorer backend, and no code outside that backend
 # may import anything from it, so these libraries are not ending up as requirements of Pants itself.
