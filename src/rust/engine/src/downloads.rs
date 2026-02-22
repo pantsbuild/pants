@@ -315,12 +315,14 @@ mod tests {
 
         let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
         let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+        listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
 
         let router = Router::new().route("/foo.txt", get(|| async { TEST_RESPONSE }));
 
         tokio::spawn(async move {
-            axum_server::Server::from_tcp(listener)
+            axum_server::from_tcp(listener)
+                .expect("Unable to create Server from std::net::TcpListener")
                 .serve(router.into_make_service())
                 .await
                 .unwrap();
@@ -359,6 +361,7 @@ mod tests {
 
         let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
         let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+        listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
 
         #[derive(Clone)]
@@ -389,7 +392,8 @@ mod tests {
             });
 
         tokio::spawn(async move {
-            axum_server::Server::from_tcp(listener)
+            axum_server::from_tcp(listener)
+                .expect("Unable to create Server from std::net::TcpListener")
                 .serve(router.into_make_service())
                 .await
                 .unwrap();
