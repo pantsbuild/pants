@@ -204,7 +204,6 @@ dependencies = [
 name = "async_value"
 version = "0.0.1"
 dependencies = [
- "futures",
  "tokio",
 ]
 
@@ -431,9 +430,7 @@ version = "0.0.1"
 dependencies = [
  "bytes",
  "clap",
- "dirs-next",
  "env_logger",
- "errno",
  "fuser",
  "futures",
  "grpc_util",
@@ -449,7 +446,6 @@ dependencies = [
  "time",
  "tokio",
  "tokio-stream",
- "workunit_store",
 ]
 
 [[package]]
@@ -1021,7 +1017,6 @@ dependencies = [
 name = "docker"
 version = "0.0.1"
 dependencies = [
- "async-lock",
  "async-oncecell",
  "async-stream",
  "async-trait",
@@ -1048,8 +1043,6 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-rustls",
- "tokio-util 0.7.18",
  "workunit_store",
 ]
 
@@ -1087,16 +1080,12 @@ name = "engine"
 version = "0.0.1"
 dependencies = [
  "address",
- "async-oncecell",
  "async-trait",
  "async_latch",
  "axum",
  "axum-server",
  "bytes",
  "cache",
- "children",
- "concrete_time",
- "crossbeam-channel",
  "deepsize",
  "dep_inference",
  "derivative",
@@ -1148,7 +1137,6 @@ dependencies = [
  "tokio",
  "tokio-retry2",
  "tokio-util 0.7.18",
- "tryfuture",
  "ui",
  "url",
  "watch",
@@ -1343,9 +1331,7 @@ dependencies = [
  "hashing",
  "log",
  "parking_lot 0.12.5",
- "prost",
  "protos",
- "rand 0.9.2",
  "serde",
  "serde_derive",
  "serde_json",
@@ -1589,16 +1575,13 @@ dependencies = [
  "either",
  "futures",
  "http",
- "http-body",
  "http-body-util",
  "hyper",
  "hyper-rustls",
  "hyper-util",
  "itertools 0.14.0",
- "log",
  "parking_lot 0.12.5",
  "pin-project",
- "pin-project-lite",
  "prost",
  "prost-build",
  "prost-types",
@@ -1610,13 +1593,11 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tokio-stream",
- "tokio-util 0.7.18",
  "tonic",
  "tonic-build",
  "tower 0.5.3",
  "tower-layer",
  "tower-service",
- "webpki",
  "workunit_store",
 ]
 
@@ -2400,8 +2381,6 @@ dependencies = [
  "parking_lot 0.12.5",
  "regex",
  "stdio",
- "tokio",
- "uuid",
 ]
 
 [[package]]
@@ -2501,10 +2480,7 @@ dependencies = [
  "async-stream",
  "bytes",
  "futures",
- "grpc_util",
  "hashing",
- "hyper",
- "log",
  "parking_lot 0.12.5",
  "prost",
  "prost-types",
@@ -2705,7 +2681,6 @@ checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 name = "options"
 version = "0.0.1"
 dependencies = [
- "hashing",
  "itertools 0.14.0",
  "log",
  "maplit",
@@ -2865,7 +2840,6 @@ name = "pe_nailgun"
 version = "0.0.1"
 dependencies = [
  "async-lock",
- "async-stream",
  "async-trait",
  "env_logger",
  "futures",
@@ -2885,8 +2859,6 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-rustls",
- "tokio-util 0.7.18",
  "workunit_store",
 ]
 
@@ -3062,9 +3034,7 @@ dependencies = [
 name = "process_execution"
 version = "0.0.1"
 dependencies = [
- "async-lock",
  "async-oncecell",
- "async-stream",
  "async-trait",
  "bincode",
  "bytes",
@@ -3073,30 +3043,24 @@ dependencies = [
  "concrete_time",
  "deepsize",
  "derivative",
- "env_logger",
  "fs",
  "futures",
  "grpc_util",
  "hashing",
- "hyper-util",
  "itertools 0.14.0",
  "libc",
  "log",
  "maplit",
  "mock",
  "nails",
- "nix",
- "once_cell",
  "parking_lot 0.12.5",
  "prost",
  "prost-types",
  "protos",
- "rand 0.9.2",
  "regex",
  "sandboxer",
  "serde",
  "serde_json",
- "sha2",
  "sharded_lmdb",
  "shell-quote",
  "shlex",
@@ -3107,15 +3071,10 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-rustls",
- "tokio-stream",
  "tokio-util 0.7.18",
- "tonic",
- "tower 0.5.3",
  "tryfuture",
  "uname",
  "uuid",
- "walkdir",
  "workunit_store",
 ]
 
@@ -3124,7 +3083,6 @@ name = "process_executor"
 version = "0.0.1"
 dependencies = [
  "clap",
- "dirs-next",
  "env_logger",
  "fs",
  "futures",
@@ -3211,7 +3169,6 @@ dependencies = [
 name = "protos"
 version = "0.0.1"
 dependencies = [
- "bytes",
  "hashing",
  "prost",
  "prost-build",
@@ -3509,13 +3466,10 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 name = "remote"
 version = "0.0.1"
 dependencies = [
- "async-lock",
  "async-oncecell",
- "async-stream",
  "async-trait",
  "bytes",
  "concrete_time",
- "derivative",
  "env_logger",
  "fs",
  "futures",
@@ -3525,8 +3479,6 @@ dependencies = [
  "log",
  "maplit",
  "mock",
- "once_cell",
- "opendal",
  "parking_lot 0.12.5",
  "process_execution",
  "prost",
@@ -3543,8 +3495,6 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-rustls",
- "tokio-util 0.7.18",
  "tonic",
  "workunit_store",
 ]
@@ -3553,7 +3503,6 @@ dependencies = [
 name = "remote_provider"
 version = "0.0.1"
 dependencies = [
- "grpc_util",
  "remote_provider_opendal",
  "remote_provider_reapi",
  "remote_provider_traits",
@@ -3571,7 +3520,6 @@ dependencies = [
  "http",
  "mock",
  "opendal",
- "parking_lot 0.12.5",
  "prost",
  "protos",
  "remote_provider_traits",
@@ -3611,7 +3559,6 @@ dependencies = [
 name = "remote_provider_traits"
 version = "0.0.1"
 dependencies = [
- "async-oncecell",
  "async-trait",
  "bytes",
  "grpc_util",
@@ -4048,8 +3995,6 @@ name = "sharded_lmdb"
 version = "0.0.1"
 dependencies = [
  "bytes",
- "fs",
- "futures",
  "hashing",
  "lmdb-rkv",
  "log",
@@ -4148,31 +4093,22 @@ name = "store"
 version = "0.1.0"
 dependencies = [
  "async-oncecell",
- "async-stream",
  "async-trait",
  "bytes",
  "clap",
- "concrete_time",
  "criterion",
  "deepsize",
  "fs",
  "fs-set-times",
  "futures",
- "glob",
  "grpc_util",
  "hashing",
- "http",
- "http-body",
- "indexmap 2.13.0",
  "itertools 0.14.0",
- "lmdb-rkv",
  "log",
  "mock",
  "num_cpus",
- "opendal",
  "parking_lot 0.12.5",
  "prost",
- "prost-types",
  "protos",
  "remote_provider",
  "serde",
@@ -4182,12 +4118,7 @@ dependencies = [
  "tempfile",
  "testutil",
  "tokio",
- "tokio-rustls",
- "tokio-util 0.7.18",
- "tonic",
- "tower-service",
  "tryfuture",
- "uuid",
  "walkdir",
  "workunit_store",
 ]
@@ -4344,7 +4275,6 @@ dependencies = [
 name = "testutil"
 version = "0.0.1"
 dependencies = [
- "async-stream",
  "bytes",
  "fs",
  "grpc_util",
@@ -4829,7 +4759,6 @@ dependencies = [
  "stdio",
  "task_executor",
  "terminal_size",
- "uuid",
  "workunit_store",
 ]
 
@@ -5150,8 +5079,6 @@ version = "0.0.1"
 dependencies = [
  "crossbeam-channel",
  "fs",
- "futures",
- "hashing",
  "log",
  "notify",
  "parking_lot 0.12.5",
@@ -5179,16 +5106,6 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "webpki"
-version = "0.22.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed63aea5ce73d0ff405984102c42de94fc55a6b75765d621c65262469b3c9b53"
-dependencies = [
- "ring",
- "untrusted",
 ]
 
 [[package]]

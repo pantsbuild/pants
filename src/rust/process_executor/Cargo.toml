@@ -8,7 +8,6 @@ publish = false
 [dependencies]
 protos = { path = "../protos" }
 clap = { workspace = true, features = ["derive"] }
-dirs-next = { workspace = true }
 env_logger = { workspace = true }
 fs = { path = "../fs" }
 futures = { workspace = true }
