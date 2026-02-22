@@ -110,6 +110,7 @@ def test_export_venv_new_codepath(
         [
             *pants_args_for_python_lockfiles,
             f"--python-interpreter-constraints=['=={current_interpreter}']",
+            "--python-default-resolve=a",
             "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
             "--export-resolve=a",
             "--export-resolve=b",
