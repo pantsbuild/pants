@@ -11,7 +11,6 @@ import itertools
 import logging
 import os.path
 import textwrap
-from types import UnionType
 import zlib
 from abc import ABC, ABCMeta, abstractmethod
 from collections import deque
@@ -20,6 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from operator import attrgetter
 from pathlib import PurePath
+from types import UnionType
 from typing import (
     AbstractSet,
     Any,
@@ -27,8 +27,8 @@ from typing import (
     Generic,
     Protocol,
     Self,
-    Union,
     TypeVar,
+    Union,
     cast,
     final,
     get_args,
