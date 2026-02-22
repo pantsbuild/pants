@@ -689,8 +689,12 @@ def test_field_set() -> None:
     assert OptionalFieldSet.create(optional_tgt).optional.value == "configured"
     assert OptionalFieldSet.create(no_fields_tgt).optional.value == OptionalField.default
     assert OptionalUnionFieldSet.fields == FrozenDict({"optional": OptionalField})
-    assert OptionalUnionFieldSet.create(optional_tgt).optional.value == "configured"
-    assert OptionalUnionFieldSet.create(no_fields_tgt).optional.value == OptionalField.default
+    optional_union_field = OptionalUnionFieldSet.create(optional_tgt).optional
+    assert optional_union_field is not None
+    assert optional_union_field.value == "configured"
+    default_union_field = OptionalUnionFieldSet.create(no_fields_tgt).optional
+    assert default_union_field is not None
+    assert default_union_field.value == OptionalField.default
 
 
 # -----------------------------------------------------------------------------------------------
