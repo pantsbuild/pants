@@ -215,7 +215,7 @@ rustls-pemfile = "2.0"
 rustls-pki-types = "1.14.0"
 serde = "1.0.228"
 serde_derive = "1.0.98"
-serde_json = "1.0"
+serde_json = "1.0.149"
 serde_test = "1.0"
 serde_yaml = "0.9"
 sha2 = "0.10"
@@ -249,7 +249,7 @@ whoami = "1.6.1"
 
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/dep_inference/Cargo.toml`.
-tree-sitter = "0.25.10"
+tree-sitter = "0.26.5"
 tree-sitter-dockerfile = { git = "https://github.com/pantsbuild/tree-sitter-dockerfile.git", rev = "508588913c93a30e7ef09a4ac3ecdee955b7b950" }
 tree-sitter-python = "0.25.0"
 tree-sitter-typescript = "0.23.2"
