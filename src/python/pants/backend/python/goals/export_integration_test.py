@@ -48,6 +48,7 @@ def build_config(
         "python": {
             "enable_resolves": True,
             "interpreter_constraints": [f"=={platform.python_version()}"],
+            "default_resolve": "a",
             "resolves": {
                 "a": "3rdparty/a.lock",
                 "b": "3rdparty/b.lock",
