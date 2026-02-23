@@ -6,7 +6,6 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-bytes = { workspace = true }
 hashing = { path = "../hashing" }
 prost = { workspace = true }
 prost-build = { workspace = true }

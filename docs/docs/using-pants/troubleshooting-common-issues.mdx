@@ -54,6 +54,10 @@ If this resolves the issue, please report that on the ticket and attach the rece
 
 If restarting pantsd is not sufficient, you can also use `--no-local-cache` to ignore the persistent caches. If this resolves the issue, then it is possible that the contents of the cache (at `~/.cache/pants`) will be useful for debugging the ticket that you filed: please try to preserve the cache contents until it can be resolved.
 
+## Rerun a test that may be flaky or have side effects, not just have Pants return a cached result
+
+Use `--test-force` as in `pants test --force src/foo:test` to force Pants to run a test. In contrast to the broader cache invalidation options described above, this only invalidates the final step (aka "actually running the test"). All intermediate steps remain cached.
+
 ## Pants cannot find a file in your project
 
 Pants may complain that it cannot find a file or directory, even though the file does indeed exist.
