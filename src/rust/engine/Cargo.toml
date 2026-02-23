@@ -39,7 +39,6 @@ futures-core = { workspace = true }
 graph = { path = "../graph" }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
-humansize = { workspace = true }
 indexmap = { workspace = true }
 internment = { workspace = true }
 itertools = { workspace = true }

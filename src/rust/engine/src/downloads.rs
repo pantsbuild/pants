@@ -13,7 +13,6 @@ use bytes::{BufMut, Bytes};
 use futures::TryFutureExt;
 use futures::stream::StreamExt;
 use hashing::Digest;
-use humansize::{FileSize, file_size_opts};
 use reqwest::Error;
 use reqwest::header::{HeaderMap, HeaderName};
 use store::Store;
@@ -236,10 +235,7 @@ pub async fn download(
         Level::Debug,
         desc = Some(format!(
             "Downloading: {url} ({})",
-            expected_digest
-                .size_bytes
-                .file_size(file_size_opts::CONVENTIONAL)
-                .unwrap()
+            filesize_with_suffix(expected_digest.size_bytes)
         )),
         |_workunit| async move {
             let retry_strategy =
@@ -280,6 +276,23 @@ pub async fn download(
     Ok(())
 }
 
+/// Converts the input size to a string with a trailing metric suffix.
+///
+/// Values larger than 1KB are rendered with 2 decimal places. The largest
+/// suffix returned is "GB".
+fn filesize_with_suffix(filesize: usize) -> String {
+    const KB: usize = 1024;
+    const MB: usize = KB * 1024;
+    const GB: usize = MB * 1024;
+    let filesize_f64: f64 = filesize as f64;
+    match filesize {
+        0..KB => format!("{} B", filesize),
+        KB..MB => format!("{:.2} KB", filesize_f64 / KB as f64),
+        MB..GB => format!("{:.2} MB", filesize_f64 / MB as f64),
+        _ => format!("{:.2} GB", filesize_f64 / GB as f64),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -301,6 +314,8 @@ mod tests {
     use tempfile::TempDir;
     use url::Url;
     use workunit_store::WorkunitStore;
+
+    use crate::downloads::filesize_with_suffix;
 
     use super::download;
 
@@ -424,5 +439,27 @@ mod tests {
             .ensure_downloaded(file_digests_set, HashSet::new())
             .await
             .unwrap();
+    }
+
+    #[test]
+    fn test_filesize_with_suffix() {
+        assert_eq!(filesize_with_suffix(0), "0 B");
+        assert_eq!(filesize_with_suffix(1), "1 B");
+        assert_eq!(filesize_with_suffix(42), "42 B");
+        assert_eq!(filesize_with_suffix(1023), "1023 B");
+
+        assert_eq!(filesize_with_suffix(1024), "1.00 KB");
+        assert_eq!(filesize_with_suffix(1025), "1.00 KB");
+        assert_eq!(filesize_with_suffix(1_000_000), "976.56 KB");
+        assert_eq!(filesize_with_suffix(1_048_575), "1024.00 KB");
+
+        assert_eq!(filesize_with_suffix(1_048_576), "1.00 MB");
+        assert_eq!(filesize_with_suffix(1_048_577), "1.00 MB");
+        assert_eq!(filesize_with_suffix(1_000_000_000), "953.67 MB");
+        assert_eq!(filesize_with_suffix(1_073_741_823), "1024.00 MB");
+
+        assert_eq!(filesize_with_suffix(1_073_741_824), "1.00 GB");
+        assert_eq!(filesize_with_suffix(1_000_000_000_000), "931.32 GB");
+        assert_eq!(filesize_with_suffix(100_000_000_000_000), "93132.26 GB");
     }
 }
