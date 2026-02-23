@@ -284,7 +284,7 @@ fn filesize_with_suffix(filesize: usize) -> String {
     const KB: usize = 1024;
     const MB: usize = KB * 1024;
     const GB: usize = MB * 1024;
-    let filesize_f64: f64 = filesize as f64;
+    let filesize_f64 = filesize as f64;
     match filesize {
         0..KB => format!("{} B", filesize),
         KB..MB => format!("{:.2} KB", filesize_f64 / KB as f64),
