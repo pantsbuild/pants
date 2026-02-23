@@ -12,7 +12,7 @@ Pants supports code generators that convert a protocol language like Protobuf in
 Pants will not actually write the generated files to disk, except when running `pants export-codegen`. Instead, any targets that depend on the protocol targets will cause their code to be generated, and those generated files will be copied over into the "chroot" (temporary directory) where Pants executes.
 
 :::note Example: Protobuf -> Python
-This guide walks through each step of adding Protobuf to generate Python sources. See [here](https://github.com/pantsbuild/pants/tree/master/src/python/pants/backend/codegen/protobuf) for the final result.
+This guide walks through each step of adding Protobuf to generate Python sources. See [here](https://github.com/pantsbuild/pants/tree/main/src/python/pants/backend/codegen/protobuf) for the final result.
 :::
 
 This guide assumes that you are running a code generator that already exists outside of Pants as a stand-alone binary, such as running Protoc or Thrift.
@@ -192,7 +192,7 @@ If you used `ExternalTool` in step 1, you will use `download_external_tool()` to
 
 For many code generators, you will need to get the input target's direct or transitive dependencies and include their sources in the `input_digest`. See [Rules and the Target API](../the-rules-api/rules-and-the-target-api.mdx).
 
-You will likely need to add logic for handling [source roots](../../using-pants/key-concepts/source-roots.mdx). For example, the code generator may not understand source roots so you may need to [strip source roots](../the-rules-api/rules-and-the-target-api.mdx) before putting the sources in the `input_digest`. Likely, you will want to restore a source root after generation because most Pants code will assume that there is a source root present. In the below example, we restore the original source root, e.g. `src/protobuf/f.proto` becomes `src/protobuf/f_pb2.py`. See [`protobuf/python/rules.py`](https://github.com/pantsbuild/pants/tree/master/src/python/pants/backend/codegen/protobuf/python/rules.py) for a more complex example that allows the user to specify what source root to use through a field on the `protobuf_library`.
+You will likely need to add logic for handling [source roots](../../using-pants/key-concepts/source-roots.mdx). For example, the code generator may not understand source roots so you may need to [strip source roots](../the-rules-api/rules-and-the-target-api.mdx) before putting the sources in the `input_digest`. Likely, you will want to restore a source root after generation because most Pants code will assume that there is a source root present. In the below example, we restore the original source root, e.g. `src/protobuf/f.proto` becomes `src/protobuf/f_pb2.py`. See [`protobuf/python/rules.py`](https://github.com/pantsbuild/pants/tree/main/src/python/pants/backend/codegen/protobuf/python/rules.py) for a more complex example that allows the user to specify what source root to use through a field on the `protobuf_library`.
 
 ```python
 @rule
