@@ -315,9 +315,7 @@ mod tests {
     use url::Url;
     use workunit_store::WorkunitStore;
 
-    use crate::downloads::filesize_with_suffix;
-
-    use super::download;
+    use super::{download, filesize_with_suffix};
 
     const TEST_RESPONSE: &[u8] = b"xyzzy";
 
