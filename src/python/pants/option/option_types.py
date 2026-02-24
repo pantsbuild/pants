@@ -785,7 +785,7 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 # Generic Dataclass Concrete Option Classes
 # -----------------------------------------------------------------------------------------------
 
-class DataclassOption(_OptionBase[_OptT, _OptT]):
+class DataclassOption(_OptionBase[_OptT, _DefaultT]):
     """A dataclass option.
 
     - If you provide a static non-None `default` parameter, the `dataclass_type` parameter will be
@@ -854,6 +854,7 @@ class DataclassOption(_OptionBase[_OptT, _OptT]):
         fingerprint: bool | None = None,
     ):
         instance = super().__new__(
+            cls,
             flag_name,
             default=default,
             help=help,

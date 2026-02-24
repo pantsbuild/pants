@@ -22,11 +22,6 @@ from pants.backend.docker.registries import DockerRegistries, DockerRegistryOpti
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     BuildctlOptionsFieldMixin,
-    DockerBuildOptionFieldListOfMultiValueDictMixin,
-    DockerBuildOptionFieldMultiValueDictMixin,
-    DockerBuildOptionFieldMultiValueMixin,
-    DockerBuildOptionFieldValueMixin,
-    DockerBuildOptionFlagFieldMixin,
     DockerBuildOptionsFieldMixin,
     DockerImageBuildImageOutputField,
     DockerImageContextRootField,
@@ -551,7 +546,11 @@ async def build_docker_image(
             keep_sandboxes=keep_sandboxes,
         )
 
-    parse_image_id = parse_image_id_from_podman_build_output if options.build_engine == DockerBuildEngine.PODMAN else parse_image_id_from_buildkit_output
+    parse_image_id = (
+        parse_image_id_from_podman_build_output
+        if options.build_engine == DockerBuildEngine.PODMAN
+        else parse_image_id_from_buildkit_output
+    )
     image_id = parse_image_id(result.stdout, result.stderr)
     docker_build_output_msg = "\n".join(
         (

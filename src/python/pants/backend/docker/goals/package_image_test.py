@@ -2489,9 +2489,7 @@ def test_get_context_root(
 def test_parse_image_id_from_docker_build_output(
     docker: DockerBinary, expected: str, stdout: str, stderr: str
 ) -> None:
-    assert expected == parse_image_id_from_buildkit_output(
-        docker, stdout.encode(), stderr.encode()
-    )
+    assert expected == parse_image_id_from_buildkit_output(docker, stdout.encode(), stderr.encode())
 
 
 ImageRefTest = namedtuple(
