@@ -1177,7 +1177,7 @@ dependencies = [
  "pantsd",
  "parking_lot 0.12.5",
  "pe_nailgun",
- "petgraph",
+ "petgraph 0.8.3",
  "process_execution",
  "protos",
  "pyo3",
@@ -1621,7 +1621,7 @@ dependencies = [
  "futures",
  "log",
  "parking_lot 0.12.5",
- "petgraph",
+ "petgraph 0.8.3",
  "rand 0.10.0",
  "task_executor",
  "tokio",
@@ -2969,6 +2969,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "petgraph"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8701b58ea97060d5e5b155d383a69952a60943f0e6dfe30b04c287beb0b27455"
+dependencies = [
+ "fixedbitset",
+ "hashbrown 0.15.2",
+ "indexmap 2.13.0",
+ "serde",
+]
+
+[[package]]
 name = "pin-project"
 version = "1.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3197,7 +3209,7 @@ dependencies = [
  "log",
  "multimap",
  "once_cell",
- "petgraph",
+ "petgraph 0.7.1",
  "prettyplease",
  "prost",
  "prost-types",
@@ -3750,7 +3762,7 @@ dependencies = [
  "internment",
  "itertools 0.14.0",
  "log",
- "petgraph",
+ "petgraph 0.8.3",
  "smallvec",
 ]
 
@@ -5589,7 +5601,7 @@ dependencies = [
  "internment",
  "log",
  "parking_lot 0.12.5",
- "petgraph",
+ "petgraph 0.8.3",
  "rand 0.10.0",
  "smallvec",
  "strum",

@@ -182,7 +182,7 @@ os_pipe = "1.2.3"
 parameterized = "2.0.0"
 parking_lot = "0.12.5"
 peg = "0.8"
-petgraph = "0.7.1"
+petgraph = { version = "0.8.3", default-features = false, features = ["std", "stable_graph"] }
 pin-project = "1.1.5"
 pin-project-lite = "0.2"
 prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messages-draft", version = "16", default-features = false, features = [
