@@ -1,4 +1,4 @@
-# Copyright 2026 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
 from abc import ABC, abstractmethod
@@ -30,7 +30,6 @@ T = TypeVar("T", bound="BaseBinary")
 class BaseBinary(BinaryPath, ABC):
     """Base class for all binary paths."""
 
-    global_options: tuple[str, ...]
     extra_env: Mapping[str, str]
     extra_input_digests: Mapping[str, Digest] | None
 
@@ -38,11 +37,9 @@ class BaseBinary(BinaryPath, ABC):
         self,
         path: str,
         fingerprint: str | None = None,
-        global_options: tuple[str, ...] = (),
         extra_env: Mapping[str, str] | None = None,
         extra_input_digests: Mapping[str, Digest] | None = None,
     ) -> None:
-        object.__setattr__(self, "global_options", global_options)
         object.__setattr__(self, "extra_env", {} if extra_env is None else extra_env)
         object.__setattr__(self, "extra_input_digests", extra_input_digests)
         super().__init__(path, fingerprint)
@@ -83,7 +80,7 @@ class _DockerPodmanMixin(BaseBinary):
         env: Mapping[str, str],
         extra_args: tuple[str, ...] = (),
     ) -> Process:
-        args = [self.path, *self.global_options, "build", *extra_args]
+        args = [self.path, "build", *extra_args]
 
         for tag in tags:
             args.extend(["--tag", tag])
@@ -112,7 +109,7 @@ class _DockerPodmanMixin(BaseBinary):
 
     def push_image(self, tag: str, env: Mapping[str, str] | None = None) -> Process:
         return Process(
-            argv=(self.path, *self.global_options, "push", tag),
+            argv=(self.path, "push", tag),
             cache_scope=ProcessCacheScope.PER_SESSION,
             description=f"Pushing docker image {tag}",
             env=self._get_process_environment(env or {}),
@@ -130,7 +127,6 @@ class _DockerPodmanMixin(BaseBinary):
         return Process(
             argv=(
                 self.path,
-                *self.global_options,
                 "run",
                 *(docker_run_args or []),
                 tag,
@@ -166,7 +162,6 @@ class BuildctlBinary(BaseBinary):
     ) -> Process:
         args = [
             self.path,
-            *self.global_options,
             "build",
             "--frontend",
             "dockerfile.v0",
@@ -271,9 +266,7 @@ async def get_binary(
     first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
 
     if not docker_options.tools and not docker_options.optional_tools:
-        return binary_cls(
-            first_path.path, first_path.fingerprint, global_options=docker_options.global_options
-        )
+        return binary_cls(first_path.path, first_path.fingerprint)
 
     tools_shims = await _get_docker_tools_shims(
         tools=docker_options.tools,
@@ -284,7 +277,6 @@ async def get_binary(
     return binary_cls(
         first_path.path,
         first_path.fingerprint,
-        global_options=docker_options.global_options,
         extra_env={"PATH": tools_shims.path_component},
         extra_input_digests=tools_shims.immutable_input_digests,
     )

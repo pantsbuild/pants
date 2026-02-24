@@ -151,14 +151,6 @@ class DockerOptions(Subsystem):
             """
         ),
     )
-    global_options = ShellStrListOption(
-        default=[],
-        help=softwrap(
-            """
-            Global options to use for all Docker and BuildKit invocations.
-            """
-        ),
-    )
     engine = DataclassOption(
         default=DockerEngines(),
         mutually_exclusive_group="engines",
