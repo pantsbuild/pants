@@ -551,7 +551,7 @@ async def build_docker_image(
         if options.build_engine == DockerBuildEngine.PODMAN
         else parse_image_id_from_buildkit_output
     )
-    image_id = parse_image_id(result.stdout, result.stderr)
+    image_id = parse_image_id(result.stdout, result.stderr) or "<unknown>"
     docker_build_output_msg = "\n".join(
         (
             f"{options.build_engine.value.capitalize()} build output for {build_process.tags[0]}:",
