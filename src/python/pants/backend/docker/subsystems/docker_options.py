@@ -7,7 +7,7 @@ import logging
 import sys
 from typing import Any
 
-from pants.backend.docker.engine_types import DockerBuildEngine, DockerEngines, DockerRunEngine
+from pants.backend.docker.engine_types import DockerBuildEngine, DockerEngines, DockerPushEngine, DockerRunEngine
 from pants.backend.docker.package_types import DockerPushOnPackageBehavior
 from pants.backend.docker.registries import DockerRegistries
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
@@ -186,6 +186,20 @@ class DockerOptions(Subsystem):
         mutually_exclusive_group="engines",
     )
 
+    def _experimental_enable_podman_warning[E: DockerBuildEngine | DockerRunEngine | DockerPushEngine](self, engine_type: type[E], engine_opt: str) -> E | None:
+        experimental_enable_podman = self.options.get("experimental_enable_podman", None)
+        match experimental_enable_podman:
+            case None:
+                return getattr(self.engine, engine_opt)
+            case True:
+                engine = engine_type.PODMAN
+            case False:
+                engine = engine_type.DOCKER
+        logger.warning(
+            f'`[docker].experimental_enable_podman` is deprecated. Use `[docker.engine].{engine_opt} = "{engine.value}"` instead.'
+        )
+        return engine
+
     @property
     def build_engine(self) -> DockerBuildEngine:
         use_buildx = self.options.get("use_buildx")
@@ -197,30 +211,15 @@ class DockerOptions(Subsystem):
                 )
             logger.warning(warning)
             return DockerBuildEngine.DOCKER
-        experimental_enable_podman = self.options.get("experimental_enable_podman")
-        if experimental_enable_podman is not None:
-            logger.warning(
-                '`[docker].experimental_enable_podman` is deprecated. Use `[docker.engine].build = "podman"` instead.'
-            )
-            return (
-                DockerBuildEngine.PODMAN if experimental_enable_podman else DockerBuildEngine.DOCKER
-            )
-        return self.engine.build
+        return self._experimental_enable_podman_warning(DockerBuildEngine, "build")
 
     @property
     def run_engine(self) -> DockerRunEngine:
-        experimental_enable_podman = self.options.get("experimental_enable_podman", None)
-        match experimental_enable_podman:
-            case None:
-                return self.engine.run
-            case True:
-                engine = DockerRunEngine.PODMAN
-            case False:
-                engine = DockerRunEngine.DOCKER
-        logger.warning(
-            f'`[docker].experimental_enable_podman` is deprecated. Use `[docker.engine].run = "{engine.value}"` instead.'
-        )
-        return engine
+        return self._experimental_enable_podman_warning(DockerRunEngine, "run")
+
+    @property
+    def push_engine(self) -> DockerPushEngine:
+        return self._experimental_enable_podman_warning(DockerPushEngine, "push")
 
     _build_args = ShellStrListOption(
         help=softwrap(

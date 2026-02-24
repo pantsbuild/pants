@@ -1,10 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TypeVar, cast
+from typing import Protocol, TypeVar, cast
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
@@ -56,7 +56,8 @@ class BaseBinary(BinaryPath, ABC):
         )
         return res
 
-    @abstractmethod
+
+class BuildBinaryProtocol(Protocol):
     def build_image(
         self,
         tags: tuple[str, ...],
@@ -67,6 +68,10 @@ class BaseBinary(BinaryPath, ABC):
         env: Mapping[str, str],
         extra_args: tuple[str, ...] = (),
     ) -> Process: ...
+
+
+class PushBinaryProtocol(Protocol):
+    def push_image(self, tag: str, env: Mapping[str, str] | None = None) -> Process: ...
 
 
 class _DockerPodmanMixin(BaseBinary):

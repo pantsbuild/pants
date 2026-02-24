@@ -10,6 +10,11 @@ class DockerBuildEngine(Enum):
     PODMAN = "podman"
 
 
+class DockerPushEngine(Enum):
+    DOCKER = "docker"
+    PODMAN = "podman"
+
+
 class DockerRunEngine(Enum):
     DOCKER = "docker"
     PODMAN = "podman"
@@ -18,4 +23,5 @@ class DockerRunEngine(Enum):
 @dataclass(frozen=True)
 class DockerEngines:
     build: DockerBuildEngine = DockerBuildEngine.DOCKER
+    push: DockerPushEngine = DockerPushEngine.DOCKER
     run: DockerRunEngine = DockerRunEngine.DOCKER
