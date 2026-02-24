@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use futures::Future;
-use rand::Rng;
+use rand::RngExt;
 use tonic::{Code, Status};
 
 pub fn status_is_retryable(status: &Status) -> bool {

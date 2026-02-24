@@ -21,7 +21,7 @@ pub use metrics::{Metric, ObservationMetric};
 use parking_lot::Mutex;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{VisitMap, Visitable};
-use rand::Rng;
+use rand::RngExt;
 use smallvec::SmallVec;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task_local;

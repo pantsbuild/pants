@@ -199,7 +199,7 @@ prost-build = "0.13"
 prost-types = "0.13"
 pyo3 = { version = "0.27.2", features = ["parking_lot"] }
 pyo3-build-config = "0.27.2"
-rand = "0.9.2"
+rand = "0.10.0"
 regex = "1.12.3"
 reqwest = { version = "0.12", default-features = false }
 rlimit = "0.10"
