@@ -7,13 +7,14 @@ import logging
 import sys
 from typing import Any
 
-from pants.backend.docker.engine_types import DockerBuildEngine, DockerRunEngine
+from pants.backend.docker.engine_types import DockerBuildEngine, DockerEngines, DockerRunEngine
 from pants.backend.docker.package_types import DockerPushOnPackageBehavior
 from pants.backend.docker.registries import DockerRegistries
 from pants.base.deprecated import resolve_conflicting_options
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
     BoolOption,
+    DataclassOption,
     DictOption,
     EnumOption,
     ShellStrListOption,
@@ -159,26 +160,27 @@ class DockerOptions(Subsystem):
             """
         ),
     )
-    _build_engine = EnumOption(
-        default=DockerBuildEngine.DOCKER,
-        enum_type=DockerBuildEngine,
-        help=softwrap(
-            """
-            The engine to use for Docker builds.
+    engine = DataclassOption(default=DockerEngines(), mutually_exclusive_group="engines", help=softwrap(
+        """
+        The engines to use for Docker builds and runs.
 
-            Valid values are:
+        Valid values for `build` are:
 
-            - `docker`: Use the Docker CLI with buildx to build images. (https://docs.docker.com/reference/cli/docker/buildx/build/)
-            - `buildkit`: Invoke buildkit directly to build images. (https://github.com/moby/buildkit/blob/master/docs/reference/buildctl.md#build)
-            - `podman`: Use Podman to build images. (https://docs.podman.io/en/latest/markdown/podman-build.1.html)
-            """
-        ),
-    )
+        - `docker`: Use the Docker CLI to build images. (https://docs.docker.com/reference/cli/docker/buildx/build/)
+        - `buildkit`: Invoke buildkit directly to build images. (https://github.com/moby/buildkit/blob/master/docs/reference/buildctl.md#build)
+        - `podman`: Use Podman to build images. (https://docs.podman.io/en/latest/markdown/podman-build.1.html)
+
+        Valid values for `run` are:
+
+        - `docker`: Use the Docker CLI to run containers. (https://docs.docker.com/reference/cli/docker/run/)
+        - `podman`: Use Podman to run containers. (https://docs.podman.io/en/latest/markdown/podman-run.1.html)
+        """
+    ))
     use_buildx = BoolOption(
         default=True,
         help=softwrap(
             """
-            DEPRECATED: Use [docker].build_engine = "docker" instead.
+            DEPRECATED: Use [docker.engine].build = "docker" instead.
 
             See here for using the legacy builder: https://docs.docker.com/reference/cli/docker/build-legacy/
 
@@ -186,43 +188,23 @@ class DockerOptions(Subsystem):
             """
         ),
         deprecation_start_version="2.31.0",
+        mutually_exclusive_group="engines",
     )
 
     @property
     def build_engine(self) -> DockerBuildEngine:
-        result: DockerBuildEngine | bool = resolve_conflicting_options(
-            old_option="use_buildx",
-            new_option="build_engine",
-            old_scope=self.options_scope,
-            new_scope=self.options_scope,
-            old_container=self.options,
-            new_container=self.options,
-        )
-        if isinstance(result, bool):
-            warning = '`[docker].use_buildx` is deprecated. Buildx is now the default Docker build engine. Use `[docker].build_engine = "docker"` instead.'
-            if not result:
-                warning += (
-                    " To use the legacy engine, add `DOCKER_BUILDKIT=0` to `[docker].env_vars`."
-                )
+        use_buildx = self.options.get("use_buildx")
+        if use_buildx is not None:
+            warning = '`[docker].use_buildx` is deprecated. Buildx is now the default Docker build engine. Use `[docker.engine].build = "docker"` instead.'
+            if not use_buildx:
+                warning += " To use the legacy engine, add `DOCKER_BUILDKIT=0` to `[docker].env_vars`."
             logger.warning(warning)
-            explicit = result
-            result = DockerBuildEngine.DOCKER
-            used_option = "[docker].use_buildx"
-        else:
-            explicit = not self.options.is_default("build_engine")
-            used_option = '[docker].build_engine != "podman"'
-        experimental_enable_podman = self.options.get("experimental_enable_podman", None)
+            return DockerBuildEngine.DOCKER
+        experimental_enable_podman = self.options.get("experimental_enable_podman")
         if experimental_enable_podman is not None:
-            logger.warning(
-                '`[docker].experimental_enable_podman` is deprecated. Use `[docker].build_engine = "podman"` instead.'
-            )
-            if experimental_enable_podman:
-                if explicit and result != DockerBuildEngine.PODMAN:
-                    raise ValueError(
-                        f"Conflicting options `{used_option}` and `[docker].experimental_enable_podman` both enabled."
-                    )
-                result = DockerBuildEngine.PODMAN
-        return result
+            logger.warning('`[docker].experimental_enable_podman` is deprecated. Use `[docker.engine].build = "podman"` instead.')
+            return DockerBuildEngine.PODMAN if experimental_enable_podman else DockerBuildEngine.DOCKER
+        return self.engine.build
 
     _run_engine = EnumOption(
         default=DockerRunEngine.DOCKER,
@@ -237,21 +219,17 @@ class DockerOptions(Subsystem):
     @property
     def run_engine(self) -> DockerRunEngine:
         experimental_enable_podman = self.options.get("experimental_enable_podman", None)
-        if experimental_enable_podman is not None:
-            logger.warning(
-                '`[docker].experimental_enable_podman` is deprecated. Use `[docker].run_engine = "podman"` instead.'
-            )
-            if experimental_enable_podman:
-                if not self.options.is_default("run_engine"):
-                    raise ValueError(
-                        f'Conflicting options `[docker].run_engine != "podman"` and `[docker].experimental_enable_podman` both enabled.'
-                    )
-                return DockerRunEngine.PODMAN
-            if self._run_engine == DockerRunEngine.PODMAN:
-                raise ValueError(
-                    '`[docker].run_engine` is set to "podman", but the deprecated option `[docker].experimental_enable_podman` is disabled.'
-                )
-        return self._run_engine
+        match experimental_enable_podman:
+            case None:
+                return self.engine.run
+            case True:
+                engine = DockerRunEngine.PODMAN
+            case False:
+                engine = DockerRunEngine.DOCKER
+        logger.warning(
+            f'`[docker].experimental_enable_podman` is deprecated. Use `[docker.engine].run = "{engine.value}"` instead.'
+        )
+        return engine
 
     _build_args = ShellStrListOption(
         help=softwrap(

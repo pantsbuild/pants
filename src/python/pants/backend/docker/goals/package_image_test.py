@@ -28,7 +28,7 @@ from pants.backend.docker.goals.package_image import (
     build_docker_image,
     get_docker_image_build_process,
     get_image_refs,
-    parse_image_id_from_docker_build_output,
+    parse_image_id_from_buildkit_output,
     rules,
 )
 from pants.backend.docker.package_types import (
@@ -2489,7 +2489,7 @@ def test_get_context_root(
 def test_parse_image_id_from_docker_build_output(
     docker: DockerBinary, expected: str, stdout: str, stderr: str
 ) -> None:
-    assert expected == parse_image_id_from_docker_build_output(
+    assert expected == parse_image_id_from_buildkit_output(
         docker, stdout.encode(), stderr.encode()
     )
 

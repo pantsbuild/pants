@@ -782,6 +782,112 @@ class DictOption(_OptionBase["dict[str, _ValueT]", "dict[str, _ValueT]"], Generi
 
 
 # -----------------------------------------------------------------------------------------------
+# Generic Dataclass Concrete Option Classes
+# -----------------------------------------------------------------------------------------------
+
+class DataclassOption(_OptionBase[_OptT, _OptT]):
+    """A dataclass option.
+
+    - If you provide a static non-None `default` parameter, the `dataclass_type` parameter will be
+        inferred from the type of the default.
+    - If you provide a dynamic `default` or `default` is `None`, you must also provide `dataclass_type`.
+    """
+
+    @overload
+    def __new__(
+        cls,
+        flag_name: str | None = None,
+        *,
+        default: _MaybeDynamicT[_OptT],
+        help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
+        advanced: bool | None = None,
+        default_help_repr: str | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_version: str | None = None,
+        removal_hint: _HelpT | None = None,
+        deprecation_start_version: str | None = None,
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
+    ) -> DataclassOption[_OptT, _OptT]: ...
+
+    @overload
+    def __new__(
+        cls,
+        flag_name: str | None = None,
+        *,
+        dataclass_type: type[_OptT],
+        default: None,
+        help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
+        advanced: bool | None = None,
+        default_help_repr: str | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_version: str | None = None,
+        removal_hint: _HelpT | None = None,
+        deprecation_start_version: str | None = None,
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
+    ) -> DataclassOption[_OptT, None]: ...
+
+    def __new__(
+        cls,
+        flag_name: str | None = None,
+        *,
+        dataclass_type: type[_OptT] | None = None,
+        default: _MaybeDynamicT[_OptT] | None,
+        help: _HelpT,
+        register_if: _RegisterIfFuncT | None = None,
+        advanced: bool | None = None,
+        default_help_repr: str | None = None,
+        fromfile: bool | None = None,
+        metavar: str | None = None,
+        mutually_exclusive_group: str | None = None,
+        removal_version: str | None = None,
+        removal_hint: _HelpT | None = None,
+        deprecation_start_version: str | None = None,
+        daemon: bool | None = None,
+        fingerprint: bool | None = None,
+    ):
+        instance = super().__new__(
+            flag_name,
+            default=default,
+            help=help,
+            register_if=register_if,
+            advanced=advanced,
+            default_help_repr=default_help_repr,
+            fromfile=fromfile,
+            metavar=metavar,
+            mutually_exclusive_group=mutually_exclusive_group,
+            removal_version=removal_version,
+            removal_hint=removal_hint,
+            deprecation_start_version=deprecation_start_version,
+            daemon=daemon,
+            fingerprint=fingerprint,
+        )
+        instance._dataclass_type = dataclass_type
+        return instance
+
+    def get_option_type(self, subsystem_cls):
+        dataclass_type = self._dataclass_type
+        default = _eval_maybe_dynamic(self._default, subsystem_cls)
+        if dataclass_type is None:
+            if default is None:
+                raise ValueError(
+                    "`dataclass_type` must be provided to the constructor if `default` isn't provided."
+                )
+            return type(default)
+        elif default is not None and not isinstance(default, dataclass_type):
+            raise ValueError(
+                f"Expected the default value to be of type '{dataclass_type}', got '{type(default)}'"
+            )
+        return dataclass_type
+
+# -----------------------------------------------------------------------------------------------
 # "Specialized" Concrete Option Classes
 # -----------------------------------------------------------------------------------------------
 

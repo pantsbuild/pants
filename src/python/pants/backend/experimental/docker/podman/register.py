@@ -8,7 +8,7 @@ from pants.util.strutil import softwrap
 class ExperimentalPodmanOptions:
     experimental_enable_podman = BoolOption(
         default=True,
-        mutually_exclusive_group="run_engine",
+        mutually_exclusive_group="engines",
         help=softwrap(
             """
             DEPRECATED: Use [docker].run_engine = "podman" instead.

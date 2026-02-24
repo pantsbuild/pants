@@ -22,9 +22,7 @@ from pants.backend.docker.registries import DockerRegistries, DockerRegistryOpti
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     BuildctlOptionsFieldMixin,
-    DockerBuildKitOptionField,
     DockerBuildOptionFieldListOfMultiValueDictMixin,
-    DockerBuildOptionFieldMixin,
     DockerBuildOptionFieldMultiValueDictMixin,
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
@@ -553,13 +551,7 @@ async def build_docker_image(
             keep_sandboxes=keep_sandboxes,
         )
 
-    match options.build_engine:
-        case DockerBuildEngine.BUILDKIT:
-            parse_image_id = parse_image_id_from_buildctl_build_output
-        case DockerBuildEngine.PODMAN:
-            parse_image_id = parse_image_id_from_podman_build_output
-        case _:
-            parse_image_id = parse_image_id_from_docker_build_output
+    parse_image_id = parse_image_id_from_podman_build_output if options.build_engine == DockerBuildEngine.PODMAN else parse_image_id_from_buildkit_output
     image_id = parse_image_id(result.stdout, result.stderr)
     docker_build_output_msg = "\n".join(
         (
@@ -586,7 +578,7 @@ async def build_docker_image(
     )
 
 
-def parse_image_id_from_docker_build_output(*outputs: bytes) -> str | None:
+def parse_image_id_from_buildkit_output(*outputs: bytes) -> str | None:
     """Outputs are typically the stdout/stderr pair from the `docker build` process."""
     # NB: We use the extracted image id for invalidation. The short_id may theoretically
     #  not be unique enough, although in a non adversarial situation, this is highly unlikely
@@ -596,6 +588,8 @@ def parse_image_id_from_docker_build_output(*outputs: bytes) -> str | None:
             (
                 # BuildKit output.
                 r"(writing image (?P<digest>sha256:\S+))",
+                # Buildkit with --push=true output.
+                r"(pushing manifest for (?P<pushed_manifest>\S+))",
                 # BuildKit with containerd-snapshotter output.
                 r"(exporting manifest list (?P<manifest_list>sha256:\S+))",
                 # BuildKit with containerd-snapshotter output and no attestation.
@@ -620,6 +614,7 @@ def parse_image_id_from_docker_build_output(*outputs: bytes) -> str | None:
         if image_id_match:
             image_id = (
                 image_id_match.group("digest")
+                or image_id_match.group("pushed_manifest")
                 or image_id_match.group("short_id")
                 or image_id_match.group("manifest_list")
                 or image_id_match.group("manifest")
@@ -629,7 +624,7 @@ def parse_image_id_from_docker_build_output(*outputs: bytes) -> str | None:
     return None
 
 
-def parse_image_id_from_podman_build_output(*outputs: bytes) -> str:
+def parse_image_id_from_podman_build_output(*outputs: bytes) -> str | None:
     for output in outputs:
         try:
             _, image_id, success, *__ = reversed(output.decode().split("\n"))
@@ -639,9 +634,6 @@ def parse_image_id_from_podman_build_output(*outputs: bytes) -> str:
         if success.startswith("Successfully tagged"):
             return image_id
     return None
-
-
-def parse_image_id_from_buildctl_build_output(*outputs: bytes) -> str: ...
 
 
 def format_docker_build_context_help_message(
