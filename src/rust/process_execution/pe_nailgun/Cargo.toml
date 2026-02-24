@@ -6,7 +6,6 @@ authors = ["Pants Build <pantsbuild@gmail.com>"]
 publish = false
 
 [dependencies]
-async-stream = { workspace = true }
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
@@ -16,8 +15,6 @@ sandboxer = { path = "../sandboxer" }
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
 tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-rustls = { workspace = true }
-tokio-util = { workspace = true, features = ["codec"] }
 workunit_store = { path = "../../workunit_store" }
 itertools = { workspace = true }
 process_execution = { path = ".." }

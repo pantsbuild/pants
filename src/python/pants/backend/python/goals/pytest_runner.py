@@ -83,7 +83,7 @@ from pants.engine.intrinsics import (
     get_digest_contents,
     merge_digests,
 )
-from pants.engine.process import InteractiveProcess, Process, ProcessCacheScope, ProcessWithRetries
+from pants.engine.process import InteractiveProcess, Process, ProcessWithRetries
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Target, TransitiveTargetsRequest, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -422,9 +422,7 @@ async def setup_pytest_for_target(
     }
 
     # Cache test runs only if they are successful, or not at all if `--test-force`.
-    cache_scope = (
-        ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
-    )
+    cache_scope = test_subsystem.default_process_cache_scope
 
     xdist_concurrency = 0
     if pytest.xdist_enabled and not request.is_debug:

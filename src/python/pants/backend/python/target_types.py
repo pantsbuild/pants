@@ -15,7 +15,11 @@ from typing import TYPE_CHECKING, ClassVar, cast
 from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import (
+    DEFAULT_TEST_FILE_GLOBS,
+    DEFAULT_TESTUTIL_FILE_GLOBS,
+    PythonSetup,
+)
 from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.goals.package import OutputPathField
@@ -1376,7 +1380,7 @@ class PythonTestTarget(Target):
 
 class PythonTestsGeneratingSourcesField(PythonGeneratingSourcesBase):
     expected_file_extensions = (".py", "")  # Note that this does not include `.pyi`.
-    default = ("test_*.py", "*_test.py", "tests.py")
+    default = DEFAULT_TEST_FILE_GLOBS
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['test_*.py', '*_test.py', 'tests.py']`"
     )
@@ -1463,7 +1467,7 @@ class PythonSourcesOverridesField(OverridesField):
 
 
 class PythonTestUtilsGeneratingSourcesField(PythonGeneratingSourcesBase):
-    default = ("conftest.py", "test_*.pyi", "*_test.pyi", "tests.pyi")
+    default = DEFAULT_TESTUTIL_FILE_GLOBS
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['conftest.py', 'test_*.pyi', '*_test.pyi', 'tests.pyi']`"
     )

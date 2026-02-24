@@ -411,7 +411,6 @@ async def mypy_determine_partitions(
     )
 
 
-# TODO(#10864): Improve performance, e.g. by leveraging the MyPy cache.
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> CheckResults:
     if mypy.skip:

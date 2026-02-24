@@ -9,6 +9,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Sequence
 
 from pants.backend.python.dependency_inference.module_mapper import module_from_stripped_path
 from pants.backend.python.macros.pipenv_requirements import parse_pipenv_requirements
@@ -21,9 +22,7 @@ from pants.backend.python.target_types import (
     PexBinary,
     PexEntryPointField,
     PythonSourcesGeneratorTarget,
-    PythonTestsGeneratingSourcesField,
     PythonTestsGeneratorTarget,
-    PythonTestUtilsGeneratingSourcesField,
     PythonTestUtilsGeneratorTarget,
     ResolvePexEntryPointRequest,
 )
@@ -57,10 +56,12 @@ class PutativePythonTargetsRequest(PutativeTargetsRequest):
     pass
 
 
-def classify_source_files(paths: Iterable[str]) -> dict[type[Target], set[str]]:
+def classify_source_files(
+    paths: Iterable[str], test_file_globs: Sequence[str], testutils_file_globs: Sequence[str]
+) -> dict[type[Target], set[str]]:
     """Returns a dict of target type -> files that belong to targets of that type."""
-    tests_filespec_matcher = FilespecMatcher(PythonTestsGeneratingSourcesField.default, ())
-    test_utils_filespec_matcher = FilespecMatcher(PythonTestUtilsGeneratingSourcesField.default, ())
+    tests_filespec_matcher = FilespecMatcher(test_file_globs, ())
+    test_utils_filespec_matcher = FilespecMatcher(testutils_file_globs, ())
 
     path_to_file_name = {path: os.path.basename(path) for path in paths}
     test_file_names = set(tests_filespec_matcher.matches(list(path_to_file_name.values())))
@@ -122,10 +123,13 @@ async def _find_source_targets(
 ) -> list[PutativeTarget]:
     result = []
     check_if_init_file_empty: dict[str, tuple[str, str]] = {}  # full_path: (dirname, filename)
-
     all_py_files = await path_globs_to_paths(py_files_globs)
     unowned_py_files = set(all_py_files.files) - set(all_owned_sources)
-    classified_unowned_py_files = classify_source_files(unowned_py_files)
+    classified_unowned_py_files = classify_source_files(
+        unowned_py_files,
+        python_setup.tailor_test_file_globs,
+        python_setup.tailor_testutils_file_globs,
+    )
     for tgt_type, paths in classified_unowned_py_files.items():
         for dirname, filenames in group_by_dir(paths).items():
             name: str | None

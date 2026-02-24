@@ -84,7 +84,6 @@ from pants.engine.intrinsics import (
 )
 from pants.engine.process import (
     Process,
-    ProcessCacheScope,
     ProcessWithRetries,
     execute_process_or_raise,
 )
@@ -661,9 +660,7 @@ async def run_go_tests(
     else:
         extra_env["PATH"] = goroot_bin_path
 
-    cache_scope = (
-        ProcessCacheScope.PER_SESSION if test_subsystem.force else ProcessCacheScope.SUCCESSFUL
-    )
+    cache_scope = test_subsystem.default_process_cache_scope
 
     test_flags = transform_test_args(
         go_test_subsystem.args,

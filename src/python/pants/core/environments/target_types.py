@@ -108,8 +108,9 @@ class LocalEnvironmentTarget(Target):
         Only one `local_environment` may be defined in `[environments-preview].names` per platform, and
         when `{LOCAL_ENVIRONMENT_MATCHER}` is specified as the environment, the
         `local_environment` that matches the current platform (if defined) will be selected.
+
+        See https://www.pantsbuild.org/stable/docs/using-pants/environments for more information.
         """
-        # TODO(#17096) Add a link to the environments docs once they land.
     )
 
 
@@ -256,8 +257,9 @@ class DockerEnvironmentTarget(Target):
         **Enable default Docker socket** is enabled, you can find it in **Docker Desktop Settings > Advanced**
         panel. That option tells Docker to create a socket at `/var/run/docker.sock` which Pants can use to
         communicate with Docker.
+
+        See https://www.pantsbuild.org/stable/docs/using-pants/environments for more information.
         """
-        # TODO(#17096) Add a link to the environments docs once they land.
     )
 
 
@@ -352,8 +354,9 @@ class RemoteEnvironmentTarget(Target):
         repository, but it can be useful to have >1 so that you can set different
         `extra_platform_properties`. For example, with some servers, you could use this to
         configure a different Docker image per environment.
+
+        See https://www.pantsbuild.org/stable/docs/using-pants/environments for more information.
         """
-        # TODO(#17096) Add a link to the environments docs once they land.
     )
 
 

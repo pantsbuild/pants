@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import difflib
 import itertools
 import logging
 from collections import defaultdict
@@ -291,7 +292,6 @@ class UnrecognizedResolveNamesError(Exception):
     ) -> None:
         all_valid_binaries = all_valid_binaries or set()
 
-        # TODO(#12314): maybe implement "Did you mean?"
         if len(unrecognized_resolve_names) == 1:
             unrecognized_str = unrecognized_resolve_names[0]
             name_description = "name"
@@ -316,6 +316,13 @@ class UnrecognizedResolveNamesError(Exception):
         if should_be_resolves:
             cmd = " ".join([f"--resolve={e}" for e in should_be_resolves])
             message.append(f"HINT: Some binaries should be resolves, try with `{cmd}`")
+
+        # "Did you mean?"
+        for name in unrecognized_resolve_names:
+            close_matches = difflib.get_close_matches(name, all_valid_names)
+            if close_matches:
+                suggestions = ", ".join(f"`{m}`" for m in close_matches)
+                message.append(f"Did you mean: {suggestions} (for `{name}`)")
 
         super().__init__(softwrap("\n\n".join(message)))
 

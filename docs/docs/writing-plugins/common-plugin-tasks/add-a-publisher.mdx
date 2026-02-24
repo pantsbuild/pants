@@ -162,8 +162,8 @@ def rules():
 If your publisher has expensive packaging steps, you can use `check_skip_request` to preemptively skip packaging when you know the publish will be skipped:
 
 ```python
+from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import CheckSkipRequest, CheckSkipResult
-from pants.core.goals import package
 
 
 @dataclass(frozen=True)
@@ -174,7 +174,7 @@ class MyPublishFieldSet(PublishFieldSet):
     repositories: MyRepositoriesField
     skip_push: MySkipPushField
 
-    def check_skip_request(self, package_fs: package.PackageFieldSet) -> CheckSkipRequest[Self] | None:
+    def check_skip_request(self, package_fs: PackageFieldSet) -> CheckSkipRequest[Self] | None:
         """Return a request to check if we should skip packaging."""
         return MyPublishSkipRequest(publish_fs=self, package_fs=package_fs)
 ```

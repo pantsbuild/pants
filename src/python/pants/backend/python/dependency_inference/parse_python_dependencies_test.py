@@ -47,6 +47,7 @@ def assert_deps_parsed(
     *,
     expected_imports: dict[str, ImpInfo] | None = None,
     expected_assets: list[str] | None = None,
+    expected_explicit_deps: dict[str, int] | None = None,
     filename: str = "project/foo.py",
     string_imports: bool = True,
     string_imports_min_dots: int = 2,
@@ -55,6 +56,8 @@ def assert_deps_parsed(
 ) -> None:
     expected_imports = expected_imports or {}
     expected_assets = expected_assets or []
+    expected_explicit_deps = expected_explicit_deps or {}
+
     rule_runner.set_options(
         [
             f"--python-infer-string-imports={string_imports}",
@@ -87,6 +90,7 @@ def assert_deps_parsed(
     )
     assert dict(result.imports) == expected_imports
     assert list(result.assets) == sorted(expected_assets)
+    assert dict(result.explicit_dependencies) == expected_explicit_deps
 
 
 def test_normal_imports(rule_runner: RuleRunner) -> None:
@@ -559,3 +563,15 @@ def test_assets(rule_runner: RuleRunner, min_slashes: int) -> None:
         rule_runner, content, expected_assets=expected, assets_min_slashes=min_slashes
     )
     assert_deps_parsed(rule_runner, content, assets=False, expected_assets=[])
+
+
+def test_explicit_deps_pragma(rule_runner: RuleRunner) -> None:
+    # Python (OG) dep inference doesn't yet handle the deps from these pragmas.
+    # We still need to decide on their format. This just tests that the arg
+    # is plumbed through to Python.
+    content = dedent(
+        """\
+        # pants: infer-dep(foo/bar/baz.py)
+        """
+    )
+    assert_deps_parsed(rule_runner, content, expected_explicit_deps={"foo/bar/baz.py": 1})

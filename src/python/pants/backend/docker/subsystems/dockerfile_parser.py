@@ -224,7 +224,7 @@ async def parse_dockerfile(
 
     if not dockerfile_parser.use_rust_parser:
         warn_or_error(
-            removal_version="2.32.0.dev1",
+            removal_version="2.33.0.dev1",
             entity="Using the old Dockerfile parser",
             hint=softwrap(
                 f"""

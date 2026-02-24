@@ -12,7 +12,6 @@ futures = { workspace = true }
 grpc_util = { path = "../../grpc_util" }
 hashing = { path = "../../hashing" }
 http = { workspace = true }
-parking_lot = { workspace = true }
 prost = { workspace = true }
 protos = { path = "../../protos" }
 opendal = { workspace = true }
