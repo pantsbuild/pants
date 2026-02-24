@@ -1,7 +1,3 @@
-# NOTE: See `src/rust/.cargo/config` for `--cfg` flags enabled for these crates.
-# tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
-# See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
-
 [profile.release]
 # Enable only "line tables", which give line information in backtraces, but do not record information
 # about local variables.
