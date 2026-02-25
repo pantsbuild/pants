@@ -26,7 +26,7 @@ from pants.backend.typescript.target_types import TypeScriptSourceField, TypeScr
 from pants.backend.typescript.tsconfig import AllTSConfigs, TSConfig, construct_effective_ts_configs
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
-from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
+from pants.core.goals.check import CheckRequest, CheckResult, CheckResults, CheckSubsystem
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.system_binaries import CpBinary, FindBinary, MkdirBinary, TouchBinary
 from pants.engine.fs import (
@@ -421,6 +421,7 @@ async def _prepare_tsc_build_process(
 async def _typecheck_single_project(
     project: NodeJSProject,
     subsystem: TypeScriptSubsystem,
+    check_subsystem: CheckSubsystem,
     global_options: GlobalOptions,
     all_targets: AllTargets,
     all_projects: AllNodeJSProjects,
@@ -464,6 +465,9 @@ async def _typecheck_single_project(
         project_targets,
         build_root,
     )
+
+    process = replace(process, cache_scope=check_subsystem.default_process_cache_scope)
+
     result = await execute_process(process, **implicitly())
 
     return CheckResult.from_fallible_process_result(
@@ -477,11 +481,12 @@ async def _typecheck_single_project(
 async def typecheck_typescript(
     request: TypeScriptCheckRequest,
     subsystem: TypeScriptSubsystem,
+    check_subsystem: CheckSubsystem,
     global_options: GlobalOptions,
     build_root: BuildRoot,
 ) -> CheckResults:
     if subsystem.skip:
-        return CheckResults([], checker_name=request.tool_name)
+        return CheckResults([], checker_name=request.tool_name, output_per_partition=False)
 
     field_sets = request.field_sets
     (
@@ -513,6 +518,7 @@ async def typecheck_typescript(
         _typecheck_single_project(
             project,
             subsystem,
+            check_subsystem,
             global_options,
             all_targets,
             all_projects,
@@ -523,7 +529,7 @@ async def typecheck_typescript(
         for project in projects
     )
 
-    return CheckResults(project_results, checker_name=request.tool_name)
+    return CheckResults(project_results, checker_name=request.tool_name, output_per_partition=False)
 
 
 def rules():
