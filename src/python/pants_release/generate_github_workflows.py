@@ -3,6 +3,7 @@
 #
 # Editing Github Actions directly will fail in CI, instead edit this file and run:
 # `pants run src/python/pants_release/generate_github_workflows.py`
+#
 
 from __future__ import annotations
 
@@ -84,7 +85,7 @@ CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
 # We don't specify a patch version so that we get the latest, which comes pre-installed:
 #  https://github.com/actions/setup-python#available-versions-of-python
 # NOTE: The last entry becomes the default
-_BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
+_BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
 
 PYTHON_VERSIONS_PER_PLATFORM = {
     Platform.LINUX_X86_64: _BASE_PYTHON_VERSIONS,
@@ -399,7 +400,7 @@ def install_go() -> list[Step]:
 def install_python_headers_in_manylinux_container() -> Step:
     return {
         "name": "Install Python headers",
-        "run": "yum install -y python3.11-devel",
+        "run": "echo 'no-op'",
     }
 
 
@@ -1000,6 +1001,7 @@ def build_wheels_job(
                     echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
                     """
                 ),
             },

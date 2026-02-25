@@ -1,4 +1,0 @@
-# tokio_unstable is necessary for access to the `id`-related functions of tokio::task::JoinSet.
-# See https://docs.rs/tokio/1.21.1/tokio/task/struct.JoinSet.html#method.join_next_with_id.
-[build]
-rustflags = ["--cfg", "tokio_unstable"]

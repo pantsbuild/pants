@@ -114,13 +114,13 @@ class CoursierSubsystem(TemplatedExternalTool):
 
     default_version = "v2.1.24"
     default_known_versions = [
-        "v2.1.24|macos_arm64 |8f47594eb62dea25af913c8932d1f1d86a3a9c8e1262925b63852635390a3f43|21541383|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.24/cs-aarch64-apple-darwin.gz",
         "v2.1.24|linux_arm64 |96b4c7580d253b6999a40e94413ca6c4a9bd2339ecce4754ac31a26d1a12fcbf|21534519|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.24/cs-aarch64-pc-linux.gz",
         "v2.1.24|linux_x86_64|d2c0572a17fb6146ea65349b59dd216b38beff60ae22bce6e549867c6ed2eda6|23366878",
+        "v2.1.24|macos_arm64 |8f47594eb62dea25af913c8932d1f1d86a3a9c8e1262925b63852635390a3f43|21541383|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.24/cs-aarch64-apple-darwin.gz",
         "v2.1.24|macos_x86_64|33913cd6b61658035d9e6fe971e919cb0ef1f659aa7bff7deeded963a2d36385|22442034",
-        "v2.1.6|macos_arm64 |746b3e346fa2c0107fdbc8a627890d495cb09dee4f8dcc87146bdb45941088cf|20829782|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.6/cs-aarch64-apple-darwin.gz",
         "v2.1.6|linux_arm64 |33330ca433781c9db9458e15d2d32e5d795de3437771647e26835e8b1391af82|20899290|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.6/cs-aarch64-pc-linux.gz",
         "v2.1.6|linux_x86_64|af7234f8802107f5e1130307ef8a5cc90262d392f16ddff7dce27a4ed0ddd292|20681688",
+        "v2.1.6|macos_arm64 |746b3e346fa2c0107fdbc8a627890d495cb09dee4f8dcc87146bdb45941088cf|20829782|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.6/cs-aarch64-apple-darwin.gz",
         "v2.1.6|macos_x86_64|36a5d42a0724be2ac39d0ebd8869b985e3d58ceb121bc60389ee2d6d7408dd56|20037412",
         "v2.1.0-M5-18-gfebf9838c|linux_arm64 |d4ad15ba711228041ad8a46d848c83c8fbc421d7b01c415d8022074dd609760f|19264005",
         "v2.1.0-M5-18-gfebf9838c|linux_x86_64|3e1a1ad1010d5582e9e43c5a26b273b0147baee5ebd27d3ac1ab61964041c90b|19551533",

@@ -20,10 +20,10 @@ class Trivy(TemplatedExternalTool):
 
     default_version = "0.57.0"
     default_known_versions = [
-        "0.57.0|macos_arm64|61230c8a56e463e8eba2bf922bc688b7bd40352187e1f725c79861b0801437f0|39193442",
-        "0.57.0|macos_x86_64|e7955b6d38d8125d4aa8936e6af51b0de2b0e0840b4feb90b44002bf7f47bf13|41286618",
-        "0.57.0|linux_arm64|29012fdb5ba18da506d1c8b6f389c2ec9d113db965c254971f35267ebb45dd64|37315561",
+        "0.57.0|linux_arm64 |29012fdb5ba18da506d1c8b6f389c2ec9d113db965c254971f35267ebb45dd64|37315561",
         "0.57.0|linux_x86_64|cf08a8cd861e5192631fc03bb21efde27c1d93e4407ab70bab32e572bafcbf07|40466119",
+        "0.57.0|macos_arm64 |61230c8a56e463e8eba2bf922bc688b7bd40352187e1f725c79861b0801437f0|39193442",
+        "0.57.0|macos_x86_64|e7955b6d38d8125d4aa8936e6af51b0de2b0e0840b4feb90b44002bf7f47bf13|41286618",
     ]
 
     default_url_template = "https://github.com/aquasecurity/trivy/releases/download/v{version}/trivy_{version}_{platform}.tar.gz"

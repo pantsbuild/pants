@@ -8,8 +8,6 @@ publish = false
 [dependencies]
 crossbeam-channel = { workspace = true }
 fs = { path = "../fs" }
-futures = { workspace = true }
-hashing = { path = "../hashing" }
 log = { workspace = true }
 # TODO: See https://github.com/notify-rs/notify/issues/255.
 notify = { workspace = true }

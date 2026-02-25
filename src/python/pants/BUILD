@@ -36,7 +36,7 @@ python_distribution(
         # TODO(7344): the tuple syntax for ext_modules is deprecated. Use Extension once we support it.
         ext_modules=[("native_engine", {"sources": ["pants/dummy.c"]})],
         # N.B.: Must match [python] interpreter_constraints in pants.toml.
-        python_requires="==3.11.*",
+        python_requires="==3.14.*",
     ),
     entry_points={"console_scripts": {"pants": "pants.bin.pants_loader:main"}},
     # We need to explicitly control the wheel tagging, rather than following whatever the current

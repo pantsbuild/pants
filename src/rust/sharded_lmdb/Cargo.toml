@@ -6,8 +6,6 @@ edition = "2024"
 
 [dependencies]
 bytes = { workspace = true }
-fs = { path = "../fs" }
-futures = { workspace = true }
 hashing = { path = "../hashing" }
 lmdb-rkv = { workspace = true }
 log = { workspace = true }
