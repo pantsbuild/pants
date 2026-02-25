@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os.path
 from collections.abc import Iterable
-from enum import Enum
+from enum import StrEnum
 
 from packaging.version import parse
 
@@ -20,7 +20,7 @@ from pants.option.option_types import ArgsListOption, BoolOption, FileOption, Sk
 from pants.util.strutil import softwrap
 
 
-class RuffMode(str, Enum):
+class RuffMode(StrEnum):
     FIX = "check --fix"
     FORMAT = "format"
     LINT = "check"

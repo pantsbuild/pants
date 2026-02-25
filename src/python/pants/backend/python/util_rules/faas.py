@@ -10,7 +10,7 @@ import logging
 import os.path
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import ClassVar, cast
 
@@ -293,7 +293,7 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
     )
 
 
-class FaaSArchitecture(str, Enum):
+class FaaSArchitecture(StrEnum):
     X86_64 = "x86_64"
     ARM64 = "arm64"
 
