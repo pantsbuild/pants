@@ -185,7 +185,7 @@ class PantsDaemonIntegrationTestBase(unittest.TestCase):
                     ],
                 },
                 "python": {
-                    "interpreter_constraints": "['>=3.11,<3.12']",
+                    "interpreter_constraints": "['>=3.14,<3.15']",
                 },
             }
 

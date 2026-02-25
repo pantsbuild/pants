@@ -142,10 +142,12 @@ mod tests {
     async fn plain_client_request_test() {
         let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
         let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+        listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
 
         tokio::spawn(async move {
-            axum_server::Server::from_tcp(listener)
+            axum_server::from_tcp(listener)
+                .expect("Unable to create Server from std::net::TcpListener")
                 .serve(router().into_make_service())
                 .await
                 .unwrap();
@@ -187,7 +189,8 @@ mod tests {
         listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
 
-        let server = axum_server::from_tcp_rustls(listener, config);
+        let server = axum_server::from_tcp_rustls(listener, config)
+            .expect("Unable to create Server from std::net::TcpListener");
 
         tokio::spawn(async move {
             server.serve(router().into_make_service()).await.unwrap();
@@ -325,9 +328,11 @@ mod tests {
 
         let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
         let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+        listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
 
-        let server = axum_server::from_tcp_rustls(listener, config);
+        let server = axum_server::from_tcp_rustls(listener, config)
+            .expect("Unable to create Server from std::net::TcpListener");
 
         tokio::spawn(async move {
             server.serve(router().into_make_service()).await.unwrap();

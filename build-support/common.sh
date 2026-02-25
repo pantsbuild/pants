@@ -52,7 +52,7 @@ function determine_python() {
     which "${PY}" && return 0
   fi
 
-  version='3.11'
+  version='3.14'
   interpreter_path="$(command -v "python${version}")"
   if [[ -z "${interpreter_path}" ]]; then
     echo "pants: Failed to find a Python ${version} interpreter" 1>&2 && return 1

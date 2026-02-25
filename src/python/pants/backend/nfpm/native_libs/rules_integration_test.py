@@ -112,7 +112,7 @@ def _get_pex_binary(rule_runner: RuleRunner, address: Address) -> Pex:
     (
         pytest.param(["cowsay==4.0"], "cowsay", (), (), id="cowsay"),
         pytest.param(
-            ["setproctitle==1.3.6"],
+            ["setproctitle==1.3.7"],
             None,
             (f"_setproctitle.cpython-{_PY_TAG}-x86_64-linux-gnu.so()(64bit)",),
             (
@@ -125,7 +125,7 @@ def _get_pex_binary(rule_runner: RuleRunner, address: Address) -> Pex:
             id="setproctitle-x86_64",
         ),
         pytest.param(
-            ["setproctitle==1.3.6"],
+            ["setproctitle==1.3.7"],
             None,
             (f"_setproctitle.cpython-{_PY_TAG}-aarch64-linux-gnu.so()(64bit)",),
             (
@@ -167,7 +167,7 @@ def test_rpm_depends_from_pex_rule(
     (
         pytest.param(
             "rpm",
-            ["setproctitle==1.3.6"],
+            ["setproctitle==1.3.7"],
             None,
             "amd64",
             (f"_setproctitle.cpython-{_PY_TAG}-x86_64-linux-gnu.so()(64bit)",),
@@ -182,7 +182,7 @@ def test_rpm_depends_from_pex_rule(
         ),
         pytest.param(
             "rpm",
-            ["setproctitle==1.3.6"],
+            ["setproctitle==1.3.7"],
             None,
             "arm64",
             (f"_setproctitle.cpython-{_PY_TAG}-aarch64-linux-gnu.so()(64bit)",),

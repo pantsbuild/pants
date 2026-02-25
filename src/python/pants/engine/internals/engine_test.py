@@ -255,6 +255,7 @@ def test_include_trace_error_raises_error_with_trace(tmp_path: Path) -> None:
             Traceback (most recent call last):
               File LOCATION-INFO, in nested_raise
                 fn_raises(x)
+                ~~~~~~~~~^^^
               File LOCATION-INFO, in fn_raises
                 raise Exception(f"An exception for {type(x).__name__}")
             Exception: An exception for B

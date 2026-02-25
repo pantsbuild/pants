@@ -830,7 +830,7 @@ def smoke_test_install_and_version(version: str) -> None:
             ]
 
             [python]
-            interpreter_constraints = ["==3.11.*"]
+            interpreter_constraints = ["==3.14.*"]
             enable_resolves = true
             """
         )

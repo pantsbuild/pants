@@ -24,6 +24,9 @@ PY_38 = "3.8"
 PY_39 = "3.9"
 PY_310 = "3.10"
 PY_311 = "3.11"
+PY_312 = "3.12"
+PY_313 = "3.13"
+PY_314 = "3.14"
 
 
 def has_python_version(version):
@@ -147,7 +150,18 @@ def all_major_minor_python_versions(
     """
     versions = InterpreterConstraints(constraints).partition_into_major_minor_versions(
         # Please update this when new stable Python versions are released to CI.
-        interpreter_universe=["2.7", "3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        interpreter_universe=[
+            "2.7",
+            "3.6",
+            "3.7",
+            "3.8",
+            "3.9",
+            "3.10",
+            "3.11",
+            "3.12",
+            "3.13",
+            "3.14",
+        ]
     )
     return tuple(
         pytest.param(
