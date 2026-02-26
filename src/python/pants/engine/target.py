@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from operator import attrgetter
 from pathlib import PurePath
+from types import UnionType
 from typing import (
     AbstractSet,
     Any,
@@ -27,8 +28,11 @@ from typing import (
     Protocol,
     Self,
     TypeVar,
+    Union,
     cast,
     final,
+    get_args,
+    get_origin,
     get_type_hints,
 )
 
@@ -1475,11 +1479,28 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     @final
     @memoized_classproperty
     def fields(cls) -> FrozenDict[str, type[Field]]:
+        def field_type_from_annotation(annotation: Any) -> type[Field] | None:
+            if isinstance(annotation, type) and issubclass(annotation, Field):
+                return annotation
+
+            origin = get_origin(annotation)
+            if origin not in (Union, UnionType):
+                return None
+
+            field_types = [
+                arg
+                for arg in get_args(annotation)
+                if isinstance(arg, type) and issubclass(arg, Field)
+            ]
+            if len(field_types) != 1:
+                return None
+            return field_types[0]
+
         return FrozenDict(
             (
                 (name, field_type)
-                for name, field_type in get_type_hints(cls).items()
-                if isinstance(field_type, type) and issubclass(field_type, Field)
+                for name, annotation in get_type_hints(cls).items()
+                if (field_type := field_type_from_annotation(annotation)) is not None
             )
         )
 

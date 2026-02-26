@@ -95,6 +95,7 @@ def test_sort_all_python_distributions_by_resolve(rule_runner: PythonRuleRunner)
     rule_runner.set_options(
         [
             "--python-enable-resolves=True",
+            "--python-default-resolve=a",
             "--python-resolves={'a': 'lock.txt', 'b': 'lock.txt'}",
             # Turn off lockfile validation to make the test simpler.
             "--python-invalid-lockfile-behavior=ignore",
