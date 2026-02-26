@@ -6,7 +6,7 @@ import logging
 import re
 from collections.abc import Collection
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path, PurePath
 
 from pants.base.build_environment import get_buildroot
@@ -20,7 +20,7 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-class AsdfPathString(str, Enum):
+class AsdfPathString(StrEnum):
     STANDARD = "<ASDF>"
     LOCAL = "<ASDF_LOCAL>"
 
