@@ -3,14 +3,17 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 from typing import Any
 
+from pants.backend.docker.engine_types import DockerBuildEngine, DockerEngines, DockerPushEngine, DockerRunEngine
 from pants.backend.docker.package_types import DockerPushOnPackageBehavior
 from pants.backend.docker.registries import DockerRegistries
 from pants.core.util_rules.search_paths import ExecutableSearchPathsOptionMixin
 from pants.option.option_types import (
     BoolOption,
+    DataclassOption,
     DictOption,
     EnumOption,
     ShellStrListOption,
@@ -28,6 +31,8 @@ doc_links = {
         "https://docs.docker.com/engine/reference/commandline/cli/#environment-variables"
     ),
 }
+
+logger = logging.getLogger(__name__)
 
 
 class DockerOptions(Subsystem):
@@ -146,14 +151,75 @@ class DockerOptions(Subsystem):
             """
         ),
     )
-    use_buildx = BoolOption(
-        default=False,
+    engine = DataclassOption(
+        default=DockerEngines(),
+        mutually_exclusive_group="engines",
         help=softwrap(
             """
+        The engines to use for Docker builds and runs.
+
+        Valid values for `build` are:
+
+        - `docker`: Use the Docker CLI to build images. (https://docs.docker.com/reference/cli/docker/buildx/build/)
+        - `buildkit`: Invoke buildkit directly to build images. (https://github.com/moby/buildkit/blob/master/docs/reference/buildctl.md#build)
+        - `podman`: Use Podman to build images. (https://docs.podman.io/en/latest/markdown/podman-build.1.html)
+
+        Valid values for `run` are:
+
+        - `docker`: Use the Docker CLI to run containers. (https://docs.docker.com/reference/cli/docker/run/)
+        - `podman`: Use Podman to run containers. (https://docs.podman.io/en/latest/markdown/podman-run.1.html)
+        """
+        ),
+    )
+    use_buildx = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            DEPRECATED: Use [docker.engine].build = "docker" instead.
+
+            See here for using the legacy builder: https://docs.docker.com/reference/cli/docker/build-legacy/
+
             Use [buildx](https://github.com/docker/buildx#buildx) (and BuildKit) for builds.
             """
         ),
+        deprecation_start_version="2.31.0",
+        mutually_exclusive_group="engines",
     )
+
+    def _experimental_enable_podman_warning[E: DockerBuildEngine | DockerRunEngine | DockerPushEngine](self, engine_type: type[E], engine_opt: str) -> E | None:
+        experimental_enable_podman = self.options.get("experimental_enable_podman", None)
+        match experimental_enable_podman:
+            case None:
+                return getattr(self.engine, engine_opt)
+            case True:
+                engine = engine_type.PODMAN
+            case False:
+                engine = engine_type.DOCKER
+        logger.warning(
+            f'`[docker].experimental_enable_podman` is deprecated. Use `[docker.engine].{engine_opt} = "{engine.value}"` instead.'
+        )
+        return engine
+
+    @property
+    def build_engine(self) -> DockerBuildEngine:
+        use_buildx = self.options.get("use_buildx")
+        if use_buildx is not None:
+            warning = '`[docker].use_buildx` is deprecated. Buildx is now the default Docker build engine. Use `[docker.engine].build = "docker"` instead.'
+            if not use_buildx:
+                warning += (
+                    " To use the legacy engine, add `DOCKER_BUILDKIT=0` to `[docker].env_vars`."
+                )
+            logger.warning(warning)
+            return DockerBuildEngine.DOCKER
+        return self._experimental_enable_podman_warning(DockerBuildEngine, "build")
+
+    @property
+    def run_engine(self) -> DockerRunEngine:
+        return self._experimental_enable_podman_warning(DockerRunEngine, "run")
+
+    @property
+    def push_engine(self) -> DockerPushEngine:
+        return self._experimental_enable_podman_warning(DockerPushEngine, "push")
 
     _build_args = ShellStrListOption(
         help=softwrap(

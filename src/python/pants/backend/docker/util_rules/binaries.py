@@ -1,13 +1,10 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import annotations
-
-import logging
 import os
+from abc import ABC
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import Protocol, TypeVar, cast
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
@@ -21,23 +18,20 @@ from pants.core.util_rules.system_binaries import (
     find_binary,
 )
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import concurrently
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
-logger = logging.getLogger(__name__)
+T = TypeVar("T", bound="BaseBinary")
 
 
 @dataclass(frozen=True)
-class DockerBinary(BinaryPath):
-    """The `docker` binary."""
+class BaseBinary(BinaryPath, ABC):
+    """Base class for all binary paths."""
 
     extra_env: Mapping[str, str]
     extra_input_digests: Mapping[str, Digest] | None
-
-    is_podman: bool
 
     def __init__(
         self,
@@ -45,11 +39,9 @@ class DockerBinary(BinaryPath):
         fingerprint: str | None = None,
         extra_env: Mapping[str, str] | None = None,
         extra_input_digests: Mapping[str, Digest] | None = None,
-        is_podman: bool = False,
     ) -> None:
         object.__setattr__(self, "extra_env", {} if extra_env is None else extra_env)
         object.__setattr__(self, "extra_input_digests", extra_input_digests)
-        object.__setattr__(self, "is_podman", is_podman)
         super().__init__(path, fingerprint)
 
     def _get_process_environment(self, env: Mapping[str, str]) -> Mapping[str, str]:
@@ -64,6 +56,8 @@ class DockerBinary(BinaryPath):
         )
         return res
 
+
+class BuildBinaryProtocol(Protocol):
     def build_image(
         self,
         tags: tuple[str, ...],
@@ -72,15 +66,26 @@ class DockerBinary(BinaryPath):
         build_args: DockerBuildArgs,
         context_root: str,
         env: Mapping[str, str],
-        use_buildx: bool,
+        extra_args: tuple[str, ...] = (),
+    ) -> Process: ...
+
+
+class PushBinaryProtocol(Protocol):
+    def push_image(self, tag: str, env: Mapping[str, str] | None = None) -> Process: ...
+
+
+class _DockerPodmanMixin(BaseBinary):
+    def build_image(
+        self,
+        tags: tuple[str, ...],
+        digest: Digest,
+        dockerfile: str,
+        build_args: DockerBuildArgs,
+        context_root: str,
+        env: Mapping[str, str],
         extra_args: tuple[str, ...] = (),
     ) -> Process:
-        if use_buildx:
-            build_commands = ["buildx", "build"]
-        else:
-            build_commands = ["build"]
-
-        args = [self.path, *build_commands, *extra_args]
+        args = [self.path, "build", *extra_args]
 
         for tag in tags:
             args.extend(["--tag", tag])
@@ -125,11 +130,71 @@ class DockerBinary(BinaryPath):
         env: Mapping[str, str] | None = None,
     ) -> Process:
         return Process(
-            argv=(self.path, "run", *(docker_run_args or []), tag, *(image_args or [])),
+            argv=(
+                self.path,
+                "run",
+                *(docker_run_args or []),
+                tag,
+                *(image_args or []),
+            ),
             cache_scope=ProcessCacheScope.PER_SESSION,
             description=f"Running docker image {tag}",
             env=self._get_process_environment(env or {}),
             immutable_input_digests=self.extra_input_digests,
+        )
+
+
+class DockerBinary(_DockerPodmanMixin):
+    """The `docker` binary."""
+
+
+class PodmanBinary(_DockerPodmanMixin):
+    """The `podman` binary."""
+
+
+class BuildctlBinary(BaseBinary):
+    """The `buildctl` binary."""
+
+    def build_image(
+        self,
+        tags: tuple[str, ...],
+        digest: Digest,
+        dockerfile: str,
+        build_args: DockerBuildArgs,
+        context_root: str,
+        env: Mapping[str, str],
+        extra_args: tuple[str, ...] = (),
+    ) -> Process:
+        args = [
+            self.path,
+            "build",
+            "--frontend",
+            "dockerfile.v0",
+            "--local",
+            f"context={context_root}",
+            "--local",
+            f"dockerfile={os.path.dirname(dockerfile)}",
+            "--opt",
+            f"filename={os.path.basename(dockerfile)}",
+            *extra_args,
+        ]
+
+        for build_arg in build_args:
+            args.extend(["--opt", f"build-arg:{build_arg}"])
+
+        for tag in tags:
+            args.extend(["--output", f"type=image,name={tag},push=true"])
+
+        return Process(
+            argv=tuple(args),
+            description=(
+                f"Building docker image {tags[0]}"
+                + (f" +{pluralize(len(tags) - 1, 'additional tag')}." if len(tags) > 1 else "")
+            ),
+            env=self._get_process_environment(env),
+            input_digest=digest,
+            immutable_input_digests=self.extra_input_digests,
+            cache_scope=ProcessCacheScope.PER_SESSION,
         )
 
 
@@ -189,57 +254,58 @@ async def _get_docker_tools_shims(
     return tools_shims
 
 
-@rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
-async def get_docker(
-    docker_options: DockerOptions, docker_options_env_aware: DockerOptions.EnvironmentAware
-) -> DockerBinary:
+async def get_binary(
+    binary_name: str,
+    binary_cls: type[T],
+    docker_options: DockerOptions,
+    docker_options_env_aware: DockerOptions.EnvironmentAware,
+) -> T:
     search_path = docker_options_env_aware.executable_search_path
 
-    first_path: BinaryPath | None = None
-    is_podman = False
-
-    if getattr(docker_options.options, "experimental_enable_podman", False):
-        # Enable podman support with `pants.backend.experimental.docker.podman`
-        request = BinaryPathRequest(
-            binary_name="podman",
-            search_path=search_path,
-            test=BinaryPathTest(args=["-v"]),
-        )
-        paths = await find_binary(request, **implicitly())
-        first_path = paths.first_path
-        if first_path:
-            is_podman = True
-            logger.warning("podman found. Podman support is experimental.")
-
-    if not first_path:
-        request = BinaryPathRequest(
-            binary_name="docker",
-            search_path=search_path,
-            test=BinaryPathTest(args=["-v"]),
-        )
-        paths = await find_binary(request, **implicitly())
-        first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
+    request = BinaryPathRequest(
+        binary_name=binary_name,
+        search_path=search_path,
+        test=BinaryPathTest(args=["-v"]),
+    )
+    paths = await find_binary(request, **implicitly())
+    first_path = paths.first_path_or_raise(request, rationale="interact with the docker daemon")
 
     if not docker_options.tools and not docker_options.optional_tools:
-        return DockerBinary(first_path.path, first_path.fingerprint, is_podman=is_podman)
+        return binary_cls(first_path.path, first_path.fingerprint)
 
     tools_shims = await _get_docker_tools_shims(
         tools=docker_options.tools,
         optional_tools=docker_options.optional_tools,
         search_path=search_path,
-        rationale="use docker",
+        rationale=f"use {binary_name}",
     )
-
-    extra_env = {"PATH": tools_shims.path_component}
-    extra_input_digests = tools_shims.immutable_input_digests
-
-    return DockerBinary(
+    return binary_cls(
         first_path.path,
         first_path.fingerprint,
-        extra_env=extra_env,
-        extra_input_digests=extra_input_digests,
-        is_podman=is_podman,
+        extra_env={"PATH": tools_shims.path_component},
+        extra_input_digests=tools_shims.immutable_input_digests,
     )
+
+
+@rule(desc="Finding the `docker` binary and related tooling", level=LogLevel.DEBUG)
+async def get_docker(
+    docker_options: DockerOptions, docker_options_env_aware: DockerOptions.EnvironmentAware
+) -> DockerBinary:
+    return await get_binary("docker", DockerBinary, docker_options, docker_options_env_aware)
+
+
+@rule(desc="Finding the `podman` binary and related tooling", level=LogLevel.DEBUG)
+async def get_podman(
+    docker_options: DockerOptions, docker_options_env_aware: DockerOptions.EnvironmentAware
+) -> PodmanBinary:
+    return await get_binary("podman", PodmanBinary, docker_options, docker_options_env_aware)
+
+
+@rule(desc="Finding the `buildctl` binary and related tooling", level=LogLevel.DEBUG)
+async def get_buildctl(
+    docker_options: DockerOptions, docker_options_env_aware: DockerOptions.EnvironmentAware
+) -> BuildctlBinary:
+    return await get_binary("buildctl", BuildctlBinary, docker_options, docker_options_env_aware)
 
 
 def rules():
