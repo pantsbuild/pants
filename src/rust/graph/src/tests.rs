@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use futures::future;
 use parking_lot::Mutex;
-use rand::{self, Rng};
+use rand::RngExt;
 use task_executor::Executor;
 use tokio::time::{error::Elapsed, sleep, timeout};
 

@@ -9,6 +9,7 @@ use crate::entry::{Entry, Generation, RunToken};
 
 use std::collections::VecDeque;
 use std::fs::File;
+use std::hash::RandomState;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::sync::{Arc, Weak};
@@ -149,7 +150,7 @@ impl<N: Node> InnerGraph<N> {
                 .neighbors_directed(*running_candidate, Direction::Incoming)
                 .find(|id| running_scc.contains(id))
                 .unwrap();
-            let running_path: Vec<_> = petgraph::algo::all_simple_paths(
+            let running_path = petgraph::algo::all_simple_paths::<Vec<_>, _, RandomState>(
                 &running_graph,
                 *running_candidate,
                 running_predecessor,

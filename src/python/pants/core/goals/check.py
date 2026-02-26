@@ -24,10 +24,12 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST, Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.selectors import concurrently
-from pants.engine.process import FallibleProcessResult
+from pants.engine.internals.session import RunId
+from pants.engine.process import FallibleProcessResult, ProcessCacheScope, ProcessResultMetadata
 from pants.engine.rules import QueryRule, collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import FieldSet, FilteredTargets
 from pants.engine.unions import UnionMembership, union
+from pants.option.option_types import BoolOption
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
@@ -45,6 +47,7 @@ class CheckResult:
     stderr: str
     partition_description: str | None = None
     report: Digest = EMPTY_DIGEST
+    result_metadata: ProcessResultMetadata | None = None
 
     @staticmethod
     def from_fallible_process_result(
@@ -60,6 +63,7 @@ class CheckResult:
             stderr=output_simplifier.simplify(process_result.stderr),
             partition_description=partition_description,
             report=report,
+            result_metadata=process_result.metadata,
         )
 
     def metadata(self) -> dict[str, Any]:
@@ -77,10 +81,18 @@ class CheckResults(EngineAwareReturnType):
 
     results: tuple[CheckResult, ...]
     checker_name: str
+    output_per_partition: bool
 
-    def __init__(self, results: Iterable[CheckResult], *, checker_name: str) -> None:
+    def __init__(
+        self,
+        results: Iterable[CheckResult],
+        *,
+        checker_name: str,
+        output_per_partition: bool = True,
+    ) -> None:
         object.__setattr__(self, "results", tuple(results))
         object.__setattr__(self, "checker_name", checker_name)
+        object.__setattr__(self, "output_per_partition", output_per_partition)
 
     @property
     def skipped(self) -> bool:
@@ -177,11 +189,55 @@ class CheckSubsystem(GoalSubsystem):
         return CheckRequest in union_membership
 
     only = OnlyOption("checker", "mypy", "javac")
+    force = BoolOption(
+        default=False,
+        help="Force checks to run, even if they could be satisfied from cache.",
+    )
+
+    @property
+    def default_process_cache_scope(self) -> ProcessCacheScope:
+        return ProcessCacheScope.PER_SESSION if self.force else ProcessCacheScope.SUCCESSFUL
 
 
 class Check(Goal):
     subsystem_cls = CheckSubsystem
     environment_behavior = Goal.EnvironmentBehavior.USES_ENVIRONMENTS
+
+
+_SOURCE_MAP = {
+    ProcessResultMetadata.Source.MEMOIZED: "memoized",
+    ProcessResultMetadata.Source.RAN: "ran",
+    ProcessResultMetadata.Source.HIT_LOCALLY: "cached locally",
+    ProcessResultMetadata.Source.HIT_REMOTELY: "cached remotely",
+}
+
+
+def _format_check_result(
+    checker_name: str,
+    result: CheckResult,
+    run_id: RunId,
+    console: Console,
+) -> str:
+    """Format a single check result for console output."""
+    sigil = console.sigil_succeeded() if result.exit_code == 0 else console.sigil_failed()
+    status = "succeeded" if result.exit_code == 0 else "failed"
+
+    desc = checker_name
+    if result.partition_description:
+        desc = f"{checker_name} ({result.partition_description})"
+
+    elapsed = ""
+    if result.result_metadata and result.result_metadata.total_elapsed_ms:
+        elapsed = f" in {result.result_metadata.total_elapsed_ms / 1000:.2f}s"
+
+    # Cache source (only show if not RAN)
+    source_desc = ""
+    if result.result_metadata:
+        source = result.result_metadata.source(run_id)
+        if source != ProcessResultMetadata.Source.RAN:
+            source_desc = f" ({_SOURCE_MAP.get(source, source.value)})"
+
+    return f"{sigil} {desc} {status}{elapsed}{source_desc}."
 
 
 @goal_rule
@@ -192,6 +248,7 @@ async def check_goal(
     dist_dir: DistDir,
     union_membership: UnionMembership,
     check_subsystem: CheckSubsystem,
+    run_id: RunId,
 ) -> Check:
     request_types = cast("Iterable[type[CheckRequest]]", union_membership[CheckRequest])
     specified_ids = determine_specified_tool_ids("check", check_subsystem.only, request_types)
@@ -245,14 +302,17 @@ async def check_goal(
     for results in sorted(all_results, key=lambda results: results.checker_name):
         if results.skipped:
             continue
-        elif results.exit_code == 0:
-            sigil = console.sigil_succeeded()
-            status = "succeeded"
-        else:
-            sigil = console.sigil_failed()
-            status = "failed"
+        if results.exit_code != 0:
             exit_code = results.exit_code
-        console.print_stderr(f"{sigil} {results.checker_name} {status}.")
+        if results.output_per_partition:
+            for result in results.results:
+                console.print_stderr(
+                    _format_check_result(results.checker_name, result, run_id, console)
+                )
+        else:
+            sigil = console.sigil_succeeded() if results.exit_code == 0 else console.sigil_failed()
+            status = "succeeded" if results.exit_code == 0 else "failed"
+            console.print_stderr(f"{sigil} {results.checker_name} {status}.")
 
     return Check(exit_code)
 

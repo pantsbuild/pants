@@ -38,7 +38,13 @@ from pants.backend.python.util_rules.python_sources import (
     prepare_python_sources,
 )
 from pants.base.build_root import BuildRoot
-from pants.core.goals.check import REPORT_DIR, CheckRequest, CheckResult, CheckResults
+from pants.core.goals.check import (
+    REPORT_DIR,
+    CheckRequest,
+    CheckResult,
+    CheckResults,
+    CheckSubsystem,
+)
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import (
     CpBinary,
@@ -142,6 +148,7 @@ async def mypy_typecheck_partition(
     first_party_plugins: MyPyFirstPartyPlugins,
     build_root: BuildRoot,
     mypy: MyPy,
+    check_subsystem: CheckSubsystem,
     python_setup: PythonSetup,
     mkdir: MkdirBinary,
     mktemp: MktempBinary,
@@ -271,11 +278,11 @@ async def mypy_typecheck_partition(
                             #
                             # If we can hardlink (this means the two sides of the link are on the
                             # same filesystem), then after mypy runs, we hardlink from the sandbox
-                            # back to the named cache.
+                            # to a temp file in the named cache, then atomically rename it into place.
                             #
-                            # If we can't hardlink, we resort to copying the result next to the
-                            # cache under a temporary name, and finally doing an atomic mv from the
-                            # tempfile to the real one.
+                            # If we can't hardlink, we resort to copying the result to a temp file
+                            # in the named cache, and finally doing an atomic mv from the tempfile
+                            # to the real one.
                             #
                             # In either case, the result is an atomic replacement of the "old" named
                             # cache db, such that old references (via opened file descriptors) are
@@ -312,10 +319,13 @@ async def mypy_typecheck_partition(
                             # left the cache in an inconsistent state.
                             # See https://github.com/python/mypy/issues/6003 for exit codes
                             if [ $EXIT_CODE -le 1 ]; then
-                                if ! {ln.path} "$SANDBOX_CACHE_DB" "$NAMED_CACHE_DB" > /dev/null 2>&1; then
-                                    TMP_CACHE=$({mktemp.path} "$SANDBOX_CACHE_DB.tmp.XXXXXX")
-                                    {cp.path} "$SANDBOX_CACHE_DB" "$TMP_CACHE" > /dev/null 2>&1
-                                    {mv.path} "$TMP_CACHE" "$NAMED_CACHE_DB" > /dev/null 2>&1
+                                if LN_TMP=$({mktemp.path} -u "$NAMED_CACHE_DB.tmp.XXXXXX") &&
+                                   {ln.path} "$SANDBOX_CACHE_DB" "$LN_TMP" > /dev/null 2>&1; then
+                                    {mv.path} "$LN_TMP" "$NAMED_CACHE_DB" > /dev/null 2>&1
+                                else
+                                    CP_TMP=$({mktemp.path} "$NAMED_CACHE_DB.tmp.XXXXXX") &&
+                                        {cp.path} "$SANDBOX_CACHE_DB" "$CP_TMP" > /dev/null 2>&1 &&
+                                        {mv.path} "$CP_TMP" "$NAMED_CACHE_DB" > /dev/null 2>&1
                                 fi
                             fi
 
@@ -366,6 +376,7 @@ async def mypy_typecheck_partition(
             output_directories=(REPORT_DIR,),
             description=f"Run MyPy on {pluralize(len(python_files), 'file')}.",
             level=LogLevel.DEBUG,
+            cache_scope=check_subsystem.default_process_cache_scope,
             append_only_caches={"mypy_cache": named_cache_dir},
         ),
         **implicitly(),
