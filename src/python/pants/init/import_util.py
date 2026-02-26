@@ -34,7 +34,7 @@ def distribution_matches_requirement(dist: Distribution, requirement: Requiremen
 
 def find_matching_distributions(
     requirement: Requirement | None,
-) -> Generator[Distribution, None, None]:
+) -> Generator[Distribution]:
     """Yield distributions matching the given requirement or all active distributions if
     `requirement` is `None`."""
     seen_dist_names: set[NormalizedName] = set()

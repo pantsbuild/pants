@@ -186,7 +186,7 @@ def plugin_resolution(
     use_pypi: bool = False,
 ):
     @contextmanager
-    def provide_chroot(existing: str | None) -> Generator[tuple[str, bool], None, None]:
+    def provide_chroot(existing: str | None) -> Generator[tuple[str, bool]]:
         if existing:
             yield existing, False
         else:
@@ -194,7 +194,7 @@ def plugin_resolution(
                 yield new_chroot, True
 
     @contextmanager
-    def save_sys_path() -> Generator[list[str], None, None]:
+    def save_sys_path() -> Generator[list[str]]:
         """Restores the previous `sys.path` once context ends."""
         orig_sys_path = sys.path
         sys.path = sys.path[:]

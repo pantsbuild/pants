@@ -1,5 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import logging
 import threading
@@ -34,7 +35,7 @@ class PantsService(ABC):
         self.name = self.__class__.__name__
         self._state = _ServiceState()
 
-    def setup(self, services: tuple["PantsService", ...]):
+    def setup(self, services: tuple[PantsService, ...]):
         """Called before `run` to allow for service->service or other side-effecting setup."""
         self.services = services
 
