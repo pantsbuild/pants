@@ -1,5 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import json
 import logging
 from typing import Any
@@ -56,7 +58,7 @@ def pass_through_unserializable_metadata(obj):
 class WorkunitLoggerCallback(WorkunitsCallback):
     """Configuration for WorkunitLogger."""
 
-    def __init__(self, wulogger: "WorkunitLogger"):
+    def __init__(self, wulogger: WorkunitLogger):
         self.wulogger = wulogger
         self._completed_workunits: dict[str, object] = {}
 

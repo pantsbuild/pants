@@ -12,7 +12,7 @@ from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree, touch
 
 
 @pytest.fixture
-def tmp_build_root() -> Generator[tuple[BuildRoot, str, str], None, None]:
+def tmp_build_root() -> Generator[tuple[BuildRoot, str, str]]:
     build_root = BuildRoot()
     original_path = build_root.path
     new_path = os.path.realpath(safe_mkdtemp())

@@ -195,7 +195,7 @@ class LoaderTest(unittest.TestCase):
     @contextmanager
     def with_mock_plugin(
         self, name, version, reg=None, alias=None, after=None, rules=None, target_types=None
-    ) -> Generator[str, None, None]:
+    ) -> Generator[str]:
         """Make a fake Distribution (optionally with entry points)
 
         Note the entry points do not actually point to code in the returned distribution --

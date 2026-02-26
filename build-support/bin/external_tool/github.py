@@ -19,7 +19,7 @@ def fetch_releases(url: str) -> list[Release]:
     return releases
 
 
-def _parse_github_releases(json_data: list[Release]) -> Generator[str, None, None]:
+def _parse_github_releases(json_data: list[Release]) -> Generator[str]:
     for release in json_data:
         if "tag_name" in release:
             yield release["tag_name"].strip().lstrip("v")
