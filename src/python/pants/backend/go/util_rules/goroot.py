@@ -120,7 +120,7 @@ async def setup_goroot(
         if compatible_go_version(
             compiler_version=version, target_version=golang_subsystem.minimum_expected_version
         ):
-            env_result = await fallible_to_exec_result_or_raise(  # noqa: PNT30: requires triage
+            env_result = await fallible_to_exec_result_or_raise(
                 **implicitly(
                     Process(
                         (binary_path.path, "env", "-json"),

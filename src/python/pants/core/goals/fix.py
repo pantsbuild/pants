@@ -315,9 +315,7 @@ async def fix_batch_sequential(
     results = []
     for request_type, tool_name, files, key in request:
         batch = request_type(tool_name, files, key, current_snapshot)
-        result = await fix_batch(  # noqa: PNT30: this is inherently sequential
-            **implicitly({batch: AbstractFixRequest.Batch})
-        )
+        result = await fix_batch(**implicitly({batch: AbstractFixRequest.Batch}))
         results.append(result)
 
         assert set(result.output.files) == set(batch.files), (
