@@ -334,13 +334,13 @@ async def setup_user_lockfile_requests(
         return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)
-    find_links: set[str] = set()
+    resolve_to_find_links: dict[str, set[str]] = defaultdict(set)
     for tgt in all_targets:
         if not tgt.has_fields((PythonRequirementResolveField, PythonRequirementsField)):
             continue
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
         resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
-        find_links.update(tgt[PythonRequirementFindLinksField].value or ())
+        resolve_to_find_links[resolve].update(tgt[PythonRequirementFindLinksField].value or ())
 
     tools = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
@@ -352,7 +352,7 @@ async def setup_user_lockfile_requests(
                     requirements=PexRequirements.req_strings_from_requirement_fields(
                         resolve_to_requirements_fields[resolve]
                     ),
-                    find_links=FrozenOrderedSet(find_links),
+                    find_links=FrozenOrderedSet(resolve_to_find_links[resolve]),
                     interpreter_constraints=InterpreterConstraints(
                         python_setup.resolves_to_interpreter_constraints.get(
                             resolve, python_setup.interpreter_constraints
@@ -381,7 +381,7 @@ async def setup_user_lockfile_requests(
             out.add(
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet(sorted(tool.requirements)),
-                    find_links=FrozenOrderedSet(find_links),
+                    find_links=FrozenOrderedSet(),
                     interpreter_constraints=ic,
                     resolve_name=resolve,
                     lockfile_dest=DEFAULT_TOOL_LOCKFILE,
