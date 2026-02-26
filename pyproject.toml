@@ -71,4 +71,4 @@ select = ["I", "UP"]
 ignore = ["UP006", "UP007", "UP018", "UP031", "UP035", "UP036"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["internal_plugins", "pants", "pants_test"]
+known-first-party = ["internal_plugins", "pants", "pants_test", "python_constant"]
