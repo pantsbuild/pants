@@ -298,8 +298,8 @@ def main():
     only_latest = args.version_constraint is None
 
     mapping: dict[str, Releases | None] = {
-        "dl.k8s.io": KubernetesReleases(pool=pool, only_latest=True),
-        "github.com": GithubReleases(only_latest=True),
+        "dl.k8s.io": KubernetesReleases(pool=pool, only_latest=only_latest),
+        "github.com": GithubReleases(only_latest=only_latest),
         "get.helm.sh": HelmReleases(only_latest=only_latest),
         "releases.hashicorp.com": None,  # TODO
         "raw.githubusercontent.com": None,  # TODO
