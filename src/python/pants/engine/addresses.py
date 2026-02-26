@@ -7,12 +7,12 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from pants.build_graph.address import Address as Address
-from pants.build_graph.address import AddressInput as AddressInput  # noqa: F401: rexport.
-from pants.build_graph.address import BuildFileAddress as BuildFileAddress  # noqa: F401: rexport.
-from pants.build_graph.address import (  # noqa: F401: rexport.
+from pants.build_graph.address import AddressInput as AddressInput  # noqa: F401  # rexport
+from pants.build_graph.address import BuildFileAddress as BuildFileAddress  # noqa: F401  # rexport
+from pants.build_graph.address import (  # noqa: F401  # rexport
     BuildFileAddressRequest as BuildFileAddressRequest,
 )
-from pants.build_graph.address import MaybeAddress as MaybeAddress  # noqa: F401: rexport.
+from pants.build_graph.address import MaybeAddress as MaybeAddress  # noqa: F401  # rexport
 from pants.build_graph.address import ResolveError
 from pants.engine.collection import Collection
 from pants.util.strutil import bullet_list

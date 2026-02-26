@@ -49,7 +49,7 @@ async def find_putative_targets(
     paths = tuple(targets)
 
     while paths:
-        digest = await path_globs_to_digest(PathGlobs(paths))  # noqa: PNT30: this is inherently sequential
+        digest = await path_globs_to_digest(PathGlobs(paths))
         result = await parse_openapi_sources(
             ParseOpenApiSources(
                 sources_digest=digest,

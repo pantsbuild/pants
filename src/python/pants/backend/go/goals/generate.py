@@ -219,7 +219,7 @@ async def _run_generators(
             args[i] = _expand_env(arg, env)
 
         # Invoke the subprocess and store its output for use as input root of next command (if any).
-        result = await execute_process_or_raise(  # noqa: PNT30: this is inherently sequential
+        result = await execute_process_or_raise(
             **implicitly(
                 Process(
                     argv=args,
@@ -232,9 +232,7 @@ async def _run_generators(
             ),
         )
 
-        digest = await add_prefix(  # noqa: PNT30: this is inherently sequential
-            AddPrefix(result.output_digest, dir_path)
-        )
+        digest = await add_prefix(AddPrefix(result.output_digest, dir_path))
 
     return digest
 
@@ -322,7 +320,7 @@ async def run_go_package_generators(
         output_digest_for_go_file = await _run_generators(
             analysis, pkg_digest.digest, dir_path, go_file, goroot, env
         )
-        output_digest = await merge_digests_with_overwrite(  # noqa: PNT30: requires triage
+        output_digest = await merge_digests_with_overwrite(
             OverwriteMergeDigests(output_digest, output_digest_for_go_file)
         )
 

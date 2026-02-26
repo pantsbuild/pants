@@ -116,9 +116,7 @@ async def execute_process_with_retry(req: ProcessWithRetries) -> ProcessResultWi
     results: list[FallibleProcessResult] = []
     for attempt in range(0, req.attempts):
         proc = dataclasses.replace(req.proc, attempt=attempt)
-        result = await execute_process(  # noqa: PNT30: We only know that we need to rerun the test after we run it
-            proc, **implicitly()
-        )
+        result = await execute_process(proc, **implicitly())
         results.append(result)
         if result.exit_code == 0:
             break
