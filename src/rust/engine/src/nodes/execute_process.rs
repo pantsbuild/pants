@@ -15,6 +15,7 @@ use process_execution::{
 use pyo3::Bound;
 use pyo3::prelude::{PyAny, Python};
 use pyo3::pybacked::PyBackedStr;
+use pyo3::types::PyAnyMethods;
 use store::{self, Store, StoreError};
 use workunit_store::{
     Metric, ObservationMetric, RunningWorkunit, UserMetadataItem, WorkunitMetadata,
@@ -81,6 +82,18 @@ impl ExecuteProcess {
             .map_err(|e| format!("Failed to get `working_directory` from field: {e}"))?
             .map(RelativePath::new)
             .transpose()?;
+
+        let stdin = {
+            let stdin_py: Bound<'_, PyAny> = externs::getattr(value, "stdin")?;
+            if stdin_py.is_none() {
+                None
+            } else {
+                let stdin_bytes: Vec<u8> = stdin_py
+                    .extract()
+                    .map_err(|e| format!("Failed to extract `stdin` bytes: {e}"))?;
+                Some(stdin_bytes)
+            }
+        };
 
         let output_files = externs::getattr::<Vec<String>>(value, "output_files")?
             .into_iter()
@@ -165,6 +178,7 @@ impl ExecuteProcess {
             env,
             working_directory,
             input_digests,
+            stdin,
             output_files,
             output_directories,
             timeout,

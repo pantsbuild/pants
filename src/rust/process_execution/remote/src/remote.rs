@@ -905,6 +905,17 @@ impl process_execution::CommandRunner for CommandRunner {
         _workunit: &mut RunningWorkunit,
         request: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+        // Remote execution does not support stdin.
+        // This is checked up in the python engine, but checking
+        // here as well in case another caller comes along.
+        if request.stdin.is_some() {
+            return Err(ProcessError::Unclassified(format!(
+                "Process '{}' cannot use stdin with remote execution. \
+                     Configure the process to run locally or remove stdin.",
+                request.description
+            )));
+        }
+
         // Retrieve capabilities for this server.
         let capabilities = self.get_capabilities().await?;
         trace!("RE capabilities: {:?}", &capabilities);
