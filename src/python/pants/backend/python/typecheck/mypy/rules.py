@@ -14,6 +14,7 @@ import packaging
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.typecheck.mypy.subsystem import (
     MyPy,
+    MyPyCacheMode,
     MyPyConfigFile,
     MyPyFieldSet,
     MyPyFirstPartyPlugins,
@@ -87,6 +88,30 @@ class MyPyRequest(CheckRequest):
     tool_name = MyPy.options_scope
 
 
+def _get_cache_args(
+    mypy_version: packaging.version.Version,
+    python_version: str | None,
+    cache_mode: MyPyCacheMode,
+    cache_dir: str,
+) -> tuple[str, ...]:
+    if (
+        mypy_version > packaging.version.Version("0.700")
+        and python_version is not None
+        and cache_mode == MyPyCacheMode.sqlite
+    ):
+        return (
+            # Skip mtime checks because we don't propagate mtime when materializing the
+            # sandbox, so the mtime checks will always fail otherwise.
+            "--skip-cache-mtime-check",
+            # See "__mypy_runner.sh" below for explanation
+            "--sqlite-cache",  # Added in v 0.660
+            "--cache-dir",
+            cache_dir,
+        )
+    else:
+        return ("--cache-dir=/dev/null",)
+
+
 async def _generate_argv(
     mypy: MyPy,
     *,
@@ -105,16 +130,7 @@ async def _generate_argv(
     mypy_pex_info = await determine_venv_pex_resolve_info(pex)
     mypy_info = mypy_pex_info.find("mypy")
     assert mypy_info is not None
-    if mypy_info.version > packaging.version.Version("0.700") and python_version is not None:
-        # Skip mtime checks because we don't propagate mtime when materializing the sandbox, so the
-        # mtime checks will always fail otherwise.
-        args.append("--skip-cache-mtime-check")
-        # See "__run_wrapper.sh" below for explanation
-        args.append("--sqlite-cache")  # Added in v 0.660
-        args.extend(("--cache-dir", cache_dir))
-    else:
-        # Don't bother caching
-        args.append("--cache-dir=/dev/null")
+    args.extend(_get_cache_args(mypy_info.version, python_version, mypy.cache_mode, cache_dir))
     args.append(f"@{file_list_path}")
     return tuple(args)
 
@@ -254,84 +270,93 @@ async def mypy_typecheck_partition(
         python_version=py_version,
     )
 
+    mypy_command = " ".join(shell_quote(arg) for arg in argv)
+
+    if mypy.cache_mode == MyPyCacheMode.none:
+        script_content = dedent(f"""\
+            {mypy_command}
+        """)
+    else:
+        sandbox_cache_dir = f"{run_cache_dir}/{py_version}"
+
+        script_content = dedent(f"""\
+            # We want to leverage the MyPy cache for fast incremental runs of MyPy.
+            # Pants exposes "append_only_caches" we can leverage, but with the caveat
+            # that it requires either only appending files, or multiprocess-safe access.
+            #
+            # MyPy guarantees neither, but there's workarounds!
+            #
+            # By default, MyPy uses 2 cache files per source file, which introduces a
+            # whole slew of race conditions. We can minimize the race conditions by
+            # using MyPy's SQLite cache. MyPy still has race conditions when using the
+            # db, as it issues at least 2 single-row queries per source file at different
+            # points in time (therefore SQLite's own safety guarantees don't apply).
+            #
+            # Our workaround depends on whether we can hardlink between the sandbox
+            # and cache or not.
+            #
+            # If we can hardlink (this means the two sides of the link are on the
+            # same filesystem), then after mypy runs, we hardlink from the sandbox
+            # to a temp file in the named cache, then atomically rename it into place.
+            #
+            # If we can't hardlink, we resort to copying the result to a temp file
+            # in the named cache, and finally doing an atomic mv from the tempfile
+            # to the real one.
+            #
+            # In either case, the result is an atomic replacement of the "old" named
+            # cache db, such that old references (via opened file descriptors) are
+            # still valid, but new references use the new contents.
+            #
+            # There is a chance of multiple processes thrashing on the cache, leaving
+            # it in a state that doesn't reflect reality at the current point in time,
+            # and forcing other processes to do potentially done work. This strategy
+            # still provides a net benefit because the cache is generally _mostly_
+            # valid (it includes entries for the standard library, and 3rdparty deps,
+            # among 1stparty sources), and even in the worst case
+            # (every single file has changed) the overhead of missing the cache each
+            # query should be small when compared to the work being done of typechecking.
+            #
+            # Lastly, we expect that since this is run through Pants which attempts
+            # to partition MyPy runs by python version (which the DB is independent
+            # for different versions) and uses a one-process-at-a-time daemon by default,
+            # multiple MyPy processes operating on a single db cache should be rare.
+
+            NAMED_CACHE_DIR="{mypy_cache_dir}/{py_version}"
+            NAMED_CACHE_DB="$NAMED_CACHE_DIR/cache.db"
+            SANDBOX_CACHE_DIR="{sandbox_cache_dir}"
+            SANDBOX_CACHE_DB="$SANDBOX_CACHE_DIR/cache.db"
+
+            {mkdir.path} -p "$NAMED_CACHE_DIR" > /dev/null 2>&1
+            {mkdir.path} -p "$SANDBOX_CACHE_DIR" > /dev/null 2>&1
+            {cp.path} "$NAMED_CACHE_DB" "$SANDBOX_CACHE_DB" > /dev/null 2>&1
+
+            {mypy_command}
+            EXIT_CODE=$?
+
+            # Only update the cache on successful runs (exit code 0 or 1).
+            # Exit code 2 indicates a crash or internal error, which may have
+            # left the cache in an inconsistent state.
+            # See https://github.com/python/mypy/issues/6003 for exit codes
+            if [ $EXIT_CODE -le 1 ]; then
+                if LN_TMP=$({mktemp.path} -u "$NAMED_CACHE_DB.tmp.XXXXXX") &&
+                   {ln.path} "$SANDBOX_CACHE_DB" "$LN_TMP" > /dev/null 2>&1; then
+                    {mv.path} "$LN_TMP" "$NAMED_CACHE_DB" > /dev/null 2>&1
+                else
+                    CP_TMP=$({mktemp.path} "$NAMED_CACHE_DB.tmp.XXXXXX") &&
+                        {cp.path} "$SANDBOX_CACHE_DB" "$CP_TMP" > /dev/null 2>&1 &&
+                        {mv.path} "$CP_TMP" "$NAMED_CACHE_DB" > /dev/null 2>&1
+                fi
+            fi
+
+            exit $EXIT_CODE
+        """)
+
     script_runner_digest = await create_digest(
         CreateDigest(
             [
                 FileContent(
                     "__mypy_runner.sh",
-                    dedent(
-                        f"""\
-                            # We want to leverage the MyPy cache for fast incremental runs of MyPy.
-                            # Pants exposes "append_only_caches" we can leverage, but with the caveat
-                            # that it requires either only appending files, or multiprocess-safe access.
-                            #
-                            # MyPy guarantees neither, but there's workarounds!
-                            #
-                            # By default, MyPy uses 2 cache files per source file, which introduces a
-                            # whole slew of race conditions. We can minimize the race conditions by
-                            # using MyPy's SQLite cache. MyPy still has race conditions when using the
-                            # db, as it issues at least 2 single-row queries per source file at different
-                            # points in time (therefore SQLite's own safety guarantees don't apply).
-                            #
-                            # Our workaround depends on whether we can hardlink between the sandbox
-                            # and cache or not.
-                            #
-                            # If we can hardlink (this means the two sides of the link are on the
-                            # same filesystem), then after mypy runs, we hardlink from the sandbox
-                            # to a temp file in the named cache, then atomically rename it into place.
-                            #
-                            # If we can't hardlink, we resort to copying the result to a temp file
-                            # in the named cache, and finally doing an atomic mv from the tempfile
-                            # to the real one.
-                            #
-                            # In either case, the result is an atomic replacement of the "old" named
-                            # cache db, such that old references (via opened file descriptors) are
-                            # still valid, but new references use the new contents.
-                            #
-                            # There is a chance of multiple processes thrashing on the cache, leaving
-                            # it in a state that doesn't reflect reality at the current point in time,
-                            # and forcing other processes to do potentially done work. This strategy
-                            # still provides a net benefit because the cache is generally _mostly_
-                            # valid (it includes entries for the standard library, and 3rdparty deps,
-                            # among 1stparty sources), and even in the worst case
-                            # (every single file has changed) the overhead of missing the cache each
-                            # query should be small when compared to the work being done of typechecking.
-                            #
-                            # Lastly, we expect that since this is run through Pants which attempts
-                            # to partition MyPy runs by python version (which the DB is independent
-                            # for different versions) and uses a one-process-at-a-time daemon by default,
-                            # multiple MyPy processes operating on a single db cache should be rare.
-
-                            NAMED_CACHE_DIR="{mypy_cache_dir}/{py_version}"
-                            NAMED_CACHE_DB="$NAMED_CACHE_DIR/cache.db"
-                            SANDBOX_CACHE_DIR="{run_cache_dir}/{py_version}"
-                            SANDBOX_CACHE_DB="$SANDBOX_CACHE_DIR/cache.db"
-
-                            {mkdir.path} -p "$NAMED_CACHE_DIR" > /dev/null 2>&1
-                            {mkdir.path} -p "$SANDBOX_CACHE_DIR" > /dev/null 2>&1
-                            {cp.path} "$NAMED_CACHE_DB" "$SANDBOX_CACHE_DB" > /dev/null 2>&1
-
-                            {" ".join(shell_quote(arg) for arg in argv)}
-                            EXIT_CODE=$?
-
-                            # Only update the cache on successful runs (exit code 0 or 1).
-                            # Exit code 2 indicates a crash or internal error, which may have
-                            # left the cache in an inconsistent state.
-                            # See https://github.com/python/mypy/issues/6003 for exit codes
-                            if [ $EXIT_CODE -le 1 ]; then
-                                if LN_TMP=$({mktemp.path} -u "$NAMED_CACHE_DB.tmp.XXXXXX") &&
-                                   {ln.path} "$SANDBOX_CACHE_DB" "$LN_TMP" > /dev/null 2>&1; then
-                                    {mv.path} "$LN_TMP" "$NAMED_CACHE_DB" > /dev/null 2>&1
-                                else
-                                    CP_TMP=$({mktemp.path} "$NAMED_CACHE_DB.tmp.XXXXXX") &&
-                                        {cp.path} "$SANDBOX_CACHE_DB" "$CP_TMP" > /dev/null 2>&1 &&
-                                        {mv.path} "$CP_TMP" "$NAMED_CACHE_DB" > /dev/null 2>&1
-                                fi
-                            fi
-
-                            exit $EXIT_CODE
-                        """
-                    ).encode(),
+                    script_content.encode(),
                     is_executable=True,
                 )
             ]
@@ -368,6 +393,12 @@ async def mypy_typecheck_partition(
         "MYPY_FORCE_TERMINAL_WIDTH": "642092230765939",
     }
 
+    # Only use append_only_caches when caching is enabled
+    if mypy.cache_mode == MyPyCacheMode.none:
+        append_only_caches = {}
+    else:
+        append_only_caches = {"mypy_cache": named_cache_dir}
+
     process = await setup_venv_pex_process(
         VenvPexProcess(
             mypy_pex,
@@ -377,7 +408,7 @@ async def mypy_typecheck_partition(
             description=f"Run MyPy on {pluralize(len(python_files), 'file')}.",
             level=LogLevel.DEBUG,
             cache_scope=check_subsystem.default_process_cache_scope,
-            append_only_caches={"mypy_cache": named_cache_dir},
+            append_only_caches=append_only_caches,
         ),
         **implicitly(),
     )
