@@ -61,6 +61,28 @@ $ pants generate-lockfiles
 
 The inputs used to generate a lockfile are third-party dependencies in your repo, expressed via [`python_requirement` targets](./third-party-dependencies.mdx) , or the `python_requirements` / `poetry_requirements` generator targets. In this case, since you haven't yet explicitly mapped your requirement targets to a resolve, they will all map to `python-default`, and so all serve as inputs to the default lockfile.
 
+### Using uv for faster resolution (experimental)
+
+If `pants generate-lockfiles` is slow due to dependency resolution, you can opt in to using
+[uv](https://github.com/astral-sh/uv) to pre-resolve pinned requirements, while still generating a
+Pex lockfile.
+
+```toml title="pants.toml"
+[python]
+lockfile_resolver = "uv"
+# Currently required: lock with a single Python major/minor version.
+interpreter_constraints = ["CPython==3.11.*"]
+
+[uv]
+# Example uv flag support.
+args = ["--index-strategy", "unsafe-first-match"]
+```
+
+Limitations:
+
+- Only supported with `lock_style="strict"` or `lock_style="sources"` (not `universal`).
+- Not supported with `complete_platforms`.
+
 ### Multiple lockfiles
 
 It's generally simpler to have a single resolve for the whole repository, if you can get away with it. But sometimes you may need more than one resolve, if you genuinely have conflicting requirements in different parts of your repo. For example, you may have both Django 3 and Django 4 projects in your repo.

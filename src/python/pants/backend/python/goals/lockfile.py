@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from operator import itemgetter
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import LockfileResolver, PythonSetup
+from pants.backend.python.subsystems.uv import Uv
 from pants.backend.python.target_types import (
     PythonRequirementFindLinksField,
     PythonRequirementResolveField,
@@ -44,21 +45,25 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
 )
 from pants.core.goals.resolves import ExportableTool
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.intrinsics import create_digest, get_digest_contents, merge_digests
-from pants.engine.process import ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.platform import Platform
+from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.errors import OptionsError
 from pants.option.subsystem import _construct_subsystem
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.pip_requirement import PipRequirement
+from pants.util.strutil import softwrap
 
 
 @dataclass(frozen=True)
@@ -87,6 +92,22 @@ class _PipArgsAndConstraintsSetup:
     digest: Digest
 
 
+def _strip_named_repo(value: str) -> str:
+    """Strip Pex-style named repo values like `name=https://...` down to the URL/path.
+
+    Pants allows `[python-repos].indexes` / `[python-repos].find_links` entries to optionally be
+    named so they can be referenced by `--source` in Pex. `uv` does not understand this syntax.
+    """
+    maybe_name, maybe_url = value.split("=", 1) if "=" in value else ("", value)
+    if (
+        maybe_name
+        and "://" not in maybe_name
+        and ("://" in maybe_url or maybe_url.startswith("file:"))
+    ):
+        return maybe_url
+    return value
+
+
 async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAndConstraintsSetup:
     resolve_config = await determine_resolve_pex_config(
         ResolvePexConfigRequest(resolve_name), **implicitly()
@@ -109,6 +130,8 @@ async def generate_lockfile(
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_setup: PythonSetup,
     pex_subsystem: PexSubsystem,
+    uv: Uv,
+    platform: Platform,
 ) -> GenerateLockfileResult:
     if not req.requirements:
         raise ValueError(
@@ -117,6 +140,82 @@ async def generate_lockfile(
 
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
     header_delimiter = "//"
+
+    use_uv = python_setup.lockfile_resolver == LockfileResolver.uv
+    uv_compile_output_digest: Digest | None = None
+    uv_compiled_requirements_path = "__uv_compiled_requirements.txt"
+    resolve_config = pip_args_setup.resolve_config
+
+    if use_uv:
+        if req.lock_style == "universal":
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    `[python].lockfile_resolver = "uv"` does not yet support `lock_style="universal"`.
+
+                    To use uv today, set `[python].resolves_to_lock_style` for `{req.resolve_name}` to
+                    `"strict"` or `"sources"`, or set `[python].lockfile_resolver = "pip"`.
+                    """
+                )
+            )
+        if req.complete_platforms:
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    `[python].lockfile_resolver = "uv"` does not yet support `complete_platforms`.
+
+                    Either remove `[python].resolves_to_complete_platforms` for `{req.resolve_name}`,
+                    or set `[python].lockfile_resolver = "pip"`.
+                    """
+                )
+            )
+
+        if resolve_config.overrides or resolve_config.sources or resolve_config.excludes:
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    `[python].lockfile_resolver = "uv"` is not yet compatible with per-resolve
+                    `overrides`, `sources`, or `excludes` for `{req.resolve_name}`.
+
+                    Either remove these settings for the resolve, or set `[python].lockfile_resolver = "pip"`.
+                    """
+                )
+            )
+
+        # `uv pip compile` resolves for a single interpreter, so only enable it when
+        # interpreter constraints narrow to a single major/minor version.
+        if not req.interpreter_constraints:
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    `[python].lockfile_resolver = "uv"` requires interpreter constraints to be set
+                    (and to select a single Python major/minor version) for `{req.resolve_name}`.
+
+                    For example:
+                      [python]
+                      interpreter_constraints = [\"CPython==3.11.*\"]
+                    """
+                )
+            )
+        majors_minors = {
+            (maj, minor)
+            for maj, minor, _ in req.interpreter_constraints.enumerate_python_versions(
+                python_setup.interpreter_versions_universe
+            )
+        }
+        if len(majors_minors) != 1:
+            raise OptionsError(
+                softwrap(
+                    f"""
+                    `[python].lockfile_resolver = "uv"` currently requires interpreter constraints
+                    to select exactly one Python major/minor version for `{req.resolve_name}`, but
+                    the constraints `{req.interpreter_constraints}` select: {sorted(majors_minors)}.
+
+                    Either narrow your constraints (e.g. `CPython==3.11.*`) or set
+                    `[python].lockfile_resolver = "pip"`.
+                    """
+                )
+            )
 
     python = await find_interpreter(req.interpreter_constraints, **implicitly())
 
@@ -158,6 +257,81 @@ async def generate_lockfile(
         # platform arguments - PEX will lock for the current platform only
         target_system_args = ()
 
+    if use_uv:
+        downloaded_uv = await download_external_tool(uv.get_request(platform))
+
+        requirements_in = "__uv_requirements.in"
+        uv_input_digest = await create_digest(
+            CreateDigest(
+                [
+                    FileContent(
+                        requirements_in,
+                        ("\n".join(req.requirements) + "\n").encode("utf-8"),
+                    )
+                ]
+            )
+        )
+
+        uv_index_args: list[str] = []
+        index_urls = [_strip_named_repo(i) for i in resolve_config.indexes]
+        if index_urls:
+            uv_index_args.extend(["--default-index", index_urls[0]])
+            for extra_index in index_urls[1:]:
+                uv_index_args.extend(["--index", extra_index])
+        else:
+            uv_index_args.append("--no-index")
+
+        uv_find_links_args = list(
+            itertools.chain.from_iterable(
+                ["--find-links", _strip_named_repo(link)]
+                for link in (*resolve_config.find_links, *req.find_links)
+            )
+        )
+
+        uv_constraints_args: list[str] = []
+        if resolve_config.constraints_file:
+            uv_constraints_args.extend(["--constraints", resolve_config.constraints_file.path])
+
+        uv_build_args: list[str] = []
+        if resolve_config.no_binary:
+            uv_build_args.extend(["--no-binary", ",".join(resolve_config.no_binary)])
+        if resolve_config.only_binary:
+            uv_build_args.extend(["--only-binary", ",".join(resolve_config.only_binary)])
+
+        uv_process_input_digest = await merge_digests(
+            MergeDigests([downloaded_uv.digest, uv_input_digest, pip_args_setup.digest])
+        )
+        uv_result = await fallible_to_exec_result_or_raise(
+            **implicitly(
+                Process(
+                    argv=(
+                        downloaded_uv.exe,
+                        "pip",
+                        "compile",
+                        requirements_in,
+                        "--output-file",
+                        uv_compiled_requirements_path,
+                        "--format",
+                        "requirements.txt",
+                        "--no-header",
+                        "--no-annotate",
+                        "--python",
+                        python.path,
+                        *uv_index_args,
+                        *uv_find_links_args,
+                        *uv_constraints_args,
+                        *uv_build_args,
+                        *uv.args,
+                    ),
+                    input_digest=uv_process_input_digest,
+                    output_files=(uv_compiled_requirements_path,),
+                    description=f"Resolve requirements for {req.resolve_name} with uv",
+                    cache_scope=ProcessCacheScope.PER_SESSION,
+                )
+            )
+        )
+        uv_compile_output_digest = uv_result.output_digest
+
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
             PexCliProcess(
@@ -192,11 +366,20 @@ async def generate_lockfile(
                         f"--override={override}"
                         for override in pip_args_setup.resolve_config.overrides
                     ),
-                    *req.requirements,
+                    *(
+                        (
+                            "--no-transitive",
+                            "--requirement",
+                            uv_compiled_requirements_path,
+                        )
+                        if use_uv
+                        else tuple(req.requirements)
+                    ),
                 ),
                 additional_input_digest=await merge_digests(
                     MergeDigests(
                         [pip_args_setup.digest]
+                        + ([uv_compile_output_digest] if uv_compile_output_digest else [])
                         + ([complete_platforms.digest] if complete_platforms else [])
                     )
                 ),
