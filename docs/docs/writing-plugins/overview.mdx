@@ -49,6 +49,11 @@ Plugins can be consumed in either of two ways:
 
 It's often convenient to use in-repo plugins, particularly when the plugin is only relevant to a single repo and you want to iterate on it rapidly. In other cases, you may want to publish the plugin, so it can be reused across multiple repos.
 
+:::danger Do you trust the authors of the plugin?
+
+Plugins can run arbitrary code. Review the plugin source or vet the publisher before installing, and consider running it in a restricted environment until you trust it.
+:::
+
 ### Published plugins
 
 You consume published plugins by adding them to the `plugins` option:
