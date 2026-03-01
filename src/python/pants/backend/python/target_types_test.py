@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
 from collections.abc import Iterable
+from dataclasses import dataclass
 from textwrap import dedent
 
 import pytest
