@@ -702,6 +702,30 @@ def test_field_set() -> None:
     assert default_union_field is None
 
 
+def test_field_set_invalid_annotations() -> None:
+    class ValidField(StringField):
+        alias = "valid"
+        default = "default"
+
+    @dataclass(frozen=True)
+    class InvalidStringFieldSet(FieldSet):
+        required_fields = ()
+
+        not_a_field: str
+
+    with pytest.raises(TypeError, match="`Field` subclass or `Field \\| None`"):
+        _ = InvalidStringFieldSet.fields
+
+    @dataclass(frozen=True)
+    class InvalidUnionFieldSet(FieldSet):
+        required_fields = ()
+
+        invalid: ValidField | str
+
+    with pytest.raises(TypeError, match="`Field` subclass or `Field \\| None`"):
+        _ = InvalidUnionFieldSet.none_on_absence_fields
+
+
 # -----------------------------------------------------------------------------------------------
 # Test Field templates
 # -----------------------------------------------------------------------------------------------

@@ -1490,7 +1490,7 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     @final
     @memoized_classproperty
-    def fields(cls) -> FrozenDict[str, type[Field]]:
+    def _field_info(cls) -> FrozenDict[str, tuple[type[Field], bool]]:
         def field_type_from_annotation(annotation: Any) -> tuple[type[Field], bool] | None:
             if isinstance(annotation, type) and issubclass(annotation, Field):
                 return annotation, False
@@ -1499,48 +1499,66 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
             if origin not in (Union, UnionType):
                 return None
 
+            union_args = get_args(annotation)
             field_types = [
-                arg
-                for arg in get_args(annotation)
-                if isinstance(arg, type) and issubclass(arg, Field)
+                arg for arg in union_args if isinstance(arg, type) and issubclass(arg, Field)
             ]
             if len(field_types) != 1:
                 return None
-            return field_types[0], (type(None) in get_args(annotation))
 
-        return FrozenDict(
-            (
-                (name, field_type)
-                for name, annotation in get_type_hints(cls).items()
-                if (field_type_info := field_type_from_annotation(annotation)) is not None
-                for field_type, _ in (field_type_info,)
+            preserve_none_on_absence = type(None) in union_args
+            # Only allow optional Field annotations (`Field | None`).
+            if not preserve_none_on_absence or len(union_args) != 2:
+                return None
+
+            return field_types[0], True
+
+        type_hints = get_type_hints(cls)
+        base_dataclass_field_names = {f.name for f in dataclasses.fields(FieldSet)}
+        parsed: dict[str, tuple[type[Field], bool]] = {}
+        invalid_dataclass_fields: dict[str, Any] = {}
+
+        for dataclass_field in dataclasses.fields(cls):
+            if dataclass_field.name in base_dataclass_field_names:
+                continue
+
+            annotation = type_hints[dataclass_field.name]
+            parsed_annotation = field_type_from_annotation(annotation)
+            if parsed_annotation is None:
+                invalid_dataclass_fields[dataclass_field.name] = annotation
+                continue
+
+            parsed[dataclass_field.name] = parsed_annotation
+
+        if invalid_dataclass_fields:
+            field_set_name = getattr(cls, "__name__", type(cls).__name__)
+            invalid_field_descriptions = ", ".join(
+                f"{name}: {annotation!r}"
+                for name, annotation in sorted(invalid_dataclass_fields.items())
             )
+            raise TypeError(
+                f"The FieldSet `{field_set_name}` has invalid dataclass field annotations. "
+                "Every declared dataclass field on a FieldSet must be annotated with a "
+                "`Field` subclass or `Field | None`. Invalid fields: "
+                f"{invalid_field_descriptions}"
+            )
+
+        return FrozenDict(parsed)
+
+    @final
+    @memoized_classproperty
+    def fields(cls) -> FrozenDict[str, type[Field]]:
+        return FrozenDict(
+            (field_name, field_type) for field_name, (field_type, _) in cls._field_info.items()
         )
 
     @final
     @memoized_classproperty
     def none_on_absence_fields(cls) -> FrozenOrderedSet[str]:
-        def is_optional_field_annotation(annotation: Any) -> bool:
-            origin = get_origin(annotation)
-            if origin not in (Union, UnionType):
-                return False
-
-            return (
-                type(None) in get_args(annotation)
-                and len(
-                    [
-                        arg
-                        for arg in get_args(annotation)
-                        if isinstance(arg, type) and issubclass(arg, Field)
-                    ]
-                )
-                == 1
-            )
-
         return FrozenOrderedSet(
-            name
-            for name, annotation in get_type_hints(cls).items()
-            if is_optional_field_annotation(annotation)
+            field_name
+            for field_name, (_, preserve_none_on_absence) in cls._field_info.items()
+            if preserve_none_on_absence
         )
 
     def debug_hint(self) -> str:
