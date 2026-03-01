@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from collections.abc import Iterable
 from textwrap import dedent
 
@@ -51,11 +52,14 @@ from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
     DependenciesRequest,
+    FieldSet,
     InferredDependencies,
     InvalidFieldException,
     InvalidFieldTypeException,
     InvalidTargetException,
+    StringField,
     Tags,
+    Target,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
@@ -637,7 +641,6 @@ def test_python_dependency_validation_with_parametrized_resolve_repro() -> None:
                 """\
                 [python]
                 enable_resolves = true
-                default_resolve = "a"
                 interpreter_constraints = ["==3.11.*", "==3.14.*"]
                 interpreter_versions_universe = ["3.11", "3.14"]
                 default_to_resolve_interpreter_constraints = true
@@ -716,3 +719,36 @@ def test_python_dependency_validation_with_parametrized_resolve_repro() -> None:
         [DependenciesRequest(derived_a[PythonDependenciesField])],
     )
     assert tuple(resolved) == (base_a.address,)
+
+
+class _ReproRequiredField(StringField):
+    alias = "required"
+    required = True
+
+
+class _ReproOptionalField(StringField):
+    alias = "optional"
+
+
+class _ReproTarget(Target):
+    alias = "repro_target"
+    core_fields = (_ReproRequiredField,)
+
+
+@dataclass(frozen=True)
+class _ReproFieldSet(FieldSet):
+    required_fields = (_ReproRequiredField,)
+
+    required: _ReproRequiredField
+    optional: _ReproOptionalField | None = None
+
+
+def test_field_set_optional_union_field_is_none_when_target_lacks_field_repro() -> None:
+    target = _ReproTarget(
+        {_ReproRequiredField.alias: "value"},
+        Address("src/python/pkg", target_name="repro"),
+    )
+    field_set = _ReproFieldSet.create(target)
+
+    assert field_set.required.value == "value"
+    assert field_set.optional is None

@@ -1385,13 +1385,24 @@ def _generate_file_level_targets(
 # -----------------------------------------------------------------------------------------------
 def _get_field_set_fields_from_target(
     field_set: type[FieldSet], target: Target
-) -> dict[str, Field]:
-    return {
-        dataclass_field_name: (
-            target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
-        )
-        for dataclass_field_name, field_cls in field_set.fields.items()
-    }
+) -> dict[str, Field | None]:
+    result: dict[str, Field | None] = {}
+    for dataclass_field_name, field_cls in field_set.fields.items():
+        if field_cls in field_set.required_fields:
+            result[dataclass_field_name] = target[field_cls]
+            continue
+
+        if dataclass_field_name in field_set.none_on_absence_fields and not target.has_field(
+            field_cls
+        ):
+            # Preserve true optionality for `Field | None` annotations when the target type
+            # doesn't define that field.
+            result[dataclass_field_name] = None
+            continue
+
+        result[dataclass_field_name] = target.get(field_cls)
+
+    return result
 
 
 _FS = TypeVar("_FS", bound="FieldSet")
@@ -1403,8 +1414,9 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses should declare all the fields they consume as dataclass attributes. They should also
     indicate which of these are required, rather than optional, through the class property
-    `required_fields`. When a field is optional, the default constructor for the field will be used
-    for any targets that do not have that field registered.
+    `required_fields`. For fields annotated as `Field | None`, Pants will preserve `None` when the
+    target type does not have that field registered. For non-union `Field` annotations, Pants will
+    construct the default field value when the target type does not have that field registered.
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
@@ -1479,9 +1491,9 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
     @final
     @memoized_classproperty
     def fields(cls) -> FrozenDict[str, type[Field]]:
-        def field_type_from_annotation(annotation: Any) -> type[Field] | None:
+        def field_type_from_annotation(annotation: Any) -> tuple[type[Field], bool] | None:
             if isinstance(annotation, type) and issubclass(annotation, Field):
-                return annotation
+                return annotation, False
 
             origin = get_origin(annotation)
             if origin not in (Union, UnionType):
@@ -1494,14 +1506,41 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
             ]
             if len(field_types) != 1:
                 return None
-            return field_types[0]
+            return field_types[0], (type(None) in get_args(annotation))
 
         return FrozenDict(
             (
                 (name, field_type)
                 for name, annotation in get_type_hints(cls).items()
-                if (field_type := field_type_from_annotation(annotation)) is not None
+                if (field_type_info := field_type_from_annotation(annotation)) is not None
+                for field_type, _ in (field_type_info,)
             )
+        )
+
+    @final
+    @memoized_classproperty
+    def none_on_absence_fields(cls) -> FrozenOrderedSet[str]:
+        def is_optional_field_annotation(annotation: Any) -> bool:
+            origin = get_origin(annotation)
+            if origin not in (Union, UnionType):
+                return False
+
+            return (
+                type(None) in get_args(annotation)
+                and len(
+                    [
+                        arg
+                        for arg in get_args(annotation)
+                        if isinstance(arg, type) and issubclass(arg, Field)
+                    ]
+                )
+                == 1
+            )
+
+        return FrozenOrderedSet(
+            name
+            for name, annotation in get_type_hints(cls).items()
+            if is_optional_field_annotation(annotation)
         )
 
     def debug_hint(self) -> str:

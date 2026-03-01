@@ -653,6 +653,8 @@ def test_field_set() -> None:
     required_tgt = TargetWithRequired({RequiredField.alias: "configured"}, required_addr)
     optional_addr = Address("", target_name="unrelated")
     optional_tgt = TargetWithoutRequired({OptionalField.alias: "configured"}, optional_addr)
+    optional_default_addr = Address("", target_name="optional_default")
+    optional_default_tgt = TargetWithoutRequired({}, optional_default_addr)
     no_fields_addr = Address("", target_name="no_fields")
     no_fields_tgt = NoFieldsTarget({}, no_fields_addr)
     opt_out_addr = Address("", target_name="conditional")
@@ -689,12 +691,15 @@ def test_field_set() -> None:
     assert OptionalFieldSet.create(optional_tgt).optional.value == "configured"
     assert OptionalFieldSet.create(no_fields_tgt).optional.value == OptionalField.default
     assert OptionalUnionFieldSet.fields == FrozenDict({"optional": OptionalField})
+    assert OptionalUnionFieldSet.none_on_absence_fields == FrozenOrderedSet(["optional"])
     optional_union_field = OptionalUnionFieldSet.create(optional_tgt).optional
     assert optional_union_field is not None
     assert optional_union_field.value == "configured"
+    default_registered_union_field = OptionalUnionFieldSet.create(optional_default_tgt).optional
+    assert default_registered_union_field is not None
+    assert default_registered_union_field.value == OptionalField.default
     default_union_field = OptionalUnionFieldSet.create(no_fields_tgt).optional
-    assert default_union_field is not None
-    assert default_union_field.value == OptionalField.default
+    assert default_union_field is None
 
 
 # -----------------------------------------------------------------------------------------------
