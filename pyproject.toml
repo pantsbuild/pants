@@ -57,7 +57,7 @@ markers = ["platform_specific_behavior"]
 # Exclusions were copied from [tool.black]
 exclude = [".git", ".mypy_cache", ".pants.d", "dist/"]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 # I: isort (import sorting)
@@ -68,7 +68,9 @@ select = ["I", "UP"]
 # UP018: Replaces `int(42)` in tests, breaking call-by-type and implicitly
 # UP031: Two string replacements that are not auto-fixable
 # UP036: Outdated version check (in rule_visitor for Python 3.8)
-ignore = ["UP006", "UP007", "UP018", "UP031", "UP035", "UP036"]
+# UP040/UP046/UP047:  Cost-benefit unclear, see https://github.com/python/cpython/issues/114159
+ignore = ["UP006", "UP007", "UP018", "UP031", "UP035", "UP036", "UP040", "UP046", "UP047"]
+external = ["PNT20"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["internal_plugins", "pants", "pants_test"]
+known-first-party = ["internal_plugins", "pants", "pants_test", "python_constant"]

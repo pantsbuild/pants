@@ -259,7 +259,7 @@ async def update_build_files(
     }
     build_file_to_change_descriptions: DefaultDict[str, list[str]] = defaultdict(list)
     for rewrite_request_cls in rewrite_request_classes:
-        all_rewritten_files = await concurrently(  # noqa: PNT30: this is inherently sequential
+        all_rewritten_files = await concurrently(
             rewrite_build_file(
                 **implicitly(
                     {

@@ -412,7 +412,7 @@ def test_group_by_dir() -> None:
 
 
 @pytest.fixture
-def abs_symlink() -> Generator[tuple[str, str, str], None, None]:
+def abs_symlink() -> Generator[tuple[str, str, str]]:
     td = safe_mkdtemp()
     source = os.path.join(td, "source")
     link = os.path.join(td, "link")

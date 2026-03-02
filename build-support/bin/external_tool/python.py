@@ -87,7 +87,7 @@ def find_modules_with_subclasses(
     *,
     base_classes: set[str],
     exclude: set[str],
-) -> Generator[tuple[Path, str], None, None]:
+) -> Generator[tuple[Path, str]]:
     """Recursively finds Python modules that contain classes subclassing a given base class."""
 
     for root, _, files in os.walk(directory):

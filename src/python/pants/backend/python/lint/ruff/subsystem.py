@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os.path
 from collections.abc import Iterable
-from enum import Enum
+from enum import StrEnum
 
 from packaging.version import parse
 
@@ -20,7 +20,7 @@ from pants.option.option_types import ArgsListOption, BoolOption, FileOption, Sk
 from pants.util.strutil import softwrap
 
 
-class RuffMode(str, Enum):
+class RuffMode(StrEnum):
     FIX = "check --fix"
     FORMAT = "format"
     LINT = "check"
@@ -37,8 +37,20 @@ class Ruff(TemplatedExternalTool):
     name = "Ruff"
     help = "The Ruff Python formatter (https://github.com/astral-sh/ruff)."
 
-    default_version = "0.13.0"
+    default_version = "0.14.14"
     default_known_versions = [
+        "0.15.2|linux_arm64 |b1417ad2977d38c93a40cc77b467b4c68d6b5578031852c38033f9b53b26a543|10034015",
+        "0.15.2|linux_x86_64|2b11788c9457ba8350f9b55bc302adf7f440d2f92a1d9660cbc3b20b6abf5e1c|10897947",
+        "0.15.2|macos_arm64 |59a3a08a077e81d0fd99566604556687b834edb2da34a69522cfb5168a07123b|9712551",
+        "0.15.2|macos_x86_64|78702adcccc2309696f19442f18b5fbe6a4bf4211efa157576c2b5f498a4cc0f|10479080",
+        "0.14.14|linux_arm64 |a4d7302aa201a6f8e71dfa217cd8273fddd4e434a93ee3b4b07047fd7a684ac1|10071345",
+        "0.14.14|linux_x86_64|55a1ee65f5ac9416cc40f99c2df62f0d4525d40369fe371caff945c495174d57|10976010",
+        "0.14.14|macos_arm64 |76a9b0ebe57d0eee56940dbe0b62462578d1369cca8314ed0d2a6f2102292d4f|9770588",
+        "0.14.14|macos_x86_64|749396c675c6f07205be6c4ef89e2e95123d790062d681059a355030e9d7d119|10540822",
+        "0.13.3|linux_arm64 |4301d51fd2fbce6d4cc55613e5f8f96ee4fcb8dcaec8419023fe555575cf78f6|12440723",
+        "0.13.3|linux_x86_64|8d24d74171772c67366d3187b990a3dc706022aa3a631b2a612d12e362f226c7|13639367",
+        "0.13.3|macos_arm64 |a170ead9a9f03527dba3d2fb3e9e445f73d9efe3584c3307f3d30c6d5f31c487|12345660",
+        "0.13.3|macos_x86_64|1c3a291a595ddd08398eb1e06fba883b7d8d715bd4255af5972f858fec8b4e57|13112788",
         "0.13.0|linux_arm64 |bdee6f1376470b74b1dc5ed48eca52ec9c3e4512bd7f3204e0df100f0bed4741|12137114",
         "0.13.0|linux_x86_64|b56ac90cc6987401bafdcf1b931ef044074c5b9451286afa4606a983f64f4fdd|13437622",
         "0.13.0|macos_arm64 |0d706798534537b6655b79fd95c2955c0a0013d4c54d36679d3306825a6bd6aa|12098971",

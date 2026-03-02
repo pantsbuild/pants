@@ -24,7 +24,7 @@ def _parse_k8s_xml(text: str) -> Iterator[str]:
 
         key = key_element.text
         if key and regex.match(key):
-            yield f"https://cdn.dl.k8s.io/{key}"
+            yield f"https://dl.k8s.io/{key}"
 
 
 class KubernetesReleases:
@@ -35,9 +35,9 @@ class KubernetesReleases:
     def get_releases(self, url_template: str) -> Iterator[str]:
         urls: Iterator[str]
         if self.only_latest:
-            urls = iter(("https://cdn.dl.k8s.io/release/stable.txt",))
+            urls = iter(("https://dl.k8s.io/release/stable.txt",))
         else:
-            response = requests.get("https://cdn.dl.k8s.io/", allow_redirects=True)
+            response = requests.get("https://dl.k8s.io/", allow_redirects=True)
             urls = _parse_k8s_xml(response.text)
 
         for v in self.pool.imap_unordered(fetch_text, urls):
