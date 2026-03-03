@@ -18,6 +18,7 @@ use nails::execution::ExitCode;
 use sandboxer::Sandboxer;
 use store::{ImmutableInputs, Store};
 use task_executor::Executor;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -165,6 +166,9 @@ impl CapturedWorkdir for CommandRunner {
         req: Process,
         exclusive_spawn: bool,
     ) -> Result<BoxStream<'r, Result<ChildOutput, String>>, CapturedWorkdirError> {
+        // Get stdin bytes from the process if provided
+        let stdin_bytes = req.stdin.clone();
+
         let cwd = if let Some(working_directory) = &req.working_directory {
             build_root.join(working_directory)
         } else {
@@ -176,7 +180,11 @@ impl CapturedWorkdir for CommandRunner {
             .args(&req.argv[1..])
             .current_dir(cwd)
             .envs(&req.env)
-            .stdin(Stdio::null())
+            .stdin(if stdin_bytes.is_some() {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
@@ -184,6 +192,19 @@ impl CapturedWorkdir for CommandRunner {
             ManagedChild::spawn(&mut command, None)
         })
         .await?;
+
+        let stdin_write_handle = if let Some(bytes) = stdin_bytes {
+            child.stdin.take().map(|mut stdin| {
+                tokio::spawn(async move {
+                    stdin
+                        .write_all(&bytes)
+                        .await
+                        .map_err(|e| format!("Failed to write to stdin: {e}"))
+                })
+            })
+        } else {
+            None
+        };
 
         debug!(
             "spawned workspace process as {:?} for {:?}",
@@ -199,6 +220,23 @@ impl CapturedWorkdir for CommandRunner {
             .fuse()
             .boxed();
         let exit_stream = async move {
+            // If stdin write was spawned, wait for it to complete and propagate any error
+            if let Some(handle) = stdin_write_handle {
+                match handle.await {
+                    Err(e) => {
+                        return Err(std::io::Error::other(format!(
+                            "Stdin write task panicked: {e}"
+                        )));
+                    }
+                    Ok(Err(e)) => {
+                        return Err(std::io::Error::other(format!(
+                            "Failed to write to stdin: {e}"
+                        )));
+                    }
+                    Ok(Ok(())) => {}
+                }
+            }
+
             child
                 .wait()
                 .map_ok(|exit_status| {
