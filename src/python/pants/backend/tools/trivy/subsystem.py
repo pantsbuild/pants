@@ -18,12 +18,12 @@ class Trivy(TemplatedExternalTool):
     name = "Trivy"
     help = "Find vulnerabilities, misconfigurations, secrets, SBOM in containers, Kubernetes, code repositories, clouds and more"
 
-    default_version = "0.57.0"
+    default_version = "0.69.2"
     default_known_versions = [
-        "0.57.0|linux_arm64 |29012fdb5ba18da506d1c8b6f389c2ec9d113db965c254971f35267ebb45dd64|37315561",
-        "0.57.0|linux_x86_64|cf08a8cd861e5192631fc03bb21efde27c1d93e4407ab70bab32e572bafcbf07|40466119",
-        "0.57.0|macos_arm64 |61230c8a56e463e8eba2bf922bc688b7bd40352187e1f725c79861b0801437f0|39193442",
-        "0.57.0|macos_x86_64|e7955b6d38d8125d4aa8936e6af51b0de2b0e0840b4feb90b44002bf7f47bf13|41286618",
+        "0.69.2|linux_arm64 |c73b97699c317b0d25532b3f188564b4e29d13d5472ce6f8eb078082546a6481|43702248",
+        "0.69.2|linux_x86_64|affa59a1e37d86e4b8ab2cd02f0ab2e63d22f1bf9cf6a7aa326c884e25e26ce3|48327305",
+        "0.69.2|macos_arm64 |320c0e6af90b5733b9326da0834240e944c6f44091e50019abdf584237ff4d0c|45881045",
+        "0.69.2|macos_x86_64|41f6eac3ebe3a00448a16f08038b55ce769fe2d5128cb0d64bdf282cdad4831a|49275481",
     ]
 
     default_url_template = "https://github.com/aquasecurity/trivy/releases/download/v{version}/trivy_{version}_{platform}.tar.gz"
