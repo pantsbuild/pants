@@ -240,6 +240,11 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         ),
     )
 
+    dep_edges = BoolOption(
+        default=False,
+        help="After goal execution, output a dependency graph (DOT + text) of all edges discovered by rules.",
+    )
+
     docker_execution = BoolOption(
         default=True,
         advanced=True,

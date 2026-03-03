@@ -88,6 +88,16 @@ class EngineAwareReturnType(ABC):
 
         return None
 
+    def dep_edges(self) -> list | None:
+        """If implemented, records dependency edges discovered by this rule.
+
+        Returns a list of objects with `source`, `target`, and `kind` string attributes.
+        These edges are accumulated session-wide and can be retrieved via
+        ``SchedulerSession.get_dep_edges()``.
+        """
+
+        return None
+
 
 class SideEffecting(ABC):
     """Marks a class as providing side-effecting APIs, which are handled specially in @rules.

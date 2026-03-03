@@ -11,7 +11,7 @@ use crate::nodes::{lift_directory_digest, lift_file_digest};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use workunit_store::{ArtifactOutput, Level, RunningWorkunit, UserMetadataItem, WorkunitMetadata};
+use workunit_store::{ArtifactOutput, DepEdge, Level, RunningWorkunit, UserMetadataItem, WorkunitMetadata};
 
 // Note: these functions should not panic, but we also don't preserve errors (e.g. to log) because
 // we rely on MyPy to catch TypeErrors with using the APIs incorrectly. So we convert errors to
@@ -22,6 +22,13 @@ pub(crate) struct EngineAwareReturnType;
 
 impl EngineAwareReturnType {
     pub(crate) fn update_workunit(workunit: &mut RunningWorkunit, task_result: &Bound<'_, PyAny>) {
+        // Record dep edges to the session-level store
+        if let Some(edges) = Self::dep_edges(task_result) {
+            for edge in edges {
+                workunit.record_dep_edge(edge.source, edge.target, edge.kind);
+            }
+        }
+
         workunit.update_metadata(|old| {
             let new_level = Self::level(task_result);
 
@@ -81,6 +88,22 @@ impl EngineAwareReturnType {
             }
             .ok()?;
             output.push((key, artifact_output));
+        }
+        Some(output)
+    }
+
+    fn dep_edges(obj: &Bound<'_, PyAny>) -> Option<Vec<DepEdge>> {
+        let edges_val = obj.call_method0("dep_edges").ok()?;
+        if edges_val.is_none() {
+            return None;
+        }
+        let edges_list: Vec<Bound<'_, PyAny>> = edges_val.extract().ok()?;
+        let mut output = Vec::new();
+        for edge in edges_list {
+            let source: String = edge.getattr("source").ok()?.extract().ok()?;
+            let target: String = edge.getattr("target").ok()?.extract().ok()?;
+            let kind: String = edge.getattr("kind").ok()?.extract().ok()?;
+            output.push(DepEdge { source, target, kind });
         }
         Some(output)
     }

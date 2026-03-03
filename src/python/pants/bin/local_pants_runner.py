@@ -191,12 +191,15 @@ class LocalPantsRunner:
         return exit_code
 
     def _perform_run_body(self, goals: tuple[str, ...], poll: bool) -> ExitCode:
+        global_options = self.options.for_global_scope()
         return self.graph_session.run_goal_rules(
             union_membership=self.union_membership,
             goals=goals,
             specs=self.specs,
             poll=poll,
             poll_delay=(0.1 if poll else None),
+            dep_edges=global_options.dep_edges,
+            dist_dir=global_options.pants_distdir,
         )
 
     def _get_workunits_callbacks(self) -> tuple[WorkunitsCallback, ...]:

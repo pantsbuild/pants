@@ -128,6 +128,8 @@ class GraphSession:
         specs: Specs,
         poll: bool = False,
         poll_delay: float | None = None,
+        dep_edges: bool = False,
+        dist_dir: str | None = None,
     ) -> int:
         """Runs @goal_rules sequentially and interactively by requesting their implicit Goal
         products.
@@ -155,9 +157,66 @@ class GraphSession:
                 self.console.flush()
 
             if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
-                return exit_code
+                break
+        else:
+            exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
-        return PANTS_SUCCEEDED_EXIT_CODE
+        if dep_edges:
+            self._render_dep_edges(dist_dir or "dist")
+
+        return exit_code
+
+    def _render_dep_edges(self, dist_dir: str) -> None:
+        """Render dependency edges collected during goal execution."""
+        from collections import defaultdict
+
+        raw_edges = self.scheduler_session.get_dep_edges()
+        if not raw_edges:
+            print("No dependency edges were recorded.")
+            return
+
+        seen: set[tuple[str, str, str]] = set()
+        unique_edges: list[tuple[str, str, str]] = []
+        for edge in raw_edges:
+            key = (edge[0], edge[1], edge[2])
+            if key not in seen:
+                seen.add(key)
+                unique_edges.append(key)
+
+        by_source: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
+        for source, target, kind in unique_edges:
+            by_source[source].append((source, target, kind))
+
+        lines: list[str] = []
+        for source in sorted(by_source.keys()):
+            lines.append(source)
+            for _, target, kind in sorted(by_source[source], key=lambda e: (e[2], e[1])):
+                lines.append(f"  -> {target} ({kind})")
+            lines.append("")
+        print("\n".join(lines))
+
+        dot_lines = [
+            "digraph depgraph {",
+            '    rankdir=LR;',
+            '    node [shape=box, fontname="Courier", fontsize=9];',
+            '    edge [fontsize=8];',
+            "",
+        ]
+        for source, target, kind in sorted(unique_edges):
+            src = source.replace('"', '\\"')
+            tgt = target.replace('"', '\\"')
+            knd = kind.replace('"', '\\"')
+            dot_lines.append(f'    "{src}" -> "{tgt}" [label="{knd}"];')
+        dot_lines.append("}")
+        dot_lines.append("")
+
+        import os
+        os.makedirs(dist_dir, exist_ok=True)
+        dot_path = os.path.join(dist_dir, "depgraph.dot")
+        with open(dot_path, "w") as f:
+            f.write("\n".join(dot_lines))
+        print(f"DOT graph written to {dot_path}")
+        print(f"Render with: dot -Tpng {dot_path} -o {os.path.join(dist_dir, 'depgraph.png')}")
 
 
 class EngineInitializer:

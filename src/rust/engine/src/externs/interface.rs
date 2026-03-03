@@ -146,6 +146,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     m.add_function(wrap_pyfunction!(session_get_metrics, m)?)?;
     m.add_function(wrap_pyfunction!(session_get_observation_histograms, m)?)?;
     m.add_function(wrap_pyfunction!(session_record_test_observation, m)?)?;
+    m.add_function(wrap_pyfunction!(session_get_dep_edges, m)?)?;
     m.add_function(wrap_pyfunction!(session_isolated_shallow_clone, m)?)?;
     m.add_function(wrap_pyfunction!(session_wait_for_tail_tasks, m)?)?;
 
@@ -1495,6 +1496,19 @@ fn session_record_test_observation(
             .workunit_store()
             .record_observation(ObservationMetric::TestObservation, value);
     })
+}
+
+#[pyfunction]
+fn session_get_dep_edges(
+    py: Python<'_>,
+    py_session: &Bound<'_, PySession>,
+) -> Vec<(String, String, String)> {
+    let session = &py_session.borrow().0;
+    let edges = py.detach(|| session.workunit_store().get_dep_edges());
+    edges
+        .into_iter()
+        .map(|e| (e.source, e.target, e.kind))
+        .collect()
 }
 
 #[pyfunction]

@@ -656,6 +656,13 @@ class SchedulerSession:
     def record_test_observation(self, value: int) -> None:
         native_engine.session_record_test_observation(self.py_scheduler, self.py_session, value)
 
+    def get_dep_edges(self) -> list[tuple[str, str, str]]:
+        """Return all dependency edges recorded during this session.
+
+        Each edge is a (source, target, kind) tuple.
+        """
+        return native_engine.session_get_dep_edges(self.py_session)
+
     @property
     def is_cancelled(self) -> bool:
         return self.py_session.is_cancelled()

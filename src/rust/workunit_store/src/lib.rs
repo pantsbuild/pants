@@ -325,6 +325,13 @@ pub enum ArtifactOutput {
     Snapshot(Arc<dyn DirectoryDigest>),
 }
 
+#[derive(Clone, Debug)]
+pub struct DepEdge {
+    pub source: String,
+    pub target: String,
+    pub kind: String,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct WorkunitMetadata {
     pub desc: Option<String>,
@@ -337,6 +344,7 @@ pub struct WorkunitMetadata {
     pub remote_action: Option<hashing::Digest>,
     pub artifacts: Vec<(String, ArtifactOutput)>,
     pub user_metadata: Vec<(String, UserMetadataItem)>,
+    pub dep_edges: Vec<DepEdge>,
 }
 
 /// Abstract id for passing user metadata items around
@@ -362,6 +370,7 @@ pub struct WorkunitStore {
     streaming_workunit_data: Arc<Mutex<StreamingWorkunitData>>,
     heavy_hitters_data: Arc<Mutex<HeavyHittersData>>,
     metrics_data: Arc<MetricsData>,
+    dep_edges: Arc<Mutex<Vec<DepEdge>>>,
 }
 
 struct StreamingWorkunitData {
@@ -559,6 +568,7 @@ impl WorkunitStore {
             streaming_workunit_data: Arc::new(Mutex::new(StreamingWorkunitData::new(receiver1))),
             heavy_hitters_data: Arc::new(Mutex::new(HeavyHittersData::new(receiver2))),
             metrics_data: Arc::default(),
+            dep_edges: Arc::default(),
         }
     }
 
@@ -717,6 +727,14 @@ impl WorkunitStore {
             .collect()
     }
 
+    pub fn record_dep_edge(&self, source: String, target: String, kind: String) {
+        self.dep_edges.lock().push(DepEdge { source, target, kind });
+    }
+
+    pub fn get_dep_edges(&self) -> Vec<DepEdge> {
+        self.dep_edges.lock().clone()
+    }
+
     ///
     /// Records an observation of a time-like metric into a histogram.
     ///
@@ -830,6 +848,13 @@ pub fn record_observation_if_in_workunit(metric: ObservationMetric, value: u64) 
     }
 }
 
+/// If this thread has a workunit set, record a dependency edge.
+pub fn record_dep_edge_if_in_workunit(source: String, target: String, kind: String) {
+    if let Some(handle) = get_workunit_store_handle() {
+        handle.store.record_dep_edge(source, target, kind)
+    }
+}
+
 /// Run the given async block. If the level given by the WorkunitMetadata is above a configured
 /// threshold, the block will run inside of a workunit recorded in the workunit store.
 ///
@@ -900,6 +925,10 @@ impl RunningWorkunit {
 
     pub fn increment_counter(&self, counter_name: Metric, change: u64) {
         self.store.increment_counter(counter_name, change);
+    }
+
+    pub fn record_dep_edge(&self, source: String, target: String, kind: String) {
+        self.store.record_dep_edge(source, target, kind);
     }
 
     ///
