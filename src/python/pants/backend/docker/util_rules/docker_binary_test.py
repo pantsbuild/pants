@@ -7,7 +7,7 @@ from unittest import mock
 import pytest
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
-from pants.backend.docker.util_rules.docker_binary import DockerBinary, get_docker, rules
+from pants.backend.docker.util_rules.binaries import DockerBinary, get_docker, rules
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.experimental.docker.podman.register import rules as podman_rules
 from pants.core.util_rules.system_binaries import (

@@ -27,7 +27,7 @@ from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.binaries import DockerBinary
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.publish import (
     CheckSkipResult,
