@@ -643,10 +643,18 @@ def test_field_set() -> None:
         def opt_out(cls, tgt: Target) -> bool:
             return tgt.get(OptOutField).value is True
 
+    @dataclass(frozen=True)
+    class OptionalUnionFieldSet(FieldSet):
+        required_fields = ()
+
+        optional: OptionalField | None = None
+
     required_addr = Address("", target_name="required")
     required_tgt = TargetWithRequired({RequiredField.alias: "configured"}, required_addr)
     optional_addr = Address("", target_name="unrelated")
     optional_tgt = TargetWithoutRequired({OptionalField.alias: "configured"}, optional_addr)
+    optional_default_addr = Address("", target_name="optional_default")
+    optional_default_tgt = TargetWithoutRequired({}, optional_default_addr)
     no_fields_addr = Address("", target_name="no_fields")
     no_fields_tgt = NoFieldsTarget({}, no_fields_addr)
     opt_out_addr = Address("", target_name="conditional")
@@ -682,6 +690,40 @@ def test_field_set() -> None:
 
     assert OptionalFieldSet.create(optional_tgt).optional.value == "configured"
     assert OptionalFieldSet.create(no_fields_tgt).optional.value == OptionalField.default
+    assert OptionalUnionFieldSet.fields == FrozenDict({"optional": OptionalField})
+    assert OptionalUnionFieldSet.none_on_absence_fields == FrozenOrderedSet(["optional"])
+    optional_union_field = OptionalUnionFieldSet.create(optional_tgt).optional
+    assert optional_union_field is not None
+    assert optional_union_field.value == "configured"
+    default_registered_union_field = OptionalUnionFieldSet.create(optional_default_tgt).optional
+    assert default_registered_union_field is not None
+    assert default_registered_union_field.value == OptionalField.default
+    default_union_field = OptionalUnionFieldSet.create(no_fields_tgt).optional
+    assert default_union_field is None
+
+
+def test_field_set_invalid_annotations() -> None:
+    class ValidField(StringField):
+        alias = "valid"
+        default = "default"
+
+    @dataclass(frozen=True)
+    class InvalidStringFieldSet(FieldSet):
+        required_fields = ()
+
+        not_a_field: str
+
+    with pytest.raises(TypeError, match="`Field` subclass or `Field \\| None`"):
+        _ = InvalidStringFieldSet.fields
+
+    @dataclass(frozen=True)
+    class InvalidUnionFieldSet(FieldSet):
+        required_fields = ()
+
+        invalid: ValidField | str
+
+    with pytest.raises(TypeError, match="`Field` subclass or `Field \\| None`"):
+        _ = InvalidUnionFieldSet.none_on_absence_fields
 
 
 # -----------------------------------------------------------------------------------------------

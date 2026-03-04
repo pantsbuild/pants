@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from operator import attrgetter
 from pathlib import PurePath
+from types import UnionType
 from typing import (
     AbstractSet,
     Any,
@@ -27,8 +28,11 @@ from typing import (
     Protocol,
     Self,
     TypeVar,
+    Union,
     cast,
     final,
+    get_args,
+    get_origin,
     get_type_hints,
 )
 
@@ -1381,13 +1385,24 @@ def _generate_file_level_targets(
 # -----------------------------------------------------------------------------------------------
 def _get_field_set_fields_from_target(
     field_set: type[FieldSet], target: Target
-) -> dict[str, Field]:
-    return {
-        dataclass_field_name: (
-            target[field_cls] if field_cls in field_set.required_fields else target.get(field_cls)
-        )
-        for dataclass_field_name, field_cls in field_set.fields.items()
-    }
+) -> dict[str, Field | None]:
+    result: dict[str, Field | None] = {}
+    for dataclass_field_name, field_cls in field_set.fields.items():
+        if field_cls in field_set.required_fields:
+            result[dataclass_field_name] = target[field_cls]
+            continue
+
+        if dataclass_field_name in field_set.none_on_absence_fields and not target.has_field(
+            field_cls
+        ):
+            # Preserve true optionality for `Field | None` annotations when the target type
+            # doesn't define that field.
+            result[dataclass_field_name] = None
+            continue
+
+        result[dataclass_field_name] = target.get(field_cls)
+
+    return result
 
 
 _FS = TypeVar("_FS", bound="FieldSet")
@@ -1399,8 +1414,9 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     Subclasses should declare all the fields they consume as dataclass attributes. They should also
     indicate which of these are required, rather than optional, through the class property
-    `required_fields`. When a field is optional, the default constructor for the field will be used
-    for any targets that do not have that field registered.
+    `required_fields`. For fields annotated as `Field | None`, Pants will preserve `None` when the
+    target type does not have that field registered. For non-union `Field` annotations, Pants will
+    construct the default field value when the target type does not have that field registered.
 
     Subclasses must set `@dataclass(frozen=True)` for their declared fields to be recognized.
 
@@ -1474,13 +1490,75 @@ class FieldSet(EngineAwareParameter, metaclass=ABCMeta):
 
     @final
     @memoized_classproperty
+    def _field_info(cls) -> FrozenDict[str, tuple[type[Field], bool]]:
+        def field_type_from_annotation(annotation: Any) -> tuple[type[Field], bool] | None:
+            if isinstance(annotation, type) and issubclass(annotation, Field):
+                return annotation, False
+
+            origin = get_origin(annotation)
+            if origin not in (Union, UnionType):
+                return None
+
+            union_args = get_args(annotation)
+            field_types = [
+                arg for arg in union_args if isinstance(arg, type) and issubclass(arg, Field)
+            ]
+            if len(field_types) != 1:
+                return None
+
+            preserve_none_on_absence = type(None) in union_args
+            # Only allow optional Field annotations (`Field | None`).
+            if not preserve_none_on_absence or len(union_args) != 2:
+                return None
+
+            return field_types[0], True
+
+        type_hints = get_type_hints(cls)
+        base_dataclass_field_names = {f.name for f in dataclasses.fields(FieldSet)}
+        parsed: dict[str, tuple[type[Field], bool]] = {}
+        invalid_dataclass_fields: dict[str, Any] = {}
+
+        for dataclass_field in dataclasses.fields(cls):
+            if dataclass_field.name in base_dataclass_field_names:
+                continue
+
+            annotation = type_hints[dataclass_field.name]
+            parsed_annotation = field_type_from_annotation(annotation)
+            if parsed_annotation is None:
+                invalid_dataclass_fields[dataclass_field.name] = annotation
+                continue
+
+            parsed[dataclass_field.name] = parsed_annotation
+
+        if invalid_dataclass_fields:
+            field_set_name = getattr(cls, "__name__", type(cls).__name__)
+            invalid_field_descriptions = ", ".join(
+                f"{name}: {annotation!r}"
+                for name, annotation in sorted(invalid_dataclass_fields.items())
+            )
+            raise TypeError(
+                f"The FieldSet `{field_set_name}` has invalid dataclass field annotations. "
+                "Every declared dataclass field on a FieldSet must be annotated with a "
+                "`Field` subclass or `Field | None`. Invalid fields: "
+                f"{invalid_field_descriptions}"
+            )
+
+        return FrozenDict(parsed)
+
+    @final
+    @memoized_classproperty
     def fields(cls) -> FrozenDict[str, type[Field]]:
         return FrozenDict(
-            (
-                (name, field_type)
-                for name, field_type in get_type_hints(cls).items()
-                if isinstance(field_type, type) and issubclass(field_type, Field)
-            )
+            (field_name, field_type) for field_name, (field_type, _) in cls._field_info.items()
+        )
+
+    @final
+    @memoized_classproperty
+    def none_on_absence_fields(cls) -> FrozenOrderedSet[str]:
+        return FrozenOrderedSet(
+            field_name
+            for field_name, (_, preserve_none_on_absence) in cls._field_info.items()
+            if preserve_none_on_absence
         )
 
     def debug_hint(self) -> str:
