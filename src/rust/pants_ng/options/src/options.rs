@@ -1,6 +1,7 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -22,9 +23,22 @@ use crate::config::{ConfigFinder, InterpolationMap};
 use crate::pants_invocation::PantsInvocation;
 
 // A set of source paths and the options that apply to those sources.
+#[derive(Eq, Hash, PartialEq)]
 pub struct SourcePartition {
     pub paths: Vec<PathBuf>,
     pub options_reader: OptionsReader,
+}
+
+impl PartialOrd for SourcePartition {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for SourcePartition {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.paths.cmp(&other.paths)
+    }
 }
 
 pub struct OptionsReader {
@@ -283,5 +297,50 @@ impl Options {
 
     pub fn get_options_reader_for_dir(&self, dir: &Path) -> Result<OptionsReader, String> {
         self.get_options_reader_for_configs(self.config_finder.get_applicable_config_files(dir)?)
+    }
+
+    pub fn partition_sources(&self, paths: Vec<PathBuf>) -> Result<Vec<SourcePartition>, String> {
+        let mut paths = paths;
+        paths.sort();
+        paths.dedup();
+        // Map from dir to paths in that dir (or the path itself, if it is a dir).
+        let mut dir_to_paths = HashMap::<PathBuf, Vec<PathBuf>>::new();
+        for path in paths {
+            let dir = if path.is_dir() {
+                path.as_path()
+            } else {
+                path.parent().unwrap()
+            };
+            if let Some(paths_in_dir) = dir_to_paths.get_mut(dir) {
+                paths_in_dir.push(path);
+            } else {
+                let paths_in_dir = vec![path.to_path_buf()];
+                dir_to_paths.insert(dir.to_path_buf(), paths_in_dir);
+            }
+        }
+
+        // Map from "ordered list of config files" to "paths for which this is the complete set of
+        // applicable config files".
+        let mut configs_to_paths = HashMap::<Vec<PathBuf>, Vec<PathBuf>>::new();
+        for (dir, paths) in dir_to_paths.iter_mut() {
+            let configs = self.config_finder.get_applicable_config_files(dir)?;
+            let paths_for_configs = configs_to_paths.entry(configs).or_default();
+            paths_for_configs.append(paths);
+        }
+
+        configs_to_paths
+            .into_iter()
+            .map(|(configs, mut paths)| {
+                paths.sort();
+                Ok(SourcePartition {
+                    paths,
+                    options_reader: self.get_options_reader_for_configs(configs)?,
+                })
+            })
+            .collect::<Result<Vec<SourcePartition>, String>>()
+            .map(|mut r| {
+                r.sort();
+                r
+            })
     }
 }
