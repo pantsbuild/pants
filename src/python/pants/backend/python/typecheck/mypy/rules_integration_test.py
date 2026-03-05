@@ -27,7 +27,6 @@ from pants.backend.python.typecheck.mypy.rules import (
     MyPyPartition,
     MyPyPartitions,
     MyPyRequest,
-    determine_python_files,
 )
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.backend.python.typecheck.mypy.subsystem import MyPy, MyPyFieldSet
@@ -744,15 +743,6 @@ def test_partition_targets(rule_runner: PythonRuleRunner) -> None:
         "3.9",
         "b",
     )
-
-
-def test_determine_python_files() -> None:
-    assert determine_python_files([]) == ()
-    assert determine_python_files(["f.py"]) == ("f.py",)
-    assert determine_python_files(["f.pyi"]) == ("f.pyi",)
-    assert determine_python_files(["f.py", "f.pyi"]) == ("f.pyi",)
-    assert determine_python_files(["f.pyi", "f.py"]) == ("f.pyi",)
-    assert determine_python_files(["script-without-extension"]) == ("script-without-extension",)
 
 
 def test_colors_and_formatting(rule_runner: PythonRuleRunner) -> None:
