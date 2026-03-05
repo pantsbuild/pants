@@ -53,11 +53,11 @@ def rules():
 
 ---
 
-Your rule should take as a parameter the `ReplImplementation ` from Step 2, which has a field `targets: Targets` containing the targets specified by the user. It also has a convenience property `addresses: Addresses` with the addresses of what was specified.
+Your rule should take as a parameter the `ReplImplementation` from Step 2, which has a field `targets: Targets` containing the targets specified by the user. It also has a convenience property `addresses: Addresses` with the addresses of what was specified.
 
 Your rule should return `ReplRequest`, which has the fields `digest: Digest`, `args: Iterable[str]`, and `extra_env: Optional[Mapping[str, str]]`.
 
-The `ReplRequest ` will get converted into an `InteractiveProcess` that will run in the foreground.
+The `ReplRequest` will get converted into an `InteractiveProcess` that will run in the foreground.
 
 The process will run in a temporary directory in the build root, which means that the script/program can access files that would normally need to be declared by adding a `file` / `files` or `resource` / `resources` target to the `dependencies` field.
 

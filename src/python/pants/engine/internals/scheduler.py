@@ -7,7 +7,7 @@ import logging
 import os
 import time
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
 from types import CoroutineType
@@ -40,10 +40,10 @@ from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
-    NativeParsedDockerfileInfo,
-    NativeParsedJavascriptDependencies,
-    NativeParsedPythonDependencies,
-    ParsedJavascriptDependencyCandidate,
+    JavascriptDependencyCandidate,
+    NativeDockerfileInfo,
+    NativeJavascriptFileDependencies,
+    NativePythonFileDependencies,
 )
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
@@ -183,10 +183,10 @@ class Scheduler:
             engine_aware_parameter=EngineAwareParameter,
             docker_resolve_image_request=DockerResolveImageRequest,
             docker_resolve_image_result=DockerResolveImageResult,
-            parsed_python_deps_result=NativeParsedPythonDependencies,
-            parsed_javascript_deps_result=NativeParsedJavascriptDependencies,
-            parsed_dockerfile_info_result=NativeParsedDockerfileInfo,
-            parsed_javascript_deps_candidate_result=ParsedJavascriptDependencyCandidate,
+            parsed_python_deps_result=NativePythonFileDependencies,
+            parsed_javascript_deps_result=NativeJavascriptFileDependencies,
+            parsed_dockerfile_info_result=NativeDockerfileInfo,
+            parsed_javascript_deps_candidate_result=JavascriptDependencyCandidate,
         )
         remoting_options = PyRemotingOptions(
             provider=execution_options.remote_provider.value,
@@ -417,9 +417,6 @@ class SchedulerSession:
 
     def visualize_rule_graph_to_file(self, filename: str) -> None:
         self._scheduler.visualize_rule_graph_to_file(filename)
-
-    def rule_graph_rule_gets(self) -> dict[Callable, list[tuple[type, list[type], Callable]]]:
-        return native_engine.rule_graph_rule_gets(self.py_scheduler)
 
     def execution_request(
         self,
@@ -711,46 +708,33 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
             unions = [t for t in awaitable.input_types if is_union(t)]
             if len(unions) == 1:
                 union = unions[0]
-                if awaitable.rule_id:
-                    if rule_id_to_rule[awaitable.rule_id].polymorphic:
-                        # This is a polymorphic call-by-name. Compute its vtable data, i.e., a list
-                        # of pairs (union member type, id of implementation rule for that type).
-                        member_rule_type_pairs = base_type_to_member_rule_type_pairs.get(union)
-                        vtable_entries: list[tuple[type[Any], str]] = []
-                        for member_rule, member_type in member_rule_type_pairs or []:
-                            # If a rule has a union member as a param, and returns the relevant
-                            # output type, then we take it to be the implementation of the
-                            # polymorphic rule for the union member.
-                            if member_rule.output_type == awaitable.output_type:
-                                vtable_entries.append((member_type, member_rule.canonical_name))
-                        in_scope_types = union_in_scope_types(union)
-                        assert in_scope_types is not None
-                        native_engine.tasks_add_call(
-                            tasks,
-                            awaitable.output_type,
-                            awaitable.input_types,
-                            awaitable.rule_id,
-                            awaitable.explicit_args_arity,
-                            vtable_entries,
-                            in_scope_types,
-                        )
-                else:
-                    # This is a union Get.
-                    # Register the union by recording a copy of the Get for each union member.
+                if rule_id_to_rule[awaitable.rule_id].polymorphic:
+                    # This is a polymorphic call-by-name. Compute its vtable data, i.e., a list
+                    # of pairs (union member type, id of implementation rule for that type).
+                    member_rule_type_pairs = base_type_to_member_rule_type_pairs.get(union)
+                    vtable_entries: list[tuple[type[Any], str]] = []
+                    for member_rule, member_type in member_rule_type_pairs or []:
+                        # If a rule has a union member as a param, and returns the relevant
+                        # output type, then we take it to be the implementation of the
+                        # polymorphic rule for the union member.
+                        if member_rule.output_type == awaitable.output_type:
+                            vtable_entries.append((member_type, member_rule.canonical_name))
                     in_scope_types = union_in_scope_types(union)
                     assert in_scope_types is not None
-                    for union_member in union_membership.get(union):
-                        native_engine.tasks_add_get_union(
-                            tasks,
-                            awaitable.output_type,
-                            tuple(union_member if t == union else t for t in awaitable.input_types),
-                            in_scope_types,
-                        )
+                    native_engine.tasks_add_call(
+                        tasks,
+                        awaitable.output_type,
+                        awaitable.input_types,
+                        awaitable.rule_id,
+                        awaitable.explicit_args_arity,
+                        vtable_entries,
+                        in_scope_types,
+                    )
             elif len(unions) > 1:
                 raise TypeError(
-                    f"Only one @union may be used in a call or Get, but {awaitable} used: {unions}."
+                    f"Only one @union may be used in a call, but {awaitable} used: {unions}."
                 )
-            elif awaitable.rule_id is not None:
+            else:
                 # Is a non-polymorphic call to a known rule.
                 native_engine.tasks_add_call(
                     tasks,
@@ -761,9 +745,6 @@ def register_rules(rule_index: RuleIndex, union_membership: UnionMembership) -> 
                     vtable_entries=None,
                     in_scope_types=None,
                 )
-            else:
-                # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                native_engine.tasks_add_get(tasks, awaitable.output_type, awaitable.input_types)
 
         native_engine.tasks_task_end(tasks)
 

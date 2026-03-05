@@ -197,6 +197,7 @@ impl CommandRunner {
     /// This function also returns a vector of all `Digest`s referenced directly and indirectly by
     /// the `ActionResult` suitable for passing to `Store::ensure_remote_has_recursive`. (The
     /// digests may include both File and Tree digests.)
+    #[allow(deprecated)] // TODO: Move to REAPI `output_path` instead of `output_files` and `output_directories`.
     pub(crate) async fn make_action_result(
         &self,
         command: &Command,
@@ -240,6 +241,7 @@ impl CommandRunner {
                     path: output_directory.to_owned(),
                     tree_digest: Some(tree_digest.into()),
                     is_topologically_sorted: false,
+                    ..Default::default()
                 });
         }
 

@@ -11,8 +11,8 @@ from typing import Any
 from pants.backend.project_info.peek import _PeekJsonEncoder
 from pants.backend.python.dependency_inference.module_mapper import ResolveName
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    ParsedPythonDependencies,
     ParsedPythonImportInfo,
+    PythonFileDependencies,
 )
 from pants.backend.python.dependency_inference.rules import (
     ImportResolveResult,
@@ -74,7 +74,7 @@ class PythonSourceAnalysis:
     results."""
 
     fs: PythonImportDependenciesInferenceFieldSet
-    identified: ParsedPythonDependencies
+    identified: PythonFileDependencies
     resolved: ResolvedParsedPythonDependencies
     possible_owners: UnownedImportsPossibleOwners
 

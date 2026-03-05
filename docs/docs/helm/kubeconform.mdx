@@ -42,5 +42,5 @@ You can use the `skip_kubeconform` field in both `helm_chart` or `helm_deploymen
 
 :::caution Skipping check on publishable charts
 On a workspace that contains both `helm_deployment` and `helm_chart` targets is easy to consider that checking the charts is a redundant task as doing it so on the deployment is effectively the same. This is a safe assumption as long as you don't publish your charts to be consumed elsewhere. For that specific case we recommend also checking the standalone chart as that gives assurance that the chart package itself is sound.
-Regardless of that, running Kubeconform on a standalone chart is a pretty lightweight operation so unless you are facing extremelly long build times, better to not skip it.
+Regardless of that, running Kubeconform on a standalone chart is a pretty lightweight operation so unless you are facing extremely long build times, better to not skip it.
 :::

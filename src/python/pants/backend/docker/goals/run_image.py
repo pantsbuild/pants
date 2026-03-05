@@ -6,7 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import cast
 
-from pants.backend.docker.goals.package_image import BuiltDockerImage, DockerPackageFieldSet
+from pants.backend.docker.goals.package_image import DockerPackageFieldSet
+from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerImageRegistriesField,

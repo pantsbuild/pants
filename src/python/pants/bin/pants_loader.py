@@ -39,6 +39,13 @@ class PantsLoader:
         # TODO: Eric-Arellano has emailed the author to see if he is willing to accept a PR fixing the
         # deprecation warnings and to release the fix. If he says yes, remove this once fixed.
         warnings.filterwarnings("ignore", category=DeprecationWarning, module="ansicolors")
+        # Silence ctypes _pack_/_layout_ warning from HdrHistogram; due by Python 3.19
+        # See: https://github.com/HdrHistogram/HdrHistogram/issues/216
+        warnings.filterwarnings(
+            "ignore",
+            category=DeprecationWarning,
+            message=r"Due to '_pack_', the '.+' Structure will use memory layout compatible with MSVC",
+        )
         # Silence this ubiquitous warning. Several of our 3rd party deps incur this.
         warnings.filterwarnings(
             "ignore",

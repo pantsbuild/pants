@@ -72,7 +72,7 @@ async def partial_env(...) -> Foo:
 
 To capture output files from the process, set `output_files: Iterable[str]` and/or `output_directories: Iterable[str]`. Then, you can use the `ProcessResult.output_digest` field to get a [`Digest`](./file-system.mdx) of the result.
 
-`output_directores` captures that directory and everything below it.
+`output_directories` captures that directory and everything below it.
 
 ### Timeouts
 
@@ -103,17 +103,17 @@ async def demo(...) -> Foo:
 
 `InteractiveProcess` is similar to Python's `subprocess.run()`. The process will run in the foreground, optionally with access to the workspace.
 
-Because the process is potentially side-effecting, you may only run an `InteractiveProcess` in an [`@goal_rule`](./goal-rules.mdx) as an `Effect`.
+Because the process is potentially side-effecting, you may only run an `InteractiveProcess` in a [`@goal_rule`](./goal-rules.mdx).
 
 ```python
-from pants.engine.rules import Effect, goal_rule
+from pants.engine.intrinsics import run_interactive_process
+from pants.engine.rules import goal_rule
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
 
 @goal_rule
 async def hello_world() -> HelloWorld:
     # This demonstrates opening a Python REPL.
-    result = await Effect(
-        InteractiveProcessResult,
+    result: InteractiveProcessResult = await run_interactive_process(
         InteractiveProcess(argv=["/usr/bin/python"]),
     )
     return HelloWorld(exit_code=result.exit_code)
@@ -123,7 +123,7 @@ You may either set the parameter `input_digest: Digest`, or you may set `run_in_
 
 To set environment variables, use the parameter `env: Mapping[str, str]`, like you would with `Process`. You can also set `hermetic_env=False` to inherit the environment variables from the parent `pants` process.
 
-The `Effect` will return an `InteractiveProcessResult`, which has a single field `exit_code: int`.
+The `InteractiveProcessResult` has a single field: `exit_code: int`.
 
 ### ProcessWithRetries
 

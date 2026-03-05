@@ -7,7 +7,7 @@ use crate::fromfile::test_util::write_fromfile;
 use crate::{DictEdit, DictEditAction, option_id};
 use crate::{ListEdit, ListEditAction, OptionId, OptionsSource, Val};
 use maplit::hashmap;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt::Debug;
 
@@ -16,7 +16,7 @@ fn env<'a, I: IntoIterator<Item = (&'a str, &'a str)>>(vars: I) -> EnvReader {
         Env::new(
             vars.into_iter()
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                .collect::<HashMap<_, _>>(),
+                .collect::<BTreeMap<_, _>>(),
         ),
         FromfileExpander::relative_to_cwd(),
     )

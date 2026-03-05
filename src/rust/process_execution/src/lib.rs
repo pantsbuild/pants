@@ -127,7 +127,10 @@ impl From<StoreError> for ProcessError {
 
 impl From<CapturedWorkdirError> for ProcessError {
     fn from(err: CapturedWorkdirError) -> Self {
-        ProcessError::Unclassified(err.to_string())
+        match err {
+            CapturedWorkdirError::MissingDigest(s, d) => ProcessError::MissingDigest(s, d),
+            _ => ProcessError::Unclassified(err.to_string()),
+        }
     }
 }
 
@@ -1253,6 +1256,7 @@ fn maybe_make_wrapper_script(
     Ok(Some(script))
 }
 
+#[allow(deprecated)] // TODO: Move to REAPI `output_path` instead of `output_files` and `output_directories`.
 pub async fn make_execute_request(
     req: &Process,
     instance_name: Option<String>,

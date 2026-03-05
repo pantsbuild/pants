@@ -36,6 +36,18 @@ fn assert_imports(code: &str, imports: &[&str]) {
     );
 }
 
+fn assert_explicit_deps(code: &str, deps: &[&str]) {
+    let mut collector = ImportCollector::new(code);
+    collector.collect();
+    let actual: Vec<&String> = collector.explicit_dependencies.keys().sorted().collect();
+    let expected: Vec<&str> = deps.iter().copied().sorted().collect();
+    assert_eq!(
+        actual, expected,
+        "'{code}' should generate '{:?}', instead received {:?}",
+        expected, actual
+    );
+}
+
 #[test]
 fn simple_imports() {
     assert_imports("import a", &["a"]);
@@ -103,6 +115,28 @@ from a.b import (
 
     // NB: Doesn't collect __future__ imports
     assert_imports("from __future__ import annotations", &[]);
+}
+
+#[test]
+fn explicit_dependencies() {
+    assert_explicit_deps("# pants: infer-dep(path/to/dep.py)", &["path/to/dep.py"]);
+    assert_explicit_deps(
+        r#"
+    foo = 42  # pants: infer-dep(path/to/dep.py)
+    class Foo:
+        # pants: infer-dep(some/glob/*.json)
+        def bar():
+            # We can support structured dep information, although the format is currently TBD
+            # and would be interpreted by the receiver.
+            # pants: infer-dep({"a" : {"json": false, "string": [1, 2, 3]}})
+            return 42
+    "#,
+        &[
+            "path/to/dep.py",
+            "some/glob/*.json",
+            r#"{"a" : {"json": false, "string": [1, 2, 3]}}"#,
+        ],
+    );
 }
 
 #[test]

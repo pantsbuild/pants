@@ -145,7 +145,7 @@ async def validate_jvm_artifacts_for_resolve(
     impls = union_membership.get(ValidateJvmArtifactsForResolveRequest)
     for impl in impls:
         validate_request = impl(artifacts=request.artifacts, resolve_name=request.resolve_name)
-        _ = await _validate_jvm_artifacts_for_resolve(  # noqa: PNT30: requires triage
+        _ = await _validate_jvm_artifacts_for_resolve(
             **implicitly({validate_request: ValidateJvmArtifactsForResolveRequest})
         )
 

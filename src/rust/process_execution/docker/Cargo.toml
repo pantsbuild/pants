@@ -8,7 +8,6 @@ publish = false
 [dependencies]
 async-stream = { workspace = true }
 async-trait = { workspace = true }
-async-lock = { workspace = true }
 bollard = { workspace = true }
 docker_credential = { workspace = true }
 fs = { path = "../../fs" }
@@ -20,8 +19,6 @@ nails = { workspace = true }
 store = { path = "../../fs/store" }
 task_executor = { path = "../../task_executor" }
 tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
-tokio-rustls = { workspace = true }
-tokio-util = { workspace = true, features = ["codec"] }
 workunit_store = { path = "../../workunit_store" }
 parking_lot = { workspace = true }
 async-oncecell = { workspace = true }

@@ -139,7 +139,7 @@ def main() -> None:
     releases: Iterable[GitRelease]
     if options.scrape_all_releases:
 
-        def get_all_releases_filtered() -> Generator[GitRelease, None, None]:
+        def get_all_releases_filtered() -> Generator[GitRelease]:
             for release in pbs_repo.get_releases():
                 if release.prerelease or release.draft:
                     continue

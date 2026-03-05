@@ -229,9 +229,7 @@ def fetch_platforms_for_version(
     return out
 
 
-def fetch_versions(
-    url: str, verifier: GPGVerifier
-) -> Generator[list[ExternalToolVersion], None, None]:
+def fetch_versions(url: str, verifier: GPGVerifier) -> Generator[list[ExternalToolVersion]]:
     """Crawl the Terraform version site and identify all supported Terraform binaries."""
     version_page = get_tf_page(url)
     version_links = get_tf_links(version_page)

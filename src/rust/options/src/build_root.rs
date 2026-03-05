@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use log::debug;
 use std::os::unix::ffi::OsStrExt;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BuildRoot(PathBuf);
 
 impl BuildRoot {

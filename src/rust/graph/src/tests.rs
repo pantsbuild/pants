@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use futures::future;
 use parking_lot::Mutex;
-use rand::{self, Rng};
+use rand::RngExt;
 use task_executor::Executor;
 use tokio::time::{error::Elapsed, sleep, timeout};
 
@@ -194,7 +194,8 @@ async fn invalidate_with_changed_dependencies() {
     );
 }
 
-// Historically flaky: https://github.com/pantsbuild/pants/issues/10839
+#[ignore] // flaky:
+// https://github.com/pantsbuild/pants/issues/10839
 #[tokio::test]
 async fn invalidate_randomly() {
     let graph = empty_graph();

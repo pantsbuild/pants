@@ -9,7 +9,7 @@ How to create new goals.
 
 For many [plugin tasks](../common-plugin-tasks/index.mdx), you will be extending existing goals, such as adding a new linter to the `lint` goal. However, you may instead want to create a new goal, such as a `publish` goal. This page explains how to create a new goal.
 
-As explained in [Concepts](./concepts.mdx), `@goal_rule`s are the entry-point into the rule graph. When a user runs `pants my-goal`, the Pants engine will look for the respective `@goal_rule`. That `@goal_rule` will usually request other types, either as parameters in the `@goal_rule` signature or through `await`ing another rule. But unlike a `@rule`, a `@goal_rule` may also trigger side effects (such as running interactive processes, writing to the filesystem, etc) via `await Effect`.
+As explained in [Concepts](./concepts.mdx), `@goal_rule`s are the entry-point into the rule graph. When a user runs `pants my-goal`, the Pants engine will look for the respective `@goal_rule`. That `@goal_rule` will usually request other types, either as parameters in the `@goal_rule` signature or through `await`ing another rule. But unlike a `@rule`, a `@goal_rule` may also trigger side effects, such as running interactive processes or writing to the filesystem.
 
 Often, you can keep all of your logic inline in the `@goal_rule`. As your `@goal_rule` gets more complex, you may end up factoring out helper `@rule`s, but you do not need to start with writing helper `@rule`s.
 

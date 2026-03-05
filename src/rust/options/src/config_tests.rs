@@ -3,7 +3,7 @@
 
 use maplit::{hashmap, hashset};
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Write;
@@ -27,7 +27,7 @@ fn maybe_config(file_content: &str) -> Result<ConfigReader, String> {
         .unwrap();
     Config::parse(
         &ConfigSource::from_file(&path)?,
-        &HashMap::from([
+        &BTreeMap::from([
             ("seed1".to_string(), "seed1val".to_string()),
             ("seed2".to_string(), "seed2val".to_string()),
         ]),
@@ -62,7 +62,7 @@ fn test_interpolate_string() {
         template: &str,
         interpolations: Vec<(&'static str, &'static str)>,
     ) -> Result<String, String> {
-        let interpolation_map: HashMap<_, _> = interpolations
+        let interpolation_map: BTreeMap<_, _> = interpolations
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
