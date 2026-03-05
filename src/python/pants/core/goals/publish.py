@@ -525,7 +525,7 @@ async def run_publish(
 
         if publish.noninteractive_process_output == ShowOutput.ALL or (
             publish.noninteractive_process_output == ShowOutput.FAILED
-            and background_res.exit_code == 0
+            and background_res.exit_code != 0
         ):
             console.print_stdout(output_msg)
 
