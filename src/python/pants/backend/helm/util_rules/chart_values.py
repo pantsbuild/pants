@@ -24,7 +24,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.internals.build_files import maybe_resolve_address
-from pants.engine.internals.native_engine import AddressInput
+from pants.engine.internals.native_engine import AddressInput, AddressParseException
 from pants.engine.intrinsics import (
     create_digest,
     digest_subset_to_digest,
@@ -67,21 +67,18 @@ async def resolve_helm_chart_values(
     resolved_values: dict[str, str] = {}
 
     for dot_path, value in request.values.items():
-        # Try to parse as a target address.
         try:
             address_input = AddressInput.parse(
                 value,
                 relative_to=request.spec_path,
                 description_of_origin="the `values` field of a `helm_chart` target",
             )
-        except Exception:
-            # Not a valid address, use as-is.
+        except AddressParseException:
             resolved_values[dot_path] = value
             continue
 
         maybe_addr = await maybe_resolve_address(address_input)
         if not isinstance(maybe_addr.val, Address):
-            # Address didn't resolve, use as-is.
             resolved_values[dot_path] = value
             continue
 
@@ -96,14 +93,11 @@ async def resolve_helm_chart_values(
             )
             resolved_values[dot_path] = result.ref
         else:
-            # Target exists but isn't a docker_image or couldn't resolve, use as-is.
             resolved_values[dot_path] = value
 
-    # Inject resolved values into values.yaml.
     chart = request.chart
     contents = await get_digest_contents(chart.snapshot.digest)
 
-    # Find existing values.yaml.
     values_content: bytes = b""
     values_filename = "values.yaml"
     for fc in contents:
@@ -112,14 +106,12 @@ async def resolve_helm_chart_values(
             values_filename = fc.path
             break
 
-    # Parse existing values and inject new ones.
     existing_values = (yaml.safe_load(values_content) or {}) if values_content else {}
     for dot_path, value in resolved_values.items():
         _set_nested_value(existing_values, dot_path, value)
 
     new_values_content = yaml.safe_dump(existing_values, default_flow_style=False).encode("utf-8")
 
-    # Create new snapshot: everything except the old values file + the new values file.
     without_values = await digest_subset_to_digest(
         DigestSubset(
             chart.snapshot.digest,
