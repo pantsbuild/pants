@@ -23,11 +23,18 @@ use crate::config::{ConfigFinder, InterpolationMap};
 use crate::pants_invocation::PantsInvocation;
 
 // A set of source paths and the options that apply to those sources.
-#[derive(Eq, Hash, PartialEq)]
 pub struct SourcePartition {
     pub paths: Vec<PathBuf>,
     pub options_reader: OptionsReader,
 }
+
+impl PartialEq for SourcePartition {
+    fn eq(&self, other: &Self) -> bool {
+        self.paths == other.paths
+    }
+}
+
+impl Eq for SourcePartition {}
 
 impl PartialOrd for SourcePartition {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

@@ -40,18 +40,19 @@ pub struct PyNgOptionsReader(pub OptionsReader);
 
 #[allow(clippy::type_complexity)]
 impl PyNgOptionsReader {
-    fn get_list<'py, T: ToOwned + ?Sized>(
+    fn get_list<'py, T: ToOwned + ?Sized, F>(
         &'py self,
         py: Python<'py>,
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<T::Owned>,
-        getter: fn(
+        getter: F,
+    ) -> PyResult<OptionValue<'py, Vec<T::Owned>>>
+    where
+        F: Fn(
             &'py OptionsReader,
             &OptionId,
             Vec<T::Owned>,
         ) -> Result<ListOptionValue<'py, T::Owned>, String>,
-    ) -> PyResult<OptionValue<'py, Vec<T::Owned>>>
-    where
         <T as ToOwned>::Owned: PartialEq,
     {
         let opt_val =
@@ -159,7 +160,7 @@ impl PyNgOptionsReader {
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<bool>,
     ) -> PyResult<OptionValue<'py, Vec<bool>>> {
-        self.get_list::<bool>(py, option_id, default, |op, oid, def| {
+        self.get_list::<bool, _>(py, option_id, default, |op, oid, def| {
             op.parse_bool_list(oid, def)
         })
     }
@@ -170,7 +171,7 @@ impl PyNgOptionsReader {
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<i64>,
     ) -> PyResult<OptionValue<'py, Vec<i64>>> {
-        self.get_list::<i64>(py, option_id, default, |op, oid, def| {
+        self.get_list::<i64, _>(py, option_id, default, |op, oid, def| {
             op.parse_int_list(oid, def)
         })
     }
@@ -181,7 +182,7 @@ impl PyNgOptionsReader {
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<f64>,
     ) -> PyResult<OptionValue<'py, Vec<f64>>> {
-        self.get_list::<f64>(py, option_id, default, |op, oid, def| {
+        self.get_list::<f64, _>(py, option_id, default, |op, oid, def| {
             op.parse_float_list(oid, def)
         })
     }
@@ -192,7 +193,7 @@ impl PyNgOptionsReader {
         option_id: &Bound<'_, PyOptionId>,
         default: Vec<String>,
     ) -> PyResult<OptionValue<'py, Vec<String>>> {
-        self.get_list::<String>(py, option_id, default, |op, oid, def| {
+        self.get_list::<String, _>(py, option_id, default, |op, oid, def| {
             op.parse_string_list(oid, def)
         })
     }
@@ -243,8 +244,8 @@ struct PyNgSourcePartition {
 impl PartialEq for PyNgSourcePartition {
     fn eq(&self, other: &Self) -> bool {
         Python::attach(|py| {
-            self.paths == other.paths &&
-            self.options_reader.borrow(py).0 == other.options_reader.borrow(py).0
+            self.paths == other.paths
+                && self.options_reader.borrow(py).0 == other.options_reader.borrow(py).0
         })
     }
 }

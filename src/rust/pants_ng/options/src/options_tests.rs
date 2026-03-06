@@ -26,7 +26,7 @@ fn mk_options(buildroot: BuildRoot, context: Option<Vec<String>>) -> Options {
 }
 
 fn test_option_id() -> OptionId {
-    OptionId::new(Scope::Global, ["test", "option"].iter(), None).unwrap()
+    OptionId::new(Scope::Global, ["test", "option"], None).unwrap()
 }
 
 fn write_config(path: &PathBuf, value: &str) {
