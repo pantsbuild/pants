@@ -1,0 +1,214 @@
+# Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from pathlib import Path
+
+import pytest
+
+from pants.engine.fs import PathGlobs, Paths
+from pants.engine.internals.native_engine import PyNgInvocation, PyNgOptions
+from pants.ng.source_partition import (
+    SourcePaths,
+    partition_sources,
+)
+from pants.source.source_root import SourceRoot, SourceRootsResult
+from pants.testutil.rule_runner import run_rule_with_mocks
+from pants.util.contextutil import pushd
+from pants.util.frozendict import FrozenDict
+
+
+@pytest.fixture
+def source_root() -> SourceRoot:
+    return SourceRoot("src/python")
+
+
+def test_commondir_single_file(source_root: SourceRoot, tmp_path: Path) -> None:
+    (tmp_path / "foo").mkdir()
+    (tmp_path / "foo" / "bar.py").touch()
+
+    source_paths = SourcePaths(
+        (tmp_path / "foo" / "bar.py",),
+        source_root,
+    )
+    assert source_paths.commondir() == str(tmp_path / "foo")
+
+
+def test_commondir_single_dir(source_root: SourceRoot, tmp_path: Path) -> None:
+    foo_dir = tmp_path / "foo"
+    bar_file = foo_dir / "bar.py"
+    baz_file = foo_dir / "baz.py"
+    foo_dir.mkdir()
+    bar_file.touch()
+    baz_file.touch()
+
+    assert SourcePaths(
+        (bar_file,),
+        source_root,
+    ).commondir() == str(foo_dir)
+
+    assert SourcePaths(
+        (bar_file, baz_file),
+        source_root,
+    ).commondir() == str(foo_dir)
+
+
+def test_commondir_multiple_dirs(source_root: SourceRoot, tmp_path: Path) -> None:
+    foo_dir = tmp_path / "foo"
+    a_dir = foo_dir / "a"
+    b_dir = foo_dir / "b"
+    bar_file = a_dir / "bar.py"
+    baz_file = b_dir / "baz.py"
+    a_dir.mkdir(parents=True)
+    b_dir.mkdir(parents=True)
+    bar_file.touch()
+    baz_file.touch()
+
+    assert SourcePaths(
+        (bar_file, baz_file),
+        source_root,
+    ).commondir() == str(foo_dir)
+
+
+def test_commondir_deeply_nested(source_root: SourceRoot, tmp_path: Path) -> None:
+    b_dir = tmp_path / "a" / "b"
+    c_dir = b_dir / "c"
+    d_dir = b_dir / "d"
+    e_dir = c_dir / "e"
+    bar_file = c_dir / "bar.py"
+    baz_file = d_dir / "baz.py"
+    qux_file = e_dir / "qux.py"
+
+    for d in b_dir, c_dir, d_dir, e_dir:
+        d.mkdir(parents=True)
+    for f in bar_file, baz_file, qux_file:
+        f.touch()
+
+    assert SourcePaths(
+        (
+            bar_file,
+            baz_file,
+        ),
+        source_root,
+    ).commondir() == str(b_dir)
+
+    assert SourcePaths(
+        (
+            bar_file,
+            qux_file,
+        ),
+        source_root,
+    ).commondir() == str(c_dir)
+
+    assert SourcePaths(
+        (
+            bar_file,
+            baz_file,
+            qux_file,
+        ),
+        source_root,
+    ).commondir() == str(b_dir)
+
+    assert SourcePaths(
+        (
+            bar_file,
+            baz_file,
+            qux_file,
+            c_dir,
+        ),
+        source_root,
+    ).commondir() == str(b_dir)
+
+
+def test_filter_by_suffixes_multiple_suffixes(source_root: SourceRoot) -> None:
+    source_paths = SourcePaths(
+        (
+            Path("foo/bar.py"),
+            Path("foo/baz.pyi"),
+            Path("foo/qux.txt"),
+            Path("foo/quux.py"),
+        ),
+        source_root,
+    )
+
+    filtered1 = source_paths.filter_by_suffixes((".py",))
+
+    assert filtered1.paths == (
+        Path("foo/bar.py"),
+        Path("foo/quux.py"),
+    )
+    assert filtered1.source_root == source_root
+
+    filtered2 = source_paths.filter_by_suffixes((".py", ".pyi"))
+
+    assert filtered2.paths == (
+        Path("foo/bar.py"),
+        Path("foo/baz.pyi"),
+        Path("foo/quux.py"),
+    )
+    assert filtered2.source_root == source_root
+
+    filtered3 = source_paths.filter_by_suffixes((".txt",))
+    assert filtered3.paths == (Path("foo/qux.txt"),)
+    assert filtered3.source_root == source_root
+
+    filtered4 = source_paths.filter_by_suffixes((".java",))
+    assert filtered4.paths == ()
+    assert filtered4.source_root == source_root
+
+
+def test_partition_sources(tmp_path: Path) -> None:
+    root1 = SourceRoot("src/py1")
+    root2 = SourceRoot("src/py2")
+
+    py1 = Path(root1.path)
+    py2 = Path(root2.path)
+    cfg_path = py1 / "foo" / "pantsng.toml"
+    bar_path = py1 / "foo" / "bar.py"
+    baz_path = py1 / "foo" / "baz.py"
+    qux_path = py1 / "qux.py"
+    corge_path = py2 / "corge.py"
+
+    paths = Paths(
+        files=(str(bar_path), str(baz_path), str(qux_path), str(corge_path)),
+        dirs=(),
+    )
+    source_roots_result = SourceRootsResult(
+        FrozenDict(
+            {
+                bar_path: root1,
+                baz_path: root1,
+                qux_path: root1,
+                corge_path: root2,
+            }
+        )
+    )
+
+    with pushd(str(tmp_path)):
+        (tmp_path / "BUILD_ROOT").touch()
+        ng_options = PyNgOptions(PyNgInvocation.empty(), {}, include_derivation=False)
+        cfg_path.parent.mkdir(parents=True)
+        cfg_path.touch()
+
+        partitions = run_rule_with_mocks(
+            partition_sources,
+            rule_args=[PathGlobs(["src/**/*.py"])],
+            mock_calls={
+                "pants.ng.source_partition.get_ng_options": lambda **kwargs: ng_options,
+                "pants.engine.intrinsics.path_globs_to_paths": lambda _: paths,
+                "pants.source.source_root.get_source_roots": lambda _: source_roots_result,
+            },
+        )
+
+    assert len(partitions) == 3
+    part1, part2, part3 = sorted(
+        partitions, key=lambda part: (part.source_paths.source_root.path, part.source_paths.paths)
+    )
+
+    assert part1.source_paths.source_root == root1
+    assert part1.source_paths.paths == (bar_path, baz_path)
+
+    assert part2.source_paths.source_root == root1
+    assert part2.source_paths.paths == (qux_path,)
+
+    assert part3.source_paths.source_root == root2
+    assert part3.source_paths.paths == (corge_path,)
