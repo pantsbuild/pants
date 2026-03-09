@@ -18,7 +18,8 @@ from pants.backend.docker.util_rules.docker_binary import DockerBinary
 from pants.backend.docker.util_rules.docker_build_args import rules as build_args_rules
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest
+from pants.engine.env_vars import EnvironmentVars
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, CreateDigest
 from pants.engine.process import Process, ProcessExecutionEnvironment
 from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.engine.unions import UnionMembership
@@ -73,7 +74,7 @@ def create_test_context(rule_runner: RuleRunner, pull_value=None):
         build_args=DockerBuildArgs(),
         digest=EMPTY_DIGEST,
         dockerfile="test/Dockerfile",
-        build_env=DockerBuildEnvironment(environment={}),
+        build_env=DockerBuildEnvironment(environment=EnvironmentVars()),
         interpolation_context=InterpolationContext.from_dict(
             {
                 "tags": InterpolationValue({}),
@@ -103,9 +104,9 @@ def test_podman_pull_string_policies(rule_runner: RuleRunner, policy: str) -> No
 
         return FallibleProcessResult(
             stdout=b"Successfully built abc123\n",
-            stdout_digest=EMPTY_DIGEST,
+            stdout_digest=EMPTY_FILE_DIGEST,
             stderr=b"",
-            stderr_digest=EMPTY_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
             exit_code=0,
             output_digest=EMPTY_DIGEST,
             metadata=ProcessResultMetadata(
