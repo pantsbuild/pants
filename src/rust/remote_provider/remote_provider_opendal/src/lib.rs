@@ -1,6 +1,8 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#![recursion_limit = "256"]
+
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
