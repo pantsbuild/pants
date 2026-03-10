@@ -19,7 +19,10 @@ from pants.backend.docker.goals.package_image import (
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.docker.util_rules.docker_build_args import rules as build_args_rules
+from pants.backend.docker.util_rules.docker_build_context import DockerBuildContext
+from pants.backend.docker.util_rules.docker_build_env import DockerBuildEnvironment
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
 from pants.engine.addresses import Address
 from pants.engine.env_vars import EnvironmentVars
@@ -28,9 +31,6 @@ from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.engine.unions import UnionMembership
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
-from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
-from pants.backend.docker.util_rules.docker_build_context import DockerBuildContext
-from pants.backend.docker.util_rules.docker_build_env import DockerBuildEnvironment
 from pants.util.value_interpolation import InterpolationContext, InterpolationValue
 
 
