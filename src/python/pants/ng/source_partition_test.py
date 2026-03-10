@@ -5,55 +5,77 @@ from pathlib import Path
 
 import pytest
 
-from pants.engine.fs import PathGlobs, Paths
+from pants.engine.fs import PathGlobs, PathMetadataRequest, PathMetadataResult, Paths
 from pants.engine.internals.native_engine import PyNgInvocation, PyNgOptions
+from pants.engine.rules import QueryRule
 from pants.ng.source_partition import (
     SourcePaths,
+    find_common_dir,
     partition_sources,
 )
 from pants.source.source_root import SourceRoot, SourceRootsResult
-from pants.testutil.rule_runner import run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import pushd
 from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
-def source_root() -> SourceRoot:
-    return SourceRoot("src/python")
-
-
-def test_commondir_single_file(source_root: SourceRoot, tmp_path: Path) -> None:
-    (tmp_path / "foo").mkdir()
-    (tmp_path / "foo" / "bar.py").touch()
-
-    source_paths = SourcePaths(
-        (tmp_path / "foo" / "bar.py",),
-        source_root,
+def rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[QueryRule(PathMetadataResult, (PathMetadataRequest,))],
     )
-    assert source_paths.commondir() == str(tmp_path / "foo")
 
 
-def test_commondir_single_dir(source_root: SourceRoot, tmp_path: Path) -> None:
-    foo_dir = tmp_path / "foo"
+def _call_find_common_dir(rule_runner: RuleRunner, source_paths: SourcePaths) -> Path | None:
+    return (
+        run_rule_with_mocks(
+            find_common_dir,
+            rule_args=[source_paths],
+            mock_calls={
+                "pants.engine.intrinsics.path_metadata_request": lambda *pmr: rule_runner.request(
+                    PathMetadataResult, pmr
+                )
+            },
+        )
+    ).path
+
+
+def test_find_common_dir_single_file(rule_runner: RuleRunner) -> None:
+    build_root = Path(rule_runner.build_root)
+    source_root = SourceRoot("src/python")
+    foo_dir = build_root / source_root.path / "foo"
+    foo_dir.mkdir(parents=True)
+    (foo_dir / "bar.py").touch()
+
+    assert _call_find_common_dir(
+        rule_runner, SourcePaths((Path("src/python/foo/bar.py"),), source_root)
+    ) == Path("src/python/foo")
+
+
+def test_find_common_dir_single_dir(rule_runner: RuleRunner) -> None:
+    build_root = Path(rule_runner.build_root)
+    source_root = SourceRoot("src/python")
+    foo_dir = build_root / source_root.path / "foo"
     bar_file = foo_dir / "bar.py"
     baz_file = foo_dir / "baz.py"
-    foo_dir.mkdir()
+    foo_dir.mkdir(parents=True)
     bar_file.touch()
     baz_file.touch()
 
-    assert SourcePaths(
-        (bar_file,),
-        source_root,
-    ).commondir() == str(foo_dir)
+    assert _call_find_common_dir(
+        rule_runner, SourcePaths((Path("src/python/foo/bar.py"),), source_root)
+    ) == Path("src/python/foo")
 
-    assert SourcePaths(
-        (bar_file, baz_file),
-        source_root,
-    ).commondir() == str(foo_dir)
+    assert _call_find_common_dir(
+        rule_runner,
+        SourcePaths((Path("src/python/foo/bar.py"), Path("src/python/foo/baz.py")), source_root),
+    ) == Path("src/python/foo")
 
 
-def test_commondir_multiple_dirs(source_root: SourceRoot, tmp_path: Path) -> None:
-    foo_dir = tmp_path / "foo"
+def test_find_common_dir_multiple_dirs(rule_runner: RuleRunner) -> None:
+    build_root = Path(rule_runner.build_root)
+    source_root = SourceRoot("src/python")
+    foo_dir = build_root / source_root.path / "foo"
     a_dir = foo_dir / "a"
     b_dir = foo_dir / "b"
     bar_file = a_dir / "bar.py"
@@ -63,14 +85,16 @@ def test_commondir_multiple_dirs(source_root: SourceRoot, tmp_path: Path) -> Non
     bar_file.touch()
     baz_file.touch()
 
-    assert SourcePaths(
-        (bar_file, baz_file),
-        source_root,
-    ).commondir() == str(foo_dir)
+    assert _call_find_common_dir(
+        rule_runner,
+        SourcePaths((Path("src/python/foo/bar.py"), Path("src/python/foo/baz.py")), source_root),
+    ) == Path("src/python/foo")
 
 
-def test_commondir_deeply_nested(source_root: SourceRoot, tmp_path: Path) -> None:
-    b_dir = tmp_path / "a" / "b"
+def test_find_common_dir_deeply_nested(rule_runner: RuleRunner) -> None:
+    build_root = Path(rule_runner.build_root)
+    source_root = SourceRoot("src/python")
+    b_dir = build_root / source_root.path / "b"
     c_dir = b_dir / "c"
     d_dir = b_dir / "d"
     e_dir = c_dir / "e"
@@ -83,43 +107,44 @@ def test_commondir_deeply_nested(source_root: SourceRoot, tmp_path: Path) -> Non
     for f in bar_file, baz_file, qux_file:
         f.touch()
 
-    assert SourcePaths(
-        (
-            bar_file,
-            baz_file,
+    assert _call_find_common_dir(
+        rule_runner,
+        SourcePaths((Path("src/python/b/c/bar.py"), Path("src/python/b/d/baz.py")), source_root),
+    ) == Path("src/python/b")
+
+    assert _call_find_common_dir(
+        rule_runner,
+        SourcePaths((Path("src/python/b/c/bar.py"), Path("src/python/b/c/e/qux.py")), source_root),
+    ) == Path("src/python/b/c")
+
+    assert _call_find_common_dir(
+        rule_runner,
+        SourcePaths(
+            (
+                Path("src/python/b/c/bar.py"),
+                Path("src/python/b/d/baz.py"),
+                Path("src/python/b/c/e/qux.py"),
+            ),
+            source_root,
         ),
-        source_root,
-    ).commondir() == str(b_dir)
+    ) == Path("src/python/b")
 
-    assert SourcePaths(
-        (
-            bar_file,
-            qux_file,
+    assert _call_find_common_dir(
+        rule_runner,
+        SourcePaths(
+            (
+                Path("src/python/b/c/bar.py"),
+                Path("src/python/b/d/baz.py"),
+                Path("src/python/b/c/e/qux.py"),
+                Path("src/python/b/c"),
+            ),
+            source_root,
         ),
-        source_root,
-    ).commondir() == str(c_dir)
-
-    assert SourcePaths(
-        (
-            bar_file,
-            baz_file,
-            qux_file,
-        ),
-        source_root,
-    ).commondir() == str(b_dir)
-
-    assert SourcePaths(
-        (
-            bar_file,
-            baz_file,
-            qux_file,
-            c_dir,
-        ),
-        source_root,
-    ).commondir() == str(b_dir)
+    ) == Path("src/python/b")
 
 
-def test_filter_by_suffixes_multiple_suffixes(source_root: SourceRoot) -> None:
+def test_filter_by_suffixes_multiple_suffixes() -> None:
+    source_root = SourceRoot("src/python")
     source_paths = SourcePaths(
         (
             Path("foo/bar.py"),

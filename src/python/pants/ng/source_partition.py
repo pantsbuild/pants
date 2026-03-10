@@ -9,15 +9,16 @@ from pathlib import Path
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.collection import Collection
-from pants.engine.fs import GlobExpansionConjunction, PathGlobs
+from pants.engine.fs import GlobExpansionConjunction, PathGlobs, PathMetadataRequest
 from pants.engine.internals.native_engine import (
     Digest,
+    PathMetadataKind,
     PyNgOptions,
     PyNgOptionsReader,
     PyNgSourcePartition,
 )
 from pants.engine.internals.session import SessionValues
-from pants.engine.intrinsics import path_globs_to_digest, path_globs_to_paths
+from pants.engine.intrinsics import path_globs_to_digest, path_globs_to_paths, path_metadata_request
 from pants.engine.rules import Rule, _uncacheable_rule, collect_rules, implicitly, rule
 from pants.source.source_root import SourceRoot, SourceRootsRequest, get_source_roots
 from pants.util.memo import memoized_property
@@ -33,18 +34,31 @@ class SourcePaths:
     def path_strs(self) -> tuple[str, ...]:
         return tuple(str(path) for path in self.paths)
 
-    def commondir(self) -> str:
-        ret = os.path.commonpath(self.paths)
-        if os.path.isfile(ret):
-            ret = os.path.dirname(ret)
-        return ret
-
     def filter_by_suffixes(self, suffixes: tuple[str, ...]) -> SourcePaths:
         suffixes_set = set(suffixes)
         return SourcePaths(
             tuple(path for path in self.paths if path.suffix in suffixes_set),
             self.source_root,
         )
+
+
+@dataclass(frozen=True)
+class CommonDir:
+    path: Path | None
+
+
+@rule
+async def find_common_dir(source_paths: SourcePaths) -> CommonDir:
+    if not source_paths.paths:  # We don't expect empty SourcePaths, but might as well be robust.
+        return CommonDir(None)
+    commonpath = os.path.commonpath(source_paths.paths)
+    meta = await path_metadata_request(PathMetadataRequest(commonpath))
+    if meta.metadata and meta.metadata.kind == PathMetadataKind.FILE:
+        # The args were a single file, so the commonpath is that file. We want its enclosing dir.
+        common_dir = os.path.dirname(commonpath)
+    else:
+        common_dir = commonpath
+    return CommonDir(Path(common_dir))
 
 
 @dataclass(frozen=True)
