@@ -496,6 +496,10 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
 
             If a backend does not support syncing it will fall back to full regeneration of
             the lockfile, and this option will have no effect.
+
+            Note that there may be edge cases where syncing will fail the next time it's run after
+            options that affect lockfile generation are changed. In this case you may need to
+            temporarily turn off `sync` and trigger a full regeneration of the lockfile.
             """
         ),
     )
