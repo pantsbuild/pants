@@ -456,7 +456,9 @@ def test_import_root_pacjage(rule_runner: RuleRunner) -> None:
     )
 
     assert sorted(analysis.fully_qualified_consumed_symbols()) == [
+        "foo.???",
         "foo.Bar",
+        "io.circe.syntax.???",
     ]
 
 
