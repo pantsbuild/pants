@@ -53,8 +53,19 @@ async def find_common_dir(source_paths: SourcePaths) -> CommonDir:
         return CommonDir(None)
     commonpath = os.path.commonpath(source_paths.paths)
     meta = await path_metadata_request(PathMetadataRequest(commonpath))
+    # Chase any symlinks back to the final path they point to.
+    while (
+        meta.metadata
+        and meta.metadata.kind == PathMetadataKind.SYMLINK
+        and meta.metadata.symlink_target
+    ):
+        # NB: We don't `normpath` because eliminating `..` might change the meaning of the path
+        #  if any of the intermediate directories are themselves symlinks.
+        symlink_target = os.path.join(os.path.dirname(commonpath), meta.metadata.symlink_target)
+        meta = await path_metadata_request(PathMetadataRequest(symlink_target))
     if meta.metadata and meta.metadata.kind == PathMetadataKind.FILE:
-        # The args were a single file, so the commonpath is that file. We want its enclosing dir.
+        # The args were a single file (or symlink to a file), so the commonpath is that file, but
+        # we want its enclosing dir.
         common_dir = os.path.dirname(commonpath)
     else:
         common_dir = commonpath

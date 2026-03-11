@@ -1,7 +1,7 @@
 # Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import pytest
 
@@ -50,6 +50,55 @@ def test_find_common_dir_single_file(rule_runner: RuleRunner) -> None:
     assert _call_find_common_dir(
         rule_runner, SourcePaths((Path("src/python/foo/bar.py"),), source_root)
     ) == Path("src/python/foo")
+
+
+def test_find_common_dir_single_file_symlink(rule_runner: RuleRunner) -> None:
+    build_root = Path(rule_runner.build_root)
+    link_target = build_root / "dir" / "link_target.py"
+    link_target.parent.mkdir(parents=True)
+    link_target.touch()
+    source_root = SourceRoot("src/python")
+    foo_dir = build_root / source_root.path / "foo"
+    foo_dir.mkdir(parents=True)
+    (foo_dir / "bar.py").symlink_to(Path("..") / ".." / ".." / "dir" / "link_target.py")
+
+    assert _call_find_common_dir(
+        rule_runner, SourcePaths((Path("src/python/foo/bar.py"),), source_root)
+    ) == Path("src/python/foo")
+
+
+def test_find_common_dir_single_dir_symlink(rule_runner: RuleRunner) -> None:
+    build_root = Path(rule_runner.build_root)
+    link_target = build_root / "dir" / "link_target_dir"
+    link_target.mkdir(parents=True)
+    source_root = SourceRoot("src/python")
+    foo_dir = build_root / source_root.path / "foo"
+    foo_dir.mkdir(parents=True)
+    (foo_dir / "bar").symlink_to(Path("..") / ".." / ".." / "dir" / "link_target_dir")
+
+    assert _call_find_common_dir(
+        rule_runner, SourcePaths((Path("src/python/foo/bar"),), source_root)
+    ) == Path("src/python/foo/bar")
+
+
+def test_find_common_dir_single_file_symlink_with_intermediate_symlink_dir(
+    rule_runner: RuleRunner,
+) -> None:
+    build_root = Path(rule_runner.build_root)
+    link_target = build_root / "p" / "q" / "link_target.py"
+    link_target.parent.mkdir(parents=True)
+    link_target.touch()
+    source_root = SourceRoot("src/python")
+    b_dir = build_root / source_root.path / "a" / "b"
+    c_dir = build_root / source_root.path / "c"
+    b_dir.mkdir(parents=True)
+    c_dir.mkdir(parents=True)
+    (b_dir / "d").symlink_to(PurePath("..") / ".." / ".." / ".." / "p")
+    (c_dir / "e.py").symlink_to(PurePath("..") / "a" / "b" / "d" / "q" / "link_target.py")
+
+    assert _call_find_common_dir(
+        rule_runner, SourcePaths((Path("src/python/c/e.py"),), source_root)
+    ) == Path("src/python/c")
 
 
 def test_find_common_dir_single_dir(rule_runner: RuleRunner) -> None:
