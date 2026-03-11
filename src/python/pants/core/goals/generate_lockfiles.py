@@ -485,6 +485,24 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             """
         ),
     )
+    sync = BoolOption(
+        advanced=False,
+        default=False,
+        help=softwrap(
+            """
+            Attempt a minimal update of the lockfile, preserving existing dependency versions
+            wherever possible. The resulting lockfile will be a valid solution for the requested
+            dependency versions, but it may not include the latest versions available.
+
+            If a backend does not support syncing it will fall back to full regeneration of
+            the lockfile, and this option will have no effect.
+
+            Note that there may be edge cases where syncing will fail the next time it's run after
+            options that affect lockfile generation are changed. In this case you may need to
+            temporarily turn off `sync` and trigger a full regeneration of the lockfile.
+            """
+        ),
+    )
     custom_command = StrOption(
         advanced=True,
         default=None,
