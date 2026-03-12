@@ -26,7 +26,7 @@ def _has_option_decorator(node: Decorator) -> bool:
 
 
 def _process_defns(defns: list[Statement]) -> None:
-    """Process definitions."""
+    """Process class/function definitions."""
     for defn in defns:
         if isinstance(defn, ClassDef):
             _process_defns(defn.defs.body)
@@ -34,6 +34,9 @@ def _process_defns(defns: list[Statement]) -> None:
             _process_defns(defn.body.body)
         elif isinstance(defn, Decorator):
             if _has_option_decorator(defn):
+                # Mark func as abstract, so mypy doesn't complain about its empty body.
+                # Note that this will make mypy complain about instantiating an abstract class
+                # if we call __init__() directly, hence the `SubsystemNg.create()` classmethod.
                 defn.func.abstract_status = IS_ABSTRACT
             else:
                 _process_defns(defn.func.body.body)
@@ -43,6 +46,7 @@ class SubsystemPlugin(Plugin):
     """Mypy plugin that processes files to find methods decorated with @option."""
 
     def get_additional_deps(self, file: MypyFile) -> list[tuple[int, str, int]]:
+        """A file-level hook that we piggyback on to process the parsed file."""
         _process_defns(file.defs)
         return []
 
