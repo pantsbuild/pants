@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial, wraps
 from types import GenericAlias
-from typing import Any, Iterable, Tuple, TypeVar, cast
+from typing import Any, Iterable, Self, Tuple, TypeVar, cast
 
 from pants.engine.internals.native_engine import PyNgOptions, PyNgOptionsReader, PyOptionId
 from pants.engine.rules import Rule, TaskRule, collect_rules, rule
@@ -200,6 +200,14 @@ class SubsystemNg:
 
     # The ctor will set.
     _option_values_: FrozenDict[str, OptionValue] | None = None
+
+    @classmethod
+    def create(cls, options_reader: PyNgOptionsReader) -> Self:
+        """Indirect constructor method.
+
+        Useful for avoiding spurious mypy errors when instantiating instances in tests.
+        """
+        return cls(options_reader)
 
     def __init__(self, options_reader: PyNgOptionsReader):
         option_values = {}

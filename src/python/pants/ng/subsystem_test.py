@@ -1,8 +1,6 @@
 # Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# mypy: disable-error-code=empty-body
-
 import re
 import textwrap
 
@@ -177,7 +175,7 @@ def test_option_value_getters_implicit_defaults(tmp_path) -> None:
 
     Dummy._initialize_()
 
-    subsys = Dummy(
+    subsys = Dummy.create(
         PyNgOptionsReader(
             buildroot=tmp_path,
             flags={},
@@ -231,7 +229,7 @@ def test_option_value_getters_explicit_defaults(tmp_path) -> None:
 
     Dummy._initialize_()
 
-    subsys = Dummy(
+    subsys = Dummy.create(
         PyNgOptionsReader(
             buildroot=tmp_path,
             flags={},
@@ -325,7 +323,7 @@ def test_option_value_getters_from_options(tmp_path) -> None:
     """)
     config_source = PyConfigSource("pantsng.toml", config.encode())
 
-    subsys = Dummy(
+    subsys = Dummy.create(
         PyNgOptionsReader(
             buildroot=tmp_path,
             flags={},
@@ -358,7 +356,7 @@ def test_required_options(tmp_path) -> None:
     with pytest.raises(
         ValueError, match=re.escape(r"No value provided for required option [dummy1].bool_opt.")
     ):
-        Dummy1(
+        Dummy1.create(
             PyNgOptionsReader(
                 buildroot=tmp_path,
                 flags={},
@@ -380,7 +378,7 @@ def test_required_options(tmp_path) -> None:
         ValueError,
         match=re.escape(r"No value provided for required option [dummy2].str_tuple_opt."),
     ):
-        Dummy2(
+        Dummy2.create(
             PyNgOptionsReader(
                 buildroot=tmp_path,
                 flags={},
@@ -401,7 +399,7 @@ def test_required_options(tmp_path) -> None:
     with pytest.raises(
         ValueError, match=re.escape(r"No value provided for required option [dummy3].dict_opt.")
     ):
-        Dummy3(
+        Dummy3.create(
             PyNgOptionsReader(
                 buildroot=tmp_path,
                 flags={},

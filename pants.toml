@@ -205,6 +205,7 @@ timeout_default = 60
 install_from_resolve = "mypy"
 requirements = ["//3rdparty/python:mypy"]
 args = ["--fixed-format-cache"]
+source_plugins = ["src/python/pants/ng/subsystem_mypy_plugin.py"]
 
 
 [coverage-py]
