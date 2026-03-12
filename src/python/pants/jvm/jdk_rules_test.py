@@ -97,7 +97,7 @@ def test_java_binary_versions(rule_runner: RuleRunner) -> None:
     assert 'openjdk version "11.0' in run_javac_version(rule_runner)
 
     rule_runner.set_options(["--jvm-tool-jdk=temurin:1.17"], env_inherit=PYTHON_BOOTSTRAP_ENV)
-    assert 'openjdk version "17"' in run_javac_version(rule_runner)
+    assert 'openjdk version "17.' in run_javac_version(rule_runner)
 
     rule_runner.set_options(["--jvm-tool-jdk=bogusjdk:999"], env_inherit=PYTHON_BOOTSTRAP_ENV)
     expected_exception_msg = r".*?JVM bogusjdk:999 not found in index.*?"
