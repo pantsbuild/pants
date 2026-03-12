@@ -20,8 +20,7 @@ from mypy.plugin import Plugin
 def _has_option_decorator(node: Decorator) -> bool:
     for dec in node.decorators:
         if hasattr(dec, "callee"):
-            callee = dec.callee
-            if hasattr(callee, "name") and callee.name == "option":
+            if hasattr(dec.callee, "name") and dec.callee.name == "option":
                 return True
     return False
 
