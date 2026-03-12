@@ -356,7 +356,10 @@ class SourceAnalysisTraverser extends Traverser {
       decltpe.foreach(tpe => {
         extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
-      super.apply(rhs)
+      // NB: Use `apply` (not `super.apply`) so that a bare Term.Name RHS (e.g. `val bar = foo`)
+      // is dispatched through the overridden method and recorded as a consumed symbol.
+      // `super.apply` only traverses *children*, which misses leaf nodes like Term.Name.
+      apply(rhs)
     }
 
     case Defn.Var(mods, pats, decltpe, rhs) => {
@@ -367,7 +370,7 @@ class SourceAnalysisTraverser extends Traverser {
       decltpe.foreach(tpe => {
         extractNamesFromTypeTree(tpe).iterator.foreach(recordConsumedSymbol(_))
       })
-      super.apply(rhs)
+      apply(rhs)
     }
 
     case Defn.Def(mods, nameNode, tparams, params, decltpe, body) => {

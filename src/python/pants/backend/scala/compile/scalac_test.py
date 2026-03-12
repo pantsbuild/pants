@@ -890,6 +890,77 @@ def test_compile_no_deps_scala3(
     assert check_result.exit_code == 0
 
 
+@maybe_skip_jdk_test
+def test_compile_scala3_top_level_val_cross_file(
+    rule_runner: RuleRunner, scala3_stdlib_jvm_lockfile: JVMLockfileFixture
+) -> None:
+    """Regression test for https://github.com/pantsbuild/pants/issues/23023."""
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                scala_sources(
+                    name = 'lib',
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD": scala3_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": scala3_stdlib_jvm_lockfile.serialized_lockfile,
+            "Foo.scala": dedent(
+                """\
+                package example
+                val foo = "foo"
+                """
+            ),
+            "Bar.scala": dedent(
+                """\
+                package example
+                val bar = foo
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        args=[
+            "--scala-version-for-resolve={'jvm-default': '3.2.0'}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    # First, verify Foo.scala compiles and produces the expected $package files.
+    foo_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="lib", relative_file_path="Foo.scala")
+    )
+    foo_classpath = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=foo_target, resolve=make_resolve(rule_runner))],
+    )
+    assert foo_classpath.content == {
+        ".Foo.scala.lib.scalac.jar": {
+            "example/Foo$package$.class",
+            "example/Foo$package.class",
+            "example/Foo$package.tasty",
+        }
+    }
+
+    # Now compile Bar.scala, which references the top-level val `foo` from Foo.scala.
+    # This requires Foo.scala's output (including the .tasty file) on the classpath.
+    bar_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="", target_name="lib", relative_file_path="Bar.scala")
+    )
+    bar_classpath = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=bar_target, resolve=make_resolve(rule_runner))],
+    )
+    assert bar_classpath.content == {
+        ".Bar.scala.lib.scalac.jar": {
+            "example/Bar$package$.class",
+            "example/Bar$package.class",
+            "example/Bar$package.tasty",
+        }
+    }
+
+
 @pytest.fixture
 def cats_jvm_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(
