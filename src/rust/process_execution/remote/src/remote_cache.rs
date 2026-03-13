@@ -10,7 +10,7 @@ use fs::{DigestTrie, RelativePath, SymlinkBehavior, directory};
 use futures::FutureExt;
 use futures::future::{BoxFuture, TryFutureExt};
 use hashing::Digest;
-use log::{log_enabled, trace};
+use log::{info, log_enabled};
 use parking_lot::Mutex;
 use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
@@ -506,10 +506,17 @@ impl process_execution::CommandRunner for CommandRunner {
         let use_remote_cache = request.cache_scope == ProcessCacheScope::Always
             || request.cache_scope == ProcessCacheScope::Successful;
 
-        let proc_descr = if log_enabled!(Level::Trace) { Some(request.description.clone()) } else { None };
+        let proc_descr = if log_enabled!(Level::Info) {
+            Some(request.description.clone())
+        } else {
+            None
+        };
         let (result, hit_cache) = if self.cache_read && use_remote_cache {
             if let Some(proc_descr) = proc_descr.as_deref() {
-                trace!("Checking remote cache for process {} against action digest {:?}", proc_descr, &action_digest);
+                info!(
+                    "Checking remote cache for process {} against action digest {:?}",
+                    proc_descr, &action_digest
+                );
             }
             self.speculate_read_action_cache(
                 context.clone(),
@@ -533,7 +540,10 @@ impl process_execution::CommandRunner for CommandRunner {
             && use_remote_cache
         {
             if let Some(proc_descr) = proc_descr.as_deref() {
-                trace!("Updating remote cache for process {} against action digest {:?}", proc_descr, &action_digest);
+                info!(
+                    "Updating remote cache for process {} against action digest {:?}",
+                    proc_descr, &action_digest
+                );
             }
             let command_runner = self.clone();
             let result = result.clone();
