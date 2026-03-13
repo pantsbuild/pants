@@ -179,7 +179,8 @@ class SubsystemNg:
     tuple[int, ...], tuple[float, ...] and FrozenDict[str, str].
 
     The `...` in the method bodies above are literal: the subsystem mechanism will provide the body.
-    You may need `# mypy: disable-error-code=empty-body` for your code to pass mypy type checks.
+    You may need `# mypy: disable-error-code=empty-body` for your code to pass mypy type checks, or
+    you can use the mypy plugin at pants.ng.subsystem_mypy_plugin to suppress those errors.
 
     `default` and `help` can be values or callables that take the subsystem type as an arg, and
     return the relevant values.
