@@ -534,17 +534,17 @@ impl process_execution::CommandRunner for CommandRunner {
             )
         };
 
+        if let Some(proc_descr) = proc_descr.as_deref() {
+            info!(
+                "Maybe updating remote cache for process {} against action digest {:?} [hit_cache={}, cache_write={}, use_remote_cache={}]",
+                proc_descr, &action_digest, hit_cache, self.cache_write, use_remote_cache
+            );
+        }
         if !hit_cache
             && (result.exit_code == 0 || failures_cached)
             && self.cache_write
             && use_remote_cache
         {
-            if let Some(proc_descr) = proc_descr.as_deref() {
-                info!(
-                    "Updating remote cache for process {} against action digest {:?}",
-                    proc_descr, &action_digest
-                );
-            }
             let command_runner = self.clone();
             let result = result.clone();
             let write_fut =
