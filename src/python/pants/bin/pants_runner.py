@@ -17,6 +17,7 @@ from pants.base.exiter import ExitCode
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
+from pants.option.bootstrap_options import BootstrapOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.docutil import doc_url
@@ -79,6 +80,8 @@ class PantsRunner:
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options
             global_bootstrap_options = bootstrap_options.for_global_scope()
+
+        BootstrapOptions.maybe_enable_stack_trampoline(global_bootstrap_options)
 
         # We enable logging here, and everything before it will be routed through regular
         # Python logging.

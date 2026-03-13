@@ -7,6 +7,7 @@ import enum
 import logging
 import os
 import re
+import sys
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -1069,6 +1070,19 @@ class BootstrapOptions:
             """
         ),
     )
+    enable_stack_trampoline = StrOption(
+        default=None,
+        daemon=True,
+        help=softwrap(
+            """ Enable `sys.activate_stack_trampoline` for Pants's own Python
+            code. This allows profilers like the Linux `perf` profiler to see
+            Python stack frames. Set to `perf` to enable the `perf`
+            trampoline.
+
+            See https://docs.python.org/3/howto/perf_profiling.html
+            """
+        ),
+    )
     sandboxer = BoolOption(
         default=False,
         daemon=False,
@@ -1896,3 +1910,8 @@ class BootstrapOptions:
                     """
                 )
             )
+
+    @staticmethod
+    def maybe_enable_stack_trampoline(opts: OptionValueContainer) -> None:
+        if sys.platform == "linux" and opts.enable_stack_trampoline is not None:
+            sys.activate_stack_trampoline(opts.enable_stack_trampoline)
