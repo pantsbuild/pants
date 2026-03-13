@@ -14,7 +14,7 @@ from pants.backend.docker.target_types import (
     DockerImageRunExtraArgsField,
     DockerImageSourceField,
 )
-from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.binaries import DockerBinary
 from pants.core.goals.package import PackageFieldSet, build_package
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.env_vars import environment_vars_subset

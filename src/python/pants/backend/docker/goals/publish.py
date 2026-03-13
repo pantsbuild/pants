@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import DefaultDict, cast
 
+from pants.backend.docker.engine_types import DockerPushEngine
 from pants.backend.docker.goals.package_image import (
     DockerPackageFieldSet,
     GetImageRefsRequest,
@@ -19,7 +20,7 @@ from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSkipPushField
-from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.binaries import DockerBinary, get_docker, get_podman
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import (
     CheckSkipRequest,
@@ -114,7 +115,6 @@ async def check_if_skip_push(
 @rule
 async def push_docker_images(
     request: PublishDockerImageRequest,
-    docker: DockerBinary,
     options: DockerOptions,
     options_env_aware: DockerOptions.EnvironmentAware,
 ) -> PublishProcesses:
@@ -148,6 +148,11 @@ async def push_docker_images(
     jobs: list[PublishPackages] = []
     refs: list[str] = []
     processes: list[Process | InteractiveProcess] = []
+    match options.push_engine:
+        case DockerPushEngine.DOCKER:
+            binary = await get_docker(**implicitly())
+        case DockerPushEngine.PODMAN:
+            binary = await get_podman(**implicitly())
 
     for tag in tags:
         for registry in options.registries().registries.values():
@@ -159,7 +164,7 @@ async def push_docker_images(
                 break
         else:
             refs.append(tag)
-            push_process = docker.push_image(tag, env)
+            push_process = binary.push_image(tag, env)
             if options.publish_noninteractively:
                 processes.append(push_process)
             else:
