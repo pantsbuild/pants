@@ -292,7 +292,7 @@ impl CommandRunner {
             match response {
                 Ok(cached_response_opt) => match &cached_response_opt {
                     Some(cached_response) if cached_response.exit_code == 0 || failures_cached => {
-                        log::debug!(
+                        log::info!(
                             "remote cache hit for: {:?} digest={:?} response={:?}",
                             request.description,
                             action_digest,
@@ -301,7 +301,7 @@ impl CommandRunner {
                         cached_response_opt
                     }
                     _ => {
-                        log::debug!(
+                        log::info!(
                             "remote cache miss for: {:?} digest={:?}",
                             request.description,
                             action_digest
@@ -554,8 +554,16 @@ impl process_execution::CommandRunner for CommandRunner {
                         .update_action_cache(&result, &command, action_digest, command_digest)
                         .await;
                     match write_result {
-                        Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
+                        Ok(_) => {
+                            if let Some(proc_descr) = proc_descr.as_deref() {
+                                info!("Successfully updated remote cache for process {} against action digest {:?}", proc_descr, &action_digest);
+                            }
+                            workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1)
+                        },
                         Err(err) => {
+                            if let Some(proc_descr) = proc_descr.as_deref() {
+                                info!("Failed to update remote cache for process {} against action digest {:?}: {:?}", proc_descr, &action_digest, err);
+                            }
                             command_runner
                                 .log_cache_error(err.to_string(), CacheErrorType::WriteError);
                             workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
