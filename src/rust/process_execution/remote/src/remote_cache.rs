@@ -547,8 +547,8 @@ impl process_execution::CommandRunner for CommandRunner {
         {
             let command_runner = self.clone();
             let result = result.clone();
-            let write_fut =
-                in_workunit!("remote_cache_write", Level::Trace, |workunit| async move {
+            let write_fut = in_workunit!("remote_cache_write", Level::Trace, |workunit| {
+                async move {
                     workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
                     let write_result = command_runner
                         .update_action_cache(&result, &command, action_digest, command_digest)
@@ -571,7 +571,8 @@ impl process_execution::CommandRunner for CommandRunner {
                     };
                 }
                 // NB: We must box the future to avoid a stack overflow.
-                .boxed());
+                .boxed()
+            });
             let task_name = format!("remote cache write {action_digest:?}");
             context
                 .tail_tasks
