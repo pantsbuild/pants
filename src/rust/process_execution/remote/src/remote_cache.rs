@@ -505,11 +505,7 @@ impl process_execution::CommandRunner for CommandRunner {
         let use_remote_cache = request.cache_scope == ProcessCacheScope::Always
             || request.cache_scope == ProcessCacheScope::Successful;
 
-        let proc_descr = if log::log_enabled!(Level::Debug) {
-            Some(request.description.clone())
-        } else {
-            None
-        };
+        let proc_descr = log::log_enabled!(Level::Debug).then(|| request.description.clone());
         let (result, hit_cache) = if self.cache_read && use_remote_cache {
             self.speculate_read_action_cache(
                 context.clone(),
@@ -542,7 +538,7 @@ impl process_execution::CommandRunner for CommandRunner {
                         .await;
                     match write_result {
                         Ok(_) => {
-                            if let Some(proc_descr) = proc_descr.as_deref() {
+                            if let Some(proc_descr) = &proc_descr {
                                 log::debug!(
                                     "remote cache updated for: {:?} digest={:?} response={:?}",
                                     proc_descr,
@@ -553,7 +549,7 @@ impl process_execution::CommandRunner for CommandRunner {
                             workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1)
                         },
                         Err(err) => {
-                            if let Some(proc_descr) = proc_descr.as_deref() {
+                            if let Some(proc_descr) = &proc_descr {
                                 log::debug!(
                                     "remote cache update failed for: {:?} digest={:?} response={:?}",
                                     proc_descr,
