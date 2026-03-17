@@ -166,6 +166,25 @@ You can have Pants display a useful summary of what changed between the old and 
 diff = true
 ```
 
+#### Lockfile syncing
+
+If you want to add or remove requirements from the lockfile without perturbing other requirement versions unnecessarily, you can use the `--sync` option:
+
+```shell title="Bash"
+$ pants generate-lockfiles --sync
+```
+
+This will attempt to perform a minimal update of the lockfile, adding and removing just what is necessary, without checking for more recent compatible versions of every requirement and upgrading to them.
+
+If you want this to be the default behavior, you can set it in config:
+
+```toml title="pants.toml"
+[generate-lockfiles]
+sync = true
+```
+
+And then override it with the `--no-sync` flag as needed.
+
 In theory, when you generate a lockfile, you should want to audit it for bugs, compliance and security concerns. In practice this is intractable to do manually. We would like to integrate with automated auditing tools and services in the future, so watch this space for updates, or feel free to [reach out on Slack](/community/members) if this is important to you and you'd like to work on it.
 
 ### Lockfile subsetting
