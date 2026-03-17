@@ -61,7 +61,7 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@40bfee73c0cbc0ab3399b622cee01fb71b3b9b66
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -188,7 +188,7 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@40bfee73c0cbc0ab3399b622cee01fb71b3b9b66
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -325,7 +325,7 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@40bfee73c0cbc0ab3399b622cee01fb71b3b9b66
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -346,7 +346,7 @@ jobs:
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@40bfee73c0cbc0ab3399b622cee01fb71b3b9b66
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -458,7 +458,7 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@40bfee73c0cbc0ab3399b622cee01fb71b3b9b66
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x

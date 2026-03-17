@@ -39,7 +39,7 @@ def action(name: str) -> str:
         "setup-go": "actions/setup-go@v6",
         "setup-java": "actions/setup-java@v5",
         "setup-node": "actions/setup-node@v6",
-        "setup-protoc": "arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623",
+        "setup-protoc": "benjyw/setup-protoc@40bfee73c0cbc0ab3399b622cee01fb71b3b9b66",
         "setup-python": "actions/setup-python@v6",
         "slack-github-action": "slackapi/slack-github-action@v2.1.1",
         "upload-artifact": "actions/upload-artifact@v6",
