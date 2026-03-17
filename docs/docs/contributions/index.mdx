@@ -19,9 +19,9 @@ If you ever encounter a confusing or mediocre error message, we would love your 
 
 ## LLM Assistance Notice
 
-AI/LLM assisted *code contributions* are welcome.  That includes using LLM assistance to write, introspect, read, reason about, debug, or test code contributions.  However, the extent of the LLM assistance use must be disclosed in the Pull Request description.  All of the normal expectations of a human apply: you need to understand it, have tested it, and be able to discuss the proposed change.
+AI/LLM assisted *code contributions* are welcome. That includes using LLM assistance to write, introspect, read, reason about, debug, or test code contributions. However, the extent of the LLM *generation* must be disclosed in the Pull Request description. All of the normal expectations of a human apply: you need to understand it, have tested it, and be able to discuss the proposed change.
 
-This isn't meant to discourage LLM use -- it is not frowned upon! -- but it is critical *context* for reviewers.  One of the most valuable community actions is careful line-by-line, review of an earnest first time contribution.  That takes a lot of time and care.  But that effort doesn't help a robot and different modes of feedback are more appropriate.
+None of this is meant to discourage LLM use -- it is not frowned upon! -- but it is critical *context* for reviewers. One of the most valuable community actions is careful, line-by-line review of an earnest first-time contribution. That takes a lot of time and care. But that effort doesn't help a robot, and different modes of feedback are more appropriate.
 
 An example disclosure:
 
@@ -31,13 +31,22 @@ Or:
     ChatGPT looked for prior art and came up with the approach but I wrote the code manually.
 Or:
 
-    Gemini generated all of the test cases.
+    I used an LLM to generate all of the test cases first, and then I wrote the code.
 
-Minor exceptions to this policy include basic auto-complete functionality or the various Machine Learning techniques that are no longer called "AI".  Spellcheck is not an AI.
+Or:
 
-:::note AI/LLM generation is for *code* changes only.  All community interactions, including comments, discussion, issues, PR titles, and descriptions *must be composed by a human*.  Be respectful to one another and mindful of the person on the other end.
+    <Inline comments calling out specific parts of the PR>
 
-This policy was inspired by the [ghostty AI Assistance Notice]( https://github.com/ghostty-org/ghostty/blob/main/CONTRIBUTING.md).  For further discussion of LLM prose and social contracts see [Using LLMs at Oxide](https://rfd.shared.oxide.computer/rfd/0576).
+Minor exceptions to this policy include basic auto-complete functionality or the various Machine Learning techniques that are no longer called "AI". Spellcheck is not an AI.
+
+To put all this in more general terms, some projects have a convention of every commit using a "Test Plan" where one would include a screenshot showing that the new website feature really did render correctly. With the expanded use of LLMs, prose that serves as a "Test Plan" for the change itself -- not just for code correctness -- becomes more valuable. Use the disclosure as an opportunity to verify the conceptual soundness of the change.
+
+:::note AI/LLM generation is for *code* changes only. All community interactions, including comments, discussion, issues, PR titles, and descriptions *must be composed by a human*. Slack chat is for humans, there are now countless other services if you want a chatbot. Be respectful to one another and mindful of the person on the other end.
+
+An exception is LLM-assisted translations. Please note when this is in use (ex: "I am translating from LANGUAGE with an LLM").
+:::
+
+This policy was inspired by the [ghostty AI Assistance Notice](https://github.com/ghostty-org/ghostty/blob/2aa773a23a87289175bd022dfb617a5e8c27e824/AI_POLICY.md) and the [Jellyfin LLM/"AI" Development Policy](https://jellyfin.org/docs/general/contributing/llm-policies/). For further discussion of LLM prose and social contracts, see [Using LLMs at Oxide](https://rfd.shared.oxide.computer/rfd/0576).
 
 ## Documentation Fixes
 
