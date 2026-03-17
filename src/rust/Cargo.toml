@@ -4,6 +4,7 @@
 debug = 1
 # Optimise for the speed of our binary, rather than the speed of compilation.
 codegen-units = 1
+lto = "thin"
 
 [workspace]
 resolver = "2"
