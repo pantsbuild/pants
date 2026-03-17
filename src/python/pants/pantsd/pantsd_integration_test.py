@@ -299,7 +299,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             ctx.checker.assert_started()
 
             # Launch a separate thread to poke files in 3rdparty.
-            join = launch_file_toucher("3rdparty/jvm/com/google/auto/value/BUILD")
+            join = launch_file_toucher("testprojects/src/python/hello/BUILD")
 
             # Repeatedly re-list 3rdparty while the file is being invalidated.
             for _ in range(0, 16):
