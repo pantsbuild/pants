@@ -39,7 +39,9 @@ def action(name: str) -> str:
         "setup-go": "actions/setup-go@v6",
         "setup-java": "actions/setup-java@v5",
         "setup-node": "actions/setup-node@v6",
-        "setup-protoc": "arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623",
+        # TODO: If arduino accept https://github.com/arduino/setup-protoc/pull/113 we
+        #  can reference the upstream SHA. Until then we use our fork.
+        "setup-protoc": "benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85",
         "setup-python": "actions/setup-python@v6",
         "slack-github-action": "slackapi/slack-github-action@v2.1.1",
         "upload-artifact": "actions/upload-artifact@v6",
