@@ -11,6 +11,8 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(ipython.lock*)
+
 
 class IPython(PythonToolBase):
     options_scope = "ipython"

@@ -1,6 +1,9 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# pants: infer-dep(native_engine.so)
+# pants: infer-dep(native_engine.so.metadata)
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence

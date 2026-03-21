@@ -10,6 +10,8 @@ from pants.engine.rules import collect_rules
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 
+# pants: infer-dep(autoflake.lock*)
+
 
 class Autoflake(PythonToolBase):
     options_scope = "autoflake"

@@ -15,6 +15,8 @@ from pants.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTest
 from pants.testutil.pants_integration_test import run_pants_with_workdir
 from pants.util.dirutil import read_file
 
+# pants: infer-dep(/testprojects/pants-plugins/src/python/test_pants_plugin/*)
+
 pytestmark = pytest.mark.platform_specific_behavior
 
 

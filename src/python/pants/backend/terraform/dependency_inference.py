@@ -54,6 +54,8 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.resources import read_resource
 from pants.util.strutil import bullet_list, softwrap
 
+# pants: infer-dep(hcl2.lock*)
+
 
 class TerraformHcl2Parser(PythonToolRequirementsBase):
     options_scope = "terraform-hcl2-parser"

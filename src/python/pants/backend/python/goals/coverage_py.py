@@ -69,6 +69,8 @@ from pants.source.source_root import AllSourceRoots
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(../subsystems/coverage_py.lock*)
+
 """
 An overview:
 

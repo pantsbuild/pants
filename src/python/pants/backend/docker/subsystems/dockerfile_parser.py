@@ -33,6 +33,8 @@ from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(dockerfile.lock*)
+
 _DOCKERFILE_SANDBOX_TOOL = "dockerfile_wrapper_script.py"
 _DOCKERFILE_PACKAGE = "pants.backend.docker.subsystems"
 
