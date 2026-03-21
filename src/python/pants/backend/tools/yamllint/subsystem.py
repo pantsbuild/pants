@@ -20,6 +20,8 @@ from pants.option.option_types import (
 )
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(yamllint.lock*)
+
 
 class Yamllint(PythonToolBase):
     name = "Yamllint"
