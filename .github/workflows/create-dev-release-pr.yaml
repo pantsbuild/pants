@@ -12,7 +12,7 @@ defaults:
 
 jobs:
   create-dev-pr:
-    name: Sanity check the requested version
+    name: Create a dev release pull request
     runs-on: ubuntu-latest
 
     permissions:
@@ -43,7 +43,7 @@ jobs:
           echo "::notice::Release version is: ${version}"
           echo "release-version=${version}" >> $GITHUB_OUTPUT
       
-      - name: Update CONTRIBUTORS and VERSION files and commit to a new branch
+      - name: Update CONTRIBUTORS.md and VERSION files
         env:
           RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
         run: |
@@ -68,7 +68,7 @@ jobs:
                 | sed 's/^/+ /'
           } > CONTRIBUTORS.md
 
-      - name: Commit changes and create PR
+      - name: Commit changes and create pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
@@ -78,18 +78,21 @@ jobs:
             exit 1
           fi
 
+          # Assign our general account to the local user
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
 
+          # Create and checkout a new release branch
           branch_name="automation/release/$RELEASE_VERSION"
           git checkout -b "$branch_name"
-          
+
+          # Commit and push to the release branch
           title="Prepare $RELEASE_VERSION"
           git add src/python/pants/VERSION CONTRIBUTORS.md
           git commit -m "$title"
           git push -u origin "$branch_name"
 
-          # Create PR from branch to main
+          # Create PR from the release branch to main
           gh pr create \
             --title "$title" \
             --body "" \
