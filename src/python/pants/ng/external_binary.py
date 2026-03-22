@@ -27,6 +27,7 @@ class ExternalBinary(ContextualSubsystem):
     def exe_default(cls) -> str:
         raise NotImplementedError("Subclasses must implement to provide the default executable")
 
+
     @option(help=exe_help, default=lambda cls: cls.exe_default)
     def exe(self) -> str: ...
 
@@ -96,4 +97,5 @@ class ExternalBinary(ContextualSubsystem):
         return ExternalToolRequest(
             download_file_request=DownloadFile(url=url, expected_digest=FileDigest(sha256, size)),
             exe=self.exe,
+            strip_common_path_prefix=True,
         )

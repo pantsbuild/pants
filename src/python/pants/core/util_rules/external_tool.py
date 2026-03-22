@@ -26,8 +26,9 @@ from pants.core.util_rules.archive import maybe_extract_archive
 from pants.engine.download_file import download_file
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, Digest, DownloadFile, FileDigest, FileEntry
+from pants.engine.internals.native_engine import RemovePrefix
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import create_digest, get_digest_entries
+from pants.engine.intrinsics import create_digest, get_digest_entries, remove_prefix
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionMembership, UnionRule
@@ -65,6 +66,10 @@ class UnsupportedVersionUsage(Enum):
 class ExternalToolRequest:
     download_file_request: DownloadFile
     exe: str
+    # Some archive files for tools may have a common path prefix, e.g., representing the platform.
+    # If this field is set, strip the common path prefix. If the archive contains just one file
+    # will strip all dirs from that file.
+    strip_common_path_prefix: bool = False
 
 
 @dataclass(frozen=True)
@@ -396,20 +401,28 @@ async def download_external_tool(request: ExternalToolRequest) -> DownloadedExte
     # Download and extract.
     maybe_archive_digest = await download_file(request.download_file_request, **implicitly())
     extracted_archive = await maybe_extract_archive(**implicitly(maybe_archive_digest))
+    digest = extracted_archive.digest
+    digest_entries = await get_digest_entries(digest)
+    if request.strip_common_path_prefix:
+        paths = tuple(entry.path for entry in digest_entries)
+        if len(paths) == 1:
+            commonpath = os.path.dirname(paths[0])
+        else:
+            commonpath = os.path.commonpath(paths)
+            digest = await remove_prefix(RemovePrefix(extracted_archive.digest, commonpath))
 
     # Confirm executable.
     exe_path = request.exe.lstrip("./")
-    digest = extracted_archive.digest
     is_not_executable = False
-    digest_entries = []
-    for entry in await get_digest_entries(digest):
+    updated_digest_entries = []
+    for entry in digest_entries:
         if isinstance(entry, FileEntry) and entry.path == exe_path and not entry.is_executable:
             # We should recreate the digest with the executable bit set.
             is_not_executable = True
             entry = dataclasses.replace(entry, is_executable=True)
-        digest_entries.append(entry)
+        updated_digest_entries.append(entry)
     if is_not_executable:
-        digest = await create_digest(CreateDigest(digest_entries))
+        digest = await create_digest(CreateDigest(updated_digest_entries))
 
     return DownloadedExternalTool(digest, request.exe)
 
