@@ -1,0 +1,99 @@
+name: Dev Release PR
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The release version to create (e.g. 2.42.4.dev2).
+        required: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  create-dev-pr:
+    name: Sanity check the requested version
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Determine release version
+        id: validate-version
+        run: |
+          version="${{ inputs.version }}"
+
+          if [[ -z "$version" ]]; then
+              echo "::error::An input 'version' must be specified"
+              exit 1
+
+          elif (( ${#version} > 13 )); then
+              echo "::error::The input 'version' must be smaller than 14 characters (i.e. allows '2.99.99.dev99')"
+              exit 1
+
+          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+)?$ ]]; then
+              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCH (1.2.3) with an optional 'dev' specifier (8.9.10.dev99)"
+              exit 1
+          fi
+
+          echo "::notice::Release version is: ${version}"
+          echo "release-version=${version}" >> $GITHUB_OUTPUT
+      
+      - name: Update CONTRIBUTORS and VERSION files and commit to a new branch
+        env:
+          RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
+        run: |
+          if [[ -z "$RELEASE_VERSION" ]]; then
+              echo "::error::The 'release_version' was empty"
+              exit 1
+          fi
+
+          echo "$RELEASE_VERSION" > src/python/pants/VERSION
+
+          # Create an alphabetical list of all contributors, using the .mailmap where available (stripping bots)
+          # The `sed` at the end is to match the existing Python code which prefixes a "+ " to each name
+          {
+            printf "Created as part of the release process.\n\n"
+            
+            git log --use-mailmap --format=format:%aN HEAD \
+                | sort -u \
+                | grep -vxF \
+                    -e "dependabot[bot]" \
+                    -e "github-actions[bot]" \
+                    -e "Worker Pants (Pantsbuild GitHub Automation Bot)" \
+                | sed 's/^/+ /'
+          } > CONTRIBUTORS.md
+
+      - name: Commit changes and create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
+        run: |
+          if [[ -z $(git status --porcelain) ]]; then
+            echo "::error::No changes detected in VERSION or CONTRIBUTORS.md - skipping PR creation"
+            exit 1
+          fi
+
+          git config --local user.email "pantsbuild+github-automation@gmail.com"
+          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+
+          branch_name="automation/release/$RELEASE_VERSION"
+          git checkout -b "$branch_name"
+          
+          title="Prepare $RELEASE_VERSION"
+          git add src/python/pants/VERSION CONTRIBUTORS.md
+          git commit -m "$title"
+          git push -u origin "$branch_name"
+
+          # Create PR from branch to main
+          gh pr create \
+            --title "$title" \
+            --body "" \
+            --base main \
+            --head "$branch_name" \
+            --label "automation:release-prep,category:internal" \
+            --assignee "${{ github.actor }}"
