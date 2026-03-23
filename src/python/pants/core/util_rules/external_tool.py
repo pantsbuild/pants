@@ -405,11 +405,15 @@ async def download_external_tool(request: ExternalToolRequest) -> DownloadedExte
     digest_entries = await get_digest_entries(digest)
     if request.strip_common_path_prefix:
         paths = tuple(entry.path for entry in digest_entries)
+        if len(paths) == 0:
+            raise ExternalToolError(
+                f"No entries found in archive {request.download_file_request.url}"
+            )
         if len(paths) == 1:
             commonpath = os.path.dirname(paths[0])
         else:
             commonpath = os.path.commonpath(paths)
-            digest = await remove_prefix(RemovePrefix(extracted_archive.digest, commonpath))
+        digest = await remove_prefix(RemovePrefix(extracted_archive.digest, commonpath))
 
     # Confirm executable.
     exe_path = request.exe.lstrip("./")

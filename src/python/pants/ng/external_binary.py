@@ -27,7 +27,6 @@ class ExternalBinary(ContextualSubsystem):
     def exe_default(cls) -> str:
         raise NotImplementedError("Subclasses must implement to provide the default executable")
 
-
     @option(help=exe_help, default=lambda cls: cls.exe_default)
     def exe(self) -> str: ...
 
