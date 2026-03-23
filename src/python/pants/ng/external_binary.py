@@ -96,4 +96,5 @@ class ExternalBinary(ContextualSubsystem):
         return ExternalToolRequest(
             download_file_request=DownloadFile(url=url, expected_digest=FileDigest(sha256, size)),
             exe=self.exe,
+            strip_common_path_prefix=True,
         )
