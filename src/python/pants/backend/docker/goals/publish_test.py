@@ -460,7 +460,7 @@ def test_docker_push_env(rule_runner: RuleRunner) -> None:
 
 def test_docker_push_on_package(rule_runner: RuleRunner) -> None:
     """Test push_docker_images when pushes_on_package() returns True."""
-    docker = DockerBinary("/dummy/docker")
+    docker: DockerBinary | PodmanBinary = DockerBinary("/dummy/docker")
 
     # Create mock build process that will be returned by get_docker_image_build_process
     mock_tags = ("push-on-package/push-on-package:latest",)

@@ -214,16 +214,6 @@ def assert_build_process(
         rule_runner, address, build_context_snapshot, copy_sources, copy_build_args, version_tags
     )
     docker_options = _setup_docker_options(rule_runner, options)
-
-    if isinstance(binary, PodmanBinary):
-        binary_mocks = {
-            "pants.backend.docker.util_rules.binaries.get_podman": lambda *args: binary,
-        }
-    else:
-        binary_mocks = {
-            "pants.backend.docker.util_rules.binaries.get_docker": lambda *args: binary,
-        }
-
     result = run_rule_with_mocks(
         get_docker_image_build_process,
         rule_args=[
@@ -234,7 +224,9 @@ def assert_build_process(
             "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
             "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
             "pants.backend.docker.goals.package_image.get_image_refs": lambda _: image_refs,
-            **binary_mocks,
+            "pants.backend.docker.util_rules.binaries.get_podman"
+            if isinstance(binary, PodmanBinary)
+            else "pants.backend.docker.util_rules.binaries.get_docker": lambda *args: binary,
         },
         union_membership=_create_union_membership(),
         show_warnings=False,
