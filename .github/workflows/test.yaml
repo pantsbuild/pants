@@ -43,7 +43,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -54,11 +54,11 @@ jobs:
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.94.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -152,7 +152,7 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -163,11 +163,11 @@ jobs:
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.94.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -268,7 +268,7 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -279,11 +279,11 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.94.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -383,7 +383,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.93.1
+        rustup default 1.94.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -396,7 +396,7 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -463,7 +463,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.93.1
+        rustup default 1.94.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -476,17 +476,19 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
@@ -551,7 +553,7 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -562,27 +564,29 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.94.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - env:
         ARCHFLAGS: -arch arm64
@@ -620,7 +624,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Install MSYS2
-      uses: msys2/setup-msys2@v2
+      uses: msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda
       with:
         install: base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf
         msystem: UCRT64
@@ -890,13 +894,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - name: Download native binaries
       uses: actions/download-artifact@v7
@@ -998,13 +1004,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1125,13 +1133,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1252,13 +1262,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1379,13 +1391,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1506,13 +1520,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1633,13 +1649,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1760,13 +1778,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1887,13 +1907,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -2014,13 +2036,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -2141,13 +2165,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -2244,13 +2270,15 @@ jobs:
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
       uses: actions/setup-python@v6

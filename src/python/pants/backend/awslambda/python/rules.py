@@ -67,6 +67,7 @@ class PythonAwsLambdaLayerFieldSet(_BaseFieldSet):
 async def package_python_aws_lambda_function(
     field_set: PythonAwsLambdaFieldSet,
 ) -> BuiltPackage:
+    assert field_set.architecture.value is not None  # Has default, never None
     return await build_python_faas(
         BuildPythonFaaSRequest(
             address=field_set.address,
@@ -90,6 +91,7 @@ async def package_python_aws_lambda_function(
 async def package_python_aws_lambda_layer(
     field_set: PythonAwsLambdaLayerFieldSet,
 ) -> BuiltPackage:
+    assert field_set.architecture.value is not None  # Has default, never None
     return await build_python_faas(
         BuildPythonFaaSRequest(
             address=field_set.address,

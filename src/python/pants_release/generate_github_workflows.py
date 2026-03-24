@@ -34,12 +34,14 @@ def action(name: str) -> str:
         "download-artifact": "actions/download-artifact@v7",
         "free-disk-space": "jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
-        "msys2": "msys2/setup-msys2@v2",
-        "rust-cache": "Swatinem/rust-cache@v2.8.2",
+        "msys2": "msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda",
+        "rust-cache": "Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4",
         "setup-go": "actions/setup-go@v6",
         "setup-java": "actions/setup-java@v5",
         "setup-node": "actions/setup-node@v6",
-        "setup-protoc": "arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623",
+        # TODO: If arduino accept https://github.com/arduino/setup-protoc/pull/113 we
+        #  can reference the upstream SHA. Until then we use our fork.
+        "setup-protoc": "benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85",
         "setup-python": "actions/setup-python@v6",
         "slack-github-action": "slackapi/slack-github-action@v2.1.1",
         "upload-artifact": "actions/upload-artifact@v6",
@@ -389,9 +391,11 @@ def install_jdk() -> Step:
 def install_go() -> list[Step]:
     def go_cfg(go_version: str) -> Step:
         return {
-            "name": "Install Go",
+            "name": f"Install Go {go_version}",
             "uses": action("setup-go"),
-            "with": {"go-version": go_version},
+            # We use this action to install Go for testing against, but our repo is not a golang
+            # repo, and has no go.mod, so module caching would fail and is therefore disabled.
+            "with": {"go-version": go_version, "cache": False},
         }
 
     return [go_cfg(go_version) for go_version in ("1.25.3", "1.24.9")]

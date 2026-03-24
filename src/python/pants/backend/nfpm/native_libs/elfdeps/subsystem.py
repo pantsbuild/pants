@@ -17,6 +17,8 @@ from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
 from pants.util.strutil import help_text
 
+# pants: infer-dep(elfdeps.lock*)
+
 _ELFDEPS_PACKAGE = "pants.backend.nfpm.native_libs.elfdeps"
 _ANALYZE_SCRIPT = "analyze.py"
 _ANALYZE_TOOL = "__pants_elfdeps_analyze.py"

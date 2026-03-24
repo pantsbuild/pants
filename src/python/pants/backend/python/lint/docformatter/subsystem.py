@@ -9,6 +9,8 @@ from pants.engine.rules import collect_rules
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 
+# pants: infer-dep(docformatter.lock*)
+
 
 class Docformatter(PythonToolBase):
     options_scope = "docformatter"

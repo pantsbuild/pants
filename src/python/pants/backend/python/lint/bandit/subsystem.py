@@ -21,6 +21,8 @@ from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, FileOption, SkipOption
 
+# pants: infer-dep(bandit.lock*)
+
 
 @dataclass(frozen=True)
 class BanditFieldSet(FieldSet):

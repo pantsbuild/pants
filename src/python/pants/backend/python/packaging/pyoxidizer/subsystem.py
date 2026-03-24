@@ -9,6 +9,8 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption
 from pants.util.strutil import help_text
 
+# pants: infer-dep(pyoxidizer.lock*)
+
 
 class PyOxidizer(PythonToolBase):
     options_scope = "pyoxidizer"

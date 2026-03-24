@@ -111,7 +111,7 @@ async def detect_django_apps(python_setup: PythonSetup) -> DjangoApps:
         ics_to_tgts[ics].append(tgt)
 
     for ics, tgts in ics_to_tgts.items():
-        sources = await concurrently(  # noqa: PNT30: requires triage
+        sources = await concurrently(
             [
                 hydrate_sources(HydrateSourcesRequest(tgt[SourcesField]), **implicitly())
                 for tgt in tgts

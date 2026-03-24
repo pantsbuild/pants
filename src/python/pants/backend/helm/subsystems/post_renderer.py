@@ -39,6 +39,8 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list, pluralize, softwrap
 
+# pants: infer-dep(post_renderer.lock*)
+
 logger = logging.getLogger(__name__)
 
 _HELM_POSTRENDERER_SOURCE = "post_renderer_main.py"

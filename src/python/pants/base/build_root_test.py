@@ -10,9 +10,11 @@ from pants.base.build_root import BuildRoot
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree, touch
 
+# pants: infer-dep(/BUILD_ROOT)
+
 
 @pytest.fixture
-def tmp_build_root() -> Generator[tuple[BuildRoot, str, str], None, None]:
+def tmp_build_root() -> Generator[tuple[BuildRoot, str, str]]:
     build_root = BuildRoot()
     original_path = build_root.path
     new_path = os.path.realpath(safe_mkdtemp())

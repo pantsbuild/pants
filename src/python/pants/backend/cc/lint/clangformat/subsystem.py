@@ -15,6 +15,8 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 from pants.util.strutil import help_text
 
+# pants: infer-dep(clangformat.lock*)
+
 
 class ClangFormat(PythonToolBase):
     options_scope = "clang-format"

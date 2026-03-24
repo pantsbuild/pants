@@ -15,6 +15,8 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, SkipOption, StrOption
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(semgrep.lock*)
+
 
 @dataclass(frozen=True)
 class SemgrepFieldSet(FieldSet):

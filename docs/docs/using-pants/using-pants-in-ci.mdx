@@ -47,7 +47,7 @@ You can use this script to nuke the cache when it gets too big:
      nuke_prefix="$(dirname "${path}")/$(basename "${path}").nuke"
      nuke_path=$(mktemp -d "${nuke_prefix}.XXXXXX")
      mv "${path}" "${nuke_path}/"
-     rm -rf "${nuke_prefix}.*"
+     rm -rf "${nuke_prefix}".*
    fi
  }
 
@@ -222,7 +222,7 @@ The default test runners for these CI providers have the following resources. If
 | :--------------------------- | :---- | :------ | :------------------------------------------------------------------------------------------------------------------------------------------ |
 | GitHub Actions, Linux        | 2     | 7 GB    | [link](https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners#supported-runners-and-hardware-resources) |
 | Travis, Linux                | 2     | 7.5 GB  | [link](https://docs.travis-ci.com/user/reference/overview/#virtualisation-environment-vs-operating-system)                                  |
-| Circle CI, Linux, free plan  | 2     | 4 GB    | [link](https://circleci.com/docs/2.0/credits/#free-plan)                                                                                    |
+| Circle CI, Linux, free plan  | 2     | 4 GB    | [link](https://circleci.com/docs/configuration-reference/)                                                                                    |
 | GitLab, Linux shared runners | 1     | 3.75 GB | [link](https://docs.gitlab.com/ee/user/gitlab_com/#linux-shared-runners)                                                                    |
 
 ## Tip: automatically retry failed tests
@@ -240,7 +240,7 @@ We recommend that you configure your CI system to store the pants log (`.pants.d
 
 Different CI providers and systems have different ways to configure build artifacts:
 
-- Circle CI - [Storing artifacts](https://circleci.com/docs/2.0/artifacts/)
+- Circle CI - [Storing artifacts](https://circleci.com/docs/artifacts/)
 - GitHub Actions - [Storing Artifacts](https://docs.github.com/en/actions/guides/storing-workflow-data-as-artifacts) - [example in the pants repo](https://github.com/pantsbuild/pants/pull/11860)
 - Bitbucket pipelines - [Using artifacts](https://support.atlassian.com/bitbucket-cloud/docs/use-artifacts-in-steps/)
 - Jenkins - [Recording artifacts](https://www.jenkins.io/doc/pipeline/tour/tests-and-artifacts/)

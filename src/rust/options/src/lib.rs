@@ -472,7 +472,7 @@ impl OptionParser {
         let subdir = |subdir_name: &str, default: &str| -> Result<String, String> {
             Ok(parser
                 .parse_string(
-                    &OptionId::new(Scope::Global, ["pants", subdir_name].iter(), None)?,
+                    &OptionId::new(Scope::Global, ["pants", subdir_name], None)?,
                     &path_join(&buildroot_string, default),
                 )?
                 .value

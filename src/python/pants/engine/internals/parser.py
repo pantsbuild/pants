@@ -11,6 +11,7 @@ import threading
 import tokenize
 import traceback
 import typing
+from annotationlib import Format, ForwardRef, call_annotate_function
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import InitVar, dataclass, field
 from difflib import get_close_matches
@@ -19,7 +20,6 @@ from pathlib import PurePath
 from typing import Annotated, Any, TypeVar
 
 import typing_extensions
-from annotationlib import Format, ForwardRef, call_annotate_function
 
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import MappingError

@@ -347,7 +347,7 @@ In this example, the deployment at `src/deploy:main` declares a dependency on a 
 
 User-defined [Helm post-renderers](https://helm.sh/docs/topics/advanced/#post-rendering) are supported by the Helm backend by means of the `post_renderers` field in the `helm_deployment` target. This field takes addresses to other runnable targets (any target that can be run using `pants run [address]`) and will build and run those targets as part of `experimental-deploy` goal. The referenced targets can be either shell commands or custom-made in any of the other languages supported by Pants.
 
-As an example, let's show how we can use the tool [`vals`](https://github.com/variantdev/vals) as a post-renderer and replace all references to secret values stored in HashiCorp Vault by their actual values. The following example is composed of a Helm chart that creates a secret resource in Kubernetes and a Helm deployment that is configured to use `vals` as a post-renderer:
+As an example, let's show how we can use the tool [`vals`](https://github.com/helmfile/vals) as a post-renderer and replace all references to secret values stored in HashiCorp Vault by their actual values. The following example is composed of a Helm chart that creates a secret resource in Kubernetes and a Helm deployment that is configured to use `vals` as a post-renderer:
 
 ```python tab={"label":"src/chart/BUILD"}
 helm_chart()

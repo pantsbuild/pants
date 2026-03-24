@@ -7,6 +7,7 @@ import enum
 import logging
 import os
 import re
+import sys
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -904,7 +905,7 @@ class BootstrapOptions:
     )
     pants_bin_name = StrOption(
         advanced=True,
-        default="pants",  # noqa: PANTSBIN
+        default="pants",
         help=softwrap(
             """
             The name of the script or binary used to invoke Pants.
@@ -936,7 +937,7 @@ class BootstrapOptions:
         advanced=True,
         metavar="<dir>",
         default=lambda _: os.path.join(get_buildroot(), "dist"),
-        help="Write end products, such as the results of `pants package`, to this dir.",  # noqa: PANTSBIN
+        help="Write end products, such as the results of `pants package`, to this dir.",
     )
     pants_subprocessdir = StrOption(
         advanced=True,
@@ -1066,6 +1067,19 @@ class BootstrapOptions:
             Enables use of the Pants daemon (pantsd). pantsd can significantly improve
             runtime performance by lowering per-run startup cost, and by memoizing filesystem
             operations and rule execution.
+            """
+        ),
+    )
+    enable_stack_trampoline = StrOption(
+        default=None,
+        daemon=True,
+        help=softwrap(
+            """ Enable `sys.activate_stack_trampoline` for Pants's own Python
+            code. This allows profilers like the Linux `perf` profiler to see
+            Python stack frames. Set to `perf` to enable the `perf`
+            trampoline.
+
+            See https://docs.python.org/3/howto/perf_profiling.html
             """
         ),
     )
@@ -1896,3 +1910,8 @@ class BootstrapOptions:
                     """
                 )
             )
+
+    @staticmethod
+    def maybe_enable_stack_trampoline(opts: OptionValueContainer) -> None:
+        if sys.platform == "linux" and opts.enable_stack_trampoline is not None:
+            sys.activate_stack_trampoline(opts.enable_stack_trampoline)

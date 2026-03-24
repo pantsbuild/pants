@@ -48,7 +48,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.93.1
+        rustup default 1.94.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -61,7 +61,7 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -175,7 +175,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.93.1
+        rustup default 1.94.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -188,17 +188,19 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
@@ -325,7 +327,7 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -336,27 +338,29 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.94.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - name: Install Go
+    - name: Install Go 1.25.3
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
+    - name: Install Go 1.24.9
       uses: actions/setup-go@v6
       with:
+        cache: false
         go-version: 1.24.9
     - env:
         ARCHFLAGS: -arch arm64
@@ -458,7 +462,7 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -469,11 +473,11 @@ jobs:
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.94.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
