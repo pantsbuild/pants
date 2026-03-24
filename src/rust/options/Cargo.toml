@@ -23,6 +23,7 @@ whoami = { workspace = true }
 [dev-dependencies]
 maplit = { workspace = true }
 tempfile = { workspace = true }
+indoc = { workspace = true }
 
 [lints]
 workspace = true
