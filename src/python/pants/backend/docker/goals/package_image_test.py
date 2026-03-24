@@ -13,10 +13,9 @@ from typing import Any, ContextManager, cast
 
 import pytest
 
+from pants.backend.docker.engine_types import DockerEngines
 from pants.backend.docker.goals.package_image import (
-    DockerBuildTargetStageError,
     DockerImageBuildProcess,
-    DockerImageOptionValueError,
     DockerImageRefs,
     DockerImageTagValueError,
     DockerInfoV1,
@@ -29,6 +28,7 @@ from pants.backend.docker.goals.package_image import (
     get_docker_image_build_process,
     get_image_refs,
     parse_image_id_from_buildkit_output,
+    parse_image_id_from_podman_build_output,
     rules,
 )
 from pants.backend.docker.package_types import (
@@ -141,7 +141,7 @@ def _create_build_context_mock(
 
 def _setup_docker_options(rule_runner: RuleRunner, options: dict | None) -> DockerOptions:
     """Setup DockerOptions with sensible defaults."""
-    if options:
+    if options is not None:
         opts = options.copy()
         opts.setdefault("registries", {})
         opts.setdefault("default_repository", "{name}")
@@ -151,7 +151,7 @@ def _setup_docker_options(rule_runner: RuleRunner, options: dict | None) -> Dock
         opts.setdefault("build_hosts", None)
         opts.setdefault("build_verbose", False)
         opts.setdefault("build_no_cache", False)
-        opts.setdefault("use_buildx", False)
+        opts.setdefault("engine", DockerEngines())
         opts.setdefault("env_vars", [])
         opts.setdefault("suggest_renames", True)
         opts.setdefault("push_on_package", DockerPushOnPackageBehavior.WARN)
@@ -178,6 +178,7 @@ def assert_build_process(
     build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
     version_tags: tuple[str, ...] = (),
     image_refs: DockerImageRefs | None = None,
+    binary: DockerBinary | PodmanBinary = DockerBinary("/dummy/docker"),
 ) -> DockerImageBuildProcess:
     """Test helper for get_docker_image_build_process rule.
 
@@ -214,17 +215,26 @@ def assert_build_process(
     )
     docker_options = _setup_docker_options(rule_runner, options)
 
+    if isinstance(binary, PodmanBinary):
+        binary_mocks = {
+            "pants.backend.docker.util_rules.binaries.get_podman": lambda *args: binary,
+        }
+    else:
+        binary_mocks = {
+            "pants.backend.docker.util_rules.binaries.get_docker": lambda *args: binary,
+        }
+
     result = run_rule_with_mocks(
         get_docker_image_build_process,
         rule_args=[
             DockerPackageFieldSet.create(tgt),
             docker_options,
-            DockerBinary("/dummy/docker"),
         ],
         mock_calls={
             "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
             "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
             "pants.backend.docker.goals.package_image.get_image_refs": lambda _: image_refs,
+            **binary_mocks,
         },
         union_membership=_create_union_membership(),
         show_warnings=False,
@@ -846,6 +856,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "env1:1.2.3",
@@ -980,7 +991,6 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
             under_test_fs,
             docker_options,
             global_options,
-            DockerBinary("/dummy/docker"),
             KeepSandboxes.never,
         ],
         mock_calls={
@@ -1014,6 +1024,7 @@ def test_docker_build_pull(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=True",
             "--tag",
             "args1:latest",
@@ -1045,6 +1056,7 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
             "--squash",
             "--tag",
@@ -1058,6 +1070,7 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "args2:latest",
@@ -1094,6 +1107,7 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "args1:1.2.3",
@@ -1197,6 +1211,7 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1249,6 +1264,7 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
             "--secret",
             "id=system-secret,src=/var/run/secrets/mysecret",
@@ -1288,6 +1304,7 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
             "--ssh",
             "default",
@@ -1328,6 +1345,7 @@ def test_docker_build_no_cache_option(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
             "--no-cache",
             "--tag",
@@ -1374,6 +1392,7 @@ def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
             "docker:10.180.0.1",
             "--add-host",
             "docker2:10.180.0.2",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1406,7 +1425,6 @@ def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
     def check_build_process(result: DockerImageBuildProcess):
         assert result.process.argv == (
             "/dummy/docker",
-            "buildx",
             "build",
             "--cache-to=type=local,dest=/tmp/docker/pants-test-cache",
             "--output=type=docker",
@@ -1443,7 +1461,6 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
     def check_build_process(result: DockerImageBuildProcess):
         assert result.process.argv == (
             "/dummy/docker",
-            "buildx",
             "build",
             "--cache-from=type=local,dest=/tmp/docker/pants-test-cache1",
             "--cache-from=type=local,dest=/tmp/docker/pants-test-cache2",
@@ -1496,7 +1513,6 @@ def test_docker_output_option(
     def check_build_process(result: DockerImageBuildProcess) -> None:
         assert result.process.argv == (
             "/dummy/docker",
-            "buildx",
             "build",
             expected_output_arg,
             "--pull=False",
@@ -1549,7 +1565,6 @@ def test_docker_output_option_when_push_on_package_error(
     def check_build_process(result: DockerImageBuildProcess) -> None:
         assert result.process.argv == (
             "/dummy/docker",
-            "buildx",
             "build",
             expected_output_arg,
             "--pull=False",
@@ -1611,7 +1626,6 @@ def test_docker_output_option_when_push_on_package_error(
                 under_test_fs,
                 docker_options,
                 global_options,
-                DockerBinary("/dummy/docker"),
                 KeepSandboxes.never,
             ],
             mock_calls={
@@ -1668,7 +1682,6 @@ def test_docker_output_option_when_push_on_package_warn(
     def check_build_process(result: DockerImageBuildProcess) -> None:
         assert result.process.argv == (
             "/dummy/docker",
-            "buildx",
             "build",
             expected_output_arg,
             "--pull=False",
@@ -1734,7 +1747,6 @@ def test_docker_output_option_when_push_on_package_warn(
             under_test_fs,
             docker_options,
             global_options,
-            DockerBinary("/dummy/docker"),
             KeepSandboxes.never,
         ],
         mock_calls={
@@ -1788,7 +1800,6 @@ def test_docker_output_option_when_push_on_package_ignore(
         def check_build_process(result: DockerImageBuildProcess) -> None:
             assert result.process.argv == (
                 "/dummy/docker",
-                "buildx",
                 "build",
                 expected_output_arg,
                 "--pull=False",
@@ -1852,7 +1863,6 @@ def test_docker_output_option_when_push_on_package_ignore(
             under_test_fs,
             docker_options,
             global_options,
-            DockerBinary("/dummy/docker"),
             KeepSandboxes.never,
         ],
         mock_calls=mock_calls,
@@ -1861,30 +1871,6 @@ def test_docker_output_option_when_push_on_package_ignore(
 
     assert result.digest == EMPTY_DIGEST
     assert len(result.artifacts) == (1 if expected_output_arg else 0)
-
-
-def test_docker_output_option_raises_when_no_buildkit(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "docker/test/BUILD": dedent(
-                """\
-                docker_image(
-                  name="img1",
-                  output={"type": "image"}
-                )
-                """
-            ),
-        }
-    )
-
-    with pytest.raises(
-        DockerImageOptionValueError,
-        match=r"Buildx must be enabled via the Docker subsystem options in order to use this field.",
-    ):
-        assert_build_process(
-            rule_runner,
-            Address("docker/test", target_name="img1"),
-        )
 
 
 def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
@@ -1906,6 +1892,7 @@ def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--network=host",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1940,6 +1927,7 @@ def test_docker_build_platform_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--platform=linux/amd64,linux/arm64,linux/arm/v7",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1984,6 +1972,7 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
             "build.host=tbs06",
             "--label",
             "build.job=13934",
+            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -2080,10 +2069,6 @@ def test_docker_build_fail_logs(
     rule_runner.write_files({"docker/test/BUILD": f"docker_image(context_root={context_root!r})"})
     build_context_files = ("docker/test/Dockerfile", *build_context_files)
     build_context_snapshot = rule_runner.make_snapshot_of_empty_files(build_context_files)
-    suggest_renames_arg = (
-        "--docker-suggest-renames" if suggest_renames else "--no-docker-suggest-renames"
-    )
-    rule_runner.set_options([suggest_renames_arg])
 
     # Step 1: Get the build process
     tgt = rule_runner.get_target(Address("docker/test"))
@@ -2092,7 +2077,7 @@ def test_docker_build_fail_logs(
     build_context_mock = _create_build_context_mock(
         rule_runner, address, build_context_snapshot, copy_sources, (), ()
     )
-    docker_options = _setup_docker_options(rule_runner, None)
+    docker_options = _setup_docker_options(rule_runner, {"suggest_renames": suggest_renames})
     global_options = rule_runner.request(GlobalOptions, [])
 
     # Get image refs
@@ -2119,17 +2104,18 @@ def test_docker_build_fail_logs(
 
     # Step 2: Create the build process with the get_docker_image_build_process rule
     under_test_fs = DockerPackageFieldSet.create(tgt)
+    docker = DockerBinary("/dummy/docker")
     build_process = run_rule_with_mocks(
         get_docker_image_build_process,
         rule_args=[
             under_test_fs,
             docker_options,
-            DockerBinary("/dummy/docker"),
         ],
         mock_calls={
             "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
             "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
             "pants.backend.docker.goals.package_image.get_image_refs": lambda _: image_refs,
+            "pants.backend.docker.util_rules.binaries.get_docker": lambda *args: docker,
         },
         show_warnings=False,
     )
@@ -2171,7 +2157,6 @@ def test_docker_build_fail_logs(
                 under_test_fs,
                 docker_options,
                 global_options,
-                DockerBinary("/dummy/docker"),
                 KeepSandboxes.never,
             ],
             mock_calls={
@@ -2216,9 +2201,9 @@ def test_build_target_stage(
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
-            "--target",
-            expected_target,
+            f"--target={expected_target}",
             "--tag",
             "image:latest",
             "--file",
@@ -2236,6 +2221,7 @@ def test_build_target_stage(
 
 
 def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
+    """An invalid target_stage is passed through to Docker which will report the error."""
     rule_runner.write_files(
         {
             "BUILD": "docker_image(name='image', target_stage='bad')",
@@ -2249,16 +2235,26 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
         }
     )
 
-    err = (
-        r"The 'target_stage' field in `docker_image` //:image was set to 'bad', but there is no "
-        r"such stage in `Dockerfile`\. Available stages: build, dev, prod\."
-    )
-    with pytest.raises(DockerBuildTargetStageError, match=err):
-        assert_build_process(
-            rule_runner,
-            Address("", target_name="image"),
-            version_tags=("build latest", "dev latest", "prod latest"),
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
+            "/dummy/docker",
+            "build",
+            "--output=type=docker",
+            "--pull=False",
+            "--target=bad",
+            "--tag",
+            "image:latest",
+            "--file",
+            "Dockerfile",
+            ".",
         )
+
+    assert_build_process(
+        rule_runner,
+        Address("", target_name="image"),
+        build_process_assertions=check_build_process,
+        version_tags=("build latest", "dev latest", "prod latest"),
+    )
 
 
 @pytest.mark.parametrize(
@@ -2323,7 +2319,7 @@ def test_get_context_root(
     [
         (
             DockerBinary("/bin/docker", "1234"),
-            "<unknown>",
+            None,
             "",
             "",
         ),
@@ -2469,27 +2465,28 @@ def test_get_context_root(
             ),
             "",
         ),
-        # Podman
-        (
-            PodmanBinary("/bin/podman", "abcd"),
-            "a85499e9039a4add9712f7ea96a4aa9f0edd57d1008c6565822561ceed927eee",
-            dedent(
-                """\
-                STEP 5/5: COPY ./ .
-                COMMIT example
-                --> a85499e9039a
-                Successfully tagged localhost/example:latest
-                a85499e9039a4add9712f7ea96a4aa9f0edd57d1008c6565822561ceed927eee
-                """
-            ),
-            "",
-        ),
     ],
 )
 def test_parse_image_id_from_docker_build_output(
-    docker: DockerBinary, expected: str, stdout: str, stderr: str
+    docker: DockerBinary, expected: str | None, stdout: str, stderr: str
 ) -> None:
     assert expected == parse_image_id_from_buildkit_output(stdout.encode(), stderr.encode())
+
+
+def test_parse_image_id_from_podman_build_output() -> None:
+    stdout = dedent(
+        """\
+        STEP 5/5: COPY ./ .
+        COMMIT example
+        --> a85499e9039a
+        Successfully tagged localhost/example:latest
+        a85499e9039a4add9712f7ea96a4aa9f0edd57d1008c6565822561ceed927eee
+        """
+    )
+    assert (
+        "a85499e9039a4add9712f7ea96a4aa9f0edd57d1008c6565822561ceed927eee"
+        == parse_image_id_from_podman_build_output(stdout.encode(), b"")
+    )
 
 
 ImageRefTest = namedtuple(
@@ -2811,6 +2808,7 @@ def test_docker_image_tags_from_plugin_hook(
         assert result.process.argv == (
             "/dummy/docker",
             "build",
+            "--output=type=docker",
             "--pull=False",
             *tag_flags,
             "--file",
