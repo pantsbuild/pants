@@ -359,7 +359,7 @@ class DockerBuildkitPassthroughFieldMixin(
     def docker_build_options(
         self, *, docker: DockerOptions, value_formatter: OptionValueFormatter
     ) -> Iterator[str]:
-        return super().buildctl_options(docker=docker, value_formatter=value_formatter)
+        return super().buildctl_options(docker=docker, value_formatter=value_formatter)  # type: ignore[safe-super]
 
 
 class BuildctlOptionMultiValueFieldMixin(BuildctlOptionsFieldMixin, ABC):

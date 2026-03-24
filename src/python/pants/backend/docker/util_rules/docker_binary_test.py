@@ -61,7 +61,6 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
         build_args=DockerBuildArgs.from_strings("arg1=2"),
         context_root="build/context",
         env=env,
-        use_buildx=False,
         extra_args=("--pull", "--squash"),
     )
 
@@ -114,26 +113,18 @@ def test_docker_binary_run_image(docker_path: str, docker: DockerBinary) -> None
     assert run_request.description == f"Running docker image {image_ref}"
 
 
-@pytest.mark.parametrize("podman_enabled", [True, False])
-@pytest.mark.parametrize("podman_found", [True, False])
-def test_get_docker(rule_runner: RuleRunner, podman_enabled: bool, podman_found: bool) -> None:
+def test_get_docker(rule_runner: RuleRunner) -> None:
     docker_options = create_subsystem(
         DockerOptions,
-        experimental_enable_podman=podman_enabled,
         tools=[],
         optional_tools=[],
     )
     docker_options_env_aware = mock.MagicMock(spec=DockerOptions.EnvironmentAware)
 
     def mock_find_binary(request: BinaryPathRequest) -> BinaryPaths:
-        if request.binary_name == "podman" and podman_found:
-            return BinaryPaths("podman", paths=[BinaryPath("/bin/podman")])
-
-        elif request.binary_name == "docker":
+        if request.binary_name == "docker":
             return BinaryPaths("docker", [BinaryPath("/bin/docker")])
-
-        else:
-            return BinaryPaths(request.binary_name, ())
+        return BinaryPaths(request.binary_name, ())
 
     def mock_create_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
         return BinaryShims(EMPTY_DIGEST, "cache_name")
@@ -147,12 +138,8 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled: bool, podman_found:
         },
     )
 
-    if podman_enabled and podman_found:
-        assert result.path == "/bin/podman"
-        assert result.is_podman
-    else:
-        assert result.path == "/bin/docker"
-        assert not result.is_podman
+    assert isinstance(result, DockerBinary)
+    assert result.path == "/bin/docker"
 
 
 def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
@@ -170,7 +157,6 @@ def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
     def run(tools: list[str], optional_tools: list[str]) -> None:
         docker_options = create_subsystem(
             DockerOptions,
-            experimental_enable_podman=False,
             tools=tools,
             optional_tools=optional_tools,
         )

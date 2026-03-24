@@ -20,7 +20,12 @@ from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageRegistriesField, DockerImageSkipPushField
-from pants.backend.docker.util_rules.binaries import DockerBinary, get_docker, get_podman
+from pants.backend.docker.util_rules.binaries import (
+    DockerBinary,
+    PodmanBinary,
+    get_docker,
+    get_podman,
+)
 from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import (
     CheckSkipRequest,
@@ -148,6 +153,7 @@ async def push_docker_images(
     jobs: list[PublishPackages] = []
     refs: list[str] = []
     processes: list[Process | InteractiveProcess] = []
+    binary: DockerBinary | PodmanBinary
     match options.push_engine:
         case DockerPushEngine.DOCKER:
             binary = await get_docker(**implicitly())

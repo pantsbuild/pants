@@ -32,9 +32,17 @@ from pants.backend.docker.target_types import (
     DockerImageTagsRequest,
     DockerImageTargetStageField,
     OptionValueFormatter,
+    ValidateOptionsMixin,
     get_docker_image_tags,
 )
-from pants.backend.docker.util_rules.binaries import get_buildctl, get_docker, get_podman
+from pants.backend.docker.util_rules.binaries import (
+    BuildctlBinary,
+    DockerBinary,
+    PodmanBinary,
+    get_buildctl,
+    get_docker,
+    get_podman,
+)
 from pants.backend.docker.util_rules.docker_build_context import (
     DockerBuildContext,
     DockerBuildContextRequest,
@@ -343,9 +351,9 @@ def get_build_options(
         else (DockerBuildOptionsFieldMixin, "docker_build_options")
     )
     for field_type in target.field_types:
-        if issubclass(field_type, engine_build_options_field_type) and target[
-            field_type
-        ].validate_options(docker_options, context):
+        if issubclass(field_type, engine_build_options_field_type) and cast(
+            ValidateOptionsMixin, target[field_type]
+        ).validate_options(docker_options, context):
             gen_options_func = getattr(target[field_type], gen_options_func_name)
             yield from gen_options_func(
                 docker=docker_options,
@@ -470,6 +478,7 @@ async def get_docker_image_build_process(
         "__UPSTREAM_IMAGE_IDS": ",".join(context.upstream_image_ids),
     }
     context_root = field_set.get_context_root(options.default_context_root)
+    binary: BuildctlBinary | PodmanBinary | DockerBinary
     match options.build_engine:
         case DockerBuildEngine.BUILDKIT:
             binary = await get_buildctl(**implicitly())

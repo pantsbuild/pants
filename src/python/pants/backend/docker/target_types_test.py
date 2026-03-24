@@ -2,9 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import os
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
+from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageBuildSecretsOptionField
 from pants.engine.internals.native_engine import Address
 
@@ -36,6 +38,10 @@ def test_secret_path_resolvement(src: str, expected: str):
     secrets_option_field = DockerImageBuildSecretsOptionField(
         {"mysecret": src}, address=Address("")
     )
-    values = list(secrets_option_field.option_values())
+    values = list(
+        secrets_option_field.buildctl_option_values(
+            docker=MagicMock(spec=DockerOptions), value_formatter=lambda x: x
+        )
+    )
 
     assert values == [f"id=mysecret,src={expected}"]

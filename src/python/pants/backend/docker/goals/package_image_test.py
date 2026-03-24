@@ -44,7 +44,7 @@ from pants.backend.docker.target_types import (
     DockerImageTagsRequest,
     DockerImageTarget,
 )
-from pants.backend.docker.util_rules.binaries import DockerBinary
+from pants.backend.docker.util_rules.binaries import DockerBinary, PodmanBinary
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
     DockerBuildArgsRequest,
@@ -2322,14 +2322,14 @@ def test_get_context_root(
     "docker, expected, stdout, stderr",
     [
         (
-            DockerBinary("/bin/docker", "1234", is_podman=False),
+            DockerBinary("/bin/docker", "1234"),
             "<unknown>",
             "",
             "",
         ),
         # Docker
         (
-            DockerBinary("/bin/docker", "1234", is_podman=False),
+            DockerBinary("/bin/docker", "1234"),
             "0e09b442b572",
             "",
             dedent(
@@ -2345,7 +2345,7 @@ def test_get_context_root(
         ),
         # Buildkit without step duration
         (
-            DockerBinary("/bin/docker", "1234", is_podman=False),
+            DockerBinary("/bin/docker", "1234"),
             "sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7",
             dedent(
                 """\
@@ -2368,7 +2368,7 @@ def test_get_context_root(
         ),
         # Buildkit with step duration
         (
-            DockerBinary("/bin/docker", "1234", is_podman=False),
+            DockerBinary("/bin/docker", "1234"),
             "sha256:7805a7da5f45a70bb9e47e8de09b1f5acd8f479dda06fb144c5590b9d2b86dd7",
             dedent(
                 """\
@@ -2387,7 +2387,7 @@ def test_get_context_root(
         ),
         # Buildkit with containerd-snapshotter 0.12.1
         (
-            DockerBinary("/bin/docker", "1234", is_podman=False),
+            DockerBinary("/bin/docker", "1234"),
             "sha256:b2b51838586286a9e544ddb31b3dbf7f6a99654d275b6e56b5f69f90138b4c0e",
             dedent(
                 """\
@@ -2406,7 +2406,7 @@ def test_get_context_root(
         ),
         # Buildkit with containerd-snapshotter and cross platform 0.12.1
         (
-            DockerBinary("/bin/docker", "1234", is_podman=False),
+            DockerBinary("/bin/docker", "1234"),
             "sha256:3c72de0e05bb75247e68e124e6500700f6e0597425db2ee9f08fd59ef28cea0f",
             dedent(
                 """\
@@ -2428,7 +2428,7 @@ def test_get_context_root(
         ),
         # Buildkit with containerd-snapshotter 0.13.1
         (
-            DockerBinary("/bin/docker", "1234", is_podman=False),
+            DockerBinary("/bin/docker", "1234"),
             "sha256:d15432046b4feaebb70370fad4710151dd8f0b9741cb8bc4d20c08ed8847f17a",
             dedent(
                 """\
@@ -2451,7 +2451,7 @@ def test_get_context_root(
         ),
         # Buildkit with containerd-snapshotter 0.17.1 and disabled attestations
         (
-            DockerBinary("/bin/docker", "1234", is_podman=False),
+            DockerBinary("/bin/docker", "1234"),
             "sha256:6c3aff6414781126578b3e7b4a217682e89c616c0eac864d5b3ea7c87f1094d0",
             dedent(
                 """\
@@ -2471,7 +2471,7 @@ def test_get_context_root(
         ),
         # Podman
         (
-            DockerBinary("/bin/podman", "abcd", is_podman=True),
+            PodmanBinary("/bin/podman", "abcd"),
             "a85499e9039a4add9712f7ea96a4aa9f0edd57d1008c6565822561ceed927eee",
             dedent(
                 """\
@@ -2489,7 +2489,7 @@ def test_get_context_root(
 def test_parse_image_id_from_docker_build_output(
     docker: DockerBinary, expected: str, stdout: str, stderr: str
 ) -> None:
-    assert expected == parse_image_id_from_buildkit_output(docker, stdout.encode(), stderr.encode())
+    assert expected == parse_image_id_from_buildkit_output(stdout.encode(), stderr.encode())
 
 
 ImageRefTest = namedtuple(
