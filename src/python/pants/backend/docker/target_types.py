@@ -227,7 +227,7 @@ class DockerImageSkipPushField(BoolField):
 OptionValueFormatter = Callable[[str], str]
 
 
-class ValidateOptionsMixin(ABC):
+class ValidateOptionsMixin(Field, ABC):
     def validate_options(self, options: DockerOptions, context: DockerBuildContext) -> bool:
         """Hook method telling Pants to ignore this option in certain contexts.
 
@@ -254,7 +254,7 @@ class DockerBuildOptionsFieldMixin(ValidateOptionsMixin, ABC):
         )
 
 
-class DockerBuildOptionFieldValueMixin(Field, DockerBuildOptionsFieldMixin, ABC):
+class DockerBuildOptionFieldValueMixin(DockerBuildOptionsFieldMixin, ABC):
     """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
     to `docker build`."""
 
@@ -301,8 +301,7 @@ class DockerBuildOptionFieldMultiValueDictMixin(
     ) -> Iterator[str]:
         if value:
             yield f"{cls.docker_build_option}=" + ",".join(
-                f"{key}={value_formatter(v)}"
-                for key, v in value.items()  # type: ignore[union-attr]
+                f"{key}={value_formatter(v)}" for key, v in value.items()
             )
 
 
@@ -324,7 +323,7 @@ class DockerBuildOptionFieldListOfMultiValueDictMixin(
         value_formatter: OptionValueFormatter,
     ) -> Iterator[str]:
         if value:
-            for item in value:  # type: ignore[union-attr]
+            for item in value:
                 yield f"{cls.docker_build_option}=" + ",".join(
                     f"{key}={value_formatter(v)}" for key, v in item.items()
                 )
@@ -392,8 +391,7 @@ class BuildctlOptionFieldMultiValueDictMixin(
     ) -> Iterator[str]:
         if value:
             yield f"{cls.buildctl_option}=" + ",".join(
-                f"{key}={value_formatter(v)}"
-                for key, v in value.items()  # type: ignore[union-attr]
+                f"{key}={value_formatter(v)}" for key, v in value.items()
             )
 
 
@@ -415,13 +413,13 @@ class BuildctlOptionFieldListOfMultiValueDictMixin(
         value_formatter: OptionValueFormatter,
     ) -> Iterator[str]:
         if value:
-            for item in value:  # type: ignore[union-attr]
+            for item in value:
                 yield f"{cls.buildctl_option}=" + ",".join(
                     f"{key}={value_formatter(v)}" for key, v in item.items()
                 )
 
 
-class BuildctlOptionFieldValueMixin(Field, BuildctlOptionsFieldMixin, ABC):
+class BuildctlOptionFieldValueMixin(BuildctlOptionsFieldMixin, ABC):
     """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
     to `buildctl build`."""
 
@@ -434,7 +432,7 @@ class BuildctlOptionFieldValueMixin(Field, BuildctlOptionsFieldMixin, ABC):
             yield f"{cls.buildctl_option}={value}"
 
 
-class BuildctlLayeredOptionFieldValueMixin(Field, BuildctlOptionsFieldMixin, ABC):
+class BuildctlLayeredOptionFieldValueMixin(BuildctlOptionsFieldMixin, ABC):
     """Inherit this mixin class to provide layered options (i.e. option in the form of `--flag
     suboption=value`) to `buildctl build`.
 
@@ -564,7 +562,7 @@ class DockerImageBuildImageLabelsOptionField(
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
     ) -> Iterator[str]:
-        for label, v in (value or {}).items():  # type: ignore[union-attr]
+        for label, v in (value or {}).items():
             yield cls.docker_build_option
             yield f"{label}={value_formatter(v)}"
 
@@ -576,7 +574,7 @@ class DockerImageBuildImageLabelsOptionField(
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
     ) -> Iterator[str]:
-        for label, v in (value or {}).items():  # type: ignore[union-attr]
+        for label, v in (value or {}).items():
             yield cls.buildctl_option
             yield f"label:{label}={value_formatter(v)}"
 
