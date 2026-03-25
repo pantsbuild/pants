@@ -39,9 +39,9 @@ def test_secret_path_resolvement(src: str, expected: str):
         {"mysecret": src}, address=Address("")
     )
     values = list(
-        secrets_option_field.buildctl_option_values(
+        secrets_option_field.buildctl_options(
             docker=MagicMock(spec=DockerOptions), value_formatter=lambda x: x
         )
     )
 
-    assert values == [f"id=mysecret,src={expected}"]
+    assert values == ["--secret", f"id=mysecret,src={expected}"]

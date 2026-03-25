@@ -21,8 +21,6 @@ from pants.backend.docker.package_types import (
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
-    BuildctlOptionsFieldMixin,
-    DockerBuildOptionsFieldMixin,
     DockerImageBuildImageOutputField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
@@ -345,16 +343,17 @@ def get_build_options(
     docker_options: DockerOptions,
     target: Target,
 ) -> Iterator[str]:
-    engine_build_options_field_type, gen_options_func_name = (
-        (BuildctlOptionsFieldMixin, "buildctl_options")
+    gen_options_func_name = (
+        "buildctl_options"
         if docker_options.build_engine == DockerBuildEngine.BUILDKIT
-        else (DockerBuildOptionsFieldMixin, "docker_build_options")
+        else "docker_build_options"
     )
     for field_type in target.field_types:
-        if issubclass(field_type, engine_build_options_field_type) and cast(
-            ValidateOptionsMixin, target[field_type]
-        ).validate_options(docker_options, context):
-            gen_options_func = getattr(target[field_type], gen_options_func_name)
+        if (
+            issubclass(field_type, ValidateOptionsMixin)
+            and target[field_type].validate_options(docker_options, context)
+            and (gen_options_func := getattr(target[field_type], gen_options_func_name, None))
+        ):
             yield from gen_options_func(
                 docker=docker_options,
                 value_formatter=get_value_formatter(context, target, field_type.alias),
@@ -362,16 +361,16 @@ def get_build_options(
 
     # Special handling for global options
     if docker_options.build_target_stage in context.stages:
-        if docker_options.build_engine == DockerBuildEngine.BUILDKIT:
-            yield from (
-                DockerImageTargetStageField.buildctl_option,
-                f"{DockerImageTargetStageField.suboption}{DockerImageTargetStageField.suboption_value_delimiter}{docker_options.build_target_stage}",
-            )
-        else:
-            yield from (
-                DockerImageTargetStageField.docker_build_option,
-                docker_options.build_target_stage,
-            )
+        compute_options_func = (
+            DockerImageTargetStageField.compute_buildctl_options
+            if docker_options.build_engine == DockerBuildEngine.BUILDKIT
+            else DockerImageTargetStageField.compute_docker_build_options
+        )
+        yield from compute_options_func(
+            docker_options.build_target_stage,
+            docker=docker_options,
+            value_formatter=get_value_formatter(context, target, DockerImageTargetStageField.alias),
+        )
 
     # This is the same for docker and buildkit
     if docker_options.build_no_cache:
