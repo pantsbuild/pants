@@ -15,6 +15,7 @@ use toml::Value;
 use toml::value::Table;
 
 use super::{DictEdit, DictEditAction, ListEdit, ListEditAction, OptionsSource, Val};
+use crate::FromVal;
 use crate::fromfile::FromfileExpander;
 use crate::id::{NameTransform, OptionId};
 use crate::parse::Parseable;
@@ -102,22 +103,16 @@ struct ValueConversionError<'a> {
     given_value: &'a Value,
 }
 
-trait FromValue: Parseable {
+trait FromValue: FromVal {
     fn from_value(value: &Value) -> Result<Self, ValueConversionError<'_>>;
 
     fn from_config(config: &ConfigReader, id: &OptionId) -> Result<Option<Self>, String> {
         if let Some(value) = config.get_value(id) {
             if value.is_str() {
-                match config
+                config
                     .fromfile_expander
-                    .expand(value.as_str().unwrap().to_owned())
-                    .map_err(|e| e.render(config.display(id)))?
-                {
-                    Some(expanded_value) => Ok(Some(
-                        Self::parse(&expanded_value).map_err(|e| e.render(config.display(id)))?,
-                    )),
-                    _ => Ok(None),
-                }
+                    .expand::<Self>(value.as_str().unwrap().to_owned())
+                    .map_err(|e| e.render(config.display(id)))
             } else {
                 match Self::from_value(value) {
                     Ok(x) => Ok(Some(x)),
