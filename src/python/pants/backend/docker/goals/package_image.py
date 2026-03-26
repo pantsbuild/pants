@@ -94,8 +94,7 @@ class DockerPackageFieldSet(PackageFieldSet):
 
     def pushes_on_package(self) -> bool:
         """Returns True if this docker_image target would push to a registry during packaging."""
-        value_or_default = self.output.value or self.output.default
-        return value_or_default.get("push") == "true" or value_or_default["type"] == "registry"
+        return self.output.value and (self.output.value.get("push") == "true" or self.output.value["type"] == "registry")
 
     def format_tag(self, tag: str, interpolation_context: InterpolationContext) -> str:
         source = InterpolationContext.TextSource(
@@ -345,7 +344,7 @@ def get_build_options(
 ) -> Iterator[str]:
     gen_options_func_name = (
         "buildctl_options"
-        if docker_options.build_engine == DockerBuildEngine.BUILDKIT
+        if docker_options.build_engine == DockerBuildEngine.BUILDCTL
         else "docker_build_options"
     )
     for field_type in target.field_types:
@@ -363,7 +362,7 @@ def get_build_options(
     if docker_options.build_target_stage in context.stages:
         compute_options_func = (
             DockerImageTargetStageField.compute_buildctl_options
-            if docker_options.build_engine == DockerBuildEngine.BUILDKIT
+            if docker_options.build_engine == DockerBuildEngine.BUILDCTL
             else DockerImageTargetStageField.compute_docker_build_options
         )
         yield from compute_options_func(
@@ -479,7 +478,7 @@ async def get_docker_image_build_process(
     context_root = field_set.get_context_root(options.default_context_root)
     binary: BuildctlBinary | PodmanBinary | DockerBinary
     match options.build_engine:
-        case DockerBuildEngine.BUILDKIT:
+        case DockerBuildEngine.BUILDCTL:
             binary = await get_buildctl(**implicitly())
         case DockerBuildEngine.PODMAN:
             binary = await get_podman(**implicitly())

@@ -695,7 +695,6 @@ class DockerImageBuildImageOutputField(
     DictStringToStringField,
 ):
     alias = "output"
-    default = FrozenDict({"type": "docker"})
     help = help_text(
         f"""
         Sets the export action for the build result.

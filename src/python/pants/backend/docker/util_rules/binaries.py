@@ -155,6 +155,7 @@ class PodmanBinary(_DockerPodmanMixin):
 class BuildctlBinary(BaseBinary):
     """The `buildctl` binary."""
 
+    # TODO: add output arg here
     def build_image(
         self,
         tags: tuple[str, ...],

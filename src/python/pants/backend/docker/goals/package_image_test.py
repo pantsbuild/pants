@@ -13,7 +13,7 @@ from typing import Any, ContextManager, cast
 
 import pytest
 
-from pants.backend.docker.engine_types import DockerEngines
+from pants.backend.docker.engine_types import DockerBuildEngine, DockerEngines
 from pants.backend.docker.goals.package_image import (
     DockerImageBuildProcess,
     DockerImageRefs,
@@ -44,7 +44,7 @@ from pants.backend.docker.target_types import (
     DockerImageTagsRequest,
     DockerImageTarget,
 )
-from pants.backend.docker.util_rules.binaries import DockerBinary, PodmanBinary
+from pants.backend.docker.util_rules.binaries import BuildctlBinary, DockerBinary, PodmanBinary
 from pants.backend.docker.util_rules.docker_build_args import (
     DockerBuildArgs,
     DockerBuildArgsRequest,
@@ -178,7 +178,7 @@ def assert_build_process(
     build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
     version_tags: tuple[str, ...] = (),
     image_refs: DockerImageRefs | None = None,
-    binary: DockerBinary | PodmanBinary = DockerBinary("/dummy/docker"),
+    binary: DockerBinary | PodmanBinary | BuildctlBinary = DockerBinary("/dummy/docker"),
 ) -> DockerImageBuildProcess:
     """Test helper for get_docker_image_build_process rule.
 
@@ -214,6 +214,15 @@ def assert_build_process(
         rule_runner, address, build_context_snapshot, copy_sources, copy_build_args, version_tags
     )
     docker_options = _setup_docker_options(rule_runner, options)
+
+    match binary:
+        case BuildctlBinary():
+            binary_rule_path = "pants.backend.docker.util_rules.binaries.get_buildctl"
+        case PodmanBinary():
+            binary_rule_path = "pants.backend.docker.util_rules.binaries.get_podman"
+        case _:
+            binary_rule_path = "pants.backend.docker.util_rules.binaries.get_docker"
+
     result = run_rule_with_mocks(
         get_docker_image_build_process,
         rule_args=[
@@ -224,9 +233,7 @@ def assert_build_process(
             "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
             "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
             "pants.backend.docker.goals.package_image.get_image_refs": lambda _: image_refs,
-            "pants.backend.docker.util_rules.binaries.get_podman"
-            if isinstance(binary, PodmanBinary)
-            else "pants.backend.docker.util_rules.binaries.get_docker": lambda *args: binary,
+            binary_rule_path: lambda *args: binary,
         },
         union_membership=_create_union_membership(),
         show_warnings=False,
@@ -848,7 +855,6 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "env1:1.2.3",
@@ -1016,7 +1022,6 @@ def test_docker_build_pull(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=True",
             "--tag",
             "args1:latest",
@@ -1048,7 +1053,6 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             "--squash",
             "--tag",
@@ -1062,7 +1066,6 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "args2:latest",
@@ -1099,7 +1102,6 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "args1:1.2.3",
@@ -1203,7 +1205,6 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1256,7 +1257,6 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             "--secret",
             "id=system-secret,src=/var/run/secrets/mysecret",
@@ -1296,7 +1296,6 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             "--ssh",
             "default",
@@ -1337,7 +1336,6 @@ def test_docker_build_no_cache_option(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             "--no-cache",
             "--tag",
@@ -1384,7 +1382,6 @@ def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
             "docker:10.180.0.1",
             "--add-host",
             "docker2:10.180.0.2",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1419,7 +1416,6 @@ def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--cache-to=type=local,dest=/tmp/docker/pants-test-cache",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1456,7 +1452,6 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
             "build",
             "--cache-from=type=local,dest=/tmp/docker/pants-test-cache1",
             "--cache-from=type=local,dest=/tmp/docker/pants-test-cache2",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1759,7 +1754,8 @@ def test_docker_output_option_when_push_on_package_warn(
 @pytest.mark.parametrize(
     ["output", "expected_output_arg"],
     [
-        (None, "--output=type=docker"),
+        (None, None),
+        ({"type": "docker"}, "--output=type=docker"),
         ({"type": "registry"}, None),
         ({"type": "image", "push": "true"}, None),
     ],
@@ -1787,13 +1783,14 @@ def test_docker_output_option_when_push_on_package_ignore(
     tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
     under_test_fs = DockerPackageFieldSet.create(tgt)
 
-    if expected_output_arg:
+    if expected_output_arg or output is None:
         # Step 1: Validate Process construction using assert_build_process
+        output_args = [expected_output_arg] if expected_output_arg else []
         def check_build_process(result: DockerImageBuildProcess) -> None:
             assert result.process.argv == (
                 "/dummy/docker",
                 "build",
-                expected_output_arg,
+                *output_args,
                 "--pull=False",
                 "--tag",
                 "img1:latest",
@@ -1884,7 +1881,6 @@ def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--network=host",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1919,7 +1915,6 @@ def test_docker_build_platform_option(rule_runner: RuleRunner) -> None:
             "/dummy/docker",
             "build",
             "--platform=linux/amd64,linux/arm64,linux/arm/v7",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1964,7 +1959,6 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
             "build.host=tbs06",
             "--label",
             "build.job=13934",
-            "--output=type=docker",
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -2193,7 +2187,6 @@ def test_build_target_stage(
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             f"--target={expected_target}",
             "--tag",
@@ -2231,7 +2224,6 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             "--target=bad",
             "--tag",
@@ -2800,7 +2792,6 @@ def test_docker_image_tags_from_plugin_hook(
         assert result.process.argv == (
             "/dummy/docker",
             "build",
-            "--output=type=docker",
             "--pull=False",
             *tag_flags,
             "--file",
@@ -2960,3 +2951,61 @@ def test_field_set_pushes_on_package(output: dict | None, expected: bool) -> Non
         rule_runner.get_target(Address("", target_name="image"))
     )
     assert field_set.pushes_on_package() is expected
+
+
+def test_docker_build_process_buildctl_engine(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  output
+                  secrets={
+                    "system-secret": "/var/run/secrets/mysecret",
+                    "target-secret": "./mysecret",
+                  },
+                  ssh=["default"],
+                  image_labels={
+                    "version": "1.0",
+                  },
+                  build_platform=["linux/amd64", "linux/arm64"],
+                )
+                """
+            ),
+        }
+    )
+
+    def check_build_process(result: DockerImageBuildProcess) -> None:
+        assert result.process.argv == (
+            "/dummy/buildctl",
+            "build",
+            "--frontend",
+            "dockerfile.v0",
+            "--local",
+            "context=.",
+            "--local",
+            "dockerfile=docker/test",
+            "--opt",
+            "filename=Dockerfile",
+            "--opt",
+            "platform=linux/amd64,linux/arm64",
+            "--opt",
+            "label:version=1.0",
+            "--secret",
+            "id=system-secret,src=/var/run/secrets/mysecret",
+            "--secret",
+            f"id=target-secret,src={rule_runner.build_root}/docker/test/mysecret",
+            "--ssh",
+            "default",
+            "--output",
+            "type=image,name=img1:latest,push=true",
+        )
+
+    assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        options=dict(engine=DockerEngines(build=DockerBuildEngine.BUILDCTL)),
+        binary=BuildctlBinary("/dummy/buildctl"),
+        build_process_assertions=check_build_process,
+    )

@@ -6,7 +6,7 @@ from enum import Enum
 
 class DockerBuildEngine(Enum):
     DOCKER = "docker"
-    BUILDKIT = "buildkit"
+    BUILDCTL = "buildctl"
     PODMAN = "podman"
 
 
