@@ -44,12 +44,12 @@ class Uv(TemplatedExternalTool):
         platform = self.default_url_platform_mapping[plat.value]
         return f"./uv-{platform}/uv"
 
-    args = ArgsListOption(
+    args_for_uv_pip_install = ArgsListOption(
         tool_name="uv",
         example="--index-strategy unsafe-first-match",
         extra_help=softwrap(
             """
-            Additional arguments to pass to uv invocations.
+            Additional arguments to pass to `uv pip install` invocations.
 
             Used when `[python].pex_builder = "uv"` to pass extra flags to the
             `uv pip install` step (e.g. `--index-url`, `--extra-index-url`).
@@ -65,13 +65,13 @@ class DownloadedUv:
 
     digest: Digest
     exe: str
-    args: tuple[str, ...]
+    args_for_uv_pip_install: tuple[str, ...]
 
 
 @rule
 async def download_uv_binary(uv: Uv, platform: Platform) -> DownloadedUv:
     downloaded = await download_external_tool(uv.get_request(platform))
-    return DownloadedUv(digest=downloaded.digest, exe=downloaded.exe, args=tuple(uv.args))
+    return DownloadedUv(digest=downloaded.digest, exe=downloaded.exe, args_for_uv_pip_install=tuple(uv.args_for_uv_pip_install))
 
 
 def rules():

@@ -919,7 +919,7 @@ async def build_pex(
                 "-r",
                 reqs_file,
                 *(("--no-deps",) if use_no_deps else ()),
-                *downloaded_uv.args,
+                *downloaded_uv.args_for_uv_pip_install,
             )
 
             uv_install_result = await execute_process_or_raise(
