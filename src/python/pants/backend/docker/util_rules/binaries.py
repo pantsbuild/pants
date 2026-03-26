@@ -212,7 +212,7 @@ class BuildctlBinary(BaseBinary):
             for tag in tags:
                 args.extend(["--output", f"type=image,name={tag}{publish_suffix}"])
         else:
-            args.extend(["--output", _comma_sep_dict_args(output)])
+            args.extend(["--output", _comma_sep_dict_args(cast(Mapping[str, str], output))])
 
         return Process(
             argv=tuple(args),

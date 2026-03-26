@@ -95,7 +95,7 @@ class DockerPackageFieldSet(PackageFieldSet):
 
     def pushes_on_package(self) -> bool:
         """Returns True if this docker_image target would push to a registry during packaging."""
-        return self.output.value and (
+        return bool(self.output.value) and (
             self.output.value.get("push") == "true" or self.output.value["type"] == "registry"
         )
 
