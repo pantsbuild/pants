@@ -843,10 +843,9 @@ async def build_pex(
                         )
                         all_resolved_reqs = ()
 
-            use_no_deps = bool(all_resolved_reqs)
-            uv_reqs = all_resolved_reqs if use_no_deps else req_strings
+            uv_reqs = all_resolved_reqs or req_strings
 
-            if use_no_deps:
+            if all_resolved_reqs:
                 logger.debug(
                     "pex_builder=uv: using %d pinned packages from lockfile with --no-deps for %s",
                     len(all_resolved_reqs),
@@ -918,7 +917,7 @@ async def build_pex(
                 os.path.join(uv_venv_dir, "bin", "python"),
                 "-r",
                 reqs_file,
-                *(("--no-deps",) if use_no_deps else ()),
+                *(("--no-deps",) if all_resolved_reqs else ()),
                 *downloaded_uv.args_for_uv_pip_install,
             )
 
