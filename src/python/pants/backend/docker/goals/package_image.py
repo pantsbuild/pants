@@ -48,6 +48,7 @@ from pants.backend.docker.util_rules.docker_build_context import (
 )
 from pants.backend.docker.utils import format_rename_suggestion
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
+from pants.core.goals.publish import PublishFieldSet
 from pants.engine.collection import Collection
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, FileContent
 from pants.engine.internals.graph import resolve_target
@@ -94,7 +95,9 @@ class DockerPackageFieldSet(PackageFieldSet):
 
     def pushes_on_package(self) -> bool:
         """Returns True if this docker_image target would push to a registry during packaging."""
-        return self.output.value and (self.output.value.get("push") == "true" or self.output.value["type"] == "registry")
+        return self.output.value and (
+            self.output.value.get("push") == "true" or self.output.value["type"] == "registry"
+        )
 
     def format_tag(self, tag: str, interpolation_context: InterpolationContext) -> str:
         source = InterpolationContext.TextSource(
@@ -492,6 +495,7 @@ async def get_docker_image_build_process(
         context_root=context_root,
         env=env,
         tags=tags,
+        output=field_set.output.value,
         extra_args=tuple(
             get_build_options(
                 context=context,
@@ -499,6 +503,7 @@ async def get_docker_image_build_process(
                 target=wrapped_target.target,
             )
         ),
+        is_publish=isinstance(field_set, PublishFieldSet),
     )
     return DockerImageBuildProcess(
         process=process,

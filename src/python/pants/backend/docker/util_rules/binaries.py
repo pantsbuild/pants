@@ -66,12 +66,18 @@ class BuildBinaryProtocol(Protocol):
         build_args: DockerBuildArgs,
         context_root: str,
         env: Mapping[str, str],
+        output: dict[str, str] | None,
         extra_args: tuple[str, ...] = (),
+        is_publish: bool = False,
     ) -> Process: ...
 
 
 class PushBinaryProtocol(Protocol):
     def push_image(self, tag: str, env: Mapping[str, str] | None = None) -> Process: ...
+
+
+def _comma_sep_dict_args(d: Mapping[str, str]) -> str:
+    return ",".join(f"{k}={v}" for k, v in d.items())
 
 
 class _DockerPodmanMixin(BaseBinary):
@@ -83,9 +89,14 @@ class _DockerPodmanMixin(BaseBinary):
         build_args: DockerBuildArgs,
         context_root: str,
         env: Mapping[str, str],
+        output: Mapping[str, str] | None,
         extra_args: tuple[str, ...] = (),
+        is_publish: bool = False,
     ) -> Process:
         args = [self.path, "build", *extra_args]
+
+        if output:
+            args.extend(["--output", _comma_sep_dict_args(output)])
 
         for tag in tags:
             args.extend(["--tag", tag])
@@ -155,7 +166,18 @@ class PodmanBinary(_DockerPodmanMixin):
 class BuildctlBinary(BaseBinary):
     """The `buildctl` binary."""
 
-    # TODO: add output arg here
+    @staticmethod
+    def _special_output_handling(output: Mapping[str, str] | None) -> bool:
+        if output:
+            try:
+                output_type = output["type"]
+            except KeyError as ke:
+                raise ValueError(
+                    "docker_image output type field is required when specifying output"
+                ) from ke
+            return output_type == "image" and "name" not in output
+        return True
+
     def build_image(
         self,
         tags: tuple[str, ...],
@@ -164,7 +186,9 @@ class BuildctlBinary(BaseBinary):
         build_args: DockerBuildArgs,
         context_root: str,
         env: Mapping[str, str],
+        output: Mapping[str, str] | None,
         extra_args: tuple[str, ...] = (),
+        is_publish: bool = False,
     ) -> Process:
         args = [
             self.path,
@@ -183,8 +207,12 @@ class BuildctlBinary(BaseBinary):
         for build_arg in build_args:
             args.extend(["--opt", f"build-arg:{build_arg}"])
 
-        for tag in tags:
-            args.extend(["--output", f"type=image,name={tag},push=true"])
+        if self._special_output_handling(output):
+            publish_suffix = ",push=true" if is_publish else ""
+            for tag in tags:
+                args.extend(["--output", f"type=image,name={tag}{publish_suffix}"])
+        else:
+            args.extend(["--output", _comma_sep_dict_args(output)])
 
         return Process(
             argv=tuple(args),

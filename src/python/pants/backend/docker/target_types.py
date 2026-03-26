@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar, final
 
@@ -38,7 +38,6 @@ from pants.engine.target import (
 )
 from pants.engine.unions import union
 from pants.util.docutil import bin_name, doc_url
-from pants.util.frozendict import FrozenDict
 from pants.util.meta import classproperty
 from pants.util.strutil import help_text, softwrap
 
@@ -275,7 +274,7 @@ class DockerBuildOptionFieldMultiValueMixin(StringSequenceField, DockerBuildOpti
     @final
     def compute_docker_build_options(
         cls,
-        value: tuple[str, ...] | None,
+        value: Sequence[str] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -294,7 +293,7 @@ class DockerBuildOptionFieldMultiValueDictMixin(
     @final
     def compute_docker_build_options(
         cls,
-        value: FrozenDict[str, str] | None,
+        value: Mapping[str, str] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -317,7 +316,7 @@ class DockerBuildOptionFieldListOfMultiValueDictMixin(
     @final
     def compute_docker_build_options(
         cls,
-        value: tuple[FrozenDict[str, str]] | None,
+        value: Sequence[Mapping[str, str]] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -384,7 +383,7 @@ class BuildctlOptionFieldMultiValueDictMixin(
     @final
     def compute_buildctl_options(
         cls,
-        value: FrozenDict[str, str] | None,
+        value: Mapping[str, str] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -407,7 +406,7 @@ class BuildctlOptionFieldListOfMultiValueDictMixin(
     @final
     def compute_buildctl_options(
         cls,
-        value: tuple[FrozenDict[str, str], ...] | None,
+        value: Sequence[Mapping[str, str]] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -461,7 +460,7 @@ class BuildctlOptionFieldMultiValueMixin(StringSequenceField, BuildctlOptionsFie
     @final
     def compute_buildctl_options(
         cls,
-        value: tuple[str, ...] | None,
+        value: Sequence[str] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -487,7 +486,7 @@ class BuildctlLayeredOptionFieldMultiValueMixin(
     @final
     def compute_buildctl_options(
         cls,
-        value: tuple[str, ...] | None,
+        value: Sequence[str] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -557,7 +556,7 @@ class DockerImageBuildImageLabelsOptionField(
     @classmethod
     def compute_docker_build_options(
         cls,
-        value: FrozenDict[str, str] | None,
+        value: Mapping[str, str] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -569,7 +568,7 @@ class DockerImageBuildImageLabelsOptionField(
     @classmethod
     def compute_buildctl_options(
         cls,
-        value: FrozenDict[str, str] | None,
+        value: Mapping[str, str] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -593,7 +592,7 @@ class DockerImageBuildImageExtraHostsField(DockerBuildOptionsFieldMixin, DictStr
     @classmethod
     def compute_docker_build_options(
         cls,
-        value: FrozenDict[str, str] | None,
+        value: Mapping[str, str] | None,
         *,
         docker: DockerOptions,
         value_formatter: OptionValueFormatter,
@@ -689,11 +688,7 @@ class DockerImageBuildImageCacheFromField(
         return not options.build_no_cache
 
 
-class DockerImageBuildImageOutputField(
-    BuildctlOptionFieldMultiValueDictMixin,
-    DockerBuildkitPassthroughFieldMixin,
-    DictStringToStringField,
-):
+class DockerImageBuildImageOutputField(DictStringToStringField):
     alias = "output"
     help = help_text(
         f"""
@@ -708,7 +703,6 @@ class DockerImageBuildImageOutputField(
         {_interpolation_help.format(kind="Values")}
         """
     )
-    buildctl_option = "--output"
 
 
 class DockerImageBuildSecretsOptionField(
@@ -789,7 +783,7 @@ class DockerImageBuildSSHOptionField(
 
     @classmethod
     def compute_buildctl_options(
-        cls, value: tuple[str, ...], *, docker: DockerOptions, value_formatter: OptionValueFormatter
+        cls, value: Sequence[str], *, docker: DockerOptions, value_formatter: OptionValueFormatter
     ) -> Iterator[str]:
         for v in value:
             yield cls.buildctl_option
