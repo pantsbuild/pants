@@ -516,6 +516,36 @@ class _UvVenvResult:
     venv_dir: str
 
 
+def _check_uv_preconditions(
+    request: PexRequest,
+    req_strings: tuple[str, ...],
+    pex_python_setup: _BuildPexPythonSetup,
+) -> str | None:
+    """Check whether the uv builder can be used for this PEX request.
+
+    Returns None if all preconditions are met, or a warning message describing
+    why uv cannot be used.
+    """
+    label = request.description or request.output_filename
+    if not req_strings:
+        return (
+            f"pex_builder=uv: no individual requirement strings for {label} "
+            "(e.g. using a whole-lockfile resolve or no third-party deps). "
+            "Falling back to the default PEX/pip builder."
+        )
+    if request.platforms or request.complete_platforms:
+        return (
+            f"pex_builder=uv: cross-platform build detected for {label}. "
+            "Falling back to the default PEX/pip builder."
+        )
+    if pex_python_setup.python is None:
+        return (
+            f"pex_builder=uv: no local Python interpreter available for {label}. "
+            "Falling back to the default PEX/pip builder."
+        )
+    return None
+
+
 @rule
 async def _build_uv_venv(
     uv_request: _UvVenvRequest,
@@ -942,26 +972,9 @@ async def build_pex(
     # uv builder only applies to non-internal PEXes with requirements and a
     # local interpreter (not cross-platform builds).
     if use_uv_builder and not request.internal_only:
-        is_cross_platform = bool(request.platforms or request.complete_platforms)
-        if not req_strings:
-            logger.warning(
-                "pex_builder=uv: no individual requirement strings for %s "
-                "(e.g. using a whole-lockfile resolve or no third-party deps). "
-                "Falling back to the default PEX/pip builder.",
-                request.description or request.output_filename,
-            )
-        elif is_cross_platform:
-            logger.warning(
-                "pex_builder=uv: cross-platform build detected for %s. "
-                "Falling back to the default PEX/pip builder.",
-                request.description or request.output_filename,
-            )
-        elif pex_python_setup.python is None:
-            logger.warning(
-                "pex_builder=uv: no local Python interpreter available for %s. "
-                "Falling back to the default PEX/pip builder.",
-                request.description or request.output_filename,
-            )
+        fallback_reason = _check_uv_preconditions(request, req_strings, pex_python_setup)
+        if fallback_reason:
+            logger.warning(fallback_reason)
         else:
             assert pex_python_setup.python is not None
             uv_result = await _build_uv_venv(
