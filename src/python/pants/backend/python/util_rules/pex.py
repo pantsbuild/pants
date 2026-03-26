@@ -777,22 +777,22 @@ async def build_pex(
     if use_uv_builder and not request.internal_only:
         is_cross_platform = bool(request.platforms or request.complete_platforms)
         if not req_strings:
-            logger.debug(
+            logger.warning(
                 "pex_builder=uv: no individual requirement strings for %s "
                 "(e.g. using a whole-lockfile resolve or no third-party deps). "
-                "Using the default PEX/pip builder.",
+                "Falling back to the default PEX/pip builder.",
                 request.description or request.output_filename,
             )
         elif is_cross_platform:
-            logger.debug(
+            logger.warning(
                 "pex_builder=uv: cross-platform build detected for %s. "
-                "Using the default PEX/pip builder.",
+                "Falling back to the default PEX/pip builder.",
                 request.description or request.output_filename,
             )
         elif pex_python_setup.python is None:
-            logger.debug(
+            logger.warning(
                 "pex_builder=uv: no local Python interpreter available for %s. "
-                "Using the default PEX/pip builder.",
+                "Falling back to the default PEX/pip builder.",
                 request.description or request.output_filename,
             )
         else:
