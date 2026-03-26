@@ -497,6 +497,173 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
         )
 
 
+@dataclass(frozen=True)
+class _UvVenvRequest:
+    """Request to build a pre-populated venv using uv for PEX --venv-repository."""
+
+    req_strings: tuple[str, ...]
+    requirements: PexRequirements | EntireLockfile
+    python_path: str
+    description: str
+    venv_dir: str = "__uv_venv"
+
+
+@dataclass(frozen=True)
+class _UvVenvResult:
+    """Result of building a uv venv."""
+
+    venv_digest: Digest | None
+    venv_dir: str
+
+
+@rule
+async def _build_uv_venv(
+    uv_request: _UvVenvRequest,
+    pex_env: PexEnvironment,
+) -> _UvVenvResult:
+    """Build a pre-populated venv using uv for use with PEX --venv-repository."""
+    downloaded_uv = await download_uv_binary(**implicitly())
+
+    logger.debug(
+        "pex_builder=uv: using uv builder for %s",
+        uv_request.description,
+    )
+
+    # Try to extract the full resolved package list from the lockfile
+    # so we can pass pinned versions with --no-deps (reproducible).
+    # Fall back to letting uv resolve transitively if no lockfile.
+    all_resolved_reqs: tuple[str, ...] = ()
+    if isinstance(uv_request.requirements, PexRequirements) and isinstance(
+        uv_request.requirements.from_superset, Resolve
+    ):
+        lockfile = await get_lockfile_for_resolve(
+            uv_request.requirements.from_superset, **implicitly()
+        )
+        loaded_lockfile = await load_lockfile(
+            LoadedLockfileRequest(lockfile), **implicitly()
+        )
+        if loaded_lockfile.is_pex_native:
+            try:
+                digest_contents = await get_digest_contents(loaded_lockfile.lockfile_digest)
+                lockfile_bytes = next(
+                    c.content
+                    for c in digest_contents
+                    if c.path == loaded_lockfile.lockfile_path
+                )
+                lockfile_data = json.loads(lockfile_bytes)
+                all_resolved_reqs = tuple(
+                    f"{req['project_name']}=={req['version']}"
+                    for resolve in lockfile_data.get("locked_resolves", ())
+                    for req in resolve.get("locked_requirements", ())
+                )
+            except (json.JSONDecodeError, KeyError, StopIteration) as e:
+                logger.warning(
+                    "pex_builder=uv: failed to parse lockfile for %s: %s. "
+                    "Falling back to transitive uv resolution.",
+                    uv_request.description,
+                    e,
+                )
+                all_resolved_reqs = ()
+
+    uv_reqs = all_resolved_reqs or uv_request.req_strings
+
+    if all_resolved_reqs:
+        logger.debug(
+            "pex_builder=uv: using %d pinned packages from lockfile with --no-deps for %s",
+            len(all_resolved_reqs),
+            uv_request.description,
+        )
+    else:
+        logger.debug(
+            "pex_builder=uv: no lockfile available, using transitive uv resolution for %s",
+            uv_request.description,
+        )
+
+    reqs_file = "__uv_requirements.txt"
+    reqs_content = "\n".join(uv_reqs) + "\n"
+    reqs_digest = await create_digest(
+        CreateDigest([FileContent(reqs_file, reqs_content.encode())])
+    )
+
+    complete_pex_env = pex_env.in_sandbox(working_directory=None)
+    uv_cache_dir = ".cache/uv_cache"
+    uv_env = {
+        **complete_pex_env.environment_dict(python_configured=True),
+        "UV_CACHE_DIR": uv_cache_dir,
+        "UV_NO_CONFIG": "1",
+    }
+    uv_caches = {
+        **complete_pex_env.append_only_caches,
+        "uv_cache": uv_cache_dir,
+    }
+    uv_tmpdir = "__uv_tmp"
+    tmpdir_digest = await create_digest(CreateDigest([Directory(uv_tmpdir)]))
+
+    python_path = uv_request.python_path
+    venv_dir = uv_request.venv_dir
+
+    uv_input = await merge_digests(
+        MergeDigests([downloaded_uv.digest, reqs_digest, tmpdir_digest])
+    )
+
+    # Step 1: Create venv with uv.
+    venv_result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                argv=(
+                    downloaded_uv.exe,
+                    "venv",
+                    venv_dir,
+                    "--python",
+                    python_path,
+                ),
+                input_digest=uv_input,
+                output_directories=(venv_dir,),
+                env={**uv_env, "TMPDIR": uv_tmpdir},
+                append_only_caches=uv_caches,
+                description=f"Create uv venv for {uv_request.description}",
+                level=LogLevel.DEBUG,
+                cache_scope=ProcessCacheScope.SUCCESSFUL,
+            )
+        )
+    )
+
+    # Step 2: Install dependencies into the venv.
+    install_input = await merge_digests(MergeDigests([uv_input, venv_result.output_digest]))
+
+    install_argv: tuple[str, ...] = (
+        downloaded_uv.exe,
+        "pip",
+        "install",
+        "--python",
+        os.path.join(venv_dir, "bin", "python"),
+        "-r",
+        reqs_file,
+        *(("--no-deps",) if all_resolved_reqs else ()),
+        *downloaded_uv.args_for_uv_pip_install,
+    )
+
+    uv_install_result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                argv=install_argv,
+                input_digest=install_input,
+                output_directories=(venv_dir,),
+                env={**uv_env, "TMPDIR": uv_tmpdir},
+                append_only_caches=uv_caches,
+                description=f"uv pip install for {uv_request.description}",
+                level=LogLevel.DEBUG,
+                cache_scope=ProcessCacheScope.SUCCESSFUL,
+            )
+        )
+    )
+
+    return _UvVenvResult(
+        venv_digest=uv_install_result.output_digest,
+        venv_dir=venv_dir,
+    )
+
+
 @dataclass
 class _BuildPexRequirementsSetup:
     digests: list[Digest]
@@ -796,146 +963,18 @@ async def build_pex(
                 request.description or request.output_filename,
             )
         else:
-            # All preconditions met - use uv to pre-populate a venv.
-            # Download uv only when actually needed (not for every build_pex call).
-            downloaded_uv = await download_uv_binary(**implicitly())
-
-            logger.debug(
-                "pex_builder=uv: using uv builder for %s",
-                request.description or request.output_filename,
+            assert pex_python_setup.python is not None
+            uv_result = await _build_uv_venv(
+                _UvVenvRequest(
+                    req_strings=req_strings,
+                    requirements=request.requirements,
+                    python_path=pex_python_setup.python.path,
+                    description=request.description or request.output_filename,
+                    venv_dir=uv_venv_dir,
+                ),
+                **implicitly(),
             )
-
-            # Try to extract the full resolved package list from the lockfile
-            # so we can pass pinned versions with --no-deps (reproducible).
-            # Fall back to letting uv resolve transitively if no lockfile.
-            # Lockfile format: PEX native lockfile JSON with
-            # locked_resolves[].locked_requirements[].{project_name, version}
-            all_resolved_reqs: tuple[str, ...] = ()
-            if isinstance(request.requirements, PexRequirements) and isinstance(
-                request.requirements.from_superset, Resolve
-            ):
-                lockfile = await get_lockfile_for_resolve(
-                    request.requirements.from_superset, **implicitly()
-                )
-                loaded_lockfile = await load_lockfile(
-                    LoadedLockfileRequest(lockfile), **implicitly()
-                )
-                if loaded_lockfile.is_pex_native:
-                    try:
-                        digest_contents = await get_digest_contents(loaded_lockfile.lockfile_digest)
-                        lockfile_bytes = next(
-                            c.content
-                            for c in digest_contents
-                            if c.path == loaded_lockfile.lockfile_path
-                        )
-                        lockfile_data = json.loads(lockfile_bytes)
-                        all_resolved_reqs = tuple(
-                            f"{req['project_name']}=={req['version']}"
-                            for resolve in lockfile_data.get("locked_resolves", ())
-                            for req in resolve.get("locked_requirements", ())
-                        )
-                    except (json.JSONDecodeError, KeyError, StopIteration) as e:
-                        logger.warning(
-                            "pex_builder=uv: failed to parse lockfile for %s: %s. "
-                            "Falling back to transitive uv resolution.",
-                            request.description or request.output_filename,
-                            e,
-                        )
-                        all_resolved_reqs = ()
-
-            uv_reqs = all_resolved_reqs or req_strings
-
-            if all_resolved_reqs:
-                logger.debug(
-                    "pex_builder=uv: using %d pinned packages from lockfile with --no-deps for %s",
-                    len(all_resolved_reqs),
-                    request.description or request.output_filename,
-                )
-            else:
-                logger.debug(
-                    "pex_builder=uv: no lockfile available, using transitive uv resolution for %s",
-                    request.description or request.output_filename,
-                )
-
-            reqs_file = "__uv_requirements.txt"
-            reqs_content = "\n".join(uv_reqs) + "\n"
-            reqs_digest = await create_digest(
-                CreateDigest([FileContent(reqs_file, reqs_content.encode())])
-            )
-
-            # Sandbox environment - mirror PexCliProcess patterns.
-            complete_pex_env = pex_env.in_sandbox(working_directory=None)
-            uv_cache_dir = ".cache/uv_cache"
-            uv_env = {
-                **complete_pex_env.environment_dict(python_configured=True),
-                "UV_CACHE_DIR": uv_cache_dir,
-                "UV_NO_CONFIG": "1",
-            }
-            uv_caches = {
-                **complete_pex_env.append_only_caches,
-                "uv_cache": uv_cache_dir,
-            }
-            uv_tmpdir = "__uv_tmp"
-            tmpdir_digest = await create_digest(CreateDigest([Directory(uv_tmpdir)]))
-
-            python_path = pex_python_setup.python.path
-
-            uv_input = await merge_digests(
-                MergeDigests([downloaded_uv.digest, reqs_digest, tmpdir_digest])
-            )
-
-            # Step 1: Create venv with uv.
-            venv_result = await execute_process_or_raise(
-                **implicitly(
-                    Process(
-                        argv=(
-                            downloaded_uv.exe,
-                            "venv",
-                            uv_venv_dir,
-                            "--python",
-                            python_path,
-                        ),
-                        input_digest=uv_input,
-                        output_directories=(uv_venv_dir,),
-                        env={**uv_env, "TMPDIR": uv_tmpdir},
-                        append_only_caches=uv_caches,
-                        description=f"Create uv venv for {request.description or request.output_filename}",
-                        level=LogLevel.DEBUG,
-                        cache_scope=ProcessCacheScope.SUCCESSFUL,
-                    )
-                )
-            )
-
-            # Step 2: Install dependencies into the venv.
-            install_input = await merge_digests(MergeDigests([uv_input, venv_result.output_digest]))
-
-            install_argv: tuple[str, ...] = (
-                downloaded_uv.exe,
-                "pip",
-                "install",
-                "--python",
-                os.path.join(uv_venv_dir, "bin", "python"),
-                "-r",
-                reqs_file,
-                *(("--no-deps",) if all_resolved_reqs else ()),
-                *downloaded_uv.args_for_uv_pip_install,
-            )
-
-            uv_install_result = await execute_process_or_raise(
-                **implicitly(
-                    Process(
-                        argv=install_argv,
-                        input_digest=install_input,
-                        output_directories=(uv_venv_dir,),
-                        env={**uv_env, "TMPDIR": uv_tmpdir},
-                        append_only_caches=uv_caches,
-                        description=f"uv pip install for {request.description or request.output_filename}",
-                        level=LogLevel.DEBUG,
-                        cache_scope=ProcessCacheScope.SUCCESSFUL,
-                    )
-                )
-            )
-            uv_venv_digest = uv_install_result.output_digest
+            uv_venv_digest = uv_result.venv_digest
 
             # Replace requirements_setup: pass requirement strings + --venv-repository
             # so PEX subsets from the uv-populated venv instead of resolving with pip.
