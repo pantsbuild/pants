@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import unittest.mock
+from dataclasses import dataclass
 from enum import Enum
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -15,6 +16,7 @@ from pants.option.option_types import (
     ArgsListOption,
     BoolListOption,
     BoolOption,
+    DataclassOption,
     DictOption,
     DirListOption,
     DirOption,
@@ -47,6 +49,12 @@ if TYPE_CHECKING:
 class MyEnum(Enum):
     Val1 = "val1"
     Val2 = "val2"
+
+
+@dataclass(frozen=True)
+class MyDataclass:
+    key1: str
+    key2: int
 
 
 def opt_info(*names, **options):
@@ -129,6 +137,9 @@ def test_other_options() -> None:
             self.options.dyn_enum_list_prop = [MyEnum.Val2]
             self.options.defaultless_enum_list_prop = [MyEnum.Val2]
             self.options.dict_prop = {"key1": "val1"}
+            self.options.dataclass_prop = MyDataclass(key1="val1", key2=11)
+            self.options.optional_dataclass_prop = MyDataclass(key1="val2", key2=22)
+            self.options.dyn_dataclass_prop = MyDataclass(key1="val3", key2=33)
 
         enum_prop = EnumOption(default=MyEnum.Val1, help="")
         dyn_enum_prop = EnumOption(
@@ -145,11 +156,19 @@ def test_other_options() -> None:
         )
         defaultless_enum_list_prop = EnumListOption(enum_type=MyEnum, help="")
         dict_prop = DictOption[Any](help="")
+        dataclass_prop = DataclassOption(default=MyDataclass(key1="val4", key2=44), help="")
+        optional_dataclass_prop = DataclassOption(dataclass_type=MyDataclass, default=None, help="")
+        dyn_dataclass_prop = DataclassOption(
+            dataclass_type=MyDataclass,
+            default=lambda cls: cls.dyn_default_dataclass,
+            help=lambda cls: f"{cls.dyn_help}",
+        )
 
     class MySubsystem(MyBaseSubsystem):
         dyn_help = "Dynamic Help"
         dyn_default = MyEnum.Val1
         dyn_default_list = [MyEnum.Val1]
+        dyn_default_dataclass = MyDataclass(key1="val5", key2=55)
 
     assert list(collect_options_info(MySubsystem)) == [
         opt_info("--enum-prop", default=MyEnum.Val1, help="", type=MyEnum),
@@ -167,6 +186,16 @@ def test_other_options() -> None:
             "--defaultless-enum-list-prop", default=[], help="", type=list, member_type=MyEnum
         ),
         opt_info("--dict-prop", default={}, help="", type=dict),
+        opt_info(
+            "--dataclass-prop", default=MyDataclass(key1="val4", key2=44), help="", type=MyDataclass
+        ),
+        opt_info("--optional-dataclass-prop", default=None, help="", type=MyDataclass),
+        opt_info(
+            "--dyn-dataclass-prop",
+            default=MyDataclass(key1="val5", key2=55),
+            help="Dynamic Help",
+            type=MyDataclass,
+        ),
     ]
 
     my_subsystem = MySubsystem()
@@ -177,6 +206,9 @@ def test_other_options() -> None:
     assert my_subsystem.dyn_enum_list_prop == (MyEnum.Val2,)
     assert my_subsystem.defaultless_enum_list_prop == (MyEnum.Val2,)
     assert my_subsystem.dict_prop == {"key1": "val1"}
+    assert my_subsystem.dataclass_prop == MyDataclass(key1="val1", key2=11)
+    assert my_subsystem.optional_dataclass_prop == MyDataclass(key1="val2", key2=22)
+    assert my_subsystem.dyn_dataclass_prop == MyDataclass(key1="val3", key2=33)
 
 
 def test_specialized_options() -> None:

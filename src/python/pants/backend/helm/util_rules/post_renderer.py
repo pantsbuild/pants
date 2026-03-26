@@ -17,7 +17,7 @@ from pants.backend.docker.target_types import (
     get_docker_image_tags,
 )
 from pants.backend.docker.util_rules import (
-    docker_binary,
+    binaries,
     docker_build_args,
     docker_build_context,
     docker_build_env,
@@ -166,7 +166,7 @@ async def prepare_post_renderer_for_helm_deployment(
 def rules():
     return [
         *collect_rules(),
-        *docker_binary.rules(),
+        *binaries.rules(),
         *docker_build_args.rules(),
         *docker_build_context.rules(),
         *docker_build_env.rules(),
