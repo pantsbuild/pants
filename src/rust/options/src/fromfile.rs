@@ -5,7 +5,7 @@ use super::{BuildRoot, DictEdit, DictEditAction, ListEdit, ListEditAction};
 
 use crate::parse::{ParseError, Parseable, mk_parse_err, parse_dict};
 use log::warn;
-use serde::de::Deserialize;
+use serde::de::DeserializeOwned;
 use sha2::{Digest, Sha256};
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -22,6 +22,7 @@ type ExpandedValue = (Option<PathBuf>, Option<String>);
 enum FromfileType {
     Json,
     Yaml,
+    Toml,
     Unknown,
 }
 
@@ -32,20 +33,23 @@ impl FromfileType {
                 return FromfileType::Json;
             } else if ext == "yml" || ext == "yaml" {
                 return FromfileType::Yaml;
+            } else if ext == "toml" {
+                return FromfileType::Toml;
             };
         }
         FromfileType::Unknown
     }
 }
 
-fn try_deserialize<'a, DE: Deserialize<'a>>(
-    value: &'a str,
+fn try_deserialize<DE: DeserializeOwned>(
+    value: &str,
     path_opt: Option<PathBuf>,
 ) -> Result<Option<DE>, ParseError> {
     if let Some(path) = path_opt {
         match FromfileType::detect(&path) {
             FromfileType::Json => serde_json::from_str(value).map_err(|e| mk_parse_err(e, &path)),
             FromfileType::Yaml => serde_yaml::from_str(value).map_err(|e| mk_parse_err(e, &path)),
+            FromfileType::Toml => toml::from_str(value).map_err(|e| mk_parse_err(e, &path)),
             _ => Ok(None),
         }
     } else {

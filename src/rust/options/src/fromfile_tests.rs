@@ -5,6 +5,7 @@ use crate::fromfile::test_util::write_fromfile;
 use crate::fromfile::*;
 use crate::parse::{ParseError, Parseable};
 use crate::{BuildRoot, DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
+use indoc::indoc;
 use maplit::hashmap;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -13,7 +14,7 @@ macro_rules! check_err {
     ($res:expr, $expected_suffix:expr $(,)?) => {
         let actual_msg = $res.unwrap_err().render("XXX");
         assert!(
-            actual_msg.ends_with($expected_suffix),
+            actual_msg.trim_end().ends_with($expected_suffix.trim_end()),
             "Error message does not have expected suffix:\n{actual_msg}\nvs\n{:>width$}",
             $expected_suffix,
             width = actual_msg.len(),
@@ -271,7 +272,7 @@ fn test_expand_fromfile_to_dict() {
         "fromfile.json",
     );
     do_test(
-        r#"
+        indoc! {"
         FOO:
           BAR: 3.14
           BAZ:
@@ -279,9 +280,22 @@ fn test_expand_fromfile_to_dict() {
             QUUX:
               - 1
               - 2
-        "#,
+        "},
         &complex_obj,
         "fromfile.yaml",
+    );
+
+    do_test(
+        indoc! {"
+        [FOO]
+        BAR = 3.14
+        
+        [FOO.BAZ]
+        QUX= true
+        QUUX = [1, 2]
+        "},
+        &complex_obj,
+        "fromfile.toml",
     );
 
     check_err!(
@@ -302,6 +316,17 @@ fn test_expand_fromfile_to_dict() {
     check_err!(
         expand_fromfile("- 1\n- 2", "@", "wrong_type.yaml"),
         "invalid type: sequence, expected a map",
+    );
+
+    check_err!(
+        expand_fromfile("THIS IS NOT TOML", "@", "invalid.toml"),
+        indoc! {"
+        TOML parse error at line 1, column 6
+          |
+        1 | THIS IS NOT TOML
+          |      ^
+        expected `.`, `=`
+        "},
     );
 
     check_err!(
