@@ -25,6 +25,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
@@ -42,6 +43,7 @@ from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyError
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
     InferredDependencies,
@@ -610,3 +612,92 @@ def test_pex_binary_targets() -> None:
         gen_pex_binary_tgt("subdir.f.py", tags=["overridden"]),
         gen_pex_binary_tgt("subdir.f:main"),
     }
+
+
+def assert_inferred(
+    rule_runner: RuleRunner, address: Address, expected: list[Address], comment=""
+) -> None:
+    tgt = rule_runner.get_target(address)
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [
+            InferPexBinaryEntryPointDependency(
+                PexBinaryEntryPointDependencyInferenceFieldSet.create(tgt)
+            )
+        ],
+    )
+    assert InferredDependencies(expected) == inferred, comment
+
+
+def test_20806() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_types_rules.rules(),
+            *import_rules(),
+            *python_sources.rules(),
+            QueryRule(InferredDependencies, [InferPythonDistributionDependencies]),
+        ],
+        target_types=[
+            PythonDistribution,
+            PythonRequirementTarget,
+            PythonSourceTarget,
+            PexBinary,
+        ],
+        objects={"parametrize": Parametrize},
+    )
+
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+            python_source(name="src", source="example.py", tags=parametrize(a=["a"], b=["b"]))
+
+            pex_binary(name="ambiguous", entry_point="./example.py")
+
+            pex_binary(name="with-target", entry_point="./example.py:src@tags=a")
+
+            pex_binary(name="with-deps", entry_point="./example.py", dependencies=[":src@tags=a"])
+
+            pex_binary(name="with-deps-and-ignore", entry_point="./example.py", dependencies=[":src@tags=a", "!:src@tags=b"])
+
+            pex_binary(name="with-ignore-only", entry_point="./example.py", dependencies=[ "!:src@tags=b"])
+            """
+            ),
+            "example.py": "print('worked!')",
+        }
+    )
+
+    assert_inferred(
+        rule_runner,
+        Address(spec_path="", target_name="ambiguous"),
+        [],
+        comment="The ambiguous should not be disambiguated",
+    )
+
+    # assert_inferred(
+    #     rule_runner,
+    #     Address(spec_path="", target_name="with-target"),
+    #     [Address(spec_path="", target_name="src", parameters={"tags": "a"})],
+    #     comment="Using an explicit target is not standard (the entry is actually a Python entrypoint, not a Pants target)",
+    # )
+
+    assert_inferred(
+        rule_runner,
+        Address(spec_path="", target_name="with-deps"),
+        [Address(spec_path="", target_name="src", parameters={"tags": "a"})],
+        comment="Explicitly providing the dep should resolve the ambiguity",
+    )
+
+    assert_inferred(
+        rule_runner,
+        Address(spec_path="", target_name="with-ignore-only"),
+        [Address(spec_path="", target_name="src", parameters={"tags": "a"})],
+        comment="Ignoring the other ambiguous cases should disambiguate",
+    )
+
+    assert_inferred(
+        rule_runner,
+        Address(spec_path="", target_name="with-deps-and-ignore"),
+        [Address(spec_path="", target_name="src", parameters={"tags": "a"})],
+        comment="Ignoring the other ambiguous cases should disambiguate, even if one of the ambiguous ones is provided as a dep",
+    )
