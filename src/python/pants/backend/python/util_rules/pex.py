@@ -146,7 +146,6 @@ class CompletePlatforms(DeduplicatedCollection[str]):
     sort_input = True
 
     def __init__(self, iterable: Iterable[str] = (), *, digest: Digest = EMPTY_DIGEST):
-        super().__init__(iterable)
         self._digest = digest
 
     @classmethod
