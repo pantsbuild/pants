@@ -497,6 +497,9 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
         )
 
 
+_UV_VENV_DIR = "__uv_venv"
+
+
 @dataclass(frozen=True)
 class _UvVenvRequest:
     """Request to build a pre-populated venv using uv for PEX --venv-repository."""
@@ -505,7 +508,6 @@ class _UvVenvRequest:
     requirements: PexRequirements | EntireLockfile
     python_path: str
     description: str
-    venv_dir: str = "__uv_venv"
 
 
 @dataclass(frozen=True)
@@ -513,7 +515,6 @@ class _UvVenvResult:
     """Result of building a uv venv."""
 
     venv_digest: Digest | None
-    venv_dir: str
 
 
 def _check_uv_preconditions(
@@ -569,16 +570,12 @@ async def _build_uv_venv(
         lockfile = await get_lockfile_for_resolve(
             uv_request.requirements.from_superset, **implicitly()
         )
-        loaded_lockfile = await load_lockfile(
-            LoadedLockfileRequest(lockfile), **implicitly()
-        )
+        loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
         if loaded_lockfile.is_pex_native:
             try:
                 digest_contents = await get_digest_contents(loaded_lockfile.lockfile_digest)
                 lockfile_bytes = next(
-                    c.content
-                    for c in digest_contents
-                    if c.path == loaded_lockfile.lockfile_path
+                    c.content for c in digest_contents if c.path == loaded_lockfile.lockfile_path
                 )
                 lockfile_data = json.loads(lockfile_bytes)
                 all_resolved_reqs = tuple(
@@ -611,9 +608,7 @@ async def _build_uv_venv(
 
     reqs_file = "__uv_requirements.txt"
     reqs_content = "\n".join(uv_reqs) + "\n"
-    reqs_digest = await create_digest(
-        CreateDigest([FileContent(reqs_file, reqs_content.encode())])
-    )
+    reqs_digest = await create_digest(CreateDigest([FileContent(reqs_file, reqs_content.encode())]))
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
     uv_cache_dir = ".cache/uv_cache"
@@ -630,11 +625,9 @@ async def _build_uv_venv(
     tmpdir_digest = await create_digest(CreateDigest([Directory(uv_tmpdir)]))
 
     python_path = uv_request.python_path
-    venv_dir = uv_request.venv_dir
+    venv_dir = _UV_VENV_DIR
 
-    uv_input = await merge_digests(
-        MergeDigests([downloaded_uv.digest, reqs_digest, tmpdir_digest])
-    )
+    uv_input = await merge_digests(MergeDigests([downloaded_uv.digest, reqs_digest, tmpdir_digest]))
 
     # Step 1: Create venv with uv.
     venv_result = await execute_process_or_raise(
@@ -690,7 +683,6 @@ async def _build_uv_venv(
 
     return _UvVenvResult(
         venv_digest=uv_install_result.output_digest,
-        venv_dir=venv_dir,
     )
 
 
@@ -966,7 +958,6 @@ async def build_pex(
     # package from it instead of resolving with pip.
     # See: https://github.com/pantsbuild/pants/issues/20679
     uv_venv_digest: Digest | None = None
-    uv_venv_dir = "__uv_venv"
 
     use_uv_builder = python_setup.pex_builder == PexBuilder.uv
     # uv builder only applies to non-internal PEXes with requirements and a
@@ -983,7 +974,6 @@ async def build_pex(
                     requirements=request.requirements,
                     python_path=pex_python_setup.python.path,
                     description=request.description or request.output_filename,
-                    venv_dir=uv_venv_dir,
                 ),
                 **implicitly(),
             )
@@ -993,7 +983,7 @@ async def build_pex(
             # so PEX subsets from the uv-populated venv instead of resolving with pip.
             requirements_setup = _BuildPexRequirementsSetup(
                 digests=[],
-                argv=[*req_strings, f"--venv-repository={uv_venv_dir}"],
+                argv=[*req_strings, f"--venv-repository={_UV_VENV_DIR}"],
                 concurrency_available=requirements_setup.concurrency_available,
             )
     elif use_uv_builder and request.internal_only:
