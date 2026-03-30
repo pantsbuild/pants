@@ -57,11 +57,15 @@ impl ExpansionRequest {
     // If the value starts with `@` (but not `@@`) then treat it as an ExpansionRequest.
     // If that reference begins with `?` then the file is optional.
     // The reference can be either `path` or `path:trail`.
-    fn from_value(value: &str) -> Option<Self> {
+    //
+    // Returns the created request, if any, and the value string to use downstream (this will
+    // be the input string in all cases except a string that starts with `@@`, in which case
+    // the leading `@` is stripped).
+    fn from_value(value: String) -> (Option<Self>, String) {
         if let Some(suffix) = value.strip_prefix('@') {
             if suffix.starts_with('@') {
                 // @@ escapes the initial @.
-                None
+                (None, suffix.to_string())
             } else {
                 let (path, trail) = match suffix.rsplit_once(":") {
                     Some((p, t)) => (p, Some(t)),
@@ -71,21 +75,24 @@ impl ExpansionRequest {
                     Some(subsuffix) => (subsuffix, true),
                     None => (path, false),
                 };
-                Some(Self {
-                    path: PathBuf::from(path),
-                    trail: trail.map(|s| {
-                        s.split(".")
-                            .map(str::to_string)
-                            .collect::<Vec<_>>()
-                            .into_iter()
-                            .rev()
-                            .collect()
+                (
+                    Some(Self {
+                        path: PathBuf::from(path),
+                        trail: trail.map(|s| {
+                            s.split(".")
+                                .map(str::to_string)
+                                .collect::<Vec<_>>()
+                                .into_iter()
+                                .rev()
+                                .collect()
+                        }),
+                        optional,
                     }),
-                    optional,
-                })
+                    value,
+                )
             }
         } else {
-            None
+            (None, value)
         }
     }
 }
@@ -190,13 +197,13 @@ impl FromfileExpander {
     }
 
     pub(crate) fn expand<T: FromVal>(&self, value: String) -> Result<Option<T>, ParseError> {
-        let (path_opt, val_opt) =
-            if let Some(expansion_request) = ExpansionRequest::from_value(&value) {
-                self.read_value_from_file(&expansion_request)
-                    .map(|v| (Some(expansion_request.path), v))?
-            } else {
-                (None, Some(Val::String(value)))
-            };
+        let (expansion_request_opt, value) = ExpansionRequest::from_value(value);
+        let (path_opt, val_opt) = if let Some(expansion_request) = expansion_request_opt {
+            self.read_value_from_file(&expansion_request)
+                .map(|v| (Some(expansion_request.path), v))?
+        } else {
+            (None, Some(Val::String(value)))
+        };
 
         val_opt
             .map(|val| {
@@ -227,43 +234,45 @@ impl FromfileExpander {
             None,
         }
 
-        let list_or_string: ListOrString<T> =
-            if let Some(expansion_request) = ExpansionRequest::from_value(&value) {
-                if expansion_request.trail.is_some() {
-                    // The list is a subobject of some top-level dict.
-                    match self.read_value_from_file(&expansion_request)? {
-                        Some(Val::List(list)) => ListOrString::List(
-                            list.iter()
-                                .map(T::from_val)
-                                .collect::<Result<_, _>>()
-                                .map_err(|e| mk_parse_err(e, &expansion_request.path))?,
-                        ),
-                        Some(Val::String(string)) => ListOrString::String(string),
-                        other_val => Err(mk_parse_err(
-                            format!("Couldn't interpret value `{:?}` as list", other_val),
-                            &expansion_request.path,
-                        ))?,
-                    }
-                } else {
-                    // Try and directly parse a top-level JSON/YAML list ,falling back to parsing
-                    // as a literal.
-                    match self.read_content_from_file(&expansion_request) {
-                        Ok(Some(content)) => {
-                            match try_deserialize::<Vec<T>>(
-                                content.as_str(),
-                                Some(&expansion_request.path),
-                            )? {
-                                Some(list) => ListOrString::List(list),
-                                None => ListOrString::String(content),
-                            }
-                        }
-                        Ok(None) => ListOrString::None,
-                        Err(e) => Err(e)?,
-                    }
+        let (expansion_request_opt, value) = ExpansionRequest::from_value(value);
+
+        let list_or_string: ListOrString<T> = if let Some(expansion_request) = expansion_request_opt
+        {
+            if expansion_request.trail.is_some() {
+                // The list is a subobject of some top-level dict.
+                match self.read_value_from_file(&expansion_request)? {
+                    Some(Val::List(list)) => ListOrString::List(
+                        list.iter()
+                            .map(T::from_val)
+                            .collect::<Result<_, _>>()
+                            .map_err(|e| mk_parse_err(e, &expansion_request.path))?,
+                    ),
+                    Some(Val::String(string)) => ListOrString::String(string),
+                    other_val => Err(mk_parse_err(
+                        format!("Couldn't interpret value `{:?}` as list", other_val),
+                        &expansion_request.path,
+                    ))?,
                 }
             } else {
-                ListOrString::String(value)
-            };
+                // Try and directly parse a top-level JSON/YAML list ,falling back to parsing
+                // as a literal.
+                match self.read_content_from_file(&expansion_request) {
+                    Ok(Some(content)) => {
+                        match try_deserialize::<Vec<T>>(
+                            content.as_str(),
+                            Some(&expansion_request.path),
+                        )? {
+                            Some(list) => ListOrString::List(list),
+                            None => ListOrString::String(content),
+                        }
+                    }
+                    Ok(None) => ListOrString::None,
+                    Err(e) => Err(e)?,
+                }
+            }
+        } else {
+            ListOrString::String(value)
+        };
 
         match list_or_string {
             ListOrString::List(items) => Ok(Some(vec![ListEdit {
@@ -279,7 +288,8 @@ impl FromfileExpander {
         &self,
         value: String,
     ) -> Result<Option<Vec<DictEdit>>, ParseError> {
-        if let Some(mut expansion_request) = ExpansionRequest::from_value(&value) {
+        let (expansion_request_opt, value) = ExpansionRequest::from_value(value);
+        if let Some(mut expansion_request) = expansion_request_opt {
             // In the specific case where we expect a dict value, if the file is parseable as
             // JSON/YAML/TOML and the user provided no trail then we know they mean the entire
             // dict, so set an empty trail to indicate that.
