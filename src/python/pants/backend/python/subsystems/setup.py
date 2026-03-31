@@ -42,6 +42,12 @@ class LockfileGenerator(enum.Enum):
     POETRY = "poetry"
 
 
+@enum.unique
+class PexBuilder(enum.Enum):
+    pex = "pex"
+    uv = "uv"
+
+
 RESOLVE_OPTION_KEY__DEFAULT = "__default__"
 
 _T = TypeVar("_T")
@@ -308,6 +314,23 @@ class PythonSetup(Subsystem):
 
             N.B.: The `latest` value selects the latest of the choices listed by PEX which is not
             necessarily the latest Pip version released on PyPI.
+            """
+        ),
+        advanced=True,
+    )
+    pex_builder = EnumOption(
+        default=PexBuilder.pex,
+        help=softwrap(
+            """
+            Which tool to use for installing dependencies when building PEX files.
+
+            - `pex` (default): Use pip via PEX.
+            - `uv` (experimental): Pre-install dependencies into a uv venv, then pass it
+              to PEX via `--venv-repository`. When a PEX-native lockfile is available,
+              uv installs the exact pinned versions with `--no-deps`.
+
+            Only applies to non-internal, non-cross-platform PEX builds. Other builds
+            silently fall back to pip.
             """
         ),
         advanced=True,
