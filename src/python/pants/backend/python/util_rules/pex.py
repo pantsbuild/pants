@@ -625,7 +625,6 @@ async def _build_uv_venv(
     tmpdir_digest = await create_digest(CreateDigest([Directory(uv_tmpdir)]))
 
     python_path = uv_request.python_path
-    venv_dir = _UV_VENV_DIR
 
     uv_input = await merge_digests(MergeDigests([downloaded_uv.digest, reqs_digest, tmpdir_digest]))
 
@@ -636,12 +635,12 @@ async def _build_uv_venv(
                 argv=(
                     downloaded_uv.exe,
                     "venv",
-                    venv_dir,
+                    _UV_VENV_DIR,
                     "--python",
                     python_path,
                 ),
                 input_digest=uv_input,
-                output_directories=(venv_dir,),
+                output_directories=(_UV_VENV_DIR,),
                 env={**uv_env, "TMPDIR": uv_tmpdir},
                 append_only_caches=uv_caches,
                 description=f"Create uv venv for {uv_request.description}",
@@ -659,7 +658,7 @@ async def _build_uv_venv(
         "pip",
         "install",
         "--python",
-        os.path.join(venv_dir, "bin", "python"),
+        os.path.join(_UV_VENV_DIR, "bin", "python"),
         "-r",
         reqs_file,
         *(("--no-deps",) if all_resolved_reqs else ()),
@@ -671,7 +670,7 @@ async def _build_uv_venv(
             Process(
                 argv=install_argv,
                 input_digest=install_input,
-                output_directories=(venv_dir,),
+                output_directories=(_UV_VENV_DIR,),
                 env={**uv_env, "TMPDIR": uv_tmpdir},
                 append_only_caches=uv_caches,
                 description=f"uv pip install for {uv_request.description}",
