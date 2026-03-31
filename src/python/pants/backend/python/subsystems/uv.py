@@ -71,7 +71,11 @@ class DownloadedUv:
 @rule
 async def download_uv_binary(uv: Uv, platform: Platform) -> DownloadedUv:
     downloaded = await download_external_tool(uv.get_request(platform))
-    return DownloadedUv(digest=downloaded.digest, exe=downloaded.exe, args_for_uv_pip_install=tuple(uv.args_for_uv_pip_install))
+    return DownloadedUv(
+        digest=downloaded.digest,
+        exe=downloaded.exe,
+        args_for_uv_pip_install=tuple(uv.args_for_uv_pip_install),
+    )
 
 
 def rules():
