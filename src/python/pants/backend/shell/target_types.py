@@ -25,8 +25,9 @@ from pants.backend.adhoc.target_types import (
     AdhocToolWorkspaceInvalidationSourcesField,
 )
 from pants.backend.shell.subsystems.shell_setup import ShellSetup
+from pants.core.environments.target_types import EnvironmentField
+from pants.core.goals.package import OutputPathField
 from pants.core.goals.test import RuntimePackageDependenciesField, TestTimeoutField
-from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.system_binaries import BinaryPathTest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -68,7 +69,7 @@ class ShellGeneratorSettingsRequest(TargetFilesGeneratorSettingsRequest):
 
 
 @rule
-def generator_settings(
+async def generator_settings(
     _: ShellGeneratorSettingsRequest,
     shell_setup: ShellSetup,
 ) -> TargetFilesGeneratorSettings:
@@ -108,7 +109,7 @@ class Shunit2Shell(Enum):
 
     @property
     def binary_path_test(self) -> BinaryPathTest | None:
-        arg = match(  # type: ignore[misc]
+        arg = match(
             self,
             {
                 self.sh: None,
@@ -268,7 +269,7 @@ class ShellSourcesGeneratorTarget(TargetFilesGenerator):
 # -----------------------------------------------------------------------------------------------
 
 
-class ShellCommandCommandField(StringField):
+class ShellCommandCommandFieldBase(StringField):
     alias = "command"
     required = True
     help = help_text(
@@ -280,6 +281,10 @@ class ShellCommandCommandField(StringField):
         set.
         """
     )
+
+
+class ShellCommandCommandField(ShellCommandCommandFieldBase):
+    pass
 
 
 class ShellCommandOutputFilesField(AdhocToolOutputFilesField):
@@ -405,6 +410,12 @@ class SkipShellCommandTestsField(BoolField):
     help = "If true, don't run this tests for target."
 
 
+class SkipShellCommandPackageField(BoolField):
+    alias = "skip_package"
+    default = False
+    help = "If true, don't run this package for target."
+
+
 class ShellCommandTarget(Target):
     alias = "shell_command"
     core_fields = (
@@ -431,7 +442,14 @@ class ShellCommandTarget(Target):
     )
     help = help_text(
         """
-        Execute any external tool for its side effects.
+        Execute any external tool for its side effects, or run it interactively.
+
+        This target provides hermetic execution with explicit tool dependencies via the
+        `tools` field. It can be used for:
+
+        - Code generation (produces output files consumed by other targets)
+        - Running scripts interactively with explicit dependencies (via `pants run`)
+        - Build-time hermetic execution (via `pants experimental_run_in_sandbox`)
 
         Example BUILD file:
 
@@ -445,13 +463,22 @@ class ShellCommandTarget(Target):
 
             shell_sources(name="scripts")
 
-        Remember to add this target to the dependencies of each consumer, such as your
-        `python_tests` or `docker_image`. When relevant, Pants will run your `command` and
-        insert the `outputs` into that consumer's context.
+        When used as a dependency of other targets (e.g., `python_tests` or `docker_image`),
+        Pants will run your `command` and insert the `outputs` into that consumer's context.
+
+        When used with `pants run :target`, the command runs interactively in the workspace
+        with all dependencies and tools available.
 
         The command may be retried and/or cancelled, so ensure that it is idempotent.
+
+        For simpler, workspace-oriented scripts that use system PATH tools, consider
+        `run_shell_command` instead.
         """
     )
+
+
+class RunShellCommandCommandField(ShellCommandCommandFieldBase):
+    pass
 
 
 class ShellCommandRunTarget(Target):
@@ -460,12 +487,15 @@ class ShellCommandRunTarget(Target):
         *COMMON_TARGET_FIELDS,
         RunShellCommandExecutionDependenciesField,
         RunShellCommandRunnableDependenciesField,
-        ShellCommandCommandField,
+        RunShellCommandCommandField,
         RunShellCommandWorkdirField,
     )
     help = help_text(
         """
-        Run a script in the workspace, with all dependencies packaged/copied into a chroot.
+        Run a script in the workspace with dependencies packaged into a chroot.
+
+        This target is designed for quick, workspace-oriented interactive scripts that use
+        tools from the system PATH.
 
         Example BUILD file:
 
@@ -477,16 +507,20 @@ class ShellCommandRunTarget(Target):
         The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
         environment variable to get the root directory for where any dependencies are located.
 
-        In contrast to the `shell_command`, in addition to `workdir` you only have
-        the `command` and `execution_dependencies` fields as the `tools` you are going to use are
-        already on the PATH which is inherited from the Pants environment. Also, the `outputs` does
-        not apply, as any output files produced will end up directly in your project tree.
+        In contrast to `shell_command`, this target:
+        - Uses tools from the system PATH (not explicit `tools` field)
+        - Does not support `output_files` (outputs go directly to workspace)
+        - Is simpler to use for quick workspace scripts
+
+        For more hermetic execution with explicit tool dependencies, consider using
+        `shell_command` instead, which provides better reproducibility and caching.
         """
     )
 
 
 class ShellCommandTestTarget(Target):
-    alias = "experimental_test_shell_command"
+    alias = "test_shell_command"
+
     core_fields = (
         *COMMON_TARGET_FIELDS,
         ShellCommandTestDependenciesField,
@@ -505,6 +539,7 @@ class ShellCommandTestTarget(Target):
         ShellCommandOutputDirectoriesField,
         ShellCommandOutputRootDirField,
         ShellCommandOutputsMatchMode,
+        ShellCommandCacheScopeField,
     )
     help = help_text(
         """
@@ -512,18 +547,76 @@ class ShellCommandTestTarget(Target):
 
         Example BUILD file:
 
-            experimental_test_shell_command(
+            test_shell_command(
                 name="test",
                 tools=["test"],
                 command="test -r $CHROOT/some-data-file.txt",
                 execution_dependencies=["src/project/files:data"],
             )
 
-        The `command` may use either `{chroot}` on the command line, or the `$CHROOT`
-        environment variable to get the root directory for where any dependencies are located.
+        The `command` may use the `{chroot}` marker on the command line or in environment variables
+        to get the root directory where any dependencies are materialized during execution.
 
         In contrast to the `run_shell_command`, this target is intended to run shell commands as tests
         and will only run them via the `test` goal.
+        """
+    )
+
+
+class ShellCommandPackageDependenciesField(ShellCommandExecutionDependenciesField):
+    pass
+
+
+class ShellCommandPackageTarget(Target):
+    alias = "package_shell_command"
+
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        ShellCommandPackageDependenciesField,
+        ShellCommandRunnableDependenciesField,
+        ShellCommandCommandField,
+        ShellCommandLogOutputField,
+        ShellCommandSourcesField,
+        ShellCommandTimeoutField,
+        ShellCommandToolsField,
+        ShellCommandExtraEnvVarsField,
+        ShellCommandPathEnvModifyModeField,
+        ShellCommandNamedCachesField,
+        ShellCommandWorkspaceInvalidationSourcesField,
+        ShellCommandCacheScopeField,
+        EnvironmentField,
+        SkipShellCommandPackageField,
+        ShellCommandWorkdirField,
+        ShellCommandOutputFilesField,
+        ShellCommandOutputDirectoriesField,
+        ShellCommandOutputRootDirField,
+        ShellCommandOutputsMatchMode,
+        ShellCommandOutputDependenciesField,
+        OutputPathField,
+    )
+
+    help = help_text(
+        """
+        Run a script to produce distributable outputs via the `package` goal.
+
+        Example BUILD file:
+
+            package_shell_command(
+                name="build-rust-app",
+                tools=["cargo"],
+                command="cargo build --release",
+                output_files=["target/release/binary"],
+            )
+
+        The `command` may use the `{chroot}` marker on the command line or in environment variables
+        to get the root directory where any dependencies are materialized during execution.
+
+        The outputs specified via `output_files` and `output_directories` will be captured and
+        made available for other Pants targets to depend on. They will also be copied to the path
+        specified via the `output_path` field (relative to the dist directory) when running
+        `pants package`.
+
+        This target is experimental and its behavior may change in future versions.
         """
     )
 

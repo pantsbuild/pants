@@ -22,8 +22,8 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import OutputPathField
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules
 from pants.engine.target import (
@@ -104,6 +104,7 @@ class PythonAwsLambdaFunctionRuntimes(Enum):
     PYTHON_311 = "python3.11"
     PYTHON_312 = "python3.12"
     PYTHON_313 = "python3.13"
+    PYTHON_314 = "python3.14"
 
     def to_interpreter_version(self) -> tuple[int, int]:
         """Returns the Python version implied by the runtime, as (major, minor)."""
@@ -131,6 +132,8 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
         (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.ARM64): "3.12-arm64",
         (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.X86_64): "3.13-x86_64",
         (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.ARM64): "3.13-arm64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_314, FaaSArchitecture.X86_64): "3.14-x86_64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_314, FaaSArchitecture.ARM64): "3.14-arm64",
     }
 
     help = help_text(

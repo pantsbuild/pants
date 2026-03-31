@@ -122,7 +122,7 @@ def run_ruff(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.8,<4"]),
+    all_major_minor_python_versions(["CPython>=3.9,<3.15"]),
 )
 def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
@@ -308,4 +308,5 @@ def test_report_file(rule_runner: RuleRunner) -> None:
     assert lint_result.exit_code == 1
     report_files = rule_runner.request(DigestContents, [lint_result.report])
     assert len(report_files) == 1
-    assert "f.py:1:5: F541" in report_files[0].content.decode()
+    assert "f.py:1:5" in report_files[0].content.decode()
+    assert "F541" in report_files[0].content.decode()

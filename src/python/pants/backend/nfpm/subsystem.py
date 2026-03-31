@@ -27,12 +27,15 @@ class NfpmSubsystem(TemplatedExternalTool):
     help = "The nFPM deb, rpm, apk, and archlinux packager (https://nfpm.goreleaser.com)."
 
     # The version WITHOUT the 'v' prefix which we add as needed in the url_template.
-    default_version = "2.38.0"  # released 05 July 2024
+    default_version = "2.41.3"
     # v2.35.0 added SOURCE_DATE_EPOCH support
     # v2.36.0 added rpm.scripts.verify
     # v2.37.0 added support for IPK packaging (TODO: add IPK package target+fields+rules)
     default_known_versions = [
-        # checksums from https://github.com/goreleaser/nfpm/releases/download/v2.38.0/checksums.txt
+        "2.41.3|linux_arm64 |f20852f79109c8a77cb19150d26fc5c5a0d3bbde33bf46a76341e434ea411225|5174782",
+        "2.41.3|linux_x86_64|22aa6d3bc2ec239d62d3d190bcb036a47f2b24e0c3c6edfccebb6a55fbb2078e|5642686",
+        "2.41.3|macos_arm64 |8f053cb9e01ffaa32b929dbf73d34f0a81d135044751f8d4138a418064ee5ae5|5370742",
+        "2.41.3|macos_x86_64|ad200ce58db4a980b79a6cf182ae69e4b3ffc6f30af722396ba4dadaa54a535e|5735548",
         "2.38.0|linux_arm64 |e63be8d586d7c8f6af06945956aa29fb88388caa19d7c5b652f41ae37a155b27|4780662",
         "2.38.0|linux_x86_64|d9eebe93ee2832cfc8435b3f79ee92a845f1e5fbb99db5a3777a0013e175170d|5196368",
         "2.38.0|macos_arm64 |48788831696cf056b1a0f9f52e187dbb65c191f5488962696ab3b98fff9f7821|4978997",

@@ -20,14 +20,14 @@ class Pyright(NodeJSToolBase):
         """
     )
 
-    default_version = "pyright@1.1.383"
+    default_version = "pyright@1.1.396"
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--version")
 
     _interpreter_constraints = StrListOption(
         advanced=True,
-        default=["CPython>=3.8,<4"],
+        default=["CPython>=3.8,<3.15"],
         help="Python interpreter constraints for Pyright (which is, itself, a NodeJS tool).",
     )
 

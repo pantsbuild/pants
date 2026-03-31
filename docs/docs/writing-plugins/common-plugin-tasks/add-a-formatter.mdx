@@ -101,29 +101,21 @@ You will need a rule for `fmt` which takes the `FmtTargetsRequest.Batch` from st
 ```python
 @rule(desc="Format with shfmt", level=LogLevel.DEBUG)
 async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platform) -> FmtResult:
-    download_shfmt_get = Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        shfmt.get_request(platform),
-    )
+    download_shfmt_call = download_external_tool(shfmt.get_request(platform))
 
     # If the user specified `--shfmt-config`, we must search for the file they specified with
     # `PathGlobs` to include it in the `input_digest`. We error if the file cannot be found.
-    config_digest_get = Get(
-        Digest,
-        PathGlobs(
-            globs=[shfmt.config] if shfmt.config else [],
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-            description_of_origin="the option `--shfmt-config`",
-        ),
+    config_digest_call = path_globs_to_digest(
+        globs=[shfmt.config] if shfmt.config else [],
+        glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        description_of_origin="the option `--shfmt-config`",
     )
 
-    downloaded_shfmt, config_digest = await MultiGet(
-        download_shfmt_get, config_digest_get
+    downloaded_shfmt, config_digest = await concurrently(
+        download_shfmt_call, config_digest_call
     )
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             (request.snapshot.digest, downloaded_shfmt.digest, config_digest)
         ),
@@ -143,15 +135,15 @@ async def shfmt_fmt(request: ShfmtRequest.Batch, shfmt: Shfmt, platform: Platfor
         level=LogLevel.DEBUG,
     )
 
-    result = await Get(ProcessResult, Process, process)
+    result = await execute_process_or_raise(**implicitly({process: Process}))
     return await FmtResult.create(request, result, output_snapshot)
 ```
 
 The `ShfmtRequest.Batch` object has `.snapshot`, which stores the list of files and the `Digest` for each source file.
 
-If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to ensure that the tool is fetched.
+If you used `ExternalTool` in step 1, you will use `download_external_tool()` to ensure that the tool is fetched.
 
-Use `Get(Digest, MergeDigests)` to combine the different inputs together, such as merging the source files and downloaded tool.
+Use `merge_digests()` to combine the different inputs together, such as merging the source files and downloaded tool.
 
 At the bottom of your file, tell Pants about your rules:
 

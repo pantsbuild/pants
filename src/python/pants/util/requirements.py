@@ -17,4 +17,9 @@ def parse_requirements_file(content: str, *, rel_path: str) -> Iterator[PipRequi
         if not line or line.startswith(("#", "-")):
             continue
 
+        # Strip comments which are otherwise on a valid requirement line.
+        comment_pos = line.find("#")
+        if comment_pos != -1:
+            line = line[0:comment_pos].strip()
+
         yield PipRequirement.parse(line, description_of_origin=f"{rel_path} at line {i}")

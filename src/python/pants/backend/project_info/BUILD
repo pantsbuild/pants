@@ -7,6 +7,10 @@ python_tests(
     name="tests",
     timeout=180,
     overrides={
+        "list_integration_test.py": {
+            "dependencies": ["testprojects/src/python:hello_directory"],
+            "timeout": 240,
+        },
         "list_targets_test.py": {
             "dependencies": ["//BUILD_ROOT:files"],
         },

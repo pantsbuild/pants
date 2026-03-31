@@ -13,7 +13,10 @@ python_tests(
         ): {
             "dependencies": ["//BUILD_ROOT:files", "//pants.toml:files"],
         },
-        "global_options_test.py": {
+        (
+            "global_options_test.py",
+            "options_diff_test.py",
+        ): {
             "dependencies": [
                 "//BUILD_ROOT:files",
                 "//pants.toml:files",

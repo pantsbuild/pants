@@ -5,13 +5,14 @@ from pants.backend.terraform.target_types import TerraformModuleTarget
 from pants.core.goals.lint import REPORT_DIR, LintResult
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import config_files
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests, RemovePrefix
+from pants.core.util_rules.config_files import find_config_file
+from pants.core.util_rules.external_tool import download_external_tool
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.engine.fs import CreateDigest, Directory, MergeDigests, RemovePrefix
+from pants.engine.intrinsics import create_digest, execute_process, merge_digests, remove_prefix
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.process import Process
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
@@ -25,17 +26,16 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
         config_file,
         custom_checks,
         report_directory,
-    ) = await MultiGet(
-        Get(DownloadedExternalTool, ExternalToolRequest, tfsec.get_request(platform)),
-        Get(SourceFiles, SourceFilesRequest(fs.sources for fs in request.elements)),
-        Get(ConfigFiles, ConfigFilesRequest, tfsec.config_request()),
-        Get(ConfigFiles, ConfigFilesRequest, tfsec.custom_checks_request()),
+    ) = await concurrently(
+        download_external_tool(tfsec.get_request(platform)),
+        determine_source_files(SourceFilesRequest(fs.sources for fs in request.elements)),
+        find_config_file(tfsec.config_request()),
+        find_config_file(tfsec.custom_checks_request()),
         # Ensure that the empty report dir exists.
-        Get(Digest, CreateDigest([Directory(REPORT_DIR)])),
+        create_digest(CreateDigest([Directory(REPORT_DIR)])),
     )
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             (
                 downloaded_tfsec.digest,
@@ -44,7 +44,7 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
                 custom_checks.snapshot.digest,
                 report_directory,
             )
-        ),
+        )
     )
 
     computed_args = []
@@ -61,8 +61,7 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
         *computed_args,
         *tfsec.args,
     ]
-    result = await Get(
-        FallibleProcessResult,
+    result = await execute_process(
         Process(
             argv=argv,
             input_digest=input_digest,
@@ -70,9 +69,10 @@ async def run_tfsec(request: TfSecRequest.Batch, tfsec: TFSec, platform: Platfor
             description=f"Run tfsec on {pluralize(len(sources.files), 'file')}",
             level=LogLevel.DEBUG,
         ),
+        **implicitly(),
     )
 
-    report = await Get(Digest, RemovePrefix(result.output_digest, REPORT_DIR))
+    report = await remove_prefix(RemovePrefix(result.output_digest, REPORT_DIR))
     return LintResult.create(request, result, report=report)
 
 

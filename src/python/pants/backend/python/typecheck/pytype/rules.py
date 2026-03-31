@@ -29,13 +29,13 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.backend.python.util_rules.pex_environment import PexEnvironment
 from pants.backend.python.util_rules.pex_from_targets import RequirementsPexRequest
-from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
+from pants.core.goals.check import CheckRequest, CheckResult, CheckResults, CheckSubsystem
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import config_files
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.collection import Collection
-from pants.engine.internals.graph import coarsened_targets as coarsened_targets_get
+from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import execute_process, merge_digests
@@ -90,6 +90,7 @@ class PytypePartitions(Collection[PytypePartition]):
 async def pytype_typecheck_partition(
     partition: PytypePartition,
     pytype: Pytype,
+    check_subsystem: CheckSubsystem,
     pex_environment: PexEnvironment,
 ) -> CheckResult:
     roots_sources, requirements_pex, pytype_pex, config_files = await concurrently(
@@ -145,6 +146,7 @@ async def pytype_typecheck_partition(
                 concurrency_available=len(roots_sources.files),
                 description=f"Run Pytype on {pluralize(len(roots_sources.files), 'file')}.",
                 level=LogLevel.DEBUG,
+                cache_scope=check_subsystem.default_process_cache_scope,
             )
         )
     )

@@ -11,9 +11,11 @@ from typing import DefaultDict
 
 from pants.backend.codegen.protobuf.target_types import AllProtobufTargets, ProtobufSourceField
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DigestContents, FileContent
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.fs import FileContent
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import HydrateSourcesRequest
 from pants.jvm.dependency_inference.artifact_mapper import MutableTrieNode
 from pants.jvm.dependency_inference.symbol_mapper import SymbolMap
 from pants.jvm.subsystems import JvmSubsystem
@@ -34,20 +36,20 @@ async def map_first_party_protobuf_jvm_targets_to_symbols(
     all_protobuf_targets: AllProtobufTargets,
     jvm: JvmSubsystem,
 ) -> SymbolMap:
-    sources = await MultiGet(
-        Get(
-            HydratedSources,
+    sources = await concurrently(
+        hydrate_sources(
             HydrateSourcesRequest(
                 tgt[ProtobufSourceField],
                 for_sources_types=(ProtobufSourceField,),
                 enable_codegen=True,
             ),
+            **implicitly(),
         )
         for tgt in all_protobuf_targets
     )
 
-    all_contents = await MultiGet(
-        Get(DigestContents, Digest, source.snapshot.digest) for source in sources
+    all_contents = await concurrently(
+        get_digest_contents(source.snapshot.digest) for source in sources
     )
 
     namespace_mapping: DefaultDict[tuple[_ResolveName, str], OrderedSet[Address]] = defaultdict(

@@ -36,6 +36,7 @@ class ExportExternalToolRequest(ExportRequest):
 async def export_external_tools(
     request: ExportExternalToolRequest, export: ExportSubsystem
 ) -> ExportResults:
+    ...
 ```
 
 3. Inside of that rule, fill the `ExportResult.exported_binaries` field.
@@ -56,6 +57,6 @@ ExportResult(
 def rules():
     return [
         ...,
-        `UnionRule(ExportableTool, FortranLint)`,
+        UnionRule(ExportableTool, FortranLint),
     ]
 ```

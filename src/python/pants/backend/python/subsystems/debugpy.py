@@ -9,6 +9,8 @@ from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
 from pants.engine.rules import collect_rules
 from pants.option.option_types import ArgsListOption
 
+# pants: infer-dep(debugpy.lock*)
+
 
 class DebugPy(PythonToolBase):
     options_scope = "debugpy"

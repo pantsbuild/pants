@@ -11,6 +11,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import (
     ConsoleScript,
     InterpreterConstraintsField,
+    PythonResolveField,
     PythonSourceField,
 )
 from pants.core.goals.resolves import ExportableTool
@@ -20,6 +21,8 @@ from pants.engine.target import FieldSet, Target
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, FileOption, SkipOption
 
+# pants: infer-dep(bandit.lock*)
+
 
 @dataclass(frozen=True)
 class BanditFieldSet(FieldSet):
@@ -27,6 +30,7 @@ class BanditFieldSet(FieldSet):
 
     source: PythonSourceField
     interpreter_constraints: InterpreterConstraintsField
+    resolve: PythonResolveField
 
     @classmethod
     def opt_out(cls, tgt: Target) -> bool:

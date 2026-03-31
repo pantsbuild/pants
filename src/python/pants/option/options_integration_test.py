@@ -153,5 +153,7 @@ def test_fromfile_invalidation(tmp_path: Path) -> None:
     )
     # Same pantsd process, new scheduler.
     assert_same_daemon()
-    assert "Initialization options changed: reinitializing scheduler..." in pants_run.stderr
+    assert "Initialization options changed" in pants_run.stderr
+    assert "pants_distdir" in pants_run.stderr
+    assert "Reinitializing scheduler" in pants_run.stderr
     assert "Scheduler initialized." in pants_run.stderr

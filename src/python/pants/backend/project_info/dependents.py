@@ -10,7 +10,8 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.internals.graph import resolve_dependencies
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     AllUnexpandedTargets,
     AlwaysTraverseDeps,
@@ -41,12 +42,12 @@ class DependentsOutputFormat(Enum):
 
 @rule(desc="Map all targets to their dependents", level=LogLevel.DEBUG)
 async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> AddressToDependents:
-    dependencies_per_target = await MultiGet(
-        Get(
-            Addresses,
+    dependencies_per_target = await concurrently(
+        resolve_dependencies(
             DependenciesRequest(
                 tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
             ),
+            **implicitly(),
         )
         for tgt in all_targets
     )
@@ -84,7 +85,7 @@ class Dependents(DeduplicatedCollection[Address]):
 
 
 @rule(level=LogLevel.DEBUG)
-def find_dependents(
+async def find_dependents(
     request: DependentsRequest, address_to_dependents: AddressToDependents
 ) -> Dependents:
     check = set(request.addresses)
@@ -132,13 +133,13 @@ async def list_dependents_as_plain_text(
     addresses: Addresses, dependents_subsystem: DependentsSubsystem, console: Console
 ) -> None:
     """Get dependents for given addresses and list them in the console as a single list."""
-    dependents = await Get(
-        Dependents,
+    dependents = await find_dependents(
         DependentsRequest(
             addresses,
             transitive=dependents_subsystem.transitive,
             include_roots=dependents_subsystem.closed,
         ),
+        **implicitly(),
     )
     with dependents_subsystem.line_oriented(console) as print_stdout:
         for address in dependents:
@@ -149,14 +150,14 @@ async def list_dependents_as_json(
     addresses: Addresses, dependents_subsystem: DependentsSubsystem, console: Console
 ) -> None:
     """Get dependents for given addresses and list them in the console in JSON."""
-    dependents_group = await MultiGet(
-        Get(
-            Dependents,
+    dependents_group = await concurrently(
+        find_dependents(
             DependentsRequest(
                 (address,),
                 transitive=dependents_subsystem.transitive,
                 include_roots=dependents_subsystem.closed,
             ),
+            **implicitly(),
         )
         for address in addresses
     )

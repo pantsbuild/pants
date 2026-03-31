@@ -57,7 +57,7 @@ Created scripts/subdir/BUILD:
 You can also manually add targets, which is necessary if you have any scripts that don't end in `.sh`:
 
 ```python
-shell_source(name="script_without_a_extension", source="script_without_an_extension")
+shell_source(name="script_without_an_extension", source="script_without_an_extension")
 ```
 
 :::note Shell dependency inference
@@ -152,7 +152,7 @@ backend_packages = [
 ]
 ```
 
-Make sure that you also have set up `shell_source` / `shell_sources` or `shunit2_test` / `shunit_tests` targets so that Pants knows to operate on the relevant files.
+Make sure that you also have set up `shell_source` / `shell_sources` or `shunit2_test` / `shunit2_tests` targets so that Pants knows to operate on the relevant files.
 
 Now you can run `pants lint`:
 
@@ -254,7 +254,7 @@ add_one() {
 }
 ```
 
-```shell tab={"label":"scripts/BUILD"}
+```python tab={"label":"scripts/BUILD"}
 shell_sources(name="lib")
 shell_tests(name="tests")
 ```

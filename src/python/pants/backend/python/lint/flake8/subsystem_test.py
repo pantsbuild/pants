@@ -14,6 +14,7 @@ from pants.backend.python.lint.flake8.subsystem import rules as subsystem_rules
 from pants.backend.python.target_types import (
     InterpreterConstraintsField,
     PythonRequirementTarget,
+    PythonResolveField,
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import python_sources
@@ -84,27 +85,37 @@ def test_first_party_plugins(rule_runner: PythonRuleRunner) -> None:
         ["ansicolors", "flake8==2.11.1"]
     )
 
-    assert first_party_plugins.interpreter_constraints_fields == FrozenOrderedSet(
+    flake8_plugins_address, subdir1_address, subdir2_address = (
+        Address("flake8-plugins", target_name="flake8-plugins", relative_file_path="plugin.py"),
+        Address("flake8-plugins/subdir1", target_name="subdir1", relative_file_path="util.py"),
+        Address(
+            "flake8-plugins/subdir2",
+            target_name="subdir2",
+            relative_file_path="another_util.py",
+        ),
+    )
+    assert first_party_plugins.interpreter_constraints_and_resolve_fields == FrozenOrderedSet(
         [
-            InterpreterConstraintsField(
-                None,
-                Address(
-                    "flake8-plugins", target_name="flake8-plugins", relative_file_path="plugin.py"
+            (
+                InterpreterConstraintsField(
+                    None,
+                    flake8_plugins_address,
                 ),
+                PythonResolveField(None, flake8_plugins_address),
             ),
-            InterpreterConstraintsField(
-                ["==3.9.*"],
-                Address(
-                    "flake8-plugins/subdir1", target_name="subdir1", relative_file_path="util.py"
+            (
+                InterpreterConstraintsField(
+                    ["==3.9.*"],
+                    subdir1_address,
                 ),
+                PythonResolveField(None, subdir1_address),
             ),
-            InterpreterConstraintsField(
-                ["==3.8.*"],
-                Address(
-                    "flake8-plugins/subdir2",
-                    target_name="subdir2",
-                    relative_file_path="another_util.py",
+            (
+                InterpreterConstraintsField(
+                    ["==3.8.*"],
+                    subdir2_address,
                 ),
+                PythonResolveField(None, subdir2_address),
             ),
         ]
     )

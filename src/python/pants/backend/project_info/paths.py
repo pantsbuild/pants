@@ -13,14 +13,15 @@ from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.internals.graph import resolve_targets
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     AlwaysTraverseDeps,
     Dependencies,
     DependenciesRequest,
     Target,
     Targets,
-    TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.option.option_types import StrOption
@@ -109,19 +110,20 @@ class RootDestinationsPair:
 
 @rule(desc="Get paths between root and destination.")
 async def get_paths_between_root_and_destination(pair: RootDestinationPair) -> SpecsPaths:
-    transitive_targets = await Get(
-        TransitiveTargets,
+    transitive_targets = await transitive_targets_get(
         TransitiveTargetsRequest(
             [pair.root.address], should_traverse_deps_predicate=AlwaysTraverseDeps()
         ),
+        **implicitly(),
     )
 
-    adjacent_targets_per_target = await MultiGet(
-        Get(
-            Targets,
-            DependenciesRequest(
-                tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
-            ),
+    adjacent_targets_per_target = await concurrently(
+        resolve_targets(
+            **implicitly(
+                DependenciesRequest(
+                    tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
+                )
+            )
         )
         for tgt in transitive_targets.closure
     )
@@ -143,11 +145,9 @@ async def get_paths_between_root_and_destination(pair: RootDestinationPair) -> S
 async def get_paths_between_root_and_destinations(
     pair: RootDestinationsPair,
 ) -> SpecsPathsCollection:
-    spec_paths = await MultiGet(
-        Get(
-            SpecsPaths,
-            RootDestinationPair,
-            RootDestinationPair(destination=destination, root=pair.root),
+    spec_paths = await concurrently(
+        get_paths_between_root_and_destination(
+            RootDestinationPair(destination=destination, root=pair.root)
         )
         for destination in pair.destinations
     )
@@ -167,31 +167,33 @@ async def paths(console: Console, paths_subsystem: PathsSubsystem) -> PathsGoal:
 
     specs_parser = SpecsParser()
 
-    from_tgts, to_tgts = await MultiGet(
-        Get(
-            Targets,
-            Specs,
-            specs_parser.parse_specs(
-                [path_from],
-                description_of_origin="the option `--paths-from`",
-            ),
+    from_tgts, to_tgts = await concurrently(
+        resolve_targets(
+            **implicitly(
+                {
+                    specs_parser.parse_specs(
+                        [path_from],
+                        description_of_origin="the option `--paths-from`",
+                    ): Specs
+                }
+            )
         ),
-        Get(
-            Targets,
-            Specs,
-            specs_parser.parse_specs(
-                [path_to],
-                description_of_origin="the option `--paths-to`",
-            ),
+        resolve_targets(
+            **implicitly(
+                {
+                    specs_parser.parse_specs(
+                        [path_to],
+                        description_of_origin="the option `--paths-to`",
+                    ): Specs
+                }
+            )
         ),
     )
 
     all_spec_paths = []
-    spec_paths = await MultiGet(
-        Get(
-            SpecsPathsCollection,
-            RootDestinationsPair,
-            RootDestinationsPair(root=root, destinations=to_tgts),
+    spec_paths = await concurrently(
+        get_paths_between_root_and_destinations(
+            RootDestinationsPair(root=root, destinations=to_tgts)
         )
         for root in from_tgts
     )

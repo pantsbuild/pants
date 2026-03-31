@@ -136,9 +136,7 @@ class ExceptionSink:
 
     def __new__(cls, *args, **kwargs):
         raise TypeError(
-            "Instances of {} are not allowed to be constructed! Call install() instead.".format(
-                cls.__name__
-            )
+            f"Instances of {cls.__name__} are not allowed to be constructed! Call install() instead."
         )
 
     class ExceptionSinkError(Exception):
@@ -179,9 +177,7 @@ class ExceptionSink:
             safe_mkdir(new_log_location)
         except Exception as e:
             raise cls.ExceptionSinkError(
-                "The provided log location path at '{}' is not writable or could not be created: {}.".format(
-                    new_log_location, str(e)
-                ),
+                f"The provided log location path at '{new_log_location}' is not writable or could not be created: {str(e)}.",
                 e,
             )
 
@@ -194,9 +190,7 @@ class ExceptionSink:
             shared_error_stream = safe_open(shared_log_path, mode="a")
         except Exception as e:
             raise cls.ExceptionSinkError(
-                "Error opening fatal error log streams for log location '{}': {}".format(
-                    new_log_location, str(e)
-                )
+                f"Error opening fatal error log streams for log location '{new_log_location}': {str(e)}"
             )
 
         # NB: mutate process-global state!
@@ -255,9 +249,7 @@ class ExceptionSink:
             cls._try_write_with_flush(cls._pid_specific_error_fileobj, fatal_error_log_entry)
         except Exception as e:
             logger.error(
-                "Error logging the message '{}' to the pid-specific file handle for {} at pid {}:\n{}".format(
-                    msg, cls._log_dir, pid, e
-                )
+                f"Error logging the message '{msg}' to the pid-specific file handle for {cls._log_dir} at pid {pid}:\n{e}"
             )
 
         # Write to the shared log.
@@ -267,9 +259,7 @@ class ExceptionSink:
             cls._try_write_with_flush(cls._shared_error_fileobj, fatal_error_log_entry)
         except Exception as e:
             logger.error(
-                "Error logging the message '{}' to the shared file handle for {} at pid {}:\n{}".format(
-                    msg, cls._log_dir, pid, e
-                )
+                f"Error logging the message '{msg}' to the shared file handle for {cls._log_dir} at pid {pid}:\n{e}"
             )
 
     @classmethod

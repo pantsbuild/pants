@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import os
 import textwrap
 from pathlib import Path
 
 import pytest
 
-from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
+from pants.core.environments.target_types import LocalWorkspaceEnvironmentTarget
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -29,6 +30,7 @@ from pants.engine.process import (
     InteractiveProcessResult,
     Process,
     ProcessCacheScope,
+    ProcessConcurrency,
     ProcessResult,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
@@ -310,6 +312,55 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
         }
 
 
+@pytest.mark.parametrize("working_directory", [None, "foo", "foo/bar"])
+@pytest.mark.parametrize("run_in_workspace", [True, False])
+def test_interactive_process_working_directory(
+    rule_runner: RuleRunner,
+    working_directory: str,
+    run_in_workspace: bool,
+) -> None:
+    # Test that interactive processes can run in a working directory, and that the
+    # working directory is correctly resolved relative to the sandbox root or workspace root.
+    rule_runner.write_files(
+        {
+            "test.txt": "workspace test.txt",
+            "foo/test.txt": "workspace foo/test.txt",
+            "foo/bar/test.txt": "workspace foo/bar/test.txt",
+        }
+    )
+    input_digest = rule_runner.make_snapshot(
+        {
+            "test.txt": "chroot test.txt",
+            "foo/test.txt": "chroot foo/test.txt",
+            "foo/bar/test.txt": "chroot foo/bar/test.txt",
+        }
+    ).digest
+
+    process = InteractiveProcess(
+        argv=["/bin/bash", "-c", "pwd && cat test.txt"],
+        input_digest=input_digest,
+        working_directory=working_directory,
+        run_in_workspace=run_in_workspace,
+    )
+
+    with mock_console(rule_runner.options_bootstrapper) as (_, stdio_reader):
+        result = rule_runner.run_interactive_process(process)
+        stdout = stdio_reader.get_stdout()
+        stderr = stdio_reader.get_stderr()
+        assert result.exit_code == 0, (
+            f"Process failed with exit code {result.exit_code}.\nstdout: {stdout}\nstderr: {stderr}"
+        )
+
+        lines = stdout.splitlines()
+        assert len(lines) == 2
+        if working_directory is not None:
+            assert lines[0].endswith(working_directory)
+
+        expected_prefix = "workspace" if run_in_workspace else "chroot"
+        expected_path = os.path.join(*(s for s in (working_directory, "test.txt") if s))
+        assert f"{expected_prefix} {expected_path}" in stdout
+
+
 def test_workspace_execution_support() -> None:
     rule_runner = RuleRunner(
         rules=[
@@ -411,3 +462,102 @@ def test_workspace_execution_support() -> None:
     assert result3.stderr.decode() == "this-goes-to-stderr\n"
     snapshot = rule_runner.request(Snapshot, [result3.output_digest])
     assert snapshot.files == ("capture-this-file",)
+
+
+@pytest.mark.parametrize(
+    "concurrency",
+    [
+        ProcessConcurrency.exactly(1),
+        ProcessConcurrency.exactly(2),
+        ProcessConcurrency.exclusive(),
+    ],
+)
+def test_concurrency(rule_runner: RuleRunner, concurrency: ProcessConcurrency) -> None:
+    test_description = f"concurrency-test-{concurrency.kind}-{concurrency.min}-{concurrency.max}"
+    process = Process(
+        argv=("/bin/echo", test_description),
+        concurrency=concurrency,
+        description=test_description,
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout.decode() == test_description + "\n"
+    assert result.stderr == b""
+
+
+@pytest.mark.parametrize(
+    "concurrency",
+    [
+        ProcessConcurrency.range(1, min=1),
+        ProcessConcurrency.range(max=2),
+        ProcessConcurrency.range(max=2, min=1),
+        # Values larger than num cores still work (they get clamped to num cores)
+        ProcessConcurrency.range(max=10000),
+        ProcessConcurrency.range(min=100, max=200),
+    ],
+)
+def test_concurrency_range(rule_runner: RuleRunner, concurrency: ProcessConcurrency) -> None:
+    test_description = f"concurrency-test-{concurrency.kind}-{concurrency.min}-{concurrency.max}"
+    process = Process(
+        # range concurrency must be templated with {pants_concurrency}
+        argv=("/bin/echo", test_description + " {pants_concurrency}"),
+        concurrency=concurrency,
+        description=test_description,
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout.decode().startswith(test_description)
+    assert result.stderr == b""
+
+
+def test_concurrency_templating(rule_runner: RuleRunner) -> None:
+    process = Process(
+        argv=("/bin/echo", "concurrency: {pants_concurrency}"),
+        concurrency=ProcessConcurrency.range(max=1),
+        description="concurrency-test",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout == b"concurrency: 1\n"
+    assert result.stderr == b""
+
+
+def test_concurrency_enum():
+    exactly_one = ProcessConcurrency.exactly(1)
+    min_one = ProcessConcurrency.range(1, min=1)
+    max_one = ProcessConcurrency.range(max=1)
+    min_one_max_two = ProcessConcurrency.range(min=1, max=2)
+    exclusive = ProcessConcurrency.exclusive()
+
+    assert exactly_one.kind == "exactly"
+    assert exactly_one.min == 1
+    assert exactly_one.max == 1
+
+    up_to_two = ProcessConcurrency.range(2)
+    assert up_to_two.kind == "range"
+    assert up_to_two.min == 1
+    assert up_to_two.max == 2
+    assert up_to_two == min_one_max_two
+
+    assert min_one.kind == "range"
+    assert max_one.kind == "range"
+    assert min_one_max_two.kind == "range"
+    assert exclusive.kind == "exclusive"
+
+    assert min_one.min == 1
+    assert min_one.max == 1
+    assert max_one.min == 1
+    assert max_one.max == 1
+    assert min_one_max_two.min == 1
+    assert min_one_max_two.max == 2
+    assert exclusive.min is None
+    assert exclusive.max is None
+
+    assert exactly_one == ProcessConcurrency.exactly(1)
+    assert min_one == ProcessConcurrency.range(1, min=1)
+    assert max_one == ProcessConcurrency.range(max=1)
+    assert min_one_max_two == ProcessConcurrency.range(min=1, max=2)
+    assert exclusive == ProcessConcurrency.exclusive()
+    assert min_one == max_one
+    assert min_one != min_one_max_two
+    assert max_one != min_one_max_two
+    assert min_one != exclusive
+    assert max_one != exclusive
+    assert min_one_max_two != exclusive

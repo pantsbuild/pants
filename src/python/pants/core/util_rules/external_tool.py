@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 
-from pkg_resources import Requirement
+from packaging.requirements import Requirement
 
 from pants.core.goals.export import (
     ExportedBinary,
@@ -22,12 +22,15 @@ from pants.core.goals.export import (
 )
 from pants.core.goals.resolves import ExportableTool, ExportMode
 from pants.core.util_rules import archive
-from pants.core.util_rules.archive import ExtractedArchive
+from pants.core.util_rules.archive import maybe_extract_archive
+from pants.engine.download_file import download_file
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, Digest, DigestEntries, DownloadFile, FileDigest, FileEntry
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.fs import CreateDigest, Digest, DownloadFile, FileDigest, FileEntry
+from pants.engine.internals.native_engine import RemovePrefix
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, get_digest_entries, remove_prefix
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import DictOption, EnumOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem, _construct_subsystem
@@ -63,6 +66,10 @@ class UnsupportedVersionUsage(Enum):
 class ExternalToolRequest:
     download_file_request: DownloadFile
     exe: str
+    # Some archive files for tools may have a common path prefix, e.g., representing the platform.
+    # If this field is set, strip the common path prefix. If the archive contains just one file
+    # will strip all dirs from that file.
+    strip_common_path_prefix: bool = False
 
 
 @dataclass(frozen=True)
@@ -188,12 +195,8 @@ class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclas
             return "./path-to/binary
 
     @rule
-    def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
-        downloaded_tool = await Get(
-            DownloadedExternalTool,
-            ExternalToolRequest,
-            my_external_tool.get_request(platform)
-        )
+    async def my_rule(my_external_tool: MyExternalTool, platform: Platform) -> Foo:
+        downloaded_tool = await download_external_tool(my_external_tool.get_request(platform))
         ...
     """
 
@@ -293,9 +296,9 @@ class ExternalTool(Subsystem, ExportableTool, ExternalToolOptionsMixin, metaclas
         if not self.version_constraints:
             return None
         # Note that this is not a Python requirement. We're just hackily piggybacking off
-        # pkg_resource.Requirement's ability to check version constraints.
-        constraints = Requirement.parse(f"{self.name}{self.version_constraints}")
-        if constraints.specifier.contains(self.version):  # type: ignore[attr-defined]
+        # packaging.requirements.Requirement's ability to check version constraints.
+        constraints = Requirement(f"{self.name}{self.version_constraints}")
+        if constraints.specifier.contains(self.version):
             # all ok
             return None
 
@@ -396,22 +399,34 @@ class TemplatedExternalTool(ExternalTool, TemplatedExternalToolOptionsMixin):
 @rule(level=LogLevel.DEBUG)
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
     # Download and extract.
-    maybe_archive_digest = await Get(Digest, DownloadFile, request.download_file_request)
-    extracted_archive = await Get(ExtractedArchive, Digest, maybe_archive_digest)
+    maybe_archive_digest = await download_file(request.download_file_request, **implicitly())
+    extracted_archive = await maybe_extract_archive(**implicitly(maybe_archive_digest))
+    digest = extracted_archive.digest
+    digest_entries = await get_digest_entries(digest)
+    if request.strip_common_path_prefix:
+        paths = tuple(entry.path for entry in digest_entries)
+        if len(paths) == 0:
+            raise ExternalToolError(
+                f"No entries found in archive {request.download_file_request.url}"
+            )
+        if len(paths) == 1:
+            commonpath = os.path.dirname(paths[0])
+        else:
+            commonpath = os.path.commonpath(paths)
+        digest = await remove_prefix(RemovePrefix(extracted_archive.digest, commonpath))
 
     # Confirm executable.
     exe_path = request.exe.lstrip("./")
-    digest = extracted_archive.digest
     is_not_executable = False
-    digest_entries = []
-    for entry in await Get(DigestEntries, Digest, digest):
+    updated_digest_entries = []
+    for entry in digest_entries:
         if isinstance(entry, FileEntry) and entry.path == exe_path and not entry.is_executable:
             # We should recreate the digest with the executable bit set.
             is_not_executable = True
             entry = dataclasses.replace(entry, is_executable=True)
-        digest_entries.append(entry)
+        updated_digest_entries.append(entry)
     if is_not_executable:
-        digest = await Get(Digest, CreateDigest(digest_entries))
+        digest = await create_digest(CreateDigest(updated_digest_entries))
 
     return DownloadedExternalTool(digest, request.exe)
 
@@ -452,9 +467,7 @@ async def export_external_tool(
         return MaybeExportResult(None)
 
     tool = await _construct_subsystem(maybe_exportable)
-    downloaded_tool = await Get(
-        DownloadedExternalTool, ExternalToolRequest, tool.get_request(platform)
-    )
+    downloaded_tool = await download_external_tool(tool.get_request(platform))
 
     dest = os.path.join("bins", tool.name)
 
@@ -474,8 +487,8 @@ async def export_external_tool(
 async def export_external_tools(
     request: ExportExternalToolRequest, export: ExportSubsystem
 ) -> ExportResults:
-    maybe_tools = await MultiGet(
-        Get(MaybeExportResult, _ExportExternalToolForResolveRequest(resolve))
+    maybe_tools = await concurrently(
+        export_external_tool(_ExportExternalToolForResolveRequest(resolve), **implicitly())
         for resolve in export.binaries
     )
     return ExportResults(tool.result for tool in maybe_tools if tool.result is not None)

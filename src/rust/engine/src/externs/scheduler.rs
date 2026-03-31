@@ -15,7 +15,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 // NB: This exists because we need the PyInterpreterState to pass to PyThreadState_New,
 // however PyInterpreterState_Get wasn't added until Py 3.9. They vary in implementation, but because
 // we don't have any sub-interpreters they should both return the same object.
-extern "C" {
+unsafe extern "C" {
     pub fn PyInterpreterState_Main() -> *mut ffi::PyInterpreterState;
 }
 
@@ -36,8 +36,8 @@ impl PyExecutor {
             // thread, and the Python runtime won't wipe the trace function between calls.
             // See https://github.com/PyO3/pyo3/issues/2495
             let _ =
-                unsafe { ffi::PyThreadState_New(Python::with_gil(|_| PyInterpreterState_Main())) };
-            Python::with_gil(|py| {
+                unsafe { ffi::PyThreadState_New(Python::attach(|_| PyInterpreterState_Main())) };
+            Python::attach(|py| {
                 let _ = py.eval(c"__import__('debugpy').debug_this_thread()", None, None);
             });
         })
@@ -54,7 +54,7 @@ impl PyExecutor {
     /// Shut down this executor, waiting for all tasks to exit. Any tasks which have not exited at
     /// the end of the timeout will be leaked.
     fn shutdown(&self, py: Python, duration_secs: f64) {
-        py.allow_threads(|| self.0.shutdown(Duration::from_secs_f64(duration_secs)))
+        py.detach(|| self.0.shutdown(Duration::from_secs_f64(duration_secs)))
     }
 }
 

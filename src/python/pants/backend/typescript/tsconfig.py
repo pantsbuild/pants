@@ -16,11 +16,10 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Literal
 
 from pants.engine.collection import Collection
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
-from pants.engine.internals.selectors import Get, concurrently
+from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
 from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.frozendict import FrozenDict
@@ -36,11 +35,37 @@ class TSConfig:
     module_resolution: str | None = None
     paths: FrozenDict[str, tuple[str, ...]] | None = None
     base_url: str | None = None
+    out_dir: str | None = None
+    allow_js: bool | None = None
+    check_js: bool | None = None
 
     @property
     def resolution_root_dir(self) -> str:
         directory = os.path.dirname(self.path)
         return os.path.join(directory, self.base_url) if self.base_url else directory
+
+    def validate_outdir(self) -> None:
+        if not self.out_dir:
+            raise ValueError(
+                f"TypeScript configuration at '{self.path}' is missing required 'outDir' setting. "
+                f"TypeScript type-checking requires an explicit outDir in compilerOptions to work properly. "
+                f'Add \'"outDir": "./dist"\' (or your preferred output directory) to the compilerOptions '
+                f"in {self.path}."
+            )
+
+        if ".." in self.out_dir:
+            raise ValueError(
+                f"TypeScript configuration at '{self.path}' has outDir '{self.out_dir}' "
+                f"that uses '..' path components. Each package should use its own output directory "
+                f"within its package boundary (e.g., './dist', './build'). Cross-package output "
+                f"directories can cause build conflicts where packages overwrite each other's artifacts."
+            )
+
+        if os.path.isabs(self.out_dir):
+            raise ValueError(
+                f"TypeScript configuration at '{self.path}' has absolute outDir '{self.out_dir}'. "
+                f"Use a relative path within the package directory instead (e.g., './dist', './build')."
+            )
 
 
 class AllTSConfigs(Collection[TSConfig]):
@@ -51,31 +76,30 @@ class AllTSConfigs(Collection[TSConfig]):
 class ParseTSConfigRequest:
     content: FileContent
     others: DigestContents
-    target_file: Literal["tsconfig.json", "jsconfig.json"]
 
 
-async def _read_parent_config(
+def _get_parent_config_content(
     child_path: str,
     extends_path: str,
     others: DigestContents,
-    target_file: Literal["tsconfig.json", "jsconfig.json"],
-) -> TSConfig | None:
+) -> FileContent | None:
     if child_path.endswith(".json"):
         relative = os.path.dirname(child_path)
     else:
         relative = child_path
     relative = os.path.normpath(os.path.join(relative, extends_path))
-    if not extends_path.endswith(".json"):
-        relative = os.path.join(relative, target_file)
-    parent = next((other for other in others if other.path == relative), None)
+    for target_file in ("tsconfig.json", "jsconfig.json"):
+        if not extends_path.endswith(".json"):
+            relative = os.path.join(relative, target_file)
+        parent = next((other for other in others if other.path == relative), None)
+        if parent:
+            break
     if not parent:
         logger.warning(
             f"pants could not locate {child_path}'s 'extends' at {relative}. Found: {[other.path for other in others]}."
         )
         return None
-    return await Get(  # Must be a Get until https://github.com/pantsbuild/pants/pull/21174 lands
-        TSConfig, ParseTSConfigRequest(parent, others, target_file)
-    )
+    return parent
 
 
 def _clean_tsconfig_contents(content: str) -> str:
@@ -118,7 +142,10 @@ def _parse_config_from_content(content: FileContent) -> tuple[TSConfig, str | No
         module_resolution=compiler_options.get("moduleResolution"),
         paths=compiler_options.get("paths"),
         base_url=compiler_options.get("baseUrl"),
-    ), compiler_options.get("extends")
+        out_dir=compiler_options.get("outDir"),
+        allow_js=compiler_options.get("allowJs"),
+        check_js=compiler_options.get("checkJs"),
+    ), parsed_ts_config_json.get("extends")
 
 
 @rule
@@ -127,9 +154,14 @@ async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
     if not extends:
         return ts_config
 
-    extended_parent = await _read_parent_config(
-        ts_config.path, extends, request.others, request.target_file
-    )
+    parent_content = _get_parent_config_content(ts_config.path, extends, request.others)
+    if parent_content:
+        extended_parent = await parse_extended_ts_config(
+            ParseTSConfigRequest(parent_content, request.others)
+        )
+    else:
+        extended_parent = None
+
     if not extended_parent:
         return ts_config
     return TSConfig(
@@ -137,24 +169,27 @@ async def parse_extended_ts_config(request: ParseTSConfigRequest) -> TSConfig:
         module_resolution=ts_config.module_resolution or extended_parent.module_resolution,
         paths=ts_config.paths or extended_parent.paths,
         base_url=ts_config.base_url or extended_parent.base_url,
+        # Do NOT inherit outDir - paths in extended configs are resolved relative to where they're defined,
+        # not where they're used, making inherited outDir values incorrect for child projects
+        out_dir=ts_config.out_dir,
+        allow_js=ts_config.allow_js if ts_config.allow_js is not None else extended_parent.allow_js,
+        check_js=ts_config.check_js if ts_config.check_js is not None else extended_parent.check_js,
     )
 
 
 @dataclass(frozen=True)
 class TSConfigsRequest:
-    target_file: Literal["tsconfig.json", "jsconfig.json"]
+    target_file: str
 
 
 @rule
-async def construct_effective_ts_configs(req: TSConfigsRequest) -> AllTSConfigs:
-    all_files = await path_globs_to_digest(PathGlobs([f"**/{req.target_file}"]))
+async def construct_effective_ts_configs() -> AllTSConfigs:
+    all_files = await path_globs_to_digest(PathGlobs(["**/tsconfig*.json", "**/jsconfig*.json"]))
     digest_contents = await get_digest_contents(all_files)
 
     return AllTSConfigs(
         await concurrently(
-            parse_extended_ts_config(
-                ParseTSConfigRequest(digest_content, digest_contents, req.target_file)
-            )
+            parse_extended_ts_config(ParseTSConfigRequest(digest_content, digest_contents))
             for digest_content in digest_contents
         )
     )
@@ -168,13 +203,12 @@ class ClosestTSConfig:
 @dataclass(frozen=True)
 class ParentTSConfigRequest:
     file: str
-    target_file: Literal["tsconfig.json", "jsconfig.json"]
 
 
 @rule(desc="Finding parent tsconfig.json")
 async def find_parent_ts_config(req: ParentTSConfigRequest) -> ClosestTSConfig:
-    all_configs = await construct_effective_ts_configs(TSConfigsRequest(req.target_file))
-    configs_by_longest_path = sorted(all_configs, key=lambda config: config.path, reverse=True)
+    all_configs = await construct_effective_ts_configs()
+    configs_by_longest_path = sorted(all_configs, key=lambda config: len(config.path), reverse=True)
     for config in configs_by_longest_path:
         if PurePath(req.file).is_relative_to(os.path.dirname(config.path)):
             return ClosestTSConfig(config)

@@ -6,13 +6,14 @@ import json
 from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
-from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
+from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.process import Process
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -45,11 +46,11 @@ class GeneratedTestMain:
 @rule
 async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMain:
     generator_binary_name = "./generator"
-    analyzer = await Get(
-        LoadedGoBinary,
+    analyzer = await setup_go_binary(
         LoadedGoBinaryRequest("generate_testmain", ("main.go",), generator_binary_name),
+        **implicitly(),
     )
-    input_digest = await Get(Digest, MergeDigests([request.digest, analyzer.digest]))
+    input_digest = await merge_digests(MergeDigests([request.digest, analyzer.digest]))
 
     test_paths = tuple(f"{GeneratedTestMain.TEST_PKG}:{path}" for path in request.test_paths)
     xtest_paths = tuple(f"{GeneratedTestMain.XTEST_PKG}:{path}" for path in request.xtest_paths)
@@ -58,8 +59,7 @@ async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMa
     if request.register_cover:
         env["GENERATE_COVER"] = "1"
 
-    result = await Get(
-        FallibleProcessResult,
+    result = await execute_process(
         Process(
             argv=(
                 generator_binary_name,
@@ -74,6 +74,7 @@ async def generate_testmain(request: GenerateTestMainRequest) -> GeneratedTestMa
             level=LogLevel.DEBUG,
             output_files=(GeneratedTestMain.TEST_MAIN_FILE,),
         ),
+        **implicitly(),
     )
 
     if result.exit_code != 0:

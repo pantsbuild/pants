@@ -36,7 +36,7 @@ class YapfFieldSet(FieldSet):
 
 class YapfRequest(FmtTargetsRequest):
     field_set_type = YapfFieldSet
-    tool_subsystem = Yapf
+    tool_subsystem = Yapf  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 

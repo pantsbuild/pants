@@ -1,7 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import logging
+import os
 from dataclasses import dataclass
 
 from pants.backend.python.target_types import (
@@ -9,6 +11,7 @@ from pants.backend.python.target_types import (
     PexBinaryDefaults,
     PexCheckField,
     PexCompletePlatformsField,
+    PexCompressField,
     PexEmitWarningsField,
     PexEntryPointField,
     PexEnvField,
@@ -23,17 +26,37 @@ from pants.backend.python.target_types import (
     PexInheritPathField,
     PexLayout,
     PexLayoutField,
+    PexScieArgsField,
+    PexScieBindResourcePathField,
+    PexScieBusyBox,
+    PexScieEnvField,
+    PexScieExeField,
+    PexScieField,
+    PexScieHashAlgField,
+    PexScieLoadDotenvField,
+    PexScieNameStyleField,
+    PexSciePbsDebug,
+    PexSciePbsFreeThreaded,
+    PexSciePbsReleaseField,
+    PexSciePbsStripped,
+    PexSciePexEntrypointEnvPassthrough,
+    PexSciePlatformField,
+    PexSciePythonVersion,
     PexScriptField,
     PexShBootField,
     PexShebangField,
     PexStripEnvField,
     PexVenvHermeticScripts,
     PexVenvSitePackagesCopies,
-    ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
 )
-from pants.backend.python.util_rules.pex import CompletePlatforms, Pex
-from pants.backend.python.util_rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.target_types_rules import resolve_pex_entry_point
+from pants.backend.python.util_rules.pex import create_pex, digest_complete_platforms
+from pants.backend.python.util_rules.pex_from_targets import (
+    PexFromTargetsRequest,
+    create_pex_from_targets,
+)
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -41,8 +64,8 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
-from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -70,6 +93,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     shebang: PexShebangField
     strip_env: PexStripEnvField
     complete_platforms: PexCompletePlatformsField
+    compress: PexCompressField
     layout: PexLayoutField
     execution_mode: PexExecutionModeField
     include_requirements: PexIncludeRequirementsField
@@ -80,6 +104,26 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     environment: EnvironmentField
     check: PexCheckField
     extra_build_args: PexExtraBuildArgsField
+
+    scie: PexScieField
+    scie_bind_resource_path: PexScieBindResourcePathField
+    scie_exe: PexScieExeField
+    scie_args: PexScieArgsField
+    scie_env: PexScieEnvField
+    scie_load_dotenv: PexScieLoadDotenvField
+    scie_name_style: PexScieNameStyleField
+    scie_busybox: PexScieBusyBox
+    scie_pex_entrypoint_env_passthrough: PexSciePexEntrypointEnvPassthrough
+    scie_platform: PexSciePlatformField
+    scie_pbs_release: PexSciePbsReleaseField
+    scie_python_version: PexSciePythonVersion
+    scie_hash_alg: PexScieHashAlgField
+    scie_pbs_free_threaded: PexSciePbsFreeThreaded
+    scie_pbs_debug: PexSciePbsDebug
+    scie_pbs_stripped: PexSciePbsStripped
+
+    def builds_pex_and_scie(self) -> bool:
+        return self.scie.value is not None
 
     @property
     def _execution_mode(self) -> PexExecutionMode:
@@ -99,6 +143,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append("--sh-boot")
         if self.check.value is not None:
             args.append(f"--check={self.check.value}")
+        if self.compress.value is False:
+            args.append("--no-compress")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
         if self.strip_env.value is False:
@@ -114,6 +160,62 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
         if self.extra_build_args.value:
             args.extend(self.extra_build_args.value)
         return tuple(args)
+
+    def generate_scie_args(
+        self,
+    ) -> tuple[str, ...]:
+        args = []
+        if self.scie.value is not None:
+            args.append(f"--scie={self.scie.value}")
+        if self.scie_bind_resource_path.value is not None:
+            args.extend(
+                [
+                    f"--scie-bind-resource-path={resource_path}"
+                    for resource_path in self.scie_bind_resource_path.value
+                ]
+            )
+        if self.scie_exe.value is not None:
+            args.append(f"--scie-exe={self.scie_exe.value}")
+        if self.scie_args.value is not None:
+            args.extend([f"--scie-args={arg}" for arg in self.scie_args.value])
+        if self.scie_env.value is not None:
+            args.extend([f"--scie-env={e}" for e in self.scie_env.value])
+        if self.scie_load_dotenv.value is not None:
+            if self.scie_load_dotenv.value:
+                args.append("--scie-load-dotenv")
+            else:
+                args.append("--no-scie-load-dotenv")
+        if self.scie_name_style.value is not None:
+            args.append(f"--scie-name-style={self.scie_name_style.value}")
+        if self.scie_busybox.value is not None:
+            args.append(f"--scie-busybox={self.scie_busybox.value}")
+        if self.scie_pex_entrypoint_env_passthrough.value is True:
+            args.append("--scie-busybox-pex-entrypoint-env-passthrough")
+        if self.scie_platform.value is not None:
+            args.extend([f"--scie-platform={platform}" for platform in self.scie_platform.value])
+        if self.scie_pbs_release.value is not None:
+            args.append(f"--scie-pbs-release={self.scie_pbs_release.value}")
+        if self.scie_python_version.value is not None:
+            args.append(f"--scie-python-version={self.scie_python_version.value}")
+        if self.scie_hash_alg.value is not None:
+            args.append(f"--scie-hash-alg={self.scie_hash_alg.value}")
+        if self.scie_pbs_debug.value is not None:
+            if self.scie_pbs_debug.value:
+                args.append("--scie-pbs-debug")
+            else:
+                args.append("--no-scie-pbs-debug")
+        if self.scie_pbs_free_threaded.value is not None:
+            if self.scie_pbs_free_threaded.value:
+                args.append("--scie-pbs-free-threaded")
+            else:
+                args.append("--no-scie-pbs-free-threaded")
+        if self.scie_pbs_stripped.value is True:
+            args.append("--scie-pbs-stripped")
+
+        return tuple(args)
+
+    def output_pex_filename(self) -> str:
+        return self.output_path.value_or_default(file_ending="pex")
 
 
 @dataclass(frozen=True)
@@ -133,15 +235,13 @@ async def package_pex_binary(
     field_set: PexBinaryFieldSet,
     pex_binary_defaults: PexBinaryDefaults,
 ) -> PexFromTargetsRequestForBuiltPackage:
-    resolved_entry_point = await Get(
-        ResolvedPexEntryPoint, ResolvePexEntryPointRequest(field_set.entry_point)
+    resolved_entry_point = await resolve_pex_entry_point(
+        ResolvePexEntryPointRequest(field_set.entry_point)
     )
 
-    output_filename = field_set.output_path.value_or_default(file_ending="pex")
+    output_filename = field_set.output_pex_filename()
 
-    complete_platforms = await Get(
-        CompletePlatforms, PexCompletePlatformsField, field_set.complete_platforms
-    )
+    complete_platforms = await digest_complete_platforms(field_set.complete_platforms)
 
     request = PexFromTargetsRequest(
         addresses=[field_set.address],
@@ -163,12 +263,45 @@ async def package_pex_binary(
 
 
 @rule
-async def built_pacakge_for_pex_from_targets_request(
-    request: PexFromTargetsRequestForBuiltPackage,
+async def built_package_for_pex_from_targets_request(
+    field_set: PexBinaryFieldSet,
 ) -> BuiltPackage:
-    pft_request = request.request
-    pex = await Get(Pex, PexFromTargetsRequest, pft_request)
-    return BuiltPackage(pex.digest, (BuiltPackageArtifact(pft_request.output_filename),))
+    pft_request = await package_pex_binary(field_set, **implicitly())
+
+    base_pex_request = await create_pex_from_targets(**implicitly(pft_request.request))
+    if field_set.builds_pex_and_scie():
+        pex_request = dataclasses.replace(
+            base_pex_request,
+            additional_args=(*base_pex_request.additional_args, *field_set.generate_scie_args()),
+        )
+    else:
+        pex_request = base_pex_request
+
+    pex = await create_pex(**implicitly(pex_request))
+    snapshot = await digest_to_snapshot(pex.digest)
+
+    # "The" PEX, and not scie, hashes, or future auxiliary files must be first
+    artifacts = [BuiltPackageArtifact(pft_request.request.output_filename)]
+    if PexLayout.ZIPAPP == pft_request.request.layout:
+        artifacts.extend(
+            BuiltPackageArtifact(artifact)
+            for artifact in snapshot.files
+            if artifact != pft_request.request.output_filename
+        )
+    else:
+        artifacts.extend(
+            BuiltPackageArtifact(artifact)
+            for artifact in snapshot.files
+            if (
+                pft_request.request.output_filename
+                != os.path.commonpath((pft_request.request.output_filename, artifact))
+            )
+        )
+    # Make sure the "regular PEX first" invariant explained above is true
+    assert artifacts[0].relpath in snapshot.files or artifacts[0].relpath in snapshot.dirs, (
+        "PEX must be first BuiltPackageArtifact"
+    )
+    return BuiltPackage(pex.digest, tuple(artifacts))
 
 
 def rules():

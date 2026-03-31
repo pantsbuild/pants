@@ -21,7 +21,8 @@ from pants.source.source_root import (
 )
 from pants.source.source_root import rules as source_root_rules
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
+from pants.util.frozendict import FrozenDict
 
 
 def _find_root(
@@ -48,14 +49,10 @@ def _find_root(
         return run_rule_with_mocks(
             get_optional_source_root,
             rule_args=[src_root_req, source_root_config],
-            mock_gets=[
-                MockGet(
-                    output_type=OptionalSourceRoot,
-                    input_types=(SourceRootRequest,),
-                    mock=_do_find_root,
-                ),
-                MockGet(output_type=Paths, input_types=(PathGlobs,), mock=_mock_fs_check),
-            ],
+            mock_calls={
+                "pants.engine.intrinsics.path_globs_to_paths": _mock_fs_check,
+                "pants.source.source_root.get_optional_source_root": _do_find_root,
+            },
         )
 
     source_root = _do_find_root(SourceRootRequest(PurePath(path))).source_root
@@ -228,14 +225,10 @@ def test_all_roots() -> None:
     output = run_rule_with_mocks(
         all_roots,
         rule_args=[source_root_config],
-        mock_gets=[
-            MockGet(output_type=Paths, input_types=(PathGlobs,), mock=provider_rule),
-            MockGet(
-                output_type=OptionalSourceRoot,
-                input_types=(SourceRootRequest,),
-                mock=source_root_mock_rule,
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.path_globs_to_paths": provider_rule,
+            "pants.source.source_root.get_optional_source_root": source_root_mock_rule,
+        },
     )
 
     assert {
@@ -266,14 +259,12 @@ def test_all_roots_with_root_at_buildroot() -> None:
     output = run_rule_with_mocks(
         all_roots,
         rule_args=[source_root_config],
-        mock_gets=[
-            MockGet(output_type=Paths, input_types=(PathGlobs,), mock=provider_rule),
-            MockGet(
-                output_type=OptionalSourceRoot,
-                input_types=(SourceRootRequest,),
-                mock=lambda req: OptionalSourceRoot(SourceRoot(".")),
+        mock_calls={
+            "pants.engine.intrinsics.path_globs_to_paths": provider_rule,
+            "pants.source.source_root.get_optional_source_root": lambda req: OptionalSourceRoot(
+                SourceRoot(".")
             ),
-        ],
+        },
     )
     assert {SourceRoot(".")} == set(output)
 
@@ -297,3 +288,26 @@ def test_source_roots_request() -> None:
         PurePath("src/python/foo"): SourceRoot("src/python"),
         PurePath("src/python/baz/qux"): SourceRoot("src/python"),
     } == dict(res.path_to_root)
+
+
+def test_root_to_paths() -> None:
+    res = SourceRootsResult(
+        FrozenDict(
+            {
+                PurePath("src/python/foo/bar.py"): SourceRoot("src/python"),
+                PurePath("tests/python/foo/bar_test.py"): SourceRoot("tests/python"),
+                PurePath("src/python/foo"): SourceRoot("src/python"),
+                PurePath("src/python/baz/qux"): SourceRoot("src/python"),
+            }
+        )
+    )
+    assert res.root_to_paths() == FrozenDict(
+        {
+            SourceRoot("src/python"): (
+                PurePath("src/python/baz/qux"),
+                PurePath("src/python/foo"),
+                PurePath("src/python/foo/bar.py"),
+            ),
+            SourceRoot("tests/python"): (PurePath("tests/python/foo/bar_test.py"),),
+        }
+    )

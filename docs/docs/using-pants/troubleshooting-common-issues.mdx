@@ -54,6 +54,10 @@ If this resolves the issue, please report that on the ticket and attach the rece
 
 If restarting pantsd is not sufficient, you can also use `--no-local-cache` to ignore the persistent caches. If this resolves the issue, then it is possible that the contents of the cache (at `~/.cache/pants`) will be useful for debugging the ticket that you filed: please try to preserve the cache contents until it can be resolved.
 
+## Rerun a test that may be flaky or have side effects, not just have Pants return a cached result
+
+Use `--test-force` as in `pants test --force src/foo:test` to force Pants to run a test. In contrast to the broader cache invalidation options described above, this only invalidates the final step (aka "actually running the test"). All intermediate steps remain cached.
+
 ## Pants cannot find a file in your project
 
 Pants may complain that it cannot find a file or directory, even though the file does indeed exist.
@@ -242,7 +246,7 @@ A more sustainable solution for shared resources is to use the [`[pytest].execut
 In recent Ubuntu distributions, the Docker service is often installed using [Snap](https://snapcraft.io/docker).
 It works mostly same as a normal installation, but has an important difference: it cannot access the `/tmp` directory of the host because it is virtualized when Snap starts the Docker service.
 
-This may cause problems if your code or tests ry to create a container with a bind-mount of a directory or file _under the current working directory_. Container creation will fail with "invalid mount config for type "bind": bind source path does not exist", because Pants' default `local_execution_root_dir` option is `/tmp`, which the Snap-based Docker service cannot access.
+This may cause problems if your code or tests try to create a container with a bind-mount of a directory or file _under the current working directory_. Container creation will fail with "invalid mount config for type "bind": bind source path does not exist", because Pants' default `local_execution_root_dir` option is `/tmp`, which the Snap-based Docker service cannot access.
 
 You can work around this issue by explicitly setting `[GLOBAL].local_execution_root_dir` to a directory outside the system `/tmp` directory, such as `"%(buildroot)s/tmp"`.
 

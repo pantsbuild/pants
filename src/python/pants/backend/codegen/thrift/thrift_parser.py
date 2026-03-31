@@ -9,10 +9,10 @@ from dataclasses import dataclass
 
 from pants.backend.codegen.thrift.target_types import ThriftSourceField
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import DigestContents
-from pants.engine.internals.native_engine import Digest
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import HydratedSources, HydrateSourcesRequest
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import HydrateSourcesRequest
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -45,8 +45,8 @@ class ParsedThriftRequest(EngineAwareParameter):
 
 @rule
 async def parse_thrift_file(request: ParsedThriftRequest) -> ParsedThrift:
-    sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
-    digest_contents = await Get(DigestContents, Digest, sources.snapshot.digest)
+    sources = await hydrate_sources(HydrateSourcesRequest(request.sources_field), **implicitly())
+    digest_contents = await get_digest_contents(sources.snapshot.digest)
     assert len(digest_contents) == 1
 
     file_content = digest_contents[0].content.decode()

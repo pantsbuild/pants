@@ -20,20 +20,21 @@ from pants.backend.adhoc.target_types import (
 from pants.build_graph.address import Address
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.adhoc_process_support import (
-    ResolvedExecutionDependencies,
     ResolveExecutionDependenciesRequest,
+    resolve_execution_environment,
 )
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
-    BinaryPaths,
     SearchPath,
     SystemBinariesSubsystem,
+    find_binary,
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import execute_process
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -69,19 +70,18 @@ async def _find_binary(
     fingerprint_dependencies: tuple[str, ...] | None,
     log_fingerprinting_errors: bool,
 ) -> BinaryPath:
-    binaries = await Get(
-        BinaryPaths,
+    binaries = await find_binary(
         BinaryPathRequest(
             binary_name=binary_name,
             search_path=search_path,
         ),
+        **implicitly(),
     )
 
     fingerprint_args = fingerprint_args or ()
 
-    deps = await Get(
-        ResolvedExecutionDependencies,
-        ResolveExecutionDependenciesRequest(address, (), fingerprint_dependencies),
+    deps = await resolve_execution_environment(
+        ResolveExecutionDependenciesRequest(address, (), fingerprint_dependencies), **implicitly()
     )
     rds = deps.runnable_dependencies
     env: dict[str, str] = {}
@@ -93,9 +93,8 @@ async def _find_binary(
         append_only_caches = rds.append_only_caches
         immutable_input_digests = rds.immutable_input_digests
 
-    tests: tuple[FallibleProcessResult, ...] = await MultiGet(
-        Get(
-            FallibleProcessResult,
+    tests: tuple[FallibleProcessResult, ...] = await concurrently(
+        execute_process(
             Process(
                 description=f"Testing candidate for `{binary_name}` at `{path.path}`",
                 argv=(path.path,) + fingerprint_args,
@@ -104,6 +103,7 @@ async def _find_binary(
                 append_only_caches=append_only_caches,
                 immutable_input_digests=immutable_input_digests,
             ),
+            **implicitly(),
         )
         for path in binaries.paths
     )

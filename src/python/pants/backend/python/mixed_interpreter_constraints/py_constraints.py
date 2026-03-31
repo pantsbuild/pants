@@ -6,20 +6,17 @@ import logging
 from collections import defaultdict
 from textwrap import fill, indent
 
-from pants.backend.project_info.dependents import Dependents, DependentsRequest
+from pants.backend.project_info.dependents import DependentsRequest, find_dependents
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import InterpreterConstraintsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, Outputting
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import (
-    AllTargets,
-    RegisteredTargetTypes,
-    TransitiveTargets,
-    TransitiveTargetsRequest,
-)
+from pants.engine.internals.graph import find_all_targets
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly
+from pants.engine.target import RegisteredTargetTypes, TransitiveTargetsRequest
 from pants.engine.unions import UnionMembership
 from pants.option.option_types import BoolOption
 from pants.util.docutil import bin_name
@@ -79,7 +76,7 @@ async def py_constraints(
             )
             return PyConstraintsGoal(exit_code=1)
 
-        all_targets = await Get(AllTargets)
+        all_targets = await find_all_targets()
         all_python_targets = tuple(
             t for t in all_targets if t.has_field(InterpreterConstraintsField)
         )
@@ -89,8 +86,8 @@ async def py_constraints(
             for tgt in all_python_targets
         ]
 
-        transitive_targets_per_tgt = await MultiGet(
-            Get(TransitiveTargets, TransitiveTargetsRequest([tgt.address]))
+        transitive_targets_per_tgt = await concurrently(
+            transitive_targets_get(TransitiveTargetsRequest([tgt.address]), **implicitly())
             for tgt in all_python_targets
         )
         transitive_constraints_per_tgt = [
@@ -98,8 +95,11 @@ async def py_constraints(
             for transitive_targets in transitive_targets_per_tgt
         ]
 
-        dependents_per_root = await MultiGet(
-            Get(Dependents, DependentsRequest([tgt.address], transitive=True, include_roots=False))
+        dependents_per_root = await concurrently(
+            find_dependents(
+                DependentsRequest([tgt.address], transitive=True, include_roots=False),
+                **implicitly(),
+            )
             for tgt in all_python_targets
         )
 
@@ -137,7 +137,9 @@ async def py_constraints(
 
         return PyConstraintsGoal(exit_code=0)
 
-    transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(addresses))
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest(addresses), **implicitly()
+    )
     final_constraints = InterpreterConstraints.create_from_targets(
         transitive_targets.closure, python_setup
     )

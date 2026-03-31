@@ -6,10 +6,11 @@ from pathlib import PurePath
 
 from pants.backend.python import dependency_inference
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
+    ExplicitPythonDependencies,
     ParsedPythonAssetPaths,
-    ParsedPythonDependencies,
     ParsedPythonImportInfo,
     ParsedPythonImports,
+    PythonFileDependencies,
 )
 from pants.backend.python.dependency_inference.rules import (
     ImportOwnerStatus,
@@ -66,8 +67,8 @@ async def _django_migration_dependencies(
                 output_filename="__visitor.pex",
                 internal_only=True,
                 main=EntryPoint("__visitor"),
-                interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                    [request.field_set.interpreter_constraints], python_setup=python_setup
+                interpreter_constraints=InterpreterConstraints.create_from_field_sets(
+                    [request.field_set], python_setup=python_setup
                 ),
                 sources=visitor_digest,
             )
@@ -97,11 +98,12 @@ async def _django_migration_dependencies(
     resolved_dependencies = await resolve_parsed_dependencies(
         ResolvedParsedPythonDependenciesRequest(
             request.field_set,
-            ParsedPythonDependencies(
+            PythonFileDependencies(
                 ParsedPythonImports(
                     (module, ParsedPythonImportInfo(0, False)) for module in modules
                 ),
                 ParsedPythonAssetPaths(),
+                ExplicitPythonDependencies(),
             ),
             resolve,
         ),
@@ -141,12 +143,13 @@ async def _django_app_implicit_dependencies(
     resolved_dependencies = await resolve_parsed_dependencies(
         ResolvedParsedPythonDependenciesRequest(
             request.field_set,
-            ParsedPythonDependencies(
+            PythonFileDependencies(
                 ParsedPythonImports(
                     (package, ParsedPythonImportInfo(0, False))
                     for package in implicit_dependency_packages
                 ),
                 ParsedPythonAssetPaths(),
+                ExplicitPythonDependencies(),
             ),
             resolve,
         ),

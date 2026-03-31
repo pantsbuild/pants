@@ -1,0 +1,12 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "address"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+peg = { workspace = true }
+
+[lints]
+workspace = true

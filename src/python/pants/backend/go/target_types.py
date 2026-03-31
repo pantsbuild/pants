@@ -6,10 +6,10 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable, Sequence
 
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import OutputPathField
 from pants.core.goals.run import RestartableField
 from pants.core.goals.test import TestExtraEnvVarsField, TestTimeoutField
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,

@@ -8,7 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 use fs::DirectoryDigest;
-use protos::gen::pants::cache::{
+use protos::pb::pants::cache::{
     JavascriptInferenceMetadata, dependency_inference_request, javascript_inference_metadata,
 };
 

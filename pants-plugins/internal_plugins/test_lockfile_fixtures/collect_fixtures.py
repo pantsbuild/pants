@@ -16,18 +16,18 @@ def get_func_path(func):
 
 
 def get_fixturedef(fixture_request, name):
-    fixturedef = fixture_request._fixture_defs.get(name)
-    if fixturedef:
-        return fixturedef
-    try:
-        return fixture_request._getnextfixturedef(name)
-    except fixtures.FixtureLookupError:
-        return None
+    # Get fixture definitions without executing them. `_get_active_fixturedef` actually
+    # tries to execute the fixture.
+    fixturedefs = fixture_request._arg2fixturedefs.get(name)
+    if fixturedefs:
+        # Return the most specific fixture definition (last one in the list).
+        return fixturedefs[-1]
+    return None
 
 
 def process_fixtures(item):
     lockfile_definitions = []
-    fixture_request = fixtures.FixtureRequest(item, _ispytest=True)
+    fixture_request = fixtures.TopRequest(item, _ispytest=True)
     for fixture_name in fixture_request.fixturenames:
         fixture_def = get_fixturedef(fixture_request, fixture_name)
         if not fixture_def:

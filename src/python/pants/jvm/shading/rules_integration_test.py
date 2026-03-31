@@ -17,9 +17,8 @@ from pants.core.util_rules import archive
 from pants.core.util_rules.archive import ExtractedArchive, MaybeExtractArchiveRequest
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, Snapshot
 from pants.engine.target import AllTargets, CoarsenedTargets, CoarsenedTargetsRequest
-from pants.jvm import classpath
+from pants.jvm import classpath, jdk_rules, non_jvm_dependencies
 from pants.jvm import compile as jvm_compile
-from pants.jvm import jdk_rules, non_jvm_dependencies
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.resolve import coursier_fetch, coursier_setup, jvm_tool
 from pants.jvm.resolve.coordinate import Coordinate

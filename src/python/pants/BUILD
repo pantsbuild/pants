@@ -18,8 +18,9 @@ python_distribution(
     dependencies=[
         "./__main__.py",
         ":resources",
-        # Include the native client binary in the distribution.
+        # Include the native client and sandboxer binaries in the distribution.
         "src/python/pants/bin:native_client",
+        "src/python/pants/bin:sandboxer",
     ],
     # Because we have native code, this will cause the wheel to use whatever the ABI is for the
     # interpreter used to run setup.py, e.g. `cp39m-macosx_10_15_x86_64`.
@@ -35,7 +36,7 @@ python_distribution(
         # TODO(7344): the tuple syntax for ext_modules is deprecated. Use Extension once we support it.
         ext_modules=[("native_engine", {"sources": ["pants/dummy.c"]})],
         # N.B.: Must match [python] interpreter_constraints in pants.toml.
-        python_requires="==3.11.*",
+        python_requires="==3.14.*",
     ),
     entry_points={"console_scripts": {"pants": "pants.bin.pants_loader:main"}},
     # We need to explicitly control the wheel tagging, rather than following whatever the current
@@ -52,6 +53,20 @@ pex_binary(
     shebang="/usr/bin/env python",
     strip_pex_env=False,
     layout="zipapp",
+    scie="eager",
+    # GitHub Actions already have naming logic
+    scie_name_style="dynamic",
+    # The native code engine is per platform
+    scie_platform=["current"],
+    scie_pbs_stripped=True,
+    scie_hash_alg="sha256",
+    scie_pex_entrypoint_env_passthrough=True,
+    scie_load_dotenv=True,
+    # NOTE: Existing scie-pants releases expects this to be at
+    # pants/bin/native_client instead of as a  "script" in the wheel.
+    scie_bind_resource_path=["PANTS_NATIVE_CLIENT=pants/bin/native_client"],
+    scie_exe="{scie.env.PANTS_NATIVE_CLIENT}",
+    scie_env=["NO_SCIE_WARNING=true", "_PANTS_SERVER_EXE={scie.env.VIRTUAL_ENV}/bin/pants"],
 )
 
 # NB: we use `dummy.c` to avoid clang/gcc complaining `error: no input files` when building

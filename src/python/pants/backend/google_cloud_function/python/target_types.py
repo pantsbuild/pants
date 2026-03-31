@@ -19,8 +19,8 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSRuntimeField,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import OutputPathField
-from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.rules import collect_rules
 from pants.engine.target import COMMON_TARGET_FIELDS, InvalidFieldException, StringField, Target

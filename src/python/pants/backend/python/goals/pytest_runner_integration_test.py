@@ -43,15 +43,16 @@ from pants.core.goals.test import (
 from pants.core.util_rules import config_files, distdir
 from pants.core.util_rules.partitions import Partitions
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
+from pants.engine.fs import CreateDigest, DigestContents, FileContent
+from pants.engine.intrinsics import create_digest
 from pants.engine.process import InteractiveProcessResult
-from pants.engine.rules import Get, rule
+from pants.engine.rules import rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.testutil.debug_adapter_util import debugadapter_port_for_testing
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
-    skip_unless_python38_and_python39_present,
+    skip_unless_python310_and_python311_present,
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule, mock_console
@@ -188,7 +189,7 @@ def run_pytest_interactive(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.8,<4"]),
+    all_major_minor_python_versions(["CPython>=3.9,<3.15"]),
 )
 def test_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
@@ -281,36 +282,37 @@ def test_dependencies(rule_runner: PythonRuleRunner) -> None:
     assert f"{PACKAGE}/tests.py ." in result.stdout_simplified_str
 
 
-@skip_unless_python38_and_python39_present
+@skip_unless_python310_and_python311_present
 def test_uses_correct_python_version(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
+            # ExceptionGroup was introduced in 3.11.
             f"{PACKAGE}/tests.py": dedent(
                 """\
                 def test() -> None:
-                  y = {} | {}
+                    eg = ExceptionGroup('', [Exception()])
                 """
             ),
             f"{PACKAGE}/BUILD": dedent(
                 """\
-                python_tests(name='py38', interpreter_constraints=['==3.8.*'])
-                python_tests(name='py39', interpreter_constraints=['==3.9.*'])
+                python_tests(name='py310', interpreter_constraints=['==3.10.*'])
+                python_tests(name='py311', interpreter_constraints=['==3.11.*'])
                 """
             ),
         }
     )
 
-    py38_tgt = rule_runner.get_target(
-        Address(PACKAGE, target_name="py38", relative_file_path="tests.py")
+    py310_tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="py310", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py38_tgt], test_debug_adapter=False)
+    result = run_pytest(rule_runner, [py310_tgt], test_debug_adapter=False)
     assert result.exit_code == 1
-    assert b"TypeError: unsupported" in result.stdout_bytes
+    assert b"NameError: name 'ExceptionGroup' is not defined" in result.stdout_bytes
 
-    py39_tgt = rule_runner.get_target(
-        Address(PACKAGE, target_name="py39", relative_file_path="tests.py")
+    py311_tgt = rule_runner.get_target(
+        Address(PACKAGE, target_name="py311", relative_file_path="tests.py")
     )
-    result = run_pytest(rule_runner, [py39_tgt], test_debug_adapter=False)
+    result = run_pytest(rule_runner, [py311_tgt], test_debug_adapter=False)
     assert result.exit_code == 0
     assert f"{PACKAGE}/tests.py ." in result.stdout_simplified_str
 
@@ -670,13 +672,13 @@ class UnusedPlugin(PytestPluginSetupRequest):
 
 @rule
 async def used_plugin(_: UsedPlugin) -> PytestPluginSetup:
-    digest = await Get(Digest, CreateDigest([FileContent("used.txt", b"")]))
+    digest = await create_digest(CreateDigest([FileContent("used.txt", b"")]))
     return PytestPluginSetup(digest=digest, extra_sys_path=("sys/path/used",))
 
 
 @rule
 async def unused_plugin(_: UnusedPlugin) -> PytestPluginSetup:
-    digest = await Get(Digest, CreateDigest([FileContent("unused.txt", b"")]))
+    digest = await create_digest(CreateDigest([FileContent("unused.txt", b"")]))
     return PytestPluginSetup(digest=digest, extra_sys_path=("sys/path/unused",))
 
 
@@ -932,7 +934,7 @@ def test_partition(
 @pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "major_minor_interpreter",
-    all_major_minor_python_versions(["CPython>=3.8,<4"]),
+    all_major_minor_python_versions(["CPython>=3.9,<3.15"]),
 )
 def test_batched_passing(rule_runner: PythonRuleRunner, major_minor_interpreter: str) -> None:
     rule_runner.write_files(
@@ -980,3 +982,34 @@ def test_batched_failing(rule_runner: PythonRuleRunner) -> None:
     stdout_text = result.stdout_simplified_str
     assert f"{PACKAGE}/test_1.py ." in stdout_text
     assert f"{PACKAGE}/test_2.py F" in stdout_text
+
+
+def test_no_tests_collected_fails_by_default(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/tests.py": GOOD_TEST,
+            f"{PACKAGE}/BUILD": "python_tests()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest_noninteractive(
+        rule_runner, tgt, extra_args=["--pytest-args='-k nonexistent_test'"]
+    )
+    assert result.exit_code == 5
+    assert b"deselected" in result.stdout_bytes
+
+
+def test_no_tests_collected_succeeds_when_allowed(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/tests.py": GOOD_TEST,
+            f"{PACKAGE}/BUILD": "python_tests()",
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="tests.py"))
+    result = run_pytest_noninteractive(
+        rule_runner,
+        tgt,
+        extra_args=["--pytest-args='-k nonexistent_test'", "--pytest-allow-empty-test-collection"],
+    )
+    assert result.exit_code is None

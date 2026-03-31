@@ -8,8 +8,7 @@ from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
 from pants.backend.codegen.protobuf.target_types import ProtobufDependenciesField
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.build_graph.address import Address
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
@@ -83,8 +82,8 @@ async def infer_scalapb_runtime_dependency(
 ) -> InferredDependencies:
     resolve = request.field_set.resolve.normalized_value(jvm)
 
-    scalapb_runtime_target_info = await Get(
-        ScalaPBRuntimeForResolve, ScalaPBRuntimeForResolveRequest(resolve)
+    scalapb_runtime_target_info = await resolve_scalapb_runtime_for_resolve(
+        ScalaPBRuntimeForResolveRequest(resolve), **implicitly()
     )
     return InferredDependencies(scalapb_runtime_target_info.addresses)
 

@@ -104,7 +104,7 @@ async function handleRequest(event) {
     Promise.all([
       sendToGA4(event.request.headers, url.host, pathname),
       sendToUA(event.request.headers, url.host, pathname),
-    ])
+    ]),
   );
   return Response.redirect(destinationURL, 302);
 }

@@ -21,8 +21,7 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
@@ -70,7 +69,7 @@ async def find_putative_targets(
 
     if scala_subsystem.tailor_source_targets:
         all_scala_files_globs = req.path_globs("*.scala")
-        all_scala_files = await Get(Paths, PathGlobs, all_scala_files_globs)
+        all_scala_files = await path_globs_to_paths(all_scala_files_globs)
         unowned_scala_files = set(all_scala_files.files) - set(all_owned_sources)
         classified_unowned_scala_files = classify_source_files(unowned_scala_files)
         for tgt_type, paths in classified_unowned_scala_files.items():

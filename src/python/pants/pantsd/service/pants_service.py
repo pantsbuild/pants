@@ -1,5 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
 
 import logging
 import threading
@@ -34,7 +35,7 @@ class PantsService(ABC):
         self.name = self.__class__.__name__
         self._state = _ServiceState()
 
-    def setup(self, services: tuple["PantsService", ...]):
+    def setup(self, services: tuple[PantsService, ...]):
         """Called before `run` to allow for service->service or other side-effecting setup."""
         self.services = services
 
@@ -125,9 +126,7 @@ class _ServiceState:
             while self._state != self._PAUSED:
                 if self._state != self._PAUSING:
                     raise AssertionError(
-                        "Cannot wait for {} to reach `{}` while it is in `{}`.".format(
-                            self, self._PAUSED, self._state
-                        )
+                        f"Cannot wait for {self} to reach `{self._PAUSED}` while it is in `{self._state}`."
                     )
                 timeout = deadline - time.time() if deadline else None
                 if timeout and timeout <= 0:

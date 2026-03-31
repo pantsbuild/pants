@@ -12,20 +12,27 @@ from pants.backend.go.target_types import (
     GoPackageTarget,
     GoThirdPartyPackageTarget,
 )
-from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
-from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
-from pants.backend.go.util_rules.build_pkg import BuiltGoPackage
+from pants.backend.go.util_rules.binary import (
+    GoBinaryMainPackageRequest,
+    determine_main_pkg_for_go_binary,
+)
+from pants.backend.go.util_rules.build_opts import (
+    GoBuildOptionsFromTargetRequest,
+    go_extract_build_options_from_target,
+)
+from pants.backend.go.util_rules.build_pkg import required_built_go_package
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
-    FallibleFirstPartyPkgAnalysis,
     FirstPartyPkgAnalysisRequest,
+    analyze_first_party_package,
 )
-from pants.backend.go.util_rules.go_mod import GoModInfo, GoModInfoRequest
-from pants.backend.go.util_rules.link import LinkedGoBinary, LinkGoBinaryRequest
+from pants.backend.go.util_rules.go_mod import GoModInfoRequest, determine_go_mod_info
+from pants.backend.go.util_rules.link import LinkGoBinaryRequest, link_go_binary
 from pants.backend.go.util_rules.third_party_pkg import (
-    ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
+    extract_package_info,
 )
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import (
     BuiltPackage,
     BuiltPackageArtifact,
@@ -33,10 +40,10 @@ from pants.core.goals.package import (
     PackageFieldSet,
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
-from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.fs import AddPrefix, Digest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.fs import AddPrefix
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import add_prefix
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -54,33 +61,33 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 @rule(desc="Package Go binary", level=LogLevel.DEBUG)
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
-    main_pkg, build_opts = await MultiGet(
-        Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(field_set.main)),
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address)),
+    main_pkg, build_opts = await concurrently(
+        determine_main_pkg_for_go_binary(GoBinaryMainPackageRequest(field_set.main)),
+        go_extract_build_options_from_target(
+            GoBuildOptionsFromTargetRequest(field_set.address), **implicitly()
+        ),
     )
 
     if main_pkg.is_third_party:
         assert isinstance(main_pkg.import_path, str)
 
         go_mod_address = main_pkg.address.maybe_convert_to_target_generator()
-        go_mod_info = await Get(GoModInfo, GoModInfoRequest(go_mod_address))
+        go_mod_info = await determine_go_mod_info(GoModInfoRequest(go_mod_address))
 
-        analysis = await Get(
-            ThirdPartyPkgAnalysis,
+        analysis = await extract_package_info(
             ThirdPartyPkgAnalysisRequest(
                 main_pkg.import_path,
                 go_mod_address,
                 go_mod_info.digest,
                 go_mod_info.mod_path,
                 build_opts=build_opts,
-            ),
+            )
         )
 
         package_name = analysis.name
     else:
-        main_pkg_analysis = await Get(
-            FallibleFirstPartyPkgAnalysis,
-            FirstPartyPkgAnalysisRequest(main_pkg.address, build_opts=build_opts),
+        main_pkg_analysis = await analyze_first_party_package(
+            FirstPartyPkgAnalysisRequest(main_pkg.address, build_opts=build_opts), **implicitly()
         )
         if not main_pkg_analysis.analysis:
             raise ValueError(
@@ -97,16 +104,16 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
             "requires that main packages actually use `main` as the package name."
         )
 
-    built_package = await Get(
-        BuiltGoPackage,
-        BuildGoPackageTargetRequest(main_pkg.address, is_main=True, build_opts=build_opts),
+    built_package = await required_built_go_package(
+        **implicitly(
+            BuildGoPackageTargetRequest(main_pkg.address, is_main=True, build_opts=build_opts)
+        ),
     )
 
     main_pkg_a_file_path = built_package.import_paths_to_pkg_a_files["main"]
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
-    binary = await Get(
-        LinkedGoBinary,
+    binary = await link_go_binary(
         LinkGoBinaryRequest(
             input_digest=built_package.digest,
             archives=(main_pkg_a_file_path,),
@@ -115,9 +122,10 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
             output_filename=f"./{output_filename.name}",
             description=f"Link Go binary for {field_set.address}",
         ),
+        **implicitly(),
     )
 
-    renamed_output_digest = await Get(Digest, AddPrefix(binary.digest, str(output_filename.parent)))
+    renamed_output_digest = await add_prefix(AddPrefix(binary.digest, str(output_filename.parent)))
 
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
     return BuiltPackage(renamed_output_digest, (artifact,))

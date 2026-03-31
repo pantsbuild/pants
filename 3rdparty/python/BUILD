@@ -34,6 +34,12 @@ python_requirements(
     resolve="pbs-script",
 )
 
+python_requirements(
+    name="external-tool-upgrade",
+    source="external-tool-upgrade-requirements.txt",
+    resolve="external-tool-upgrade",
+)
+
 __dependents_rules__(
     (  # Only the explorer server may depend on these libraries
         (
@@ -43,6 +49,13 @@ __dependents_rules__(
             "[uvicorn]",
         ),
         "pants-plugins/pants_explorer/server/**",
+        "!*",
+    ),
+    (  # Only scripts, not including rule code, in the elfdeps backend may depend on the elfdeps library
+        ("[elfdeps]",),
+        "!src/python/pants/backend/nfpm/native_libs/elfdeps/rules*.py",
+        "!src/python/pants/backend/nfpm/native_libs/elfdeps/subsystem.py",
+        "src/python/pants/backend/nfpm/native_libs/elfdeps/**",
         "!*",
     ),
     # Free for all on the rest

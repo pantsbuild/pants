@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import os.path
+import os
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
@@ -18,23 +18,28 @@ from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalToolRequest,
     TemplatedExternalTool,
+    download_external_tool,
 )
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+_PEX_VERSION = "v2.91.6"
+_PEX_BINARY_HASH = "7ad93771823900012ecd5386ed00cc4a15393ef76a76c410853708f9f91abecd"
+_PEX_BINARY_SIZE = 5079012
 
 
 class PexCli(TemplatedExternalTool):
@@ -42,9 +47,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.33.1"
+    default_version = _PEX_VERSION
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.13.0,<3.0"
+    version_constraints = ">=2.76.0,<3.0"
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
@@ -58,19 +63,10 @@ class PexCli(TemplatedExternalTool):
         ),
     )
 
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "|".join(
-                (
-                    cls.default_version,
-                    plat,
-                    "5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28",
-                    "4559974",
-                )
-            )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
-        ]
+    default_known_versions = [
+        f"{_PEX_VERSION}|{platform}|{_PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}"
+        for platform in ["macos_x86_64", "macos_arm64", "linux_x86_64", "linux_arm64"]
+    ]
 
 
 @dataclass(frozen=True)
@@ -126,7 +122,7 @@ class PexPEX(DownloadedExternalTool):
 
 @rule
 async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
-    pex_pex = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
+    pex_pex = await download_external_tool(pex_cli.get_request(platform))
     return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
 
 
@@ -143,19 +139,19 @@ async def setup_pex_cli_process(
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
-    gets: list[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
+    gets = [create_digest(CreateDigest([Directory(tmpdir)]))]
 
     cert_args = []
     if global_options.ca_certs_path:
         ca_certs_fc = ca_certs_path_to_file_content(global_options.ca_certs_path)
-        gets.append(Get(Digest, CreateDigest((ca_certs_fc,))))
+        gets.append(create_digest(CreateDigest((ca_certs_fc,))))
         cert_args = ["--cert", ca_certs_fc.path]
 
     digests_to_merge = [pex_pex.digest]
-    digests_to_merge.extend(await MultiGet(gets))
+    digests_to_merge.extend(await concurrently(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
-    input_digest = await Get(Digest, MergeDigests(digests_to_merge))
+    input_digest = await merge_digests(MergeDigests(digests_to_merge))
 
     global_args = [
         # Ensure Pex and its subprocesses create temporary files in the process execution
@@ -203,11 +199,11 @@ async def setup_pex_cli_process(
     ]
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
+    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args, python=bootstrap_python)
     env = {
-        **complete_pex_env.environment_dict(python=bootstrap_python),
+        **complete_pex_env.environment_dict(python_configured=True),
         **python_native_code.subprocess_env_vars,
-        **(request.extra_env or {}),  # type: ignore[dict-item]
+        **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }

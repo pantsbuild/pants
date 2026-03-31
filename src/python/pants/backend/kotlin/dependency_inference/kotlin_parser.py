@@ -10,17 +10,29 @@ from typing import Any
 
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.source_files import SourceFiles
-from pants.engine.fs import CreateDigest, DigestContents, Directory, FileContent
-from pants.engine.internals.native_engine import AddPrefix, Digest, MergeDigests, RemovePrefix
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import FallibleProcessResult, ProcessResult, ProductDescription
-from pants.engine.rules import collect_rules, rule
+from pants.engine.fs import CreateDigest, Directory, FileContent
+from pants.engine.internals.native_engine import AddPrefix, MergeDigests, RemovePrefix
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    execute_process,
+    get_digest_contents,
+    merge_digests,
+    remove_prefix,
+)
+from pants.engine.process import (
+    FallibleProcessResult,
+    ProductDescription,
+    fallible_to_exec_result_or_raise,
+)
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.jdk_rules import InternalJdk, JdkEnvironment, JdkRequest, JvmProcess
+from pants.jvm.jdk_rules import InternalJdk, JdkRequest, JvmProcess, prepare_jdk_environment
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate
-from pants.jvm.resolve.coursier_fetch import ToolClasspath, ToolClasspathRequest
+from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -158,7 +170,7 @@ async def analyze_kotlin_source_dependencies(
 ) -> FallibleKotlinSourceDependencyAnalysisResult:
     # Use JDK 8 due to https://youtrack.jetbrains.com/issue/KTIJ-17192 and https://youtrack.jetbrains.com/issue/KT-37446.
     request = JdkRequest("zulu:8.0.392")
-    env = await Get(JdkEnvironment, JdkRequest, request)
+    env = await prepare_jdk_environment(**implicitly({request: JdkRequest}))
     jdk = InternalJdk.from_jdk_environment(env)
 
     if len(source_files.files) > 1:
@@ -177,12 +189,11 @@ async def analyze_kotlin_source_dependencies(
     (
         tool_classpath,
         prefixed_source_files_digest,
-    ) = await MultiGet(
-        Get(
-            ToolClasspath,
-            ToolClasspathRequest(lockfile=(GenerateJvmLockfileFromTool.create(tool))),
+    ) = await concurrently(
+        materialize_classpath_for_tool(
+            ToolClasspathRequest(lockfile=(GenerateJvmLockfileFromTool.create(tool)))
         ),
-        Get(Digest, AddPrefix(source_files.snapshot.digest, source_prefix)),
+        add_prefix(AddPrefix(source_files.snapshot.digest, source_prefix)),
     )
 
     extra_immutable_input_digests = {
@@ -192,26 +203,27 @@ async def analyze_kotlin_source_dependencies(
 
     analysis_output_path = "__source_analysis.json"
 
-    process_result = await Get(
-        FallibleProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            classpath_entries=[
-                *tool_classpath.classpath_entries(toolcp_relpath),
-                processorcp_relpath,
-            ],
-            argv=[
-                "org.pantsbuild.backend.kotlin.dependency_inference.KotlinParserKt",
-                analysis_output_path,
-                source_path,
-            ],
-            input_digest=prefixed_source_files_digest,
-            extra_immutable_input_digests=extra_immutable_input_digests,
-            output_files=(analysis_output_path,),
-            extra_nailgun_keys=extra_immutable_input_digests,
-            description=f"Analyzing {source_files.files[0]}",
-            level=LogLevel.DEBUG,
-        ),
+    process_result = await execute_process(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=[
+                    *tool_classpath.classpath_entries(toolcp_relpath),
+                    processorcp_relpath,
+                ],
+                argv=[
+                    "org.pantsbuild.backend.kotlin.dependency_inference.KotlinParserKt",
+                    analysis_output_path,
+                    source_path,
+                ],
+                input_digest=prefixed_source_files_digest,
+                extra_immutable_input_digests=extra_immutable_input_digests,
+                output_files=(analysis_output_path,),
+                extra_nailgun_keys=extra_immutable_input_digests,
+                description=f"Analyzing {source_files.files[0]}",
+                level=LogLevel.DEBUG,
+            )
+        )
     )
 
     return FallibleKotlinSourceDependencyAnalysisResult(process_result=process_result)
@@ -222,11 +234,12 @@ async def resolve_fallible_result_to_analysis(
     fallible_result: FallibleKotlinSourceDependencyAnalysisResult,
 ) -> KotlinSourceDependencyAnalysis:
     desc = ProductDescription("Kotlin source dependency analysis failed.")
-    result = await Get(
-        ProcessResult,
-        {fallible_result.process_result: FallibleProcessResult, desc: ProductDescription},
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            {fallible_result.process_result: FallibleProcessResult, desc: ProductDescription}
+        )
     )
-    analysis_contents = await Get(DigestContents, Digest, result.output_digest)
+    analysis_contents = await get_digest_contents(result.output_digest)
     analysis = json.loads(analysis_contents[0].content)
     return KotlinSourceDependencyAnalysis.from_json_dict(analysis)
 
@@ -245,9 +258,8 @@ async def setup_kotlin_parser_classfiles(
 
     parser_source = FileContent("KotlinParser.kt", parser_source_content)
 
-    tool_classpath, parser_classpath, source_digest = await MultiGet(
-        Get(
-            ToolClasspath,
+    tool_classpath, parser_classpath, source_digest = await concurrently(
+        materialize_classpath_for_tool(
             ToolClasspathRequest(
                 prefix="__toolcp",
                 artifact_requirements=ArtifactRequirements.from_coordinates(
@@ -259,51 +271,50 @@ async def setup_kotlin_parser_classfiles(
                         ),
                     ]
                 ),
-            ),
+            )
         ),
-        Get(
-            ToolClasspath,
+        materialize_classpath_for_tool(
             ToolClasspathRequest(
                 prefix="__parsercp", lockfile=(GenerateJvmLockfileFromTool.create(tool))
-            ),
+            )
         ),
-        Get(Digest, CreateDigest([parser_source, Directory(dest_dir)])),
+        create_digest(CreateDigest([parser_source, Directory(dest_dir)])),
     )
 
-    merged_digest = await Get(
-        Digest,
+    merged_digest = await merge_digests(
         MergeDigests(
             (
                 tool_classpath.digest,
                 parser_classpath.digest,
                 source_digest,
             )
-        ),
+        )
     )
 
-    process_result = await Get(
-        ProcessResult,
-        JvmProcess(
-            jdk=jdk,
-            classpath_entries=tool_classpath.classpath_entries(),
-            argv=[
-                "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
-                "-classpath",
-                ":".join(parser_classpath.classpath_entries()),
-                "-d",
-                dest_dir,
-                parser_source.path,
-            ],
-            input_digest=merged_digest,
-            output_directories=(dest_dir,),
-            description="Compile Kotlin parser for dependency inference with kotlinc",
-            level=LogLevel.DEBUG,
-            # NB: We do not use nailgun for this process, since it is launched exactly once.
-            use_nailgun=False,
-        ),
+    process_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=tool_classpath.classpath_entries(),
+                argv=[
+                    "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+                    "-classpath",
+                    ":".join(parser_classpath.classpath_entries()),
+                    "-d",
+                    dest_dir,
+                    parser_source.path,
+                ],
+                input_digest=merged_digest,
+                output_directories=(dest_dir,),
+                description="Compile Kotlin parser for dependency inference with kotlinc",
+                level=LogLevel.DEBUG,
+                # NB: We do not use nailgun for this process, since it is launched exactly once.
+                use_nailgun=False,
+            )
+        )
     )
-    stripped_classfiles_digest = await Get(
-        Digest, RemovePrefix(process_result.output_digest, dest_dir)
+    stripped_classfiles_digest = await remove_prefix(
+        RemovePrefix(process_result.output_digest, dest_dir)
     )
     return KotlinParserCompiledClassfiles(digest=stripped_classfiles_digest)
 

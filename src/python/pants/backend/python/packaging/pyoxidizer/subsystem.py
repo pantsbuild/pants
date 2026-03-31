@@ -9,6 +9,8 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption
 from pants.util.strutil import help_text
 
+# pants: infer-dep(pyoxidizer.lock*)
+
 
 class PyOxidizer(PythonToolBase):
     options_scope = "pyoxidizer"
@@ -26,7 +28,6 @@ class PyOxidizer(PythonToolBase):
     default_requirements = ["pyoxidizer>=0.18.0,<1"]
 
     register_interpreter_constraints = True
-    default_interpreter_constraints = ["CPython>=3.8,<4"]
 
     default_lockfile_resource = ("pants.backend.python.packaging.pyoxidizer", "pyoxidizer.lock")
 

@@ -1,0 +1,15 @@
+[package]
+name = "local_execution_server"
+version = "0.1.0"
+edition = "2024"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+protos = { path = "../../protos" }
+mock = { path = "../mock" }
+clap = { workspace = true, features = ["derive"] }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

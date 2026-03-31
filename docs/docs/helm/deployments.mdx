@@ -6,7 +6,7 @@
 ---
 
 :::caution Helm deployment support is in alpha stage
-Pants has experimental support for managing deployments via the `experimental-deploy` goal. Helm deployments provides with a basic implementation of this goal.
+Pants has experimental support for managing deployments via the `experimental-deploy` goal. Helm deployments provide a basic implementation of this goal.
 
 Please share feedback for what you need to use Pants with your Helm deployments by either [opening a GitHub issue](https://github.com/pantsbuild/pants/issues/new/choose) or [joining our Slack](/community/getting-help)!
 :::
@@ -17,7 +17,7 @@ Helm's ultimate purpose is to simplify the deployment of Kubernetes resources an
 
 This hinders reproducibility since operators end up having a set of configuration files and additional shell scripts that ensure that the Helm command line used to deploy a piece of software into a given environment is always the same.
 
-Pants solves this problem by providing with the ability to manage the configuration files and the different parameters of a deployment as single unit such that a simple command line as `pants experimental-deploy ::` will always have the same effect on each of the deployments previously defined.
+Pants solves this problem by providing the ability to manage the configuration files and the different parameters of a deployment as single unit such that a simple command line as `pants experimental-deploy ::` will always have the same effect on each of the deployments previously defined.
 
 ## Defining Helm deployments
 
@@ -82,7 +82,7 @@ There are quite a few things to notice in the previous example:
 
 - The `helm_deployment` target requires you to explicitly set the `chart` field to specify which chart to use.
 - We have three different deployments using different sets of configuration files with the same chart.
-- One of those value files (`common-values.yaml`) provides with default values that are common to all deployments.
+- One of those value files (`common-values.yaml`) provides default values that are common to all deployments.
 - Each deployment uses an additional `xxx-override.yaml` file with values that are specific to the given deployment.
 
 The `helm_deployment` target has many additional fields including the target kubernetes namespace, adding inline override values (similar to using helm's `--set` arg) and many others. Please run `pants help helm_deployment` to see all the possibilities.
@@ -254,8 +254,67 @@ As shown above, now the `release` and `namespace` fields are calculated at deplo
 
 :::caution Ensuring repeatable deployments
 You should always favor using static values (or value files) VS dynamic values in your deployments. Using interpolated environment variables in your deployments can render your deployments non-repeatable anymore if those values can affect the behaviour of the system deployed, or what gets deployed (i.e. Docker image addresses).
-Be careful when chossing the values that are going to be calculated dynamically.
+Be careful when choosing the values that are going to be calculated dynamically.
 :::
+
+## Using custom resource definitions
+
+Pants uses [hikaru](https://github.com/haxsaw/hikaru) to analyze Helm charts and detect required first-party Docker images by resolving Pants' target addresses. However, by default, hikaru cannot parse custom resource definitions (CRDs), so Pants will not automatically detect Docker images referenced within CRDs.
+
+To enable Pants to recognize Docker images in your CRDs, you need to extend hikaru with your custom resource definitions. This process is documented in the [hikaru CRD guide](https://hikaru.readthedocs.io/en/latest/crd.html).
+
+For example, consider the following CRD manifest:
+
+```apiVersion: pants/v1alpha1
+   kind: CustomResourceDefinition
+   metadata:
+     name: crd_foo
+   spec:
+    containers:
+      - name: myapp-container
+          image: busybox:1.28
+    initContainers:
+      - name: init-service
+        image: busybox:1.29
+```
+
+By default, Pants will not be able to parse Docker image references inside your CRDs, because the CRD is not registered with Hikaru. To enable Pants to recognize these images, you need to define and register your custom resource with Hikaru.
+
+Create a Python file at `pantsbuild/crd.py` with content similar to:
+```
+
+        from __future__ import annotations
+        from hikaru.model.rel_1_28.v1 import *
+
+        from hikaru import (HikaruBase, HikaruDocumentBase,
+                            set_default_release)
+        from hikaru.crd import HikaruCRDDocumentMixin
+        from typing import Optional, List
+        from dataclasses import dataclass
+
+        set_default_release("rel_1_28")
+
+        @dataclass
+        class ContainersSpec(HikaruBase):
+            containers: List[Container]
+            initContainers: List[Container]
+
+        @dataclass
+        class CRD(HikaruDocumentBase, HikaruCRDDocumentMixin):
+            spec: ContainersSpec
+            metadata: ObjectMeta
+            apiVersion: str = f"pants/v1alpha1"
+            kind: str = "CustomResourceDefinition"
+```
+For more details on extending Hikaru with your CRDs, see the official documentation: https://hikaru.readthedocs.io/en/latest/crd.html.
+
+After defining your CRD Python class, you must register the new file and class name with Pants:
+
+```
+[helm-k8s-parser.crd]
+"pantsbuild/crd.py"="CRD"
+"pantsbuild/crd_cron2.py"="CRD2"
+```
 
 ## Third party chart artifacts
 
@@ -288,7 +347,7 @@ In this example, the deployment at `src/deploy:main` declares a dependency on a 
 
 User-defined [Helm post-renderers](https://helm.sh/docs/topics/advanced/#post-rendering) are supported by the Helm backend by means of the `post_renderers` field in the `helm_deployment` target. This field takes addresses to other runnable targets (any target that can be run using `pants run [address]`) and will build and run those targets as part of `experimental-deploy` goal. The referenced targets can be either shell commands or custom-made in any of the other languages supported by Pants.
 
-As an example, let's show how we can use the tool [`vals`](https://github.com/variantdev/vals) as a post-renderer and replace all references to secret values stored in HashiCorp Vault by their actual values. The following example is composed of a Helm chart that creates a secret resource in Kubernetes and a Helm deployment that is configured to use `vals` as a post-renderer:
+As an example, let's show how we can use the tool [`vals`](https://github.com/helmfile/vals) as a post-renderer and replace all references to secret values stored in HashiCorp Vault by their actual values. The following example is composed of a Helm chart that creates a secret resource in Kubernetes and a Helm deployment that is configured to use `vals` as a post-renderer:
 
 ```python tab={"label":"src/chart/BUILD"}
 helm_chart()

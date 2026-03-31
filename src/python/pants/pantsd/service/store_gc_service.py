@@ -7,7 +7,7 @@ import logging
 import time
 
 from pants.engine.internals.scheduler import Scheduler
-from pants.option.global_options import (
+from pants.option.bootstrap_options import (
     DEFAULT_LOCAL_STORE_OPTIONS,
     LOCAL_STORE_LEASE_TIME_SECS,
     LocalStoreOptions,

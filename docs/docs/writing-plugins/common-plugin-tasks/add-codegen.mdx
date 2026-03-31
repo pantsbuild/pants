@@ -12,7 +12,7 @@ Pants supports code generators that convert a protocol language like Protobuf in
 Pants will not actually write the generated files to disk, except when running `pants export-codegen`. Instead, any targets that depend on the protocol targets will cause their code to be generated, and those generated files will be copied over into the "chroot" (temporary directory) where Pants executes.
 
 :::note Example: Protobuf -> Python
-This guide walks through each step of adding Protobuf to generate Python sources. See [here](https://github.com/pantsbuild/pants/tree/master/src/python/pants/backend/codegen/protobuf) for the final result.
+This guide walks through each step of adding Protobuf to generate Python sources. See [here](https://github.com/pantsbuild/pants/tree/main/src/python/pants/backend/codegen/protobuf) for the final result.
 :::
 
 This guide assumes that you are running a code generator that already exists outside of Pants as a stand-alone binary, such as running Protoc or Thrift.
@@ -54,12 +54,13 @@ Instead of users having to explicitly add this dependency every time, you can dy
 To inject dependencies:
 
 1. Subclass the `Dependencies` field. Register this subclass on your protocol target type.
-2. Define a subclass of `InjectDependenciesRequest` and set the class property `inject_for` to the `Dependencies` subclass defined in the previous step. Register this new class with a [`UnionRule`](../the-rules-api/union-rules-advanced.mdx) for `InjectDependenciesRequest`.
-3. Create a new rule that takes your new `InjectDependenciesRequest` subclass as a parameter and returns `InjectedDependencies`.
+2. Define a `FieldSet` subclass that includes the `Dependencies` subclass and any other fields needed for inference.
+3. Define a subclass of `InferDependenciesRequest` and set the class property `infer_from` to the `FieldSet` subclass defined in the previous step. Register this new class with a [`UnionRule`](../the-rules-api/union-rules-advanced.mdx) for `InferDependenciesRequest`.
+4. Create a new rule that takes your new `InferDependenciesRequest` subclass as a parameter and returns `InferredDependencies`.
 
 ```python
 from pants.engine.addresses import Address
-from pants.engine.target import Dependencies, InjectDependenciesRequest, InjectedDependencies
+from pants.engine.target import Dependencies, FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 
@@ -72,18 +73,24 @@ class ProtobufSourceTarget(Target):
     alias = "protobuf_source"
     core_fields = (*COMMON_TARGET_FIELDS, ProtobufDependencies, ProtobufSourceField)
 
-class InjectProtobufDependencies(InjectDependenciesRequest):
-    inject_for = ProtobufDependencies
+class ProtobufDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (ProtobufDependencies,)
+    dependencies: ProtobufDependencies
+
+class InferProtobufDependencies(InferDependenciesRequest):
+    infer_from = ProtobufDependenciesInferenceFieldSet
 
 @rule
-async def inject_dependencies(_: InjectProtobufDependencies) -> InjectedDependencies:
+async def infer_protobuf_dependencies(
+    request: InferProtobufDependencies
+) -> InferredDependencies:
     address = Address("3rdparty/python", target_name="protobuf")
-    return InjectedDependencies([address])
+    return InferredDependencies([address])
 
 def rules():
     return [
         *collect_rules(),
-        UnionRule(InjectDependenciesRequest, InjectProtobufDependencies),
+        UnionRule(InferDependenciesRequest, InferProtobufDependencies),
     ]
 ```
 
@@ -174,70 +181,67 @@ async def generate_python_from_protobuf(
     request: GeneratePythonFromProtobufRequest, protoc: Protoc
 ) -> GeneratedSources:
     ...
-    return GeneratedSources(result_snaphsot)
+    return GeneratedSources(result_snapshot)
 ```
 
 The `request` parameter will have two fields: `protocol_sources: Snapshot` and `protocol_target: Target`. Often, you will want to include `protocol_sources` in the `input_digest` to the `Process` you use to run the generator. You can use `protocol_target` to look up more information about the input target, such as finding its dependencies.
 
 The rule should return `GeneratedSources`, which take a [`Snapshot`](../the-rules-api/file-system.mdx) as its only argument. This should be a Snapshot of the generated files for the input target.
 
-If you used `ExternalTool` in step 1, you will use `Get(DownloadedExternalTool, ExternalToolRequest)` to install the tool. Be sure to merge this with the `protocol_sources` and any other relevant input digests via `Get(Digest, MergeDigests)`.
+If you used `ExternalTool` in step 1, you will use `download_external_tool()` to install the tool. Be sure to merge this with the `protocol_sources` and any other relevant input digests via `merge_digests()`.
 
 For many code generators, you will need to get the input target's direct or transitive dependencies and include their sources in the `input_digest`. See [Rules and the Target API](../the-rules-api/rules-and-the-target-api.mdx).
 
-You will likely need to add logic for handling [source roots](../../using-pants/key-concepts/source-roots.mdx). For example, the code generator may not understand source roots so you may need to [strip source roots](../the-rules-api/rules-and-the-target-api.mdx) before putting the sources in the `input_digest`. Likely, you will want to restore a source root after generation because most Pants code will assume that there is a source root present. In the below example, we restore the original source root, e.g. `src/protobuf/f.proto` becomes `src/protobuf/f_pb2.py`. See [`protobuf/python/rules.py`](https://github.com/pantsbuild/pants/tree/master/src/python/pants/backend/codegen/protobuf/python/rules.py) for a more complex example that allows the user to specify what source root to use through a field on the `protobuf_library`.
+You will likely need to add logic for handling [source roots](../../using-pants/key-concepts/source-roots.mdx). For example, the code generator may not understand source roots so you may need to [strip source roots](../the-rules-api/rules-and-the-target-api.mdx) before putting the sources in the `input_digest`. Likely, you will want to restore a source root after generation because most Pants code will assume that there is a source root present. In the below example, we restore the original source root, e.g. `src/protobuf/f.proto` becomes `src/protobuf/f_pb2.py`. See [`protobuf/python/rules.py`](https://github.com/pantsbuild/pants/tree/main/src/python/pants/backend/codegen/protobuf/python/rules.py) for a more complex example that allows the user to specify what source root to use through a field on the `protobuf_library`.
 
 ```python
 @rule
 async def generate_python_from_protobuf(
     request: GeneratePythonFromProtobufRequest, protoc: Protoc, platform: Platform
 ) -> GeneratedSources:
-    download_protoc_get = Get(
-        DownloadedExternalTool, ExternalToolRequest, protoc.get_request(platform)
-    )
+    download_protoc_call = download_external_tool(protoc.get_request(platform))
 
     # Protoc needs all transitive dependencies on `protobuf_libraries` to work properly. It won't
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
-    transitive_targets = await Get(
-        TransitiveTargets,
+    transitive_tgts = await transitive_targets(
         TransitiveTargetsRequest([request.protocol_target.address]),
+        **implicitly(),
     )
 
     # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
     # for Protobuf imports to be discoverable.
-    all_stripped_sources_get = Get(
-        StrippedSourceFiles,
-        SourceFilesRequest(
-            (tgt.get(Sources) for tgt in transitive_targets.closure),
-            for_sources_types=(ProtobufSources,),
-        ),
+    all_stripped_sources_call = strip_source_roots(
+        **implicitly(SourceFilesRequest(
+            (tgt.get(Sources) for tgt in transitive_tgts.closure),
+            for_sources_types=(ProtobufSources,)
+        ))
     )
-    target_stripped_sources_get= Get(
-        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSources]]),
+    target_stripped_sources_call = strip_source_roots(
+        **implicitly(SourceFilesRequest(
+            [request.protocol_target[ProtobufSources]]
+        ))
     )
 
     (
         downloaded_protoc_binary,
         all_sources_stripped,
         target_sources_stripped,
-    ) = await MultiGet(
-        download_protoc_get,
-        all_stripped_sources_get,
-        target_stripped_sources_get,
+    ) = await concurrently(
+        download_protoc_call,
+        all_stripped_sources_call,
+        target_stripped_sources_call,
     )
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             (all_sources_stripped.snapshot.digest, downloaded_protoc_binary.digest)
-        ),
+        )
     )
 
     output_dir = "_generated_files"
-    result = await Get(
-        ProcessResult,
-        Process(
+    result = await execute_process_or_raise(
+        **implicitly(Process(
             (
                 downloaded_protoc_binary.exe,
                 "--python_out",
@@ -247,20 +251,20 @@ async def generate_python_from_protobuf(
             input_digest=input_digest,
             description=f"Generating Python sources from {request.protocol_target.address}.",
             output_directories=(output_dir,),
-        ),
+        ))
     )
 
     # We must do some path manipulation on the output digest for it to look like normal sources,
     # including adding back a source root.
     source_root_request = SourceRootRequest.for_target(request.protocol_target)
-    normalized_digest, source_root = await MultiGet(
-        Get(Digest, RemovePrefix(result.output_digest, output_dir)),
-        Get(SourceRoot, SourceRootRequest, source_root_request),
+    normalized_digest, source_root = await concurrently(
+        remove_prefix(RemovePrefix(result.output_digest, output_dir)),
+        get_source_roots(source_root_request),
     )
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))
+        await add_prefix(AddPrefix(normalized_digest, source_root.path))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, normalized_digest)
+        else await digest_to_snapshot(normalized_digest)
     )
     return GeneratedSources(source_root_restored)
 ```

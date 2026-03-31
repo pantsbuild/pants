@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import difflib
 import itertools
 import logging
 from collections import defaultdict
@@ -17,8 +18,9 @@ from pants.engine.console import Console
 from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import collect_rules, goal_rule, implicitly, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionMembership, union
 from pants.help.maybe_color import MaybeColor
@@ -57,6 +59,13 @@ class GenerateLockfile:
     resolve_name: str
     lockfile_dest: str
     diff: bool
+
+
+@rule(polymorphic=True)
+async def generate_lockfile(
+    req: GenerateLockfile, env_name: EnvironmentName
+) -> GenerateLockfileResult:
+    raise NotImplementedError()
 
 
 @dataclass(frozen=True)
@@ -105,6 +114,11 @@ class KnownUserResolveNames:
     requested_resolve_names_cls: type[RequestedUserResolveNames]
 
 
+@rule(polymorphic=True)
+async def get_known_user_resolve_names(req: KnownUserResolveNamesRequest) -> KnownUserResolveNames:
+    raise NotImplementedError()
+
+
 @union(in_scope_types=[EnvironmentName])
 class RequestedUserResolveNames(DeduplicatedCollection[str]):
     """The user resolves requested for a particular language ecosystem.
@@ -114,6 +128,13 @@ class RequestedUserResolveNames(DeduplicatedCollection[str]):
     """
 
     sort_input = True
+
+
+@rule(polymorphic=True)
+async def get_user_generate_lockfiles(
+    req: RequestedUserResolveNames, env_name: EnvironmentName
+) -> UserGenerateLockfiles:
+    raise NotImplementedError()
 
 
 class PackageVersion(Protocol):
@@ -271,7 +292,6 @@ class UnrecognizedResolveNamesError(Exception):
     ) -> None:
         all_valid_binaries = all_valid_binaries or set()
 
-        # TODO(#12314): maybe implement "Did you mean?"
         if len(unrecognized_resolve_names) == 1:
             unrecognized_str = unrecognized_resolve_names[0]
             name_description = "name"
@@ -296,6 +316,13 @@ class UnrecognizedResolveNamesError(Exception):
         if should_be_resolves:
             cmd = " ".join([f"--resolve={e}" for e in should_be_resolves])
             message.append(f"HINT: Some binaries should be resolves, try with `{cmd}`")
+
+        # "Did you mean?"
+        for name in unrecognized_resolve_names:
+            close_matches = difflib.get_close_matches(name, all_valid_names)
+            if close_matches:
+                suggestions = ", ".join(f"`{m}`" for m in close_matches)
+                message.append(f"Did you mean: {suggestions} (for `{name}`)")
 
         super().__init__(softwrap("\n\n".join(message)))
 
@@ -458,12 +485,30 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             """
         ),
     )
+    sync = BoolOption(
+        advanced=False,
+        default=False,
+        help=softwrap(
+            """
+            Attempt a minimal update of the lockfile, preserving existing dependency versions
+            wherever possible. The resulting lockfile will be a valid solution for the requested
+            dependency versions, but it may not include the latest versions available.
+
+            If a backend does not support syncing it will fall back to full regeneration of
+            the lockfile, and this option will have no effect.
+
+            Note that there may be edge cases where syncing will fail the next time it's run after
+            options that affect lockfile generation are changed. In this case you may need to
+            temporarily turn off `sync` and trigger a full regeneration of the lockfile.
+            """
+        ),
+    )
     custom_command = StrOption(
         advanced=True,
         default=None,
         help=softwrap(
             f"""
-            If set, lockfile headers will say to run this command to regenerate the lockfile,
+            If set, lockfile metadata will say to run this command to regenerate the lockfile,
             rather than running `{bin_name()} generate-lockfiles --resolve=<name>` like normal.
             """
         ),
@@ -504,8 +549,8 @@ async def generate_lockfiles_goal(
     console: Console,
     global_options: GlobalOptions,
 ) -> GenerateLockfilesGoal:
-    known_user_resolve_names = await MultiGet(
-        Get(KnownUserResolveNames, KnownUserResolveNamesRequest, request())
+    known_user_resolve_names = await concurrently(
+        get_known_user_resolve_names(**implicitly({request(): KnownUserResolveNamesRequest}))
         for request in union_membership.get(KnownUserResolveNamesRequest)
     )
     requested_user_resolve_names = determine_resolves_to_generate(
@@ -515,10 +560,11 @@ async def generate_lockfiles_goal(
 
     # This is the "planning" phase of lockfile generation. Currently this is all done in the local
     # environment, since there's not currently a clear mechanism to prescribe an environment.
-    all_specified_user_requests = await MultiGet(
-        Get(
-            UserGenerateLockfiles,
-            {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName},
+    all_specified_user_requests = await concurrently(
+        get_user_generate_lockfiles(
+            **implicitly(
+                {resolve_names: RequestedUserResolveNames, local_environment.val: EnvironmentName}
+            )
         )
         for resolve_names in requested_user_resolve_names
     )
@@ -545,20 +591,21 @@ async def generate_lockfiles_goal(
     else:
         all_requests = applicable_user_requests
 
-    results = await MultiGet(
-        Get(
-            GenerateLockfileResult,
-            {
-                req: GenerateLockfile,
-                _preferred_environment(req, local_environment.val): EnvironmentName,
-            },
+    results = await concurrently(
+        generate_lockfile(
+            **implicitly(
+                {
+                    req: GenerateLockfile,
+                    _preferred_environment(req, local_environment.val): EnvironmentName,
+                }
+            )
         )
         for req in all_requests
     )
 
     # Lockfiles are actually written here. This would be an acceptable place to handle conflict
     # resolution behaviour if we start executing requests in multiple environments.
-    merged_digest = await Get(Digest, MergeDigests(res.digest for res in results))
+    merged_digest = await merge_digests(MergeDigests(res.digest for res in results))
     workspace.write_digest(merged_digest)
 
     diffs: list[LockfileDiff] = []

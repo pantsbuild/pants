@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from pathlib import PurePath
 
 from pants.backend.go.util_rules.goroot import GoRoot
-from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, GoSdkToolIDResult
+from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, compute_go_tool_id
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import create_digest, execute_process, merge_digests
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 
 
 @dataclass(frozen=True)
@@ -133,39 +133,40 @@ async def generate_go_assembly_symabisfile(
         symabis_path = "symabis"
     else:
         symabis_path = os.path.join(request.dir_path, "symabis")
-    go_asm_h_digest, asm_tool_id = await MultiGet(
-        Get(Digest, CreateDigest([FileContent("go_asm.h", b"")])),
-        Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm")),
+    go_asm_h_digest, asm_tool_id = await concurrently(
+        create_digest(CreateDigest([FileContent("go_asm.h", b"")])),
+        compute_go_tool_id(GoSdkToolIDRequest("asm")),
     )
-    symabis_input_digest = await Get(
-        Digest, MergeDigests([request.compilation_input, go_asm_h_digest])
+    symabis_input_digest = await merge_digests(
+        MergeDigests([request.compilation_input, go_asm_h_digest])
     )
-    symabis_result = await Get(
-        FallibleProcessResult,
-        GoSdkProcess(
-            input_digest=symabis_input_digest,
-            command=(
-                "tool",
-                "asm",
-                *_asm_args(
-                    import_path=request.import_path,
-                    dir_path=request.dir_path,
-                    goroot=goroot,
-                    extra_flags=request.extra_assembler_flags,
+    symabis_result = await execute_process(
+        **implicitly(
+            GoSdkProcess(
+                input_digest=symabis_input_digest,
+                command=(
+                    "tool",
+                    "asm",
+                    *_asm_args(
+                        import_path=request.import_path,
+                        dir_path=request.dir_path,
+                        goroot=goroot,
+                        extra_flags=request.extra_assembler_flags,
+                    ),
+                    "-gensymabis",
+                    "-o",
+                    symabis_path,
+                    "--",
+                    *(str(PurePath(request.dir_path, s_file)) for s_file in request.s_files),
                 ),
-                "-gensymabis",
-                "-o",
-                symabis_path,
-                "--",
-                *(str(PurePath(request.dir_path, s_file)) for s_file in request.s_files),
-            ),
-            env={
-                "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
-            },
-            description=f"Generate symabis metadata for assembly files for {request.dir_path}",
-            output_files=(symabis_path,),
-            replace_sandbox_root_in_args=True,
-        ),
+                env={
+                    "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
+                },
+                description=f"Generate symabis metadata for assembly files for {request.dir_path}",
+                output_files=(symabis_path,),
+                replace_sandbox_root_in_args=True,
+            )
+        )
     )
     if symabis_result.exit_code != 0:
         return FallibleGenerateAssemblySymabisResult(
@@ -185,7 +186,7 @@ async def assemble_go_assembly_files(
     request: AssembleGoAssemblyFilesRequest,
     goroot: GoRoot,
 ) -> FallibleAssembleGoAssemblyFilesResult:
-    asm_tool_id = await Get(GoSdkToolIDResult, GoSdkToolIDRequest("asm"))
+    asm_tool_id = await compute_go_tool_id(GoSdkToolIDRequest("asm"))
 
     def obj_output_path(s_file: str) -> str:
         if os.path.isabs(request.dir_path):
@@ -193,30 +194,31 @@ async def assemble_go_assembly_files(
         else:
             return str(request.dir_path / PurePath(s_file).with_suffix(".o"))
 
-    assembly_results = await MultiGet(
-        Get(
-            FallibleProcessResult,
-            GoSdkProcess(
-                input_digest=request.input_digest,
-                command=(
-                    "tool",
-                    "asm",
-                    *_asm_args(
-                        import_path=request.import_path,
-                        dir_path=request.dir_path,
-                        goroot=goroot,
-                        extra_flags=request.extra_assembler_flags,
+    assembly_results = await concurrently(
+        execute_process(
+            **implicitly(
+                GoSdkProcess(
+                    input_digest=request.input_digest,
+                    command=(
+                        "tool",
+                        "asm",
+                        *_asm_args(
+                            import_path=request.import_path,
+                            dir_path=request.dir_path,
+                            goroot=goroot,
+                            extra_flags=request.extra_assembler_flags,
+                        ),
+                        "-o",
+                        obj_output_path(s_file),
+                        str(os.path.normpath(PurePath(request.dir_path, s_file))),
                     ),
-                    "-o",
-                    obj_output_path(s_file),
-                    str(os.path.normpath(PurePath(request.dir_path, s_file))),
-                ),
-                env={
-                    "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
-                },
-                description=f"Assemble {s_file} with Go",
-                output_files=(obj_output_path(s_file),),
-                replace_sandbox_root_in_args=True,
+                    env={
+                        "__PANTS_GO_ASM_TOOL_ID": asm_tool_id.tool_id,
+                    },
+                    description=f"Assemble {s_file} with Go",
+                    output_files=(obj_output_path(s_file),),
+                    replace_sandbox_root_in_args=True,
+                )
             ),
         )
         for s_file in request.s_files

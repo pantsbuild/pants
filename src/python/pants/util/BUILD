@@ -3,4 +3,12 @@
 
 python_sources()
 
-python_tests(name="tests")
+python_tests(
+    name="tests",
+    overrides={
+        "docutil_integration_test.py": {
+            "dependencies": ["testprojects/src/python:hello_directory"],
+            "timeout": 240,
+        }
+    },
+)

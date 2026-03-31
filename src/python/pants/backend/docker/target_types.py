@@ -667,12 +667,19 @@ class DockerImageTags(Collection[str]):
     """Additional image tags to apply to built Docker images."""
 
 
+@rule(polymorphic=True)
+async def get_docker_image_tags(
+    req: DockerImageTagsRequest, env_name: EnvironmentName
+) -> DockerImageTags:
+    raise NotImplementedError()
+
+
 class AllDockerImageTargets(Targets):
     pass
 
 
 @rule
-def all_docker_targets(all_targets: AllTargets) -> AllDockerImageTargets:
+async def all_docker_targets(all_targets: AllTargets) -> AllDockerImageTargets:
     return AllDockerImageTargets(
         [tgt for tgt in all_targets if tgt.has_field(DockerImageSourceField)]
     )

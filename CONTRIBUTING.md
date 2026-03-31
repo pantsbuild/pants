@@ -1,3 +1,3 @@
 # Contributing
 
-Please see [www.pantsbuild.org/docs/contributor-overview](https://www.pantsbuild.org/docs/contributor-overview).
+Please see [https://www.pantsbuild.org/stable/docs/contributions](https://www.pantsbuild.org/stable/docs/contributions).

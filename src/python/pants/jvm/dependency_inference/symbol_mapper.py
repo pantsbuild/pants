@@ -10,7 +10,7 @@ from typing import Any
 
 from pants.build_graph.address import Address
 from pants.engine.environment import EnvironmentName
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionMembership, union
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmTypeProvidingTargets,
@@ -54,6 +54,13 @@ class SymbolMap(FrozenDict[_ResolveName, FrozenTrieNode]):
     """The first party symbols provided by a single inference implementation."""
 
 
+@rule(polymorphic=True)
+async def create_first_party_map(
+    req: FirstPartyMappingRequest, env_name: EnvironmentName
+) -> SymbolMap:
+    raise NotImplementedError()
+
+
 @dataclass(frozen=True)
 class SymbolMapping:
     """The merged first and third party symbols provided by all inference implementations."""
@@ -84,12 +91,8 @@ async def merge_symbol_mappings(
     jvm: JvmSubsystem,
     third_party_mapping: ThirdPartySymbolMapping,
 ) -> SymbolMapping:
-    all_firstparty_mappings = await MultiGet(
-        Get(
-            SymbolMap,
-            FirstPartyMappingRequest,
-            marker_cls(),
-        )
+    all_firstparty_mappings = await concurrently(
+        create_first_party_map(**implicitly({marker_cls(): FirstPartyMappingRequest}))
         for marker_cls in union_membership.get(FirstPartyMappingRequest)
     )
     all_mappings: list[FrozenDict[_ResolveName, FrozenTrieNode]] = [

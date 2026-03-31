@@ -32,7 +32,7 @@ class GoalSubsystem(Subsystem):
 
     ```
     @rule
-    def list(console: Console, list_subsystem: ListSubsystem) -> List:
+    async def list(console: Console, list_subsystem: ListSubsystem) -> List:
       transitive = list_subsystem.transitive
       documented = list_subsystem.documented
       ...
@@ -99,6 +99,10 @@ class Goal:
 
     exit_code: int
     subsystem_cls: ClassVar[type[GoalSubsystem]]
+
+    # A marker that allows initialization code to check for Goal subclasses without
+    # having to import Goal and use issubclass(), which can cause a dependency cycle.
+    __goal__ = True
 
     f"""Indicates that a Goal has been migrated to compute EnvironmentNames to build targets in.
 

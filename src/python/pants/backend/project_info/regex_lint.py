@@ -12,8 +12,9 @@ from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.goals.lint import LintFilesRequest, LintResult, Partitions
-from pants.engine.fs import DigestContents, PathGlobs
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import PathGlobs
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import DictOption, EnumOption, SkipOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -192,8 +193,8 @@ class MultiMatcher:
             path_patterns_used.add(k)
             if not isinstance(v, (tuple, list)):
                 raise ValueError(
-                    "Value for path pattern {} in required_matches must be tuple of "
-                    "content pattern names, but was {}".format(k, v)
+                    f"Value for path pattern {k} in required_matches must be tuple of "
+                    f"content pattern names, but was {v}"
                 )
             content_patterns_used.update(v)
 
@@ -259,7 +260,7 @@ class MultiMatcher:
 
 
 class RegexLintRequest(LintFilesRequest):
-    tool_subsystem = RegexLintSubsystem
+    tool_subsystem = RegexLintSubsystem  # type: ignore[assignment]
 
 
 @rule
@@ -291,8 +292,8 @@ async def lint_with_regex_patterns(
         assert content_pattern_names and encoding
         file_to_content_pattern_names_and_encoding[fp] = (content_pattern_names, encoding)
 
-    digest_contents = await Get(
-        DigestContents, PathGlobs(globs=file_to_content_pattern_names_and_encoding.keys())
+    digest_contents = await get_digest_contents(
+        **implicitly(PathGlobs(globs=file_to_content_pattern_names_and_encoding.keys()))
     )
 
     result = []

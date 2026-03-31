@@ -3,13 +3,6 @@
 from textwrap import dedent
 
 import pytest
-from python_constant import target_types
-from python_constant.target_types import (
-    PythonConstant,
-    PythonConstantTarget,
-    PythonConstantTargetGenerator,
-    PythonConstantVisitor,
-)
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import module_mapper
@@ -19,6 +12,13 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, DependenciesRequest
 from pants.testutil.rule_runner import RuleRunner
+from python_constant import target_types
+from python_constant.target_types import (
+    PythonConstant,
+    PythonConstantTarget,
+    PythonConstantTargetGenerator,
+    PythonConstantVisitor,
+)
 
 
 @pytest.fixture

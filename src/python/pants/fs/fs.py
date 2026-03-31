@@ -49,9 +49,7 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
         safe_name = f"{prefix}{sep}{hexdigest}{sep}{suffix}{ext}"
         if len(safe_name) > max_length:
             raise ValueError(
-                "Digest {} failed to produce a filename <= {} characters for {} - got {}".format(
-                    digest, max_length, filename, safe_name
-                )
+                f"Digest {digest} failed to produce a filename <= {max_length} characters for {filename} - got {safe_name}"
             )
         return safe_name
 

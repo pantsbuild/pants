@@ -17,7 +17,6 @@ def test_counters_and_histograms() -> None:
     ) as tmpdir:
         argv = [
             "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black']",
-            "--plugins=hdrhistogram",
             "--stats-log",
             "lint",
             f"{tmpdir}::",
@@ -39,15 +38,7 @@ def test_memory_summary() -> None:
     result = run_pants(["--stats-memory-summary", "--version"])
     result.assert_success()
     assert "Memory summary" in result.stderr
-    assert "pants.engine.unions.UnionMembership" in result.stderr
-
-
-def test_warn_if_no_histograms() -> None:
-    result = run_pants(["--stats-log", "roots"])
-    result.assert_success()
-    assert "Counters:" in result.stderr
-    assert "Please run with `--plugins=hdrhistogram`" in result.stderr
-    assert "Observation histogram summaries:" not in result.stderr
+    assert "builtins.UnionMembership" in result.stderr
 
 
 def test_writing_to_output_file_plain_text() -> None:
@@ -84,7 +75,6 @@ def test_writing_to_output_file_json() -> None:
     with setup_tmpdir({"src/py/app.py": "print(0)\n", "src/py/BUILD": "python_sources()"}):
         argv1 = [
             "--backend-packages=['pants.backend.python']",
-            "--plugins=hdrhistogram",
             "--stats-log",
             "--stats-memory-summary",
             "--stats-format=jsonlines",
@@ -94,7 +84,6 @@ def test_writing_to_output_file_json() -> None:
         run_pants(argv1).assert_success()
         argv2 = [
             "--backend-packages=['pants.backend.python']",
-            "--plugins=hdrhistogram",
             "--stats-log",
             "--stats-memory-summary",
             "--stats-format=jsonlines",

@@ -48,8 +48,25 @@ impl Task {
         call: externs::Call,
     ) -> NodeResult<Value> {
         let context = context.clone();
+        let implementation_rule = context
+            .core
+            .tasks
+            .vtable()
+            .get(&call.rule_id)
+            .and_then(|ve| {
+                call.inputs
+                    .iter()
+                    .map(|t| ve.get(t.type_id()))
+                    .find(Option::is_some)
+                    .flatten()
+            });
+
+        // If no implementation rule, use the base rule. Typically that will throw a
+        // relevant error, but could hypothetically provide a sensible default implementation.
+        let rule_id = implementation_rule.unwrap_or(&call.rule_id);
+
         let dependency_key =
-            DependencyKey::for_known_rule(call.rule_id.clone(), call.output_type, call.args_arity)
+            DependencyKey::for_known_rule(rule_id.clone(), call.output_type, call.args_arity)
                 .provided_params(call.inputs.iter().map(|t| *t.type_id()));
         params.extend(call.inputs.iter().cloned());
 
@@ -60,96 +77,46 @@ impl Task {
             .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
 
         // Find the entry for the Call.
-        let entry = edges.entry_for(&dependency_key).ok_or_else(|| {
-            // NB: The Python constructor for `Call()` will have already errored if
-            // `type(input) != input_type`.
-            throw(format!(
-                "{call} was not detected in your @rule body at rule compile time."
-            ))
-        })?;
-        select(context, call.args, call.args_arity, params, entry).await
-    }
-
-    // Handles the case where a generator produces a `Get` for an unknown `@rule`.
-    async fn gen_get(
-        context: &Context,
-        mut params: Params,
-        entry: Intern<rule_graph::Entry<Rule>>,
-        get: externs::Get,
-    ) -> NodeResult<Value> {
-        let dependency_key =
-            DependencyKey::new(get.output).provided_params(get.inputs.iter().map(|t| *t.type_id()));
-        params.extend(get.inputs.iter().cloned());
-
-        let edges = context
-            .core
-            .rule_graph
-            .edges_for_inner(&entry)
-            .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
-
-        // Find the entry for the Get.
         let entry = edges
             .entry_for(&dependency_key)
             .or_else(|| {
-                // The Get might have involved a @union: if so, include its in_scope types in the
+                // The Call might have involved a @union: if so, include its in_scope types in the
                 // lookup.
-                let in_scope_types = get
+                let in_scope_types = call
                     .input_types
                     .iter()
                     .find_map(|t| t.union_in_scope_types())?;
-                edges.entry_for(
-                    &DependencyKey::new(get.output)
-                        .provided_params(get.inputs.iter().map(|k| *k.type_id()))
-                        .in_scope_params(in_scope_types),
-                )
+                edges.entry_for(&dependency_key.in_scope_params(in_scope_types))
             })
             .ok_or_else(|| {
-                if get.input_types.iter().any(|t| t.is_union()) {
-                    throw(format!(
-            "Invalid Get. Because an input type for `{get}` was annotated with `@union`, \
-             the value for that type should be a member of that union. Did you \
-             intend to register a `UnionRule`? If not, you may be using the incorrect \
-             explicitly declared type.",
-          ))
-                } else {
-                    // NB: The Python constructor for `Get()` will have already errored if
-                    // `type(input) != input_type`.
-                    throw(format!(
-                        "{get} was not detected in your @rule body at rule compile time. \
-             Was the `Get` constructor called in a non async-function, or \
-             was it inside an async function defined after the @rule? \
-             Make sure the `Get` is defined before or inside the @rule body.",
-                    ))
-                }
+                // NB: The Python constructor for `Call()` will have already errored if
+                // `type(input) != input_type`.
+                throw(format!(
+                    "{call} was not detected in your @rule body at rule compile time. Make sure \
+                    the callee is defined before the @rule body."
+                ))
             })?;
-        select(context.clone(), None, 0, params, entry).await
+        select(context, call.args, call.args_arity, params, entry).await
     }
 
-    // Handles the case where a generator produces either a `Get` or a generator.
-    fn gen_get_or_generator(
+    // Handles the case where a generator produces a generator.
+    fn gen_generator(
         context: &Context,
         params: Params,
         entry: Intern<rule_graph::Entry<Rule>>,
-        gog: externs::GetOrGenerator,
-    ) -> BoxFuture<NodeResult<Value>> {
+        generator: Value,
+    ) -> BoxFuture<'_, NodeResult<Value>> {
         async move {
-            match gog {
-                externs::GetOrGenerator::Get(get) => {
-                    Self::gen_get(context, params, entry, get).await
-                }
-                externs::GetOrGenerator::Generator(generator) => {
-                    // TODO: The generator may run concurrently with any other generators requested in an
-                    // `All`/`MultiGet` (due to `future::try_join_all`), and so it needs its own workunit.
-                    // Should look into removing this constraint: possibly by running all generators from an
-                    // `All` on a tokio `LocalSet`.
-                    in_workunit!("generator", Level::Trace, |workunit| async move {
-                        let (value, _type_id) =
-                            Self::generate(context, workunit, params, entry, generator).await?;
-                        Ok(value)
-                    })
-                    .await
-                }
-            }
+            // TODO: The generator may run concurrently with any other generators requested in an
+            // `All`/`concurrently` (due to `future::try_join_all`), and so it needs its own workunit.
+            // Should look into removing this constraint: possibly by running all generators from an
+            // `All` on a tokio `LocalSet`.
+            in_workunit!("generator", Level::Trace, |workunit| async move {
+                let (value, _type_id) =
+                    Self::generate(context, workunit, params, entry, generator).await?;
+                Ok(value)
+            })
+            .await
         }
         .boxed()
     }
@@ -167,7 +134,7 @@ impl Task {
     ) -> NodeResult<(Value, TypeId)> {
         let mut input = GeneratorInput::Initial;
         loop {
-            let response = Python::with_gil(|py| {
+            let response = Python::attach(|py| {
                 externs::generator_send(py, &context.core.types.coroutine, &generator, input)
             })?;
             match response {
@@ -197,29 +164,18 @@ impl Task {
                         Err(failure) => break Err(failure),
                     }
                 }
-                GeneratorResponse::Get(get) => {
+                GeneratorResponse::All(generators) => {
                     let _blocking_token = workunit.blocking();
-                    let result = Self::gen_get(context, params.clone(), entry, get).await;
-                    match result {
-                        Ok(value) => {
-                            input = GeneratorInput::Arg(value);
-                        }
-                        Err(throw @ Failure::Throw { .. }) => {
-                            input = GeneratorInput::Err(PyErr::from(throw));
-                        }
-                        Err(failure) => break Err(failure),
-                    }
-                }
-                GeneratorResponse::All(gogs) => {
-                    let _blocking_token = workunit.blocking();
-                    let get_futures = gogs
+                    let get_futures = generators
                         .into_iter()
-                        .map(|gog| Self::gen_get_or_generator(context, params.clone(), entry, gog))
+                        .map(|generator| {
+                            Self::gen_generator(context, params.clone(), entry, generator)
+                        })
                         .collect::<Vec<_>>();
                     match future::try_join_all(get_futures).await {
                         Ok(values) => {
                             let values_tuple_result =
-                                Python::with_gil(|py| externs::store_tuple(py, values));
+                                Python::attach(|py| externs::store_tuple(py, values));
                             input = match values_tuple_result {
                                 Ok(t) => GeneratorInput::Arg(t),
                                 Err(err) => GeneratorInput::Err(err),
@@ -278,13 +234,17 @@ impl Task {
             self.task.side_effecting,
             &self.side_effected,
             async move {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     let func = self.task.func.0.value.bind(py);
 
                     // If there are explicit positional arguments, apply any computed arguments as
                     // keywords. Otherwise, apply computed arguments as positional.
                     let res = if let Some(args) = args {
-                        let args = args.value.bind(py).extract::<Bound<'_, PyTuple>>()?;
+                        let args = args
+                            .value
+                            .bind(py)
+                            .extract::<Bound<'_, PyTuple>>()
+                            .map_err(PyErr::from)?;
                         let kwargs = PyDict::new(py);
                         for ((name, _), value) in self
                             .task
@@ -338,7 +298,7 @@ impl Task {
         }
 
         if self.task.engine_aware_return_type {
-            Python::with_gil(|py| {
+            Python::attach(|py| {
                 EngineAwareReturnType::update_workunit(workunit, result_val.bind(py))
             })
         };

@@ -283,6 +283,22 @@ K8S_CUSTOM_RESOURCE_FILE = dedent(
     """
 )
 
+K8S_CRD_FILE_IMAGE = dedent(
+    """
+    apiVersion: pants/v1alpha1
+    kind: CustomResourceDefinition
+    metadata:
+      name: crd_foo
+    spec:
+      containers:
+        - name: myapp-container
+          image: busybox:1.28
+      initContainers:
+        - name: init-service
+          image: busybox:1.29
+    """
+)
+
 HELM_TEMPLATE_HELPERS_FILE = dedent(
     """\
   {{- define "fullname" -}}

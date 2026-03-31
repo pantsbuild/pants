@@ -7,7 +7,6 @@ import dataclasses
 import logging
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from enum import Enum
 from typing import Any
 
 from pants.base.deprecated import warn_or_error
@@ -29,12 +28,6 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
-
-
-class NativeOptionsValidation(Enum):
-    ignore = "ignore"
-    warning = "warning"
-    error = "error"
 
 
 class Options:

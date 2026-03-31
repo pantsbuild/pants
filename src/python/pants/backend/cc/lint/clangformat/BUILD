@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(dependencies=[":lockfile"])
-resource(name="lockfile", source="clangformat.lock")
+resources(name="lockfile", sources=["clangformat.lock*"])
 
 python_tests(
     name="tests",

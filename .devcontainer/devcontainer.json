@@ -6,8 +6,15 @@
     },
     "features": {
       "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+      "ghcr.io/devcontainers/features/go:1": {},
+      "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+        "minikube": "none"
+      },
       "ghcr.io/devcontainers/features/python:1": {
         "version": "3.11.11"
+      },
+      "ghcr.io/devcontainers/features/rust:1": {
+        "profile": "complete"
       },
       "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
     },
@@ -37,6 +44,7 @@
             "editor.defaultFormatter": "rust-lang.rust-analyzer",
             "editor.formatOnSave": true
           },
+          "dev.containers.dockerCredentialHelper": false,
           "python.analysis.extraPaths": ["src/python"],
           "black-formatter.args": ["--config=pyproject.toml"],
           "flake8.args": ["--config=build-support/flake8/.flake8"],
@@ -71,6 +79,7 @@
         "type": "volume"
       }
     ],
+    "onCreateCommand": ".devcontainer/onCreateCommand.sh",
     "postCreateCommand": ".devcontainer/postCreateCommand.sh",
     "postStartCommand": ".devcontainer/postStartCommand.sh"
   }

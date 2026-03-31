@@ -24,7 +24,7 @@ from pants.util.logging import LogLevel
 
 
 class RenameFieldsInFilesRequest(FixBuildFilesRequest):
-    tool_subsystem = BUILDDeprecationsFixer
+    tool_subsystem = BUILDDeprecationsFixer  # type: ignore[assignment]
 
 
 class RenameFieldsInFileRequest(FixBUILDFileRequest):
@@ -50,7 +50,7 @@ class RenamedFieldTypes:
 
 
 @rule
-def determine_renamed_field_types(
+async def determine_renamed_field_types(
     target_types: RegisteredTargetTypes, union_membership: UnionMembership
 ) -> RenamedFieldTypes:
     target_field_renames: DefaultDict[str, dict[str, str]] = defaultdict(dict)
@@ -71,7 +71,7 @@ def determine_renamed_field_types(
 
 
 @rule
-def fix_single(
+async def fix_single(
     request: RenameFieldsInFileRequest,
     renamed_field_types: RenamedFieldTypes,
 ) -> FixedBUILDFile:

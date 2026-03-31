@@ -52,14 +52,16 @@ def rule_runner() -> RuleRunner:
 
 @pytest.fixture(
     params=[
-        pytest.param((Path(__file__).parent / "package-lock.json", "npm"), id="npm"),
-        pytest.param((Path(__file__).parent / "pnpm-lock.yaml", "pnpm"), id="pnpm"),
-        pytest.param((Path(__file__).parent / "yarn.lock", "yarn"), id="yarn"),
+        pytest.param((Path(__file__).parent / "package-lock.json", "npm", "*"), id="npm"),
+        pytest.param(
+            (Path(__file__).parent / "pnpm-lock.yaml", "pnpm", "workspace:../child-lib"), id="pnpm"
+        ),
+        pytest.param((Path(__file__).parent / "yarn.lock", "yarn", "*"), id="yarn"),
     ],
     autouse=True,
 )
 def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRunner:
-    lockfile, package_manager = request.param
+    lockfile, package_manager, child_dep = request.param
     rule_runner.set_options(
         [f"--nodejs-package-manager={package_manager}"],
         env_inherit={"PATH"},
@@ -122,8 +124,8 @@ def configure_runner_with_js_project(request, rule_runner: RuleRunner) -> RuleRu
                     "scripts": {
                         "build": "parcel build index.mjs --dist-dir=dist --cache-dir=.parcel-cache"
                     },
-                    "dependencies": {"child-lib": "*"},
-                    "devDependencies": {"parcel": "^2.12.0"},
+                    "dependencies": {"child-lib": child_dep},
+                    "devDependencies": {"parcel": "^2.13.3"},
                     "private": True,
                 }
             ),

@@ -46,7 +46,7 @@ from pants.util.logging import LogLevel
     desc=f"Find all `{PythonDistribution.alias}` targets with `{StevedoreNamespace.alias}` entry_points",
     level=LogLevel.DEBUG,
 )
-def find_all_python_distributions_with_any_stevedore_entry_points(
+async def find_all_python_distributions_with_any_stevedore_entry_points(
     targets: AllTargets,
 ) -> AllStevedoreExtensionTargets:
     # This only supports specifying stevedore_namespace entry points in the

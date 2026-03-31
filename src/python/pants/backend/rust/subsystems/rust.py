@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from pants.base.deprecated import warn_or_error
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import OrderedSet
@@ -13,6 +14,15 @@ from pants.util.strutil import softwrap
 class RustSubsystem(Subsystem):
     options_scope = "rust"
     help = "Options for Rust support."
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        warn_or_error(
+            removal_version="2.31.0.dev1",
+            entity="The Experimental Rust Backend",
+            hint="See 2.30.0 release notes for more information",
+            start_version="2.30.0.dev0",
+        )
 
     toolchain = StrOption(
         "--toolchain",

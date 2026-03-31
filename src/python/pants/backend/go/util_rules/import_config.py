@@ -11,7 +11,7 @@ from typing import ClassVar
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import create_digest
 from pants.engine.rules import collect_rules, rule
 from pants.util.frozendict import FrozenDict
 
@@ -47,7 +47,7 @@ async def generate_import_config(request: ImportConfigRequest) -> ImportConfig:
         *(f"importmap {old}={new}" for old, new in import_map),
     ]
     content = "\n".join(lines).encode("utf-8")
-    result = await Get(Digest, CreateDigest([FileContent(ImportConfig.CONFIG_PATH, content)]))
+    result = await create_digest(CreateDigest([FileContent(ImportConfig.CONFIG_PATH, content)]))
     return ImportConfig(result)
 
 

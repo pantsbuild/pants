@@ -11,55 +11,16 @@ from typing import ContextManager
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.internals.native_engine import PyRemotingOptions
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.unions import UnionMembership
-from pants.init.options_initializer import OptionsInitializer
+from pants.option.bootstrap_options import DynamicRemoteOptions, ExecutionOptions, RemoteProvider
 from pants.option.errors import OptionsError
-from pants.option.global_options import (
-    DynamicRemoteOptions,
-    ExecutionOptions,
-    GlobalOptions,
-    RemoteProvider,
-)
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil import rule_runner
-from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.option_util import create_dynamic_remote_options
 from pants.testutil.pytest_util import no_exception
 from pants.util.dirutil import safe_mkdir_for
 from pants.version import VERSION
-
-
-def create_dynamic_remote_options(
-    *,
-    initial_headers: dict[str, str] | None = None,
-    address: str | None = "grpc://fake.url:10",
-    token_path: str | None = None,
-    plugin: str | None = None,
-) -> DynamicRemoteOptions:
-    if initial_headers is None:
-        initial_headers = {}
-    args = [
-        "--remote-cache-read",
-        f"--remote-execution-address={address}",
-        f"--remote-store-address={address}",
-        f"--remote-store-headers={initial_headers}",
-        f"--remote-execution-headers={initial_headers}",
-        "--remote-instance-name=main",
-    ]
-    if token_path:
-        args.append(f"--remote-oauth-bearer-token=@{token_path}")
-    if plugin:
-        args.append(f"--backend-packages={plugin}")
-    ob = create_options_bootstrapper(args)
-    env = CompleteEnvironmentVars({})
-    oi = OptionsInitializer(ob, rule_runner.EXECUTOR)
-    _build_config = oi.build_config(ob, env)
-    options = oi.options(ob, env, _build_config, union_membership=UnionMembership({}), raise_=False)
-    return DynamicRemoteOptions.from_options(
-        options, env, remote_auth_plugin_func=_build_config.remote_auth_plugin_func
-    )[0]
 
 
 def test_dynamic_remote_options_oauth_bearer_token_with_path(tmp_path: Path) -> None:
@@ -84,7 +45,7 @@ def test_dynamic_remote_options_auth_plugin(tmp_path: Path) -> None:
         plugin_path.write_text(
             dedent(
                 f"""\
-                from pants.option.global_options import AuthPluginState, AuthPluginResult
+                from pants.option.bootstrap_options import AuthPluginState, AuthPluginResult
 
                 def remote_auth(initial_execution_headers, initial_store_headers, options, **kwargs):
                     return AuthPluginResult(
@@ -294,6 +255,7 @@ def test_remote_provider_matches_rust_enum(
         store_rpc_concurrency=0,
         store_rpc_timeout_millis=0,
         store_batch_api_size_limit=0,
+        store_batch_load_enabled=False,
         cache_warnings_behavior="ignore",
         cache_content_behavior="validate",
         cache_rpc_concurrency=0,

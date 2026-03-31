@@ -11,35 +11,44 @@ We would love to help you with your plugin. Please reach out through [Slack](/co
 We also appreciate any feedback on the Rules API. If you find certain things confusing or are looking for additional mechanisms, please let us know.
 :::
 
-## Tip: Use `MultiGet` for increased concurrency
+## Tip: Use `concurrently` for increased concurrency
 
-Every time your rule has `await`, Python will yield execution to the engine and not resume until the engine returns the result. So, you can improve concurrency by instead bundling multiple `Get` requests into a single `MultiGet`, which will allow each request to be resolved through a separate thread.
+Every time your rule `await`s, Python will yield execution to the engine and not resume until the engine returns the result. So, you can improve concurrency by instead bundling multiple `await` requests into a single `concurrently`, which will allow requests to execute concurrently on multiple threads.
 
 Okay:
 
 ```python
-from pants.core.util_rules.source_files import SourceFilesRequest, SourceFiles
-from pants.engine.fs import AddPrefix, Digest
-from pants.engine.internals.selectors import Get
+from pants.core.util_rules.source_files import (
+    SourceFilesRequest,
+    determine_source_files
+)
+from pants.engine.fs import AddPrefix
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import add_prefix
+from pants.engine.rules import rule
 
 @rule
 async def demo(...) -> Foo:
-    new_digest = await Get(Digest, AddPrefix(original_digest, "new_prefix"))
-    source_files = await Get(SourceFiles, SourceFilesRequest(sources_fields))
+    new_digest = await add_prefix(AddPrefix(original_digest, "new_prefix"))
+    source_files = await determine_source_files(SourceFilesRequest(sources_fields))
 ```
 
 Better:
 
 ```python
-from pants.core.util_rules.source_files import SourceFilesRequest, SourceFiles
-from pants.engine.fs import AddPrefix, Digest
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.core.util_rules.source_files import (
+    SourceFilesRequest,
+    determine_source_files
+)
+from pants.engine.fs import AddPrefix
+from pants.engine.intrinsics import add_prefix
+from pants.engine.rules import concurrently, rule
 
 @rule
 async def demo(...) -> Foo:
-    new_digest, source_files = await MultiGet(
-        Get(Digest, AddPrefix(original_digest, "new_prefix")),
-        Get(SourceFiles, SourceFilesRequest(sources_fields)),
+    new_digest, source_files = await concurrently(
+        add_prefix(AddPrefix(original_digest, "new_prefix")),
+        determine_source_files(SourceFilesRequest(sources_fields)),
     )
 ```
 
@@ -82,7 +91,7 @@ Rule graph issues can be particularly hard to figure out - the error messages ar
 
 We encourage you to reach out in #plugins on [Slack](/community/getting-help) for help.
 
-Often the best way to debug a rule graph issue is to isolate where the problem comes from by commenting out code until the graph compiles. The rule graph is formed solely by looking at the types in the signature of your `@rule` and in any `Get` statements - none of the rest of your rules matter. To check if the rule graph can be built, simply run `pants --version`.
+Often the best way to debug a rule graph issue is to isolate where the problem comes from by commenting out code until the graph compiles. The rule graph is formed solely by looking at the types in the signature of your `@rule` and in any `await`s - none of the rest of your rules matter. To check if the rule graph can be built, simply run `pants --version`.
 
 We recommend starting by determining which backend—or combination of backends—is causing issues. You can run the below script to find this. Once you find the smallest offending combination, focus on fixing that first by removing all irrelevant backends from `backend_packages` in `pants.toml`—this reduces the surface area of where issues can come from. (You may need to use the option `--no-verify-config` so that Pants doesn't complain about unrecognized options.)
 
@@ -130,13 +139,13 @@ if __name__ == "__main__":
     main()
 ```
 
-Once you've identified the smallest combination of backends that fail, and you have updated `pants.toml`, you can try isolating which rules are problematic by commenting out `Get`s and the parameters to `@rule`s.
+Once you've identified the smallest combination of backends that fail, and you have updated `pants.toml`, you can try isolating which rules are problematic by commenting out `await`s and the parameters to `@rule`s.
 
 Some common sources of rule graph failures:
 
 - Dependent rules are not registered.
   - This is especially common when you only have one backend activated entirely. We recommend trying to get each backend to be valid regardless of what other backends are activated. Use the above script to see if this is happening.
-  - To fix this, see which types you're using in your `@rule` signatures and `Get`s. If they come from another backend, activate their rules. For example, if you use `await Get(Pex, PexRequest)`, you should activate `pants.backend.python.util_rules.pex.rules()` in your `register.py`.
+  - To fix this, see which types you're using in your `@rule` signatures and `await`s. If they come from another backend, activate their rules. For example, if you use `await create_pex(PexRequest)`, you should activate `pants.backend.python.util_rules.pex.rules()` in your `register.py`.
 - Not "newtyping".
   - It's possible and sometimes desirable to use types already defined in your plugin or core Pants. For example, you might want to define a new rule that goes from `MyCustomClass -> Process`. However, sometimes this makes the rule graph more complicated than it needs to be.
   - It's often helpful to create a result and request type for each of your `@rule`s, e.g. `MyPlugin` and `MyPluginRequest`.

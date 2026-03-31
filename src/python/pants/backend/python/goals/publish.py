@@ -6,22 +6,33 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.target_types import PythonDistribution
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import (
+    VenvPexProcess,
+    create_venv_pex,
+    setup_venv_pex_process,
+)
+from pants.core.goals.package import PackageFieldSet
 from pants.core.goals.publish import (
+    CheckSkipRequest,
+    CheckSkipResult,
     PublishFieldSet,
     PublishOutputData,
     PublishPackages,
     PublishProcesses,
     PublishRequest,
 )
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
+from pants.core.util_rules.config_files import ConfigFiles, find_config_file
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import CreateDigest, Digest, MergeDigests, Snapshot
-from pants.engine.process import InteractiveProcess, Process
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.fs import CreateDigest, MergeDigests, Snapshot
+from pants.engine.intrinsics import digest_to_snapshot, merge_digests
+from pants.engine.process import InteractiveProcess
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import BoolField, StringSequenceField
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.strutil import help_text
 
@@ -65,6 +76,9 @@ class PublishPythonPackageFieldSet(PublishFieldSet):
     repositories: PythonRepositoriesField
     skip_twine: SkipTwineUploadField
 
+    def make_skip_request(self, package_fs: PackageFieldSet) -> PythonDistCheckSkipRequest | None:
+        return PythonDistCheckSkipRequest(publish_fs=self, package_fs=package_fs)
+
     def get_output_data(self) -> PublishOutputData:
         return PublishOutputData(
             {
@@ -73,12 +87,33 @@ class PublishPythonPackageFieldSet(PublishFieldSet):
             }
         )
 
-    # I'd rather opt out early here, so we don't build unnecessarily, however the error feedback is
-    # misleading and not very helpful in that case.
-    #
-    # @classmethod
-    # def opt_out(cls, tgt: Target) -> bool:
-    #     return not tgt[PythonRepositoriesField].value
+
+class PythonDistCheckSkipRequest(CheckSkipRequest[PublishPythonPackageFieldSet]):
+    pass
+
+
+@rule
+async def check_if_skip_upload(
+    request: PythonDistCheckSkipRequest, twine_subsystem: TwineSubsystem
+) -> CheckSkipResult:
+    if twine_subsystem.skip:
+        reason = f"(by `[{TwineSubsystem.name}].skip = True`)"
+    elif request.publish_fs.skip_twine.value:
+        reason = f"(by `{request.publish_fs.skip_twine.alias}` on {request.address})"
+    elif not request.publish_fs.repositories.value:
+        reason = f"(no `{request.publish_fs.repositories.alias}` specified for {request.address})"
+    else:
+        return CheckSkipResult.no_skip()
+    name = (
+        request.package_fs.provides.value.kwargs.get("name", "<unknown python artifact>")
+        if isinstance(request.package_fs, PythonDistributionFieldSet)
+        else "<unknown artifact>"
+    )
+    return CheckSkipResult.skip(
+        names=[name],
+        description=reason,
+        data=request.publish_fs.get_output_data(),
+    )
 
 
 def twine_upload_args(
@@ -143,44 +178,29 @@ async def twine_upload(
         if artifact.relpath
     )
 
-    if twine_subsystem.skip or not dists:
+    if not dists:
         return PublishProcesses()
 
-    # Too verbose to provide feedback as to why some packages were skipped?
-    skip = None
-    if request.field_set.skip_twine.value:
-        skip = f"(by `{request.field_set.skip_twine.alias}` on {request.field_set.address})"
-    elif not request.field_set.repositories.value:
-        # I'd rather have used the opt_out mechanism on the field set, but that gives no hint as to
-        # why the target was not applicable.
-        skip = f"(no `{request.field_set.repositories.alias}` specified for {request.field_set.address})"
-
-    if skip:
-        return PublishProcesses(
-            [
-                PublishPackages(
-                    names=dists,
-                    description=skip,
-                ),
-            ]
-        )
-
-    twine_pex, packages_digest, config_files = await MultiGet(
-        Get(VenvPex, PexRequest, twine_subsystem.to_pex_request()),
-        Get(Digest, MergeDigests(pkg.digest for pkg in request.packages)),
-        Get(ConfigFiles, ConfigFilesRequest, twine_subsystem.config_request()),
+    twine_pex, packages_digest, config_files = await concurrently(
+        create_venv_pex(**implicitly(twine_subsystem.to_pex_request())),
+        merge_digests(MergeDigests(pkg.digest for pkg in request.packages)),
+        find_config_file(twine_subsystem.config_request()),
     )
 
     ca_cert_request = twine_subsystem.ca_certs_digest_request(global_options.ca_certs_path)
-    ca_cert = await Get(Snapshot, CreateDigest, ca_cert_request) if ca_cert_request else None
+    ca_cert = (
+        await digest_to_snapshot(**implicitly({ca_cert_request: CreateDigest}))
+        if ca_cert_request
+        else None
+    )
     ca_cert_digest = (ca_cert.digest,) if ca_cert else ()
 
-    input_digest = await Get(
-        Digest, MergeDigests((packages_digest, config_files.snapshot.digest, *ca_cert_digest))
+    input_digest = await merge_digests(
+        MergeDigests((packages_digest, config_files.snapshot.digest, *ca_cert_digest))
     )
-    pex_proc_requests = []
-    twine_envs = await MultiGet(
-        Get(EnvironmentVars, EnvironmentVarsRequest, twine_env_request(repo))
+    pex_proc_requests: list[VenvPexProcess] = []
+    twine_envs = await concurrently(
+        environment_vars_subset(**implicitly({twine_env_request(repo): EnvironmentVarsRequest}))
         for repo in request.field_set.repositories.value
     )
 
@@ -195,8 +215,8 @@ async def twine_upload(
             )
         )
 
-    processes = await MultiGet(
-        Get(Process, VenvPexProcess, request) for request in pex_proc_requests
+    processes = await concurrently(
+        setup_venv_pex_process(request, **implicitly()) for request in pex_proc_requests
     )
 
     return PublishProcesses(
@@ -216,4 +236,5 @@ def rules():
         *PublishPythonPackageFieldSet.rules(),
         PythonDistribution.register_plugin_field(PythonRepositoriesField),
         PythonDistribution.register_plugin_field(SkipTwineUploadField),
+        UnionRule(CheckSkipRequest, PythonDistCheckSkipRequest),
     )

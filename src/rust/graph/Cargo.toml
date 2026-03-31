@@ -1,0 +1,27 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "graph"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+async-trait = { workspace = true }
+async_value = { path = "../async_value" }
+fnv = { workspace = true }
+futures = { workspace = true }
+fixedbitset = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
+petgraph = { workspace = true }
+task_executor = { path = "../task_executor" }
+tokio = { workspace = true, features = ["time", "parking_lot"] }
+workunit_store = { path = "../workunit_store" }
+
+[dev-dependencies]
+rand = { workspace = true }
+env_logger = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

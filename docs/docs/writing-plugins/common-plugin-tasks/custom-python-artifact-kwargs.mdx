@@ -22,7 +22,7 @@ You can write a plugin to add custom kwarg generation logic.
 Note: there may only be at most one applicable plugin per target customizing the kwargs for the `setup()` function.
 
 :::note Example
-See [here](https://github.com/pantsbuild/pants/blob/master/pants-plugins/internal_plugins/releases/register.py) for an example that Pants uses internally for its `python_distribution` targets. This plugin demonstrates reading from the file system to set the `version` and `long_description` kwargs, along with adding hardcoded kwargs.
+See [here](https://github.com/pantsbuild/pants/blob/main/pants-plugins/internal_plugins/releases/register.py) for an example that Pants uses internally for its `python_distribution` targets. This plugin demonstrates reading from the file system to set the `version` and `long_description` kwargs, along with adding hardcoded kwargs.
 :::
 
 1. Set up a subclass of `SetupKwargsRequest`
@@ -141,22 +141,22 @@ def rules():
 
 Then, run `pants package path/to:python_distribution` and inspect the generated `setup.py`to confirm that your plugin worked correctly.
 
-Often, you will want to read from a file in your project to set kwargs like `version` or `long_description`. Use `await Get(DigestContents, PathGlobs)` to do this (see [File system](../the-rules-api/file-system.mdx)):
+Often, you will want to read from a file in your project to set kwargs like `version` or `long_description`. Use `await get_digest_contents(**implicitly(PathGlobs(...)))` to do this (see [File system](../the-rules-api/file-system.mdx)):
 
 ```python
 from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import rule
 
 @rule
 async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
+    digest_contents = await get_digest_contents(
+        **implicitly(PathGlobs(
             ["project/ABOUT.rst"],
             description_of_origin="`python_artifact()` plugin",
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        ),
+        ))
     )
     about_page_content = digest_contents[0].content.decode()
     return SetupKwargs(
@@ -186,6 +186,7 @@ import os.path
 
 from pants.backend.python.util_rules.package_dists import SetupKwargs
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
+from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import rule
 
 @rule
@@ -201,13 +202,12 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
 
     build_file_path = request.target.address.spec_path
     long_description_path = os.path.join(build_file_path, long_description_relpath)
-    digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
+    digest_contents = await get_digest_contents(
+        **implicitly(PathGlobs(
             [long_description_path],
             description_of_origin=f"the 'long_description_file' kwarg in {request.target.address}",
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        ),
+        ))
     )
     description_content = digest_contents[0].content.decode()
     return SetupKwargs(
@@ -218,6 +218,6 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
 
 Refer to these guides for additional things you may want to do in your plugin:
 
-- [Read from options](../the-rules-api/options-and-subsystems.mdx). Also see [here](https://github.com/pantsbuild/pants/blob/master/pants-plugins/internal_plugins/releases/register.py) for an example.
+- [Read from options](../the-rules-api/options-and-subsystems.mdx). Also see [here](https://github.com/pantsbuild/pants/blob/main/pants-plugins/internal_plugins/releases/register.py) for an example.
 - [Read values from the target](../the-rules-api/rules-and-the-target-api.mdx) using the Target API.
 - [Run a `Process`](../the-rules-api/processes.mdx), such as `git`. Also see [Installing tools](../the-rules-api/installing-tools.mdx).

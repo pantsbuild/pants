@@ -16,7 +16,7 @@ from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
 
 
-def test_determine_renamed_fields() -> None:
+async def test_determine_renamed_fields() -> None:
     class DeprecatedField(StringField):
         alias = "new_name"
         deprecated_alias = "old_name"
@@ -37,7 +37,9 @@ def test_determine_renamed_fields() -> None:
         moved_fields = (DeprecatedField, OkayField)
 
     registered_targets = RegisteredTargetTypes.create([Tgt, TgtGenerator])
-    result = determine_renamed_field_types.rule.func(registered_targets, UnionMembership({}))  # type: ignore[attr-defined]
+    result = await determine_renamed_field_types.rule.func(  # type: ignore[attr-defined]
+        registered_targets, UnionMembership.empty()
+    )
     deprecated_fields = FrozenDict({DeprecatedField.deprecated_alias: DeprecatedField.alias})
     assert result.target_field_renames == FrozenDict(
         {k: deprecated_fields for k in (TgtGenerator.alias, Tgt.alias, Tgt.deprecated_alias)}
@@ -58,9 +60,9 @@ def test_determine_renamed_fields() -> None:
         ["target(nested=here(deprecated_name='too deep'))"],
     ),
 )
-def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
+async def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
     content = "\n".join(lines).encode("utf-8")
-    result = fix_single.rule.func(  # type: ignore[attr-defined]
+    result = await fix_single.rule.func(  # type: ignore[attr-defined]
         RenameFieldsInFileRequest("BUILD", content=content),
         RenamedFieldTypes.from_dict({"target": {"deprecated_name": "new_name"}}),
     )
@@ -76,8 +78,8 @@ def test_rename_deprecated_field_types_noops(lines: list[str]) -> None:
         (["tgt1(", "deprecated_name", "=", ")"], ["tgt1(", "new_name", "=", ")"]),
     ),
 )
-def test_rename_deprecated_field_types_rewrite(lines: list[str], expected: list[str]) -> None:
-    result = fix_single.rule.func(  # type: ignore[attr-defined]
+async def test_rename_deprecated_field_types_rewrite(lines: list[str], expected: list[str]) -> None:
+    result = await fix_single.rule.func(  # type: ignore[attr-defined]
         RenameFieldsInFileRequest("BUILD", content="\n".join(lines).encode("utf-8")),
         RenamedFieldTypes.from_dict({"tgt1": {"deprecated_name": "new_name"}}),
     )

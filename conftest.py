@@ -19,6 +19,7 @@ def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]):
         rep.outcome = "failed"
         assert call.excinfo is not None
         r = call.excinfo._getreprcrash()
+        assert r is not None
         rep.longrepr = f"Forbidden skipped test - {r.message}"
 
 

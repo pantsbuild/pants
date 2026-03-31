@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+from enum import StrEnum
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -21,19 +22,23 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.partition import _find_all_unique_interpreter_constraints
 from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules.python_sources import (
-    PythonSourceFiles,
     PythonSourceFilesRequest,
+    prepare_python_sources,
 )
 from pants.core.goals.resolves import ExportableTool
-from pants.core.util_rules.config_files import ConfigFiles, ConfigFilesRequest
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
-from pants.engine.fs import EMPTY_DIGEST, Digest, DigestContents, FileContent
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import FieldSet, Target, TransitiveTargets, TransitiveTargetsRequest
+from pants.core.util_rules.config_files import ConfigFilesRequest, find_config_file
+from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent
+from pants.engine.internals.graph import resolve_unparsed_address_inputs
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.intrinsics import get_digest_contents
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import FieldSet, Target, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
+    EnumOption,
     FileOption,
     SkipOption,
     TargetListOption,
@@ -44,6 +49,11 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class MyPyCacheMode(StrEnum):
+    sqlite = "sqlite"
+    none = "none"
 
 
 @dataclass(frozen=True)
@@ -116,6 +126,19 @@ class MyPy(PythonToolBase):
             To instead load third-party plugins, set the option `[mypy].install_from_resolve`
             to a resolve whose lockfile includes those plugins, and set the `plugins` option
             in `mypy.ini`.  See {doc_url("docs/python/goals/check")}.
+            """
+        ),
+    )
+    cache_mode = EnumOption(
+        default=MyPyCacheMode.sqlite,
+        advanced=True,
+        help=softwrap(
+            """
+            `sqlite`: Default. Uses mypy's SQLite cache.
+
+            `none`: Disables caching entirely (--cache-dir=/dev/null). Much
+            slower.  Intended as an "escape valve" if you believe you are
+            encountering a Pants or mypy related bug.
             """
         ),
     )
@@ -198,8 +221,8 @@ class MyPyConfigFile:
 
 @rule
 async def setup_mypy_config(mypy: MyPy) -> MyPyConfigFile:
-    config_files = await Get(ConfigFiles, ConfigFilesRequest, mypy.config_request)
-    digest_contents = await Get(DigestContents, Digest, config_files.snapshot.digest)
+    config_files = await find_config_file(mypy.config_request)
+    digest_contents = await get_digest_contents(config_files.snapshot.digest)
     python_version_configured = mypy.check_and_warn_if_python_version_configured(
         digest_contents[0] if digest_contents else None
     )
@@ -225,9 +248,11 @@ async def mypy_first_party_plugins(
     if not mypy.source_plugins:
         return MyPyFirstPartyPlugins(FrozenOrderedSet(), EMPTY_DIGEST, ())
 
-    plugin_target_addresses = await Get(Addresses, UnparsedAddressInputs, mypy.source_plugins)
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest(plugin_target_addresses)
+    plugin_target_addresses = await resolve_unparsed_address_inputs(
+        mypy.source_plugins, **implicitly()
+    )
+    transitive_targets = await transitive_targets_get(
+        TransitiveTargetsRequest(plugin_target_addresses), **implicitly()
     )
 
     requirements = PexRequirements.req_strings_from_requirement_fields(
@@ -238,7 +263,9 @@ async def mypy_first_party_plugins(
         ),
     )
 
-    sources = await Get(PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure))
+    sources = await prepare_python_sources(
+        PythonSourceFilesRequest(transitive_targets.closure), **implicitly()
+    )
     return MyPyFirstPartyPlugins(
         requirement_strings=requirements,
         sources_digest=sources.source_files.snapshot.digest,

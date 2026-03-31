@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import dataclasses
 import difflib
+import importlib.metadata
 import inspect
 import itertools
 import json
@@ -19,12 +20,10 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, DefaultDict, TypeVar, Union, cast, get_type_hints
 
-import pkg_resources
-
 import pants.backend
 from pants.base import deprecated
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.environments import option_field_name_for
+from pants.core.environments.rules import option_field_name_for
 from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.parser import BuildFileSymbolInfo, BuildFileSymbolsInfo, Registrar
 from pants.engine.rules import Rule, TaskRule
@@ -772,6 +771,13 @@ class HelpInfoExtracter:
                 yield rule.output_type, provider, tuple(_rule_dependencies(rule))
 
                 for constraint in rule.awaitables:
+                    # TODO: For call-by-name, constraint.input_types only lists the types
+                    # provided explicitly in a type map passed to **implicitly. Positional
+                    # arguments don't appear in input_types. So this is no longer a robust
+                    # way to get all the types. However, if a type is also available as
+                    # some other rule's output type, we will still see it. This covers
+                    # the important case for help output, namely "which rule should I
+                    # call by name to get an instance of this type?"
                     for input_type in constraint.input_types:
                         yield input_type, _find_provider(input_type), ()
 
@@ -905,20 +911,29 @@ class HelpInfoExtracter:
             }
             return backends
 
-        def discover_plugin_backends(entry_point_name: str) -> set[DiscoveredBackend]:
-            backends = {
+        def discover_plugin_backends(entry_point_name: str) -> frozenset[DiscoveredBackend]:
+            def get_dist_file(dist: importlib.metadata.Distribution, file_path: str):
+                try:
+                    return dist.locate_file(file_path)
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to locate file `{file_path}` in distribution `{dist}`: {e}"
+                    )
+
+            backends = frozenset(
                 DiscoveredBackend(
-                    entry_point.dist.project_name,
-                    entry_point.module_name,
+                    entry_point.dist.name,
+                    entry_point.module,
                     str(
-                        Path(entry_point.dist.location)
-                        / (entry_point.module_name.replace(".", "/") + ".py")
+                        get_dist_file(
+                            entry_point.dist, entry_point.module.replace(".", "/") + ".py"
+                        )
                     ),
                     True,
                 )
-                for entry_point in pkg_resources.iter_entry_points(entry_point_name)
+                for entry_point in importlib.metadata.entry_points().select(group=entry_point_name)
                 if entry_point.dist is not None
-            }
+            )
             return backends
 
         global_options = options.for_global_scope()

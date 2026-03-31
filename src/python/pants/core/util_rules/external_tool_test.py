@@ -27,11 +27,11 @@ from pants.engine.fs import CreateDigest, DigestContents, DownloadFile, FileCont
 from pants.engine.internals.native_engine import Digest
 from pants.engine.platform import Platform
 from pants.engine.rules import QueryRule
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.scope import Scope, ScopedOptions
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import no_exception
-from pants.testutil.rule_runner import MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
 from pants.util.strutil import softwrap
 
 
@@ -68,12 +68,12 @@ class TemplatedFooBar(TemplatedExternalTool):
     options_scope = "foobar"
     default_version = "3.4.7"
     default_known_versions = [
-        "3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
-        "3.2.0|linux_ppc   |39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
-        "3.2.0|linux_x86_64|c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
-        "3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
         "3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
         "3.4.7|macos_arm64 |aca5c1da0192e2fd46b7b55ab290a92c5f07309e7b0ebf4e45ba95731ae98291|145678|https://macfoo.org/bin/v3.4.7/mac-m1-v3.4.7.tgz",
+        "3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
+        "3.2.0|linux_ppc   |39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
+        "3.2.0|linux_x86_64|c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
+        "3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
     ]
     default_url_template = "https://foobar.org/bin/v{version}/foobar-{version}-{platform}.tgz"
     default_url_platform_mapping = {
@@ -151,10 +151,12 @@ def test_export(rule_runner) -> None:
 
     Ensures we locate the class and prepare the Digest correctly
     """
-
     platform = Platform.linux_x86_64
-    union_membership = UnionMembership(
-        {ExportRequest: [ExportExternalToolRequest], ExportableTool: [TemplatedFooBar]}
+    union_membership = UnionMembership.from_rules(
+        {
+            UnionRule(ExportRequest, ExportExternalToolRequest),
+            UnionRule(ExportableTool, TemplatedFooBar),
+        }
     )
 
     templated_foobar = create_subsystem(
@@ -194,14 +196,10 @@ def test_export(rule_runner) -> None:
     result: MaybeExportResult = run_rule_with_mocks(
         export_external_tool,
         rule_args=[_ExportExternalToolForResolveRequest("foobar"), platform, union_membership],
-        mock_gets=[
-            MockGet(output_type=ScopedOptions, input_types=(Scope,), mock=fake_get_options),
-            MockGet(
-                output_type=DownloadedExternalTool,
-                input_types=(ExternalToolRequest,),
-                mock=fake_download,
-            ),
-        ],
+        mock_calls={
+            "pants.engine.internals.options_parsing.scope_options": fake_get_options,
+            "pants.core.util_rules.external_tool.download_external_tool": fake_download,
+        },
         union_membership=union_membership,
     )
 
@@ -227,11 +225,11 @@ class ConstrainedTool(TemplatedExternalTool):
     version_constraints = ">3.2.1, <3.8"
     default_version = "v3.4.7"
     default_known_versions = [
-        "v3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
+        "v3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
+        "v3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
         "v3.2.0|linux_ppc   |39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
         "v3.2.0|linux_x86_64|c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
-        "v3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
-        "v3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
+        "v3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
     ]
     default_url_template = "https://foobar.org/bin/v{version}/foobar-{version}-{platform}.tgz"
     default_url_platform_mapping = {

@@ -15,6 +15,7 @@ from pants.backend.docker.util_rules.dependencies import (
 )
 from pants.backend.go.goals import package_binary as package_go_binary
 from pants.backend.go.target_types import GoBinaryTarget
+from pants.backend.go.util_rules import link_defs as go_link_defs
 from pants.backend.python import target_types_rules as py_target_types_rules
 from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinariesGeneratorTarget, PexBinary
@@ -34,6 +35,7 @@ def rule_runner() -> RuleRunner:
             *dockerfile.rules(),
             *dockerfile_parser.rules(),
             *docker_build_args.rules(),
+            *go_link_defs.rules(),
             package.find_all_packageable_targets,
             *package_image.rules(),
             *package_pex_binary.rules(),

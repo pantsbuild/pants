@@ -8,12 +8,11 @@ from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.core.util_rules.system_binaries import (
     BinaryPath,
     BinaryPathRequest,
-    BinaryPaths,
     BinaryPathTest,
+    find_binary,
 )
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 
 
 @dataclass(frozen=True)
@@ -34,7 +33,7 @@ async def find_cgo_binary_path(
         search_path=golang_env_aware.cgo_tool_search_paths,
         test=request.binary_path_test,
     )
-    paths = await Get(BinaryPaths, BinaryPathRequest, path_request)
+    paths = await find_binary(path_request, **implicitly())
     first_path = paths.first_path_or_raise(
         path_request, rationale=f"find the `{request.binary_name}` tool required by CGo"
     )

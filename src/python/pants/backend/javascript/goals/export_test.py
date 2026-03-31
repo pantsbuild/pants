@@ -32,7 +32,19 @@ def rule_runner() -> RuleRunner:
 
 
 def given_package_with_name(name: str) -> str:
-    return json.dumps({"name": name, "version": "0.0.1", "devDependencies": {"jest": "*"}})
+    return json.dumps(
+        {
+            "name": name,
+            "version": "0.0.1",
+            "devDependencies": {
+                "@types/jest": "*",
+                "jest": "*",
+                "ts-jest": "*",
+                "typescript": "*",
+            },
+            "packageManager": "npm@10.9.2",
+        }
+    )
 
 
 def get_snapshot(rule_runner: RuleRunner, digest: Digest) -> Snapshot:

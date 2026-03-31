@@ -1,0 +1,12 @@
+{
+  "name": "parent-pkg",
+  "version": "1.0.0",
+  "type": "module",
+  "packageManager": "pnpm@10.19.0",
+  "dependencies": {
+    "child-pkg": "link:./child"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

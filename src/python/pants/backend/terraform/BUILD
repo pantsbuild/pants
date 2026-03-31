@@ -13,10 +13,10 @@ python_sources(
     name="hcl2_parser",
     sources=["hcl2_parser.py"],
     # Skip pyupgrade to avoid breaking tests running Python 3.8
-    skip_pyupgrade=True,
+    skip_ruff_check=True,
 )
 
-resource(name="lockfile", source="hcl2.lock")
+resources(name="lockfile", sources=["hcl2.lock*"])
 
 python_tests(name="tests", sources=["*_test.py", "!dependency_inference_test.py"])
 python_tests(

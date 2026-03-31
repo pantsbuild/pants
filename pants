@@ -4,8 +4,8 @@
 
 # This bootstrap script runs pants from the live sources in this repo.
 #
-# The script defaults to running with either Python 3.7 or Python 3.8. To use another Python version,
-# prefix the script with `PY=python3.8`.
+# The script defaults to running with Python 3.11. To use another Python version,
+# prefix the script with `PY=python3.14`.
 
 set -eo pipefail
 

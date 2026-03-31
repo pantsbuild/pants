@@ -12,7 +12,7 @@ from pants.util.logging import LogLevel
 
 
 class BlackRequest(FmtBuildFilesRequest):
-    tool_subsystem = Black
+    tool_subsystem = Black  # type: ignore[assignment]
 
 
 @rule(desc="Format with Black", level=LogLevel.DEBUG)

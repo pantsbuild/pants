@@ -11,6 +11,7 @@ from pants.backend.python.goals import lockfile
 from pants.backend.python.macros import python_requirements
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.target_types import PythonRequirementTarget
+from pants.backend.python.util_rules import pex
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.engine.addresses import Address
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
@@ -23,6 +24,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *lockfile.rules(),
+            *pex.rules(),
             *python_requirements.rules(),
             QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
         ],

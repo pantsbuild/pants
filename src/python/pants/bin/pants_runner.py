@@ -17,16 +17,18 @@ from pants.base.exiter import ExitCode
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
+from pants.option.bootstrap_options import BootstrapOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.docutil import doc_url
-from pants.util.osutil import get_normalized_arch_name, is_macos_before_12, macos_major_version
+from pants.util.osutil import get_normalized_arch_name, macos_major_version
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
 # First version with working Python 3.11 support:
 # https://github.com/pantsbuild/scie-pants/releases/tag/v0.12.2
+# TODO: Likely still need to update scie-pants
 MINIMUM_SCIE_PANTS_VERSION = Version("0.12.2")
 
 
@@ -78,6 +80,8 @@ class PantsRunner:
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options
             global_bootstrap_options = bootstrap_options.for_global_scope()
+
+        BootstrapOptions.maybe_enable_stack_trampoline(global_bootstrap_options)
 
         # We enable logging here, and everything before it will be routed through regular
         # Python logging.
@@ -182,11 +186,6 @@ def _validate_macos_version(global_bootstrap_options: OptionValueContainer) -> N
     macos_version = macos_major_version()
     if macos_version is None:
         # Not macOS, no validation/deprecations required!
-        return
-
-    if global_bootstrap_options.allow_deprecated_macos_before_12 and is_macos_before_12():
-        # If someone has set this (deprecated) option, and the system is older than macOS 12,
-        # they'll don't want messages, so just skip.
         return
 
     arch_versions = _MACOS_VERSION_BECOMES_UNSUPPORTED_IN[get_normalized_arch_name()]

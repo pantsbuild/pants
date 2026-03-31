@@ -16,12 +16,12 @@ def test_environment_usage() -> None:
                 pass
             """
         ),
-        "project/BUILD": "python_tests(environment='python_38')",
+        "project/BUILD": "python_tests(environment='python_310')",
         "BUILD": dedent(
             """\
             docker_environment(
-                name="python_38",
-                image="python:3.8",
+                name="python_310",
+                image="python:3.10",
                 python_bootstrap_search_path=["<PATH>"],
             )
             """
@@ -34,8 +34,8 @@ def test_environment_usage() -> None:
             return run_pants(
                 [
                     "--backend-packages=['pants.backend.python']",
-                    "--python-interpreter-constraints=['==3.8.*']",
-                    f"--environments-preview-names={{'python_38': '{dirname}:python_38'}}",
+                    "--python-interpreter-constraints=['==3.10.*']",
+                    f"--environments-preview-names={{'python_310': '{dirname}:python_310'}}",
                     "test",
                     *extra_test_args,
                     f"{dirname}/project:",

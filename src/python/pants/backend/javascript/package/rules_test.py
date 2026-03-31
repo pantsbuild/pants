@@ -167,14 +167,18 @@ def workspace_files(package_manager: str) -> dict[str, str]:
         }
     if package_manager == "pnpm":
         return {
-            "src/js/pnpm-workspace.yaml": "",
+            "src/js/pnpm-workspace.yaml": json.dumps(
+                {
+                    "packages": ["a"],
+                }
+            ),
             "src/js/pnpm-lock.yaml": json.dumps(
                 {
                     "importers": {
                         ".": {},
                         "a": {},
                     },
-                    "lockfileVersion": "6.0",
+                    "lockfileVersion": "9.0",
                 }
             ),
         }
@@ -244,6 +248,12 @@ def test_packages_files_as_resource_in_workspace(
 
 
 def test_extra_envs(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--nodejs-extra-env-vars=['FROM_SUBSYSTEM=FIZZ']",
+        ],
+        env_inherit={"PATH"},
+    )
     rule_runner.write_files(
         {
             "src/js/BUILD": dedent(
@@ -251,7 +261,8 @@ def test_extra_envs(rule_runner: RuleRunner) -> None:
                 package_json(
                     scripts=[
                         node_build_script(entry_point="build", extra_env_vars=["FOO=BAR"], output_files=["dist/index.cjs"])
-                    ]
+                    ],
+                    extra_env_vars=["FROM_PACKAGE_JSON=BUZZ"]
                 )
                 """
             ),
@@ -260,7 +271,9 @@ def test_extra_envs(rule_runner: RuleRunner) -> None:
                     "name": "ham",
                     "version": "0.0.1",
                     "browser": "lib/index.mjs",
-                    "scripts": {"build": "mkdir dist && echo $FOO >> dist/index.cjs"},
+                    "scripts": {
+                        "build": "mkdir dist && echo $FOO >> dist/index.cjs && echo $FROM_SUBSYSTEM >> dist/index.cjs && echo $FROM_PACKAGE_JSON >> dist/index.cjs"
+                    },
                 }
             ),
             "src/js/package-lock.json": json.dumps({}),
@@ -279,4 +292,4 @@ def test_extra_envs(rule_runner: RuleRunner) -> None:
     )
     rule_runner.write_digest(result.snapshot.digest)
     with open(os.path.join(rule_runner.build_root, "src/js/dist/index.cjs")) as f:
-        assert f.read() == "BAR\n"
+        assert f.read() == "BAR\nFIZZ\nBUZZ\n"

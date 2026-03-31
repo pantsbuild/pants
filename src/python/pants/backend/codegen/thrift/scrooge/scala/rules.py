@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.codegen.thrift.scrooge.rules import (
-    GeneratedScroogeThriftSources,
     GenerateScroogeThriftSourcesRequest,
+    generate_scrooge_thrift_sources,
 )
 from pants.backend.codegen.thrift.scrooge.scala import symbol_mapper
 from pants.backend.codegen.thrift.target_types import (
@@ -18,9 +18,9 @@ from pants.backend.codegen.thrift.target_types import (
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.build_graph.address import Address
-from pants.engine.fs import AddPrefix, Digest, Snapshot
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.fs import AddPrefix
+from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     GeneratedSources,
@@ -37,7 +37,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 )
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField, PrefixedJvmJdkField, PrefixedJvmResolveField
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.logging import LogLevel
 
 
@@ -65,23 +65,21 @@ class InferScroogeThriftScalaDependencies(InferDependenciesRequest):
 async def generate_scala_from_thrift_with_scrooge(
     request: GenerateScalaFromThriftRequest,
 ) -> GeneratedSources:
-    result = await Get(
-        GeneratedScroogeThriftSources,
+    result = await generate_scrooge_thrift_sources(
         GenerateScroogeThriftSourcesRequest(
             thrift_source_field=request.protocol_target[ThriftSourceField],
             lang_id="scala",
             lang_name="Scala",
         ),
+        **implicitly(),
     )
 
-    source_root = await Get(
-        SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)
-    )
+    source_root = await get_source_root(SourceRootRequest.for_target(request.protocol_target))
 
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(result.snapshot.digest, source_root.path))
+        await digest_to_snapshot(**implicitly(AddPrefix(result.snapshot.digest, source_root.path)))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, result.snapshot.digest)
+        else await digest_to_snapshot(result.snapshot.digest)
     )
     return GeneratedSources(source_root_restored)
 
@@ -130,8 +128,8 @@ async def inject_scrooge_thrift_scala_dependencies(
     request: InferScroogeThriftScalaDependencies, jvm: JvmSubsystem
 ) -> InferredDependencies:
     resolve = request.field_set.resolve.normalized_value(jvm)
-    dependencies_info = await Get(
-        ScroogeThriftScalaRuntimeForResolve, ScroogeThriftScalaRuntimeForResolveRequest(resolve)
+    dependencies_info = await resolve_scrooge_thrift_scala_runtime_for_resolve(
+        ScroogeThriftScalaRuntimeForResolveRequest(resolve), **implicitly()
     )
     return InferredDependencies(dependencies_info.addresses)
 

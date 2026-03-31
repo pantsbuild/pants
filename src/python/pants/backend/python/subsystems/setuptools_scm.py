@@ -7,6 +7,8 @@ from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import collect_rules
 from pants.engine.unions import UnionRule
 
+# pants: infer-dep(setuptools_scm.lock*)
+
 
 class SetuptoolsSCM(PythonToolBase):
     options_scope = "setuptools-scm"

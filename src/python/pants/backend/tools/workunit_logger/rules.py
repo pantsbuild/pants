@@ -1,5 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import json
 import logging
 from typing import Any
@@ -43,10 +45,20 @@ def just_dump_map(workunits_map):
     ]
 
 
+def pass_through_unserializable_metadata(obj):
+    """Most of the metadata in workunit objects is json serializable, but it is not guaranteed that
+    all of it is.
+
+    This function is intended to be used as a `default` encoder to json.dumps to drop a minimal stub
+    encoding with the name instead of throwing a TypeError and halting the entire workunit logging.
+    """
+    return {"name": obj.__class__.__name__, "json_serializable": False, "str": str(obj)}
+
+
 class WorkunitLoggerCallback(WorkunitsCallback):
     """Configuration for WorkunitLogger."""
 
-    def __init__(self, wulogger: "WorkunitLogger"):
+    def __init__(self, wulogger: WorkunitLogger):
         self.wulogger = wulogger
         self._completed_workunits: dict[str, object] = {}
 
@@ -68,7 +80,11 @@ class WorkunitLoggerCallback(WorkunitsCallback):
         if finished:
             filepath = f"{self.wulogger.logdir}/{context.run_tracker.run_id}.json"
             with safe_open(filepath, "w") as f:
-                json.dump(just_dump_map(self._completed_workunits), f)
+                json.dump(
+                    just_dump_map(self._completed_workunits),
+                    f,
+                    default=pass_through_unserializable_metadata,
+                )
                 logger.info(f"Wrote log to {filepath}")
 
 
@@ -85,7 +101,7 @@ class WorkunitLogger(Subsystem):
 
 
 @rule
-def construct_callback(
+async def construct_callback(
     _: WorkunitLoggerCallbackFactoryRequest,
     wulogger: WorkunitLogger,
 ) -> WorkunitsCallbackFactory:

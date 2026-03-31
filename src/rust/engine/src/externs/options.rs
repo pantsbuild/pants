@@ -6,13 +6,14 @@ use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use pyo3::{BoundObject, prelude::*};
 
 use options::{
-    Args, ConfigSource, DictEdit, DictEditAction, Env, GoalInfo, ListEdit, ListEditAction,
-    ListOptionValue, OptionId, OptionParser, OptionalOptionValue, PantsCommand, Scope, Source, Val,
-    apply_dict_edits, apply_list_edits, bin_name,
+    Args, BuildRoot, ConfigSource, DictEdit, DictEditAction, Env, GoalInfo, ListEdit,
+    ListEditAction, ListOptionValue, OptionId, OptionParser, OptionalOptionValue, PantsCommand,
+    Scope, Source, Val, apply_dict_edits, apply_list_edits, bin_name,
 };
 
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::path::PathBuf;
 
 pyo3::import_exception!(pants.option.errors, ParseError);
 
@@ -33,7 +34,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 // The (nested) values of a dict-valued option are represented by Val.
 // This function converts them to equivalent Python types.
-fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
+fn val_to_py_object(py: Python, val: &Val) -> PyResult<Py<PyAny>> {
     let res = match val {
         Val::Bool(b) => b.into_pyobject(py)?.into_any().unbind(),
         Val::Int(i) => i.into_pyobject(py)?.into_any().unbind(),
@@ -58,13 +59,13 @@ fn val_to_py_object(py: Python, val: &Val) -> PyResult<PyObject> {
 }
 
 // Converts a string->Val dict into a Python type.
-fn dict_into_py(py: Python, vals: HashMap<String, Val>) -> PyResult<PyDictVal> {
+pub(crate) fn dict_into_py(py: Python, vals: HashMap<String, Val>) -> PyResult<PyDictVal> {
     vals.into_iter()
         .map(|(k, v)| match val_to_py_object(py, &v) {
             Ok(pyobj) => Ok((k, pyobj)),
             Err(err) => Err(err),
         })
-        .collect::<PyResult<HashMap<String, PyObject>>>()
+        .collect::<PyResult<HashMap<String, Py<PyAny>>>>()
 }
 
 // Converts a Python object into a Val, which is necessary for receiving
@@ -92,7 +93,7 @@ pub(crate) fn py_object_to_val(obj: &Bound<'_, PyAny>) -> Result<Val, PyErr> {
         Ok(Val::Float(obj.extract()?))
     } else if obj.is_instance_of::<PyDict>() {
         Ok(Val::Dict(
-            obj.downcast::<PyDict>()?
+            obj.cast::<PyDict>()?
                 .iter()
                 .map(|(k, v)| {
                     Ok::<(String, Val), PyErr>((k.extract::<String>()?, py_object_to_val(&v)?))
@@ -101,14 +102,14 @@ pub(crate) fn py_object_to_val(obj: &Bound<'_, PyAny>) -> Result<Val, PyErr> {
         ))
     } else if obj.is_instance_of::<PyList>() {
         Ok(Val::List(
-            obj.downcast::<PyList>()?
+            obj.cast::<PyList>()?
                 .iter()
                 .map(|v| py_object_to_val(&v))
                 .collect::<Result<Vec<_>, _>>()?,
         ))
     } else if obj.is_instance_of::<PyTuple>() {
         Ok(Val::List(
-            obj.downcast::<PyTuple>()?
+            obj.cast::<PyTuple>()?
                 .iter()
                 .map(|v| py_object_to_val(&v))
                 .collect::<Result<Vec<_>, _>>()?,
@@ -143,7 +144,8 @@ impl PyGoalInfo {
 }
 
 #[pyclass]
-struct PyOptionId(OptionId);
+// struct and field are pub for consumption in pants_ng.rs.
+pub(crate) struct PyOptionId(pub(crate) OptionId);
 
 #[pymethods]
 impl PyOptionId {
@@ -164,13 +166,11 @@ impl PyOptionId {
             None => None,
             Some(s) => {
                 return Err(ParseError::new_err(format!(
-                    "Switch value should contain a single character, but was: {}",
-                    s
+                    "Switch value should contain a single character, but was: {s}"
                 )));
             }
         };
-        let option_id =
-            OptionId::new(scope, components.into_iter(), switch).map_err(ParseError::new_err)?;
+        let option_id = OptionId::new(scope, components, switch).map_err(ParseError::new_err)?;
         Ok(Self(option_id))
     }
 }
@@ -202,7 +202,7 @@ impl PyPantsCommand {
 }
 
 #[pyclass]
-struct PyConfigSource(ConfigSource);
+pub struct PyConfigSource(pub ConfigSource);
 
 #[pymethods]
 impl PyConfigSource {
@@ -216,10 +216,10 @@ impl PyConfigSource {
 }
 
 #[pyclass]
-struct PyOptionParser(OptionParser);
+pub struct PyOptionParser(pub OptionParser);
 
 // The pythonic value of a dict-typed option.
-type PyDictVal = HashMap<String, PyObject>;
+pub(crate) type PyDictVal = HashMap<String, Py<PyAny>>;
 
 // The derivation of the option value, as a vec of (value, rank, details string) tuples.
 type OptionValueDerivation<'py, T> = Vec<(T, isize, Option<Bound<'py, PyString>>)>;
@@ -231,7 +231,8 @@ type OptionValueDerivation<'py, T> = Vec<(T, isize, Option<Bound<'py, PyString>>
 // We could get rid of this tuple type by representing the final value and its rank as
 // a singleton derivation (in the case where we don't otherwise need the full derivation).
 // But that would allocate two unnecessary Vecs for every option.
-type OptionValue<'py, T> = (Option<T>, isize, Option<OptionValueDerivation<'py, T>>);
+// TODO: Disambiguate from OptionValue in the options crate.
+pub(crate) type OptionValue<'py, T> = (Option<T>, isize, Option<OptionValueDerivation<'py, T>>);
 
 fn source_to_details(source: &Source) -> Option<&str> {
     match source {
@@ -268,7 +269,7 @@ fn to_details<'py>(py: Python<'py>, sources: Vec<&'py Source>) -> Option<Bound<'
 // the derivation will show:
 //   - [d, e] (from command-line flag)
 //   - [a, b, c] (from env var, from config)
-fn condense_list_value_derivation<'py, T: PartialEq>(
+pub(crate) fn condense_list_value_derivation<'py, T: PartialEq>(
     py: Python<'py>,
     derivation: Vec<(&'py Source, Vec<ListEdit<T>>)>,
 ) -> OptionValueDerivation<'py, Vec<T>> {
@@ -318,7 +319,7 @@ fn condense_list_value_derivation<'py, T: PartialEq>(
 // the derivation will show:
 //   - {d: 4} (from command-line flag)
 //   - {a: 1, b: 2, c: 3} (from env var, from config)
-fn condense_dict_value_derivation<'py>(
+pub(crate) fn condense_dict_value_derivation<'py>(
     py: Python<'py>,
     derivation: Vec<(&'py Source, Vec<DictEdit>)>,
 ) -> PyResult<OptionValueDerivation<'py, PyDictVal>> {
@@ -354,7 +355,7 @@ fn condense_dict_value_derivation<'py>(
     Ok(ret)
 }
 
-fn into_py<'py, T>(
+pub(crate) fn into_py<'py, T>(
     py: Python<'py>,
     res: Result<OptionalOptionValue<'py, T>, String>,
 ) -> PyResult<OptionValue<'py, T>> {
@@ -401,8 +402,9 @@ impl PyOptionParser {
 #[pymethods]
 impl PyOptionParser {
     #[new]
-    #[pyo3(signature = (args, env, configs, allow_pantsrc, include_derivation, known_scopes_to_flags, known_goals))]
+    #[pyo3(signature = (buildroot, args, env, configs, allow_pantsrc, include_derivation, known_scopes_to_flags, known_goals))]
     fn __new__<'py>(
+        buildroot: Option<PathBuf>,
         args: Vec<String>,
         env: &Bound<'py, PyDict>,
         configs: Option<Vec<Bound<'py, PyConfigSource>>>,
@@ -415,7 +417,7 @@ impl PyOptionParser {
             .items()
             .into_iter()
             .map(|kv_pair| kv_pair.extract::<(String, String)>())
-            .collect::<Result<HashMap<_, _>, _>>()?;
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
 
         let option_parser = OptionParser::new(
             Args::new(args),
@@ -423,7 +425,7 @@ impl PyOptionParser {
             configs.map(|cs| cs.iter().map(|c| c.borrow().0.clone()).collect()),
             allow_pantsrc,
             include_derivation,
-            None,
+            buildroot.map(BuildRoot::for_path),
             known_scopes_to_flags.as_ref(),
             known_goals.map(|gis| gis.iter().map(|gi| gi.borrow().0.clone()).collect()),
         )
@@ -581,7 +583,7 @@ impl PyOptionParser {
     fn validate_config(
         &self,
         py: Python<'_>,
-        py_valid_keys: HashMap<String, PyObject>,
+        py_valid_keys: HashMap<String, Py<PyAny>>,
     ) -> PyResult<Vec<String>> {
         let mut valid_keys = HashMap::new();
 

@@ -17,7 +17,7 @@ from pants.option.errors import ParseError
 
 ValidPrimitives = Union[int, str]
 ParsedList = list[ValidPrimitives]
-ParsedDict = dict[str, Union[ValidPrimitives, ParsedList]]
+ParsedDict = dict[str, ValidPrimitives | ParsedList]
 
 
 def test_memory_size() -> None:

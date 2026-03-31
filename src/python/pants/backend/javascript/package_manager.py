@@ -18,10 +18,9 @@ class PackageManager:
     immutable_install_args: tuple[str, ...]
     workspace_specifier_arg: str
     run_arg_separator: tuple[str, ...]
-    download_and_execute_args: tuple[str, ...]
+    download_and_execute_args_template: tuple[str, ...]
     execute_args: tuple[str, ...]
     current_directory_args: tuple[str, ...]
-
     extra_env: FrozenDict[str, str]
     pack_archive_format: str
     extra_caches: FrozenDict[str, str]
@@ -38,6 +37,15 @@ class PackageManager:
             return cls.pnpm(package_manager_version)
         raise ValueError(f"Unsupported package manager: {package_manager_command}.")
 
+    def make_download_and_execute_args(
+        self, package: str, binary_name: str, args: tuple[str, ...]
+    ) -> tuple[str, ...]:
+        filled = tuple(
+            part.format(package=package, executable=binary_name)
+            for part in self.download_and_execute_args_template
+        )
+        return filled + args
+
     @classmethod
     def pnpm(cls, version: str | None) -> PackageManager:
         return PackageManager(
@@ -50,7 +58,7 @@ class PackageManager:
             run_arg_separator=(
                 () if version is None or nodesemver.satisfies(version, ">=7") else ("--",)
             ),
-            download_and_execute_args=("dlx",),
+            download_and_execute_args_template=("--package", "{package}", "dlx", "{executable}"),
             execute_args=("exec",),
             current_directory_args=("--prefix",),
             extra_env=FrozenDict({"PNPM_HOME": "{chroot}/._pnpm_home"}),
@@ -72,7 +80,13 @@ class PackageManager:
             ),
             workspace_specifier_arg="workspace",
             run_arg_separator=("--",),
-            download_and_execute_args=("dlx", "--quiet"),
+            download_and_execute_args_template=(
+                "dlx",
+                "--quiet",
+                "--package",
+                "{package}",
+                "{executable}",
+            ),
             execute_args=("--silent", "exec", "--"),
             current_directory_args=("--cwd",),
             extra_env=FrozenDict({"YARN_CACHE_FOLDER": "{chroot}/._yarn_cache"}),
@@ -90,7 +104,14 @@ class PackageManager:
             immutable_install_args=("clean-install",),
             workspace_specifier_arg="--workspace",
             run_arg_separator=("--",),
-            download_and_execute_args=("exec", "--yes", "--"),
+            download_and_execute_args_template=(
+                "exec",
+                "--yes",
+                "--package",
+                "{package}",
+                "--",
+                "{executable}",
+            ),
             execute_args=("exec", "--no", "--"),
             current_directory_args=("--prefix",),
             extra_env=FrozenDict(),

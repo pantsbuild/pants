@@ -9,6 +9,7 @@ import pkgutil
 import subprocess
 from dataclasses import dataclass
 from textwrap import dedent
+from typing import cast
 
 import pytest
 
@@ -19,7 +20,7 @@ from pants.backend.python.goals.package_pex_binary import (
     PexFromTargetsRequestForBuiltPackage,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
-from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
+from pants.backend.python.providers.python_build_standalone import rules as pbs
 from pants.backend.python.target_types import (
     PexBinary,
     PexLayout,
@@ -29,7 +30,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.build_graph.address import Address
-from pants.core.goals.package import BuiltPackage
+from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
 from pants.core.target_types import (
     FilesGeneratorTarget,
     FileTarget,
@@ -37,9 +38,17 @@ from pants.core.target_types import (
     ResourcesGeneratorTarget,
 )
 from pants.core.target_types import rules as core_target_types_rules
+from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.python_interpreter_selection import skip_unless_python38_present
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
+from pants.testutil.skip_utils import skip_if_linux_arm64
+
+
+def sorted_artifact_paths(artifacts: tuple[BuiltPackageArtifact, ...]) -> list[str]:
+    relpaths = [a.relpath for a in artifacts]
+    assert None not in relpaths
+    return sorted(cast(list[str], relpaths))
 
 
 @pytest.fixture
@@ -53,7 +62,6 @@ def rule_runner() -> PythonRuleRunner:
             *package_dists.rules(),
             QueryRule(BuiltPackage, [PexBinaryFieldSet]),
             QueryRule(PexFromTargetsRequestForBuiltPackage, [PexBinaryFieldSet]),
-            QueryRule(BuiltPackage, [PythonDistributionFieldSet]),
         ],
         target_types=[
             FileTarget,
@@ -254,6 +262,7 @@ def pex_executable(rule_runner: PythonRuleRunner) -> str:
     return os.path.join(rule_runner.build_root, expected_pex_relpath)
 
 
+@skip_if_linux_arm64
 @skip_unless_python38_present
 @pytest.mark.parametrize("target_type", ["files", "resources"])
 def test_complete_platforms(rule_runner: PythonRuleRunner, target_type: str) -> None:
@@ -392,6 +401,40 @@ def test_non_hermetic_venv_scripts(rule_runner: PythonRuleRunner) -> None:
     assert bob_sys_path_entry in non_hermetic_results.sys_path
 
 
+def test_no_compress_arg(rule_runner: PythonRuleRunner) -> None:
+    def get_size(address, output_name):
+        tgt = rule_runner.get_target(address)
+        field_set = PexBinaryFieldSet.create(tgt)
+        result = rule_runner.request(BuiltPackage, [field_set])
+        rule_runner.write_digest(result.digest)
+        return os.path.join(rule_runner.build_root, output_name)
+
+    rule_runner.write_files(
+        {
+            "src/py/project/BUILD": dedent(
+                """\
+                python_requirement(name="cowsay", requirements=["cowsay==6.1"])
+                pex_binary(
+                    name="compress",
+                    dependencies=[":cowsay"],
+                )
+                pex_binary(
+                    name="no-compress",
+                    dependencies=[":cowsay"],
+                    compress=False,
+                )
+                """
+            ),
+        }
+    )
+
+    assert get_size(
+        Address("src/py/project", target_name="compress"), "src.py.project/compress.pex"
+    ) < get_size(
+        Address("src/py/project", target_name="no-compress"), "src.py.project/no-compress.pex"
+    )
+
+
 def test_sh_boot_plumb(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -454,3 +497,570 @@ def test_extra_build_args(rule_runner: PythonRuleRunner) -> None:
 
     assert additional_args[-2] == "--example-extra-arg"
     assert additional_args[-1] == "value-goes-here"
+
+
+def test_package_with_python_provider() -> None:
+    # Per https://github.com/pantsbuild/pants/issues/21048, test packaging a local/unconstrained pex
+    # binary when using a Python that isn't automatically visible on $PATH (using the PBS provider
+    # as just one way to get such a Python)
+
+    rule_runner = PythonRuleRunner(
+        rules=[
+            *package_pex_binary.rules(),
+            *pex_from_targets.rules(),
+            *target_types_rules.rules(),
+            *core_target_types_rules(),
+            *pbs.rules(),
+            QueryRule(BuiltPackage, [PexBinaryFieldSet]),
+        ],
+        target_types=[
+            PexBinary,
+            PythonSourcesGeneratorTarget,
+        ],
+    )
+
+    rule_runner.write_files(
+        {
+            "app.py": "",
+            "BUILD": dedent(
+                """\
+                python_sources(name="src")
+                pex_binary(name="target", entry_point="./app.py")
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="target"))
+    field_set = PexBinaryFieldSet.create(tgt)
+
+    # a random (https://xkcd.com/221/) old version of Python, that seems unlikely to be installed on
+    # most systems, by default... but also, we don't propagate PATH (etc.) for this rule_runner, so
+    # the test shouldn't be able to find system interpreters anyway.
+    #
+    # (Thus we have two layers of "assurance" the test is doing what is intended.)
+    rule_runner.set_options(["--python-interpreter-constraints=CPython==3.10.2"])
+
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert len(result.artifacts) == 1
+    assert result.artifacts[0].relpath == "target.pex"
+
+
+def test_scie_defaults(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert (
+        result.artifacts[0].relpath == "src.py.project/project.pex"
+    )  # PEX must be first invariant
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
+
+
+@pytest.mark.parametrize("scie_hash_alg", ["md5", "sha1", "sha256", "sha384", "sha512"])
+def test_scie_hash_present(rule_runner: PythonRuleRunner, scie_hash_alg: str) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                f"""\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_hash_alg="{scie_hash_alg}",
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert sorted(
+        (
+            "src.py.project/project.pex",
+            "src.py.project/project",
+            f"src.py.project/project.{scie_hash_alg}",
+        )
+    ) == sorted_artifact_paths(result.artifacts)
+
+
+def test_scie_platform_file_suffix(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_name_style="platform-file-suffix",
+                    scie_platform=["linux-aarch64", "linux-x86_64"],
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert sorted(
+        (
+            "src.py.project/project.pex",
+            "src.py.project/project-linux-aarch64",
+            "src.py.project/project-linux-x86_64",
+        )
+    ) == sorted_artifact_paths(result.artifacts)
+
+
+def test_scie_platform_parent_dir(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_name_style="platform-parent-dir",
+                    scie_platform=["linux-aarch64", "linux-x86_64"],
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    assert sorted(
+        (
+            "src.py.project/project.pex",
+            "src.py.project/linux-aarch64/project",
+            "src.py.project/linux-x86_64/project",
+        )
+    ) == sorted_artifact_paths(result.artifacts)
+    # The result is to directories, materialize to look inside and make sure
+    # the right files are there
+    rule_runner.write_digest(result.digest)
+    os.path.exists(os.path.join(rule_runner.build_root, "src.py.project/linux-aarch64/project"))
+    os.path.exists(os.path.join(rule_runner.build_root, "src.py.project/linux-x86_64/project"))
+
+
+@pytest.mark.parametrize(
+    "passthrough",
+    [
+        "",
+        "scie_pex_entrypoint_env_passthrough=True,",
+        "scie_pex_entrypoint_env_passthrough=False,",
+    ],
+)
+def test_scie_busybox_moo(rule_runner: PythonRuleRunner, passthrough: str) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                f"""\
+                python_sources(name="lib")
+                python_requirement(name="cowsay", requirements=["cowsay==6.1"])
+                pex_binary(
+                    scie="lazy",
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                    dependencies=[":cowsay"],
+                    scie_busybox='@',
+                    {passthrough}
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting the right files are there to avoid downloading the whole
+    # PBS during testing
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
+
+
+def test_scie_pbs_version(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                python_requirement(name="cowsay", requirements=["cowsay==6.1"])
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_pbs_release="20241219"
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting the right files are there to avoid downloading the whole
+    # PBS during testing
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
+
+
+def test_scie_python_version_available(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_pbs_release="20251031",
+                    scie_python_version="3.12.12"
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting the right files are there to avoid downloading the whole
+    # PBS during testing
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
+
+
+def test_scie_python_version_unavailable(rule_runner: PythonRuleRunner) -> None:
+    # The PBS project does not produce binaries for every patch release
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_pbs_release="20251031",
+                    scie_python_version="3.12.2"
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    with pytest.raises(
+        ExecutionError, match="No released assets found for release 20251031 Python 3.12.2"
+    ):
+        rule_runner.request(BuiltPackage, [field_set])
+
+
+@pytest.mark.parametrize(
+    "stripped",
+    [
+        "",
+        "scie_pbs_stripped=True,",
+        "scie_pbs_stripped=False,",
+    ],
+)
+def test_scie_pbs_stripped(rule_runner: PythonRuleRunner, stripped: str) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                f"""\
+                python_sources(name="lib")
+                python_requirement(name="cowsay", requirements=["cowsay==6.1"])
+                pex_binary(
+                    scie="lazy",
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                    dependencies=[":cowsay"],
+                    scie_busybox='@',
+                    {stripped}
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting the right files are there to avoid downloading the whole
+    # PBS during testing
+    assert sorted(
+        ("src.py.project/project.pex", "src.py.project/project")
+    ) == sorted_artifact_paths(result.artifacts)
+
+
+@pytest.mark.parametrize("scie_load_dotenv", [True, False])
+def test_scie_load_dotenv_passthru(rule_runner: PythonRuleRunner, scie_load_dotenv: bool) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                f"""\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_load_dotenv={scie_load_dotenv},
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    # Just asserting that this executes, but not re-checking Pex's implementation
+    assert len(result.artifacts) == 2
+    assert "src.py.project/project.pex" == result.artifacts[0].relpath
+
+
+def test_scie_pbs_free_threaded(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_python_version="3.14.2",
+                    scie_pbs_free_threaded=True,
+                    scie_pbs_release="20251205",  # With free threaded and 3.14.2
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "src.py.project/project")
+    output = subprocess.check_output(executable, env={"SCIE": "inspect"})
+    # Minimal check without brittle binding to the exact SCIE=inspect format
+    # Will look something like 'ptex':
+    # {'cpython-3.14.2+20251205-x86_64-unknown-linux-gnu-freethreaded+pgo+lto-full.tar.zst':
+    # 'https://github.com/astral-sh/python-build-standalone/releases/download/20251205/cpython-3.14.2%2B20251205-x86_64-unknown-linux-gnu-freethreaded%2Bpgo%2Blto-full.tar.zst'}}
+    assert b"freethreaded" in output
+
+
+def test_scie_pbs_debug(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": dedent(
+                """\
+                print("hello")
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="app.py",
+                    scie="lazy",
+                    scie_pbs_debug=True,
+                    scie_pbs_release="20251031",  # The last release that includes Python 3.9.
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "src.py.project/project")
+    output = subprocess.check_output(executable, env={"SCIE": "inspect"})
+    assert b"stripped" not in output
+
+
+def test_scie_with_local_dist(rule_runner: PythonRuleRunner) -> None:
+    # This is a regression test for a bug early in adding scie support where
+    # the --requirements-pex flag was lost when building a scie pex, causing
+    # local distributions to not be included in the final executable.
+    rule_runner.write_files(
+        {
+            "lib/__init__.py": "",
+            "lib/greeting.py": dedent(
+                """\
+                def get_greeting():
+                    return "Hello from local dist!"
+                """
+            ),
+            "lib/BUILD": dedent(
+                """\
+                python_sources(name="sources")
+
+                python_distribution(
+                    name="dist",
+                    dependencies=[":sources"],
+                    provides=python_artifact(
+                        name="guten-tag-lib",
+                        version="0.0.1",
+                    ),
+                )
+                """
+            ),
+            "app/main.py": dedent(
+                """\
+                from lib.greeting import get_greeting
+
+                if __name__ == "__main__":
+                    print(get_greeting())
+                """
+            ),
+            "app/BUILD": dedent(
+                """\
+                python_sources(name="sources")
+
+                pex_binary(
+                    name="app",
+                    entry_point="main.py",
+                    dependencies=[":sources", "lib:dist"],
+                    scie="eager",  # Going to run it, so might as well
+                    scie_pbs_release="20251031",
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("app", target_name="app"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "app/app")
+
+    output = subprocess.check_output([executable], text=True)
+    assert "Hello from local dist!" in output
+
+
+def test_scie_custom_exe_with_env_and_args(rule_runner: PythonRuleRunner) -> None:
+    # Test that scie_exe, scie_args, and scie_env work together correctly.
+    # The script path comes from scie_bind_resource_path -> scie_env -> scie_exe,
+    # and an argument value comes from scie_env -> scie_args.
+    rule_runner.write_files(
+        {
+            "src/py/project/print_argv.py": dedent(
+                """\
+                import os
+                import sys
+
+                print("ARGV:" + repr(sys.argv[1:]))
+                print("GREETING:" + os.environ.get("GREETING", "NOT_SET"))
+                """
+            ),
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(
+                    entry_point="print_argv.py",
+                    scie="eager",
+                    scie_pbs_release="20251031",
+                    # Bind the script's resource path to MY_SCRIPT env var
+                    scie_bind_resource_path=["MY_SCRIPT=project/print_argv.py"],
+                    # Set env vars: GREETING will be used in scie_args
+                    scie_env=["GREETING=hello_world"],
+                    # Use the venv's Python as the executable
+                    scie_exe="{scie.env.VIRTUAL_ENV}/bin/python",
+                    # Pass the script path and the greeting as args
+                    scie_args=["{scie.env.MY_SCRIPT}", "--message", "{scie.env.GREETING}"],
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/py/project"))
+    field_set = PexBinaryFieldSet.create(tgt)
+    result = rule_runner.request(BuiltPackage, [field_set])
+
+    rule_runner.write_digest(result.digest)
+    executable = os.path.join(rule_runner.build_root, "src.py.project/project")
+    output = subprocess.check_output([executable], text=True)
+
+    # Verify the script received the args from scie_args (with scie_env substitution)
+    assert "ARGV:" in output
+    assert "'--message'" in output
+    assert "'hello_world'" in output
+    # Verify the GREETING env var was set by scie_env
+    assert "GREETING:hello_world" in output

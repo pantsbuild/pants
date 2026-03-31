@@ -49,12 +49,17 @@ users of _any_ dependency changed, transitively.
 
 Use filters to operate on only targets that match the predicate, e.g. only running Python tests.
 
-Specify a predicate by using one of the below `filter` options, like `--filter-target-type`. You
-can use a comma to OR multiple values, meaning that at least one member must be matched. You
-can repeat the option multiple times to AND each filter. You can prefix the filter with
-`-` to negate the filter, meaning that the target must not be true for the filter.
+Specify a predicate by using one of the below `filter` options, like `--filter-target-type`.
 
-Some examples:
+The predicates support logical OR, AND, and NOT as follows:
+
+- **OR**: Use a comma `,` within the same filter value to OR multiple values together, meaning that at least one member must be matched for the filter to match. For example, `--filter-target-type=python_source,python_test` will match targets with either the `python_source` or `python_test` target types; no other targets will be included.
+
+- **AND**: Repeat the option multiple times to AND each filter together. For example, `--filter-tag-regex=^foo --filter-tag-regex=bar$` will match targets with both at least one tag starting with `foo` and at least one tag ending in `bar`; no other targets will be included even if the target has a tag matching one of the filters.
+
+- **NOT**: Use a `-` prefix to negate a filter, meaning that the filter will _exclude_ a target if the filter matches. For example, `--filter-target-type=-python_test` will exclude any target with the `python_test` target type.
+
+Some more examples:
 
 ```bash
 # Only `python_source` targets.

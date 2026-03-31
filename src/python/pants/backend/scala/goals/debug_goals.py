@@ -4,13 +4,15 @@
 import json
 
 from pants.backend.experimental.scala.register import rules as scala_rules
-from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
+from pants.backend.scala.dependency_inference.scala_parser import (
+    resolve_fallible_result_to_analysis,
+)
 from pants.backend.scala.target_types import ScalaFieldSet
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, goal_rule, implicitly
 from pants.engine.target import Targets
 from pants.jvm.goals import debug_goals
 
@@ -30,8 +32,8 @@ async def dump_scala_source_analysis(targets: Targets, console: Console) -> Dump
     scala_source_field_sets = [
         ScalaFieldSet.create(tgt) for tgt in targets if ScalaFieldSet.is_applicable(tgt)
     ]
-    scala_source_analysis = await MultiGet(
-        Get(ScalaSourceDependencyAnalysis, SourceFilesRequest([fs.sources]))
+    scala_source_analysis = await concurrently(
+        resolve_fallible_result_to_analysis(**implicitly(SourceFilesRequest([fs.sources])))
         for fs in scala_source_field_sets
     )
     scala_source_analysis_json = [

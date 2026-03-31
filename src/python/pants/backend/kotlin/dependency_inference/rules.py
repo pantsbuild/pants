@@ -5,17 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.kotlin.dependency_inference import kotlin_parser, symbol_mapper
-from pants.backend.kotlin.dependency_inference.kotlin_parser import KotlinSourceDependencyAnalysis
+from pants.backend.kotlin.dependency_inference.kotlin_parser import (
+    resolve_fallible_result_to_analysis,
+)
 from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
 from pants.backend.kotlin.subsystems.kotlin_infer import KotlinInferSubsystem
 from pants.backend.kotlin.target_types import KotlinDependenciesField, KotlinSourceField
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
@@ -58,9 +60,13 @@ async def infer_kotlin_dependencies_via_source_analysis(
         return InferredDependencies([])
 
     address = request.field_set.address
-    explicitly_provided_deps, analysis = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(KotlinSourceDependencyAnalysis, SourceFilesRequest([request.field_set.source])),
+    explicitly_provided_deps, analysis = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
+        ),
+        resolve_fallible_result_to_analysis(
+            **implicitly(SourceFilesRequest([request.field_set.source]))
+        ),
     )
 
     symbols: OrderedSet[str] = OrderedSet()
@@ -153,8 +159,8 @@ async def infer_kotlin_stdlib_dependency(
 ) -> InferredDependencies:
     resolve = request.field_set.resolve.normalized_value(jvm)
 
-    kotlin_runtime_target_info = await Get(
-        KotlinRuntimeForResolve, KotlinRuntimeForResolveRequest(resolve)
+    kotlin_runtime_target_info = await resolve_kotlin_runtime_for_resolve(
+        KotlinRuntimeForResolveRequest(resolve), **implicitly()
     )
     return InferredDependencies(kotlin_runtime_target_info.addresses)
 

@@ -21,30 +21,18 @@ from pants.core.goals.run import (
     run,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
-from pants.core.util_rules.environments import EnvironmentNameRequest, EnvironmentTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.internals.specs_rules import (
     AmbiguousImplementationsException,
     TooManyTargetsException,
 )
-from pants.engine.process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.target import (
-    FieldSet,
-    Target,
-    TargetRootsToFieldSets,
-    TargetRootsToFieldSetsRequest,
-)
-from pants.engine.unions import UnionMembership
+from pants.engine.process import InteractiveProcess
+from pants.engine.target import FieldSet, Target, TargetRootsToFieldSets
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
-from pants.testutil.rule_runner import (
-    MockEffect,
-    MockGet,
-    RuleRunner,
-    mock_console,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import RuleRunner, mock_console, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 
 
@@ -68,11 +56,15 @@ def create_mock_run_debug_adapter_request(
 
 
 class TestRunFieldSet(RunFieldSet):
+    __test__ = False
+
     required_fields = ()
     run_in_sandbox_behavior = RunInSandboxBehavior.NOT_SUPPORTED
 
 
 class TestBinaryTarget(Target):
+    __test__ = False
+
     alias = "binary"
     core_fields = ()
 
@@ -114,34 +106,22 @@ def single_target_run(
                 workspace,
                 rule_runner.environment,
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=TargetRootsToFieldSets,
-                    input_types=(TargetRootsToFieldSetsRequest,),
-                    mock=lambda _: TargetRootsToFieldSets(targets_to_field_sets),
+            mock_calls={
+                "pants.engine.internals.specs_rules.find_valid_field_sets_for_target_roots": lambda _: TargetRootsToFieldSets(
+                    targets_to_field_sets
                 ),
-                rule_runner.do_not_use_mock(EnvironmentTarget, (EnvironmentNameRequest,)),
-                MockGet(
-                    output_type=RunRequest,
-                    input_types=(RunFieldSet,),
-                    mock=lambda _: create_mock_run_request(rule_runner, program_text),
+                "pants.core.goals.run.generate_run_request": lambda _: create_mock_run_request(
+                    rule_runner, program_text
                 ),
-                MockGet(
-                    output_type=RunDebugAdapterRequest,
-                    input_types=(RunFieldSet,),
-                    mock=lambda _: create_mock_run_request(rule_runner, program_text),
+                "pants.core.goals.run.generate_run_debug_adapter_request": lambda _: create_mock_run_request(
+                    rule_runner, program_text
                 ),
-                MockEffect(
-                    output_type=InteractiveProcessResult,
-                    input_types=(InteractiveProcess,),
-                    mock=rule_runner.run_interactive_process,
+                "pants.engine.intrinsics._interactive_process": lambda interactive_process: rule_runner.run_interactive_process(
+                    interactive_process
                 ),
-            ],
-            union_membership=UnionMembership(
-                {
-                    RunFieldSet: [TestRunFieldSet],
-                    RunDebugAdapterRequest: [TestRunFieldSet],
-                },
+            },
+            union_membership=UnionMembership.from_rules(
+                {UnionRule(RunFieldSet, TestRunFieldSet)},
             ),
         )
 
