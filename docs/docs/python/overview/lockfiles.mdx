@@ -288,6 +288,29 @@ There is an older way of generating tool lockfiles, by setting the `version` and
 If you're using this deprecated tool lockfile generation mechanism, please switch to using the one described here as soon as possible!
 :::
 
+### Using uv for faster resolution (experimental)
+
+If `generate-lockfiles` is slow due to dependency resolution, you can opt in to
+[uv](https://github.com/astral-sh/uv) to pre-resolve pinned requirements while
+still generating a Pex lockfile:
+
+```toml title="pants.toml"
+[python]
+lockfile_resolver = "uv"
+
+[uv]
+# Optional: pass extra flags to `uv pip compile`.
+args_for_lockfile_resolve = ["--index-strategy", "unsafe-first-match"]
+```
+
+All lock styles are supported (`strict`, `sources`, `universal`).
+
+**Current limitations:**
+
+- Not supported with `complete_platforms`.
+- Per-resolve `overrides`, `sources`, and `excludes` are not yet wired through the uv step.
+- For non-universal lock styles, interpreter constraints must select a single Python `major.minor`.
+
 ### Manually generating lockfiles
 
 Rather than using `generate-lockfiles` to generate Pex-style lockfiles, you can generate them manually. This can be useful when adopting Pants in a repository already using Poetry by running `poetry export --dev`.

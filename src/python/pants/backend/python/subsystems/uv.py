@@ -58,6 +58,22 @@ class Uv(TemplatedExternalTool):
         ),
     )
 
+    args_for_lockfile_resolve = ArgsListOption(
+        tool_name="uv",
+        example="--index-strategy unsafe-first-match",
+        extra_help=softwrap(
+            """
+            Additional arguments to pass to `uv pip compile` when
+            `[python].lockfile_resolver = "uv"`.
+
+            For example, to prefer the first index that provides a given package:
+
+                [uv]
+                args_for_lockfile_resolve = ["--index-strategy", "unsafe-first-match"]
+            """
+        ),
+    )
+
 
 @dataclass(frozen=True)
 class DownloadedUv:
@@ -66,6 +82,7 @@ class DownloadedUv:
     digest: Digest
     exe: str
     args_for_uv_pip_install: tuple[str, ...]
+    args_for_lockfile_resolve: tuple[str, ...]
 
 
 @rule
@@ -75,6 +92,7 @@ async def download_uv_binary(uv: Uv, platform: Platform) -> DownloadedUv:
         digest=downloaded.digest,
         exe=downloaded.exe,
         args_for_uv_pip_install=tuple(uv.args_for_uv_pip_install),
+        args_for_lockfile_resolve=tuple(uv.args_for_lockfile_resolve),
     )
 
 

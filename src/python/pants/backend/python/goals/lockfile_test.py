@@ -11,10 +11,12 @@ import pytest
 from pants.backend.python.goals.lockfile import (
     GeneratePythonLockfile,
     RequestedPythonUserResolveNames,
+    _strip_named_repo,
     setup_user_lockfile_requests,
 )
 from pants.backend.python.goals.lockfile import rules as lockfile_rules
 from pants.backend.python.subsystems.setup import RESOLVE_OPTION_KEY__DEFAULT, PythonSetup
+from pants.backend.python.subsystems.uv import rules as uv_rules
 from pants.backend.python.target_types import PythonRequirementTarget
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -538,3 +540,184 @@ def test_excluded_by_excludes(rule_runner: PythonRuleRunner) -> None:
     assert "six" in reqs[0]["requires_dists"]
     # But excluded as a project
     assert "six" not in {req["project_name"]: req for req in reqs}
+
+
+# ---------- uv lockfile resolver tests ----------
+
+
+@pytest.fixture
+def uv_rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
+        rules=[
+            *lockfile_rules(),
+            *pex.rules(),
+            *uv_rules(),
+            QueryRule(GenerateLockfileResult, [GeneratePythonLockfile]),
+        ]
+    )
+    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    return rule_runner
+
+
+def test_strip_named_repo() -> None:
+    assert _strip_named_repo("https://pypi.org/simple/") == "https://pypi.org/simple/"
+    assert _strip_named_repo("myrepo=https://example.com/simple/") == "https://example.com/simple/"
+    assert _strip_named_repo("file:///local/path") == "file:///local/path"
+    assert _strip_named_repo("name=file:///local/path") == "file:///local/path"
+    # If no scheme in the second part, keep original
+    assert _strip_named_repo("foo=bar") == "foo=bar"
+
+
+def test_uv_resolver_rejects_complete_platforms(uv_rule_runner: PythonRuleRunner) -> None:
+    uv_rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-lockfile-resolver=uv",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    with pytest.raises(ExecutionError, match="does not support complete_platforms"):
+        uv_rule_runner.request(
+            GenerateLockfileResult,
+            [
+                GeneratePythonLockfile(
+                    requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                    find_links=FrozenOrderedSet(),
+                    interpreter_constraints=InterpreterConstraints(["CPython==3.11.*"]),
+                    resolve_name="test",
+                    lockfile_dest="test.lock",
+                    diff=False,
+                    lock_style="strict",
+                    complete_platforms=("linux_x86_64",),
+                )
+            ],
+        )
+
+
+def test_uv_resolver_strict_requires_single_python(uv_rule_runner: PythonRuleRunner) -> None:
+    uv_rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-lockfile-resolver=uv",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    with pytest.raises(ExecutionError, match="exactly one Python major.minor"):
+        uv_rule_runner.request(
+            GenerateLockfileResult,
+            [
+                GeneratePythonLockfile(
+                    requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                    find_links=FrozenOrderedSet(),
+                    interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.12"]),
+                    resolve_name="test",
+                    lockfile_dest="test.lock",
+                    diff=False,
+                    lock_style="strict",
+                    complete_platforms=(),
+                )
+            ],
+        )
+
+
+def test_uv_resolver_rejects_overrides(uv_rule_runner: PythonRuleRunner) -> None:
+    uv_rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-lockfile-resolver=uv",
+            "--python-resolves-to-overrides={'test': ['ansicolors==1.1.7']}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    with pytest.raises(ExecutionError, match="does not yet support per-resolve overrides"):
+        uv_rule_runner.request(
+            GenerateLockfileResult,
+            [
+                GeneratePythonLockfile(
+                    requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                    find_links=FrozenOrderedSet(),
+                    interpreter_constraints=InterpreterConstraints(["CPython==3.11.*"]),
+                    resolve_name="test",
+                    lockfile_dest="test.lock",
+                    diff=False,
+                    lock_style="strict",
+                    complete_platforms=(),
+                )
+            ],
+        )
+
+
+def test_uv_resolver_strict_generates_valid_lockfile(uv_rule_runner: PythonRuleRunner) -> None:
+    uv_rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-lockfile-resolver=uv",
+            "--python-separate-lockfile-metadata-file",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    result = uv_rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GeneratePythonLockfile(
+                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                find_links=FrozenOrderedSet(),
+                interpreter_constraints=InterpreterConstraints(["CPython==3.11.*"]),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+                lock_style="strict",
+                complete_platforms=(),
+            )
+        ],
+    )
+    digest_contents = uv_rule_runner.request(DigestContents, [result.digest])
+    lock_content = None
+    for dc in digest_contents:
+        if dc.path == "test.lock":
+            lock_content = dc.content.decode()
+            break
+    assert lock_content is not None
+    lock_entry = json.loads(lock_content)
+    reqs = lock_entry["locked_resolves"][0]["locked_requirements"]
+    assert len(reqs) == 1
+    assert reqs[0]["project_name"] == "ansicolors"
+    assert reqs[0]["version"] == "1.1.8"
+
+
+def test_uv_resolver_universal_generates_valid_lockfile(uv_rule_runner: PythonRuleRunner) -> None:
+    uv_rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-lockfile-resolver=uv",
+            "--python-separate-lockfile-metadata-file",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    result = uv_rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GeneratePythonLockfile(
+                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                find_links=FrozenOrderedSet(),
+                interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.13"]),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+                lock_style="universal",
+                complete_platforms=(),
+            )
+        ],
+    )
+    digest_contents = uv_rule_runner.request(DigestContents, [result.digest])
+    lock_content = None
+    for dc in digest_contents:
+        if dc.path == "test.lock":
+            lock_content = dc.content.decode()
+            break
+    assert lock_content is not None
+    lock_entry = json.loads(lock_content)
+    reqs = lock_entry["locked_resolves"][0]["locked_requirements"]
+    assert len(reqs) == 1
+    assert reqs[0]["project_name"] == "ansicolors"
+    assert reqs[0]["version"] == "1.1.8"
