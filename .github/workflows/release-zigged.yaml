@@ -14,6 +14,9 @@
 
 name: Cross-compile Rust
 on:
+  push:
+    branches:
+      - cargo-zig
   workflow_dispatch:
 
 defaults:
@@ -34,7 +37,7 @@ env:
 jobs:
   setup-deps:
     name: Setup dependencies
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       # ================================
@@ -52,7 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${{ env.ZIG_HOME }}"
-          ZIG_ARCHIVE="zig-x86_64-linux-${{ env.ZIG_VERSION }}.tar.xz"
+          ZIG_ARCHIVE="zig-aarch64-macos-${{ env.ZIG_VERSION }}.tar.xz"
 
           curl -v -L "https://ziglang.org/download/${{ env.ZIG_VERSION }}/$ZIG_ARCHIVE" \
             -o "/tmp/$ZIG_ARCHIVE"
@@ -93,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${{ env.PROTOC_HOME }}"
-          PROTOC_ZIP="protoc-${{ env.PROTOC_VERSION }}-linux-x86_64.zip"
+          PROTOC_ZIP="protoc-${{ env.PROTOC_VERSION }}-osx-aarch_64.zip"
 
           gh release download v${{ env.PROTOC_VERSION }} \
             --repo protocolbuffers/protobuf \
@@ -105,7 +108,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.config.target }}
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     needs: setup-deps
     env:
       PBS_PLATFORM_DIR: "/tmp/pbs"
@@ -226,12 +229,7 @@ jobs:
           echo "::notice::cargo-zig=$(cargo-zigbuild --version)"
           echo "::notice::protoc=$(protoc --version)"
 
-          cargo zigbuild \
-            --manifest-path ./src/rust/Cargo.toml \
-            --release \
-            --target ${{ matrix.config.target }}
-
-          # TODO: Remove this: Just seeing what shows up
+          cargo zigbuild --manifest-path ./src/rust/Cargo.toml --release --target ${{ matrix.config.target }}
           echo "::notice::$(ls -la)"
           echo "::notice::$(ls -la ./src/rust/target)"
           echo "::notice::$(ls -la ./src/rust/target/release)"
