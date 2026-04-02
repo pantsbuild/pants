@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
+from enum import Enum
 from io import RawIOBase
 from pathlib import Path
-from typing import Any, ClassVar, Protocol, Self, TextIO, TypeVar, overload
+from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
     CreateDigest,
@@ -434,6 +435,8 @@ class Field:
 
     value: ImmutableValue | None
 
+    _raw_value_type: ClassVar[str]
+
     def __init__(self, raw_value: Any | None, address: Address) -> None: ...
     @classmethod
     def compute_value(cls, raw_value: Any | None, address: Address) -> ImmutableValue:
@@ -445,6 +448,128 @@ class Field:
         The resulting value must be hashable (and should be immutable).
         """
         ...
+
+_ST = TypeVar("_ST")
+
+class ScalarField(Field, Generic[_ST]):
+    expected_type: ClassVar[type[_ST]]
+    expected_type_description: ClassVar[str]
+    value: _ST | None
+    default: ClassVar[_ST | None] = None
+
+    @classmethod
+    def compute_value(cls, raw_value: Any | None, address: Address) -> _ST | None: ...
+
+class BoolField(ScalarField[bool]):
+    """A field whose value is a boolean.
+
+    Subclasses must either set `default: bool` or `required = True` so that the value is always
+    defined.
+    """
+
+    expected_type: ClassVar[type[bool]]
+    expected_type_description: ClassVar[str]
+    value: bool
+    default: ClassVar[bool]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool, address: Address) -> bool: ...  # type: ignore[override]
+
+class TriBoolField(ScalarField[bool]):
+    """A field whose value is a boolean or None, which is meant to represent a tri-state."""
+
+    expected_type: ClassVar[type[bool]]
+    expected_type_description: ClassVar[str]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool | None, address: Address) -> bool | None: ...
+
+class StringField(ScalarField[str]):
+    expected_type: ClassVar[type[str]]
+    expected_type_description: ClassVar[str]
+    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None]
+
+    @classmethod
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None: ...
+
+_ET = TypeVar("_ET")
+
+class SequenceField(Field, Generic[_ET]):
+    expected_element_type: ClassVar[type]
+    expected_type_description: ClassVar[str]
+    value: tuple[_ET, ...] | None
+    default: ClassVar[tuple[_ET, ...] | None] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[Any] | None, address: Address
+    ) -> tuple[_ET, ...] | None: ...
+
+class StringSequenceField(SequenceField[str]):
+    expected_element_type: ClassVar[type[str]]
+    expected_type_description: ClassVar[str]
+    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[str, ...] | None: ...
+
+# NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter
+# which order you use for inheriting the field template vs. the mixin.
+class AsyncFieldMixin(Field):
+    """A mixin to store the field's original `Address` for use during hydration by the engine.
+
+    Typically, you should also create a dataclass representing the hydrated value and another for
+    the request, then a rule to go from the request to the hydrated value. The request class should
+    store the async field as a property.
+
+    (Why use the request class as the rule input, rather than the field itself? It's a wrapper so
+    that subclasses of the async field work properly, given that the engine uses exact type IDs.
+    This is like WrappedTarget.)
+
+    For example:
+
+        class Sources(StringSequenceField, AsyncFieldMixin):
+            alias = "sources"
+
+            # Often, async fields will want to define entry points like this to allow subclasses to
+            # change behavior.
+            def validate_resolved_files(self, files: Sequence[str]) -> None:
+                pass
+
+
+        @dataclass(frozen=True)
+        class HydrateSourcesRequest:
+            field: Sources
+
+
+        @dataclass(frozen=True)
+        class HydratedSources:
+            snapshot: Snapshot
+
+
+        @rule
+        async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
+            digest = await path_globs_to_digest(PathGlobs(request.field.value))
+            result = await digest_to_snapshot(digest)
+            request.field.validate_resolved_files(result.files)
+            ...
+            return HydratedSources(result)
+
+    Then, call sites can `await` if they need to hydrate the field, even if they subclassed
+    the original async field to have custom behavior:
+
+        sources1 = hydrate_sources(HydrateSourcesRequest(my_tgt.get(Sources)))
+        sources2 = hydrate_sources(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
+    """
+
+    address: Address
+
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: Any) -> bool: ...
+    def __ne__(self, other: Any) -> bool: ...
+    def __repr__(self) -> str: ...
 
 # ------------------------------------------------------------------------------
 # FS

@@ -2,22 +2,119 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fmt::Write;
+use std::hash::{Hash, Hasher};
+
+use fnv::FnvHasher;
 
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::pyclass_init::PyClassInitializer;
 use pyo3::types::PyType;
 
 use crate::externs::address::Address;
 use crate::python::PyComparedBool;
 
+use std::sync::OnceLock;
+
+static INVALID_FIELD_TYPE_EXCEPTION: OnceLock<Py<PyAny>> = OnceLock::new();
+static INVALID_FIELD_CHOICE_EXCEPTION: OnceLock<Py<PyAny>> = OnceLock::new();
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Field>()?;
+    m.add_class::<ScalarField>()?;
+    m.add_class::<BoolField>()?;
+    m.add_class::<TriBoolField>()?;
+    m.add_class::<StringField>()?;
+    m.add_class::<SequenceField>()?;
+    m.add_class::<StringSequenceField>()?;
+    m.add_class::<AsyncFieldMixin>()?;
     m.add_class::<NoFieldValue>()?;
 
     m.add("NO_VALUE", NoFieldValue)?;
 
+    Ok(())
+}
+
+fn combine_hashes(hashes: &[isize]) -> isize {
+    let mut hasher = FnvHasher::default();
+    for h in hashes {
+        h.hash(&mut hasher);
+    }
+    hasher.finish() as isize
+}
+
+fn get_cached_exception<'py>(
+    py: Python<'py>,
+    cache: &OnceLock<Py<PyAny>>,
+    name: &str,
+) -> PyResult<Bound<'py, PyAny>> {
+    if let Some(exc) = cache.get() {
+        return Ok(exc.bind(py).clone());
+    }
+    let exc = py.import("pants.engine.target")?.getattr(name)?;
+    let _ = cache.set(exc.clone().unbind());
+    Ok(exc)
+}
+
+fn raise_invalid_field_type(
+    py: Python,
+    address: &Bound<PyAny>,
+    alias: &str,
+    raw_value: Option<&Bound<PyAny>>,
+    expected_type_desc: &str,
+) -> PyErr {
+    match get_cached_exception(
+        py,
+        &INVALID_FIELD_TYPE_EXCEPTION,
+        "InvalidFieldTypeException",
+    ) {
+        Ok(exc_cls) => {
+            let kwargs = pyo3::types::PyDict::new(py);
+            let _ = kwargs.set_item("expected_type", expected_type_desc);
+            match exc_cls.call((address, alias, raw_value), Some(&kwargs)) {
+                Ok(exc) => PyErr::from_value(exc),
+                Err(e) => e,
+            }
+        }
+        Err(e) => e,
+    }
+}
+
+fn validate_choices(
+    py: Python,
+    address: &Bound<PyAny>,
+    alias: &str,
+    values: &Bound<PyAny>,
+    valid_choices: &Bound<PyAny>,
+) -> PyResult<()> {
+    let choices_set = pyo3::types::PySet::empty(py)?;
+    if valid_choices.is_instance_of::<pyo3::types::PyTuple>() {
+        for item in valid_choices.try_iter()? {
+            choices_set.add(item?)?;
+        }
+    } else {
+        for member in valid_choices.try_iter()? {
+            let member = member?;
+            choices_set.add(member.getattr(intern!(py, "value"))?)?;
+        }
+    }
+    for choice in values.try_iter()? {
+        let choice = choice?;
+        if !choices_set.contains(&choice)? {
+            let exc_cls = get_cached_exception(
+                py,
+                &INVALID_FIELD_CHOICE_EXCEPTION,
+                "InvalidFieldChoiceException",
+            )?;
+            let kwargs = pyo3::types::PyDict::new(py);
+            kwargs.set_item("valid_choices", &choices_set)?;
+            return Err(PyErr::from_value(
+                exc_cls.call((address, alias, &choice), Some(&kwargs))?,
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -36,7 +133,7 @@ impl NoFieldValue {
     }
 }
 
-#[pyclass(subclass)]
+#[pyclass(subclass, frozen, module = "pants.engine.internals.native_engine")]
 pub struct Field {
     value: Py<PyAny>,
 }
@@ -67,11 +164,16 @@ impl Field {
             rv => rv,
         };
 
-        Ok(Self {
-            value: cls
-                .call_method(intern!(py, "compute_value"), (raw_value, address), None)?
-                .into(),
-        })
+        let value = cls
+            .call_method(intern!(py, "compute_value"), (raw_value, &address), None)?
+            .into();
+
+        Ok(Self { value })
+    }
+
+    #[classattr]
+    fn _raw_value_type() -> &'static str {
+        "Any | None"
     }
 
     #[classattr]
@@ -142,7 +244,10 @@ impl Field {
     }
 
     fn __hash__(self_: &Bound<'_, Self>, py: Python) -> PyResult<isize> {
-        Ok(self_.get_type().hash()? & self_.borrow().value.bind(py).hash()?)
+        Ok(combine_hashes(&[
+            self_.get_type().hash()?,
+            self_.get().value.bind(py).hash()?,
+        ]))
     }
 
     fn __repr__(self_: &Bound<'_, Self>) -> PyResult<String> {
@@ -152,7 +257,7 @@ impl Field {
             "{}(alias={}, value={}",
             self_.get_type(),
             Self::cls_alias(self_)?,
-            self_.borrow().value
+            self_.get().value
         )
         .unwrap();
         if let Ok(default) = self_.getattr("default") {
@@ -164,11 +269,7 @@ impl Field {
     }
 
     fn __str__(self_: &Bound<'_, Self>) -> PyResult<String> {
-        Ok(format!(
-            "{}={}",
-            Self::cls_alias(self_)?,
-            self_.borrow().value
-        ))
+        Ok(format!("{}={}", Self::cls_alias(self_)?, self_.get().value))
     }
 
     fn __richcmp__<'py>(
@@ -179,10 +280,10 @@ impl Field {
     ) -> PyResult<PyComparedBool> {
         let is_eq = self_.get_type().eq(other.get_type())?
             && self_
-                .borrow()
+                .get()
                 .value
                 .bind(py)
-                .eq(&other.extract::<PyRef<Field>>()?.value)?;
+                .eq(other.cast::<Field>()?.get().value.bind(py))?;
         Ok(PyComparedBool(match op {
             CompareOp::Eq => Some(is_eq),
             CompareOp::Ne => Some(!is_eq),
@@ -192,6 +293,17 @@ impl Field {
 }
 
 impl Field {
+    fn init(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<Field>> {
+        Ok(PyClassInitializer::from(Self::__new__(
+            cls, raw_value, address, py,
+        )?))
+    }
+
     fn cls_none_is_valid_value(cls: &Bound<'_, PyAny>) -> PyResult<bool> {
         cls.getattr("none_is_valid_value")?.extract::<bool>()
     }
@@ -252,5 +364,429 @@ impl Field {
             None,
         )?;
         Ok(())
+    }
+}
+
+#[pyclass(subclass, frozen, extends = Field, generic, module = "pants.engine.internals.native_engine")]
+pub struct ScalarField;
+
+#[pymethods]
+impl ScalarField {
+    #[new]
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn __new__(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        Ok(Field::init(cls, raw_value, address, py)?.add_subclass(Self))
+    }
+
+    #[classattr]
+    fn default<'py>(py: Python<'py>) -> Bound<'py, PyAny> {
+        py.None().into_bound(py)
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn compute_value<'py>(
+        cls: &Bound<'py, PyType>,
+        raw_value: Option<&Bound<'py, PyAny>>,
+        address: Bound<'py, Address>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let value_or_default = Field::compute_value(cls, raw_value, address.extract()?, py)?;
+        if !value_or_default.is_none() {
+            let expected_type = cls.getattr(intern!(py, "expected_type"))?;
+            if !value_or_default.is_instance(&expected_type)? {
+                let alias: String = Field::cls_alias(cls)?;
+                let expected_type_desc: String = cls
+                    .getattr(intern!(py, "expected_type_description"))?
+                    .extract()?;
+                return Err(raise_invalid_field_type(
+                    py,
+                    address.as_any(),
+                    &alias,
+                    raw_value,
+                    &expected_type_desc,
+                ));
+            }
+        }
+        Ok(value_or_default)
+    }
+}
+
+#[pyclass(subclass, frozen, extends = ScalarField, module = "pants.engine.internals.native_engine")]
+pub struct BoolField;
+
+#[pymethods]
+impl BoolField {
+    #[new]
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn __new__(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        Ok(Field::init(cls, raw_value, address, py)?
+            .add_subclass(ScalarField)
+            .add_subclass(Self))
+    }
+
+    #[classattr]
+    fn _raw_value_type() -> &'static str {
+        "bool"
+    }
+
+    #[classattr]
+    fn expected_type<'py>(py: Python<'py>) -> Bound<'py, PyType> {
+        py.get_type::<pyo3::types::PyBool>()
+    }
+
+    #[classattr]
+    fn expected_type_description() -> &'static str {
+        "a boolean"
+    }
+}
+
+#[pyclass(subclass, frozen, extends = ScalarField, module = "pants.engine.internals.native_engine")]
+pub struct TriBoolField;
+
+#[pymethods]
+impl TriBoolField {
+    #[new]
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn __new__(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        Ok(Field::init(cls, raw_value, address, py)?
+            .add_subclass(ScalarField)
+            .add_subclass(Self))
+    }
+
+    #[classattr]
+    fn _raw_value_type() -> &'static str {
+        "bool | None"
+    }
+
+    #[classattr]
+    fn expected_type<'py>(py: Python<'py>) -> Bound<'py, PyType> {
+        py.get_type::<pyo3::types::PyBool>()
+    }
+
+    #[classattr]
+    fn expected_type_description() -> &'static str {
+        "a boolean or None"
+    }
+}
+
+#[pyclass(subclass, frozen, extends = ScalarField, module = "pants.engine.internals.native_engine")]
+pub struct StringField;
+
+#[pymethods]
+impl StringField {
+    #[new]
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn __new__(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        Ok(Field::init(cls, raw_value, address, py)?
+            .add_subclass(ScalarField)
+            .add_subclass(Self))
+    }
+
+    #[classattr]
+    fn _raw_value_type() -> &'static str {
+        "str | None"
+    }
+
+    #[classattr]
+    fn expected_type<'py>(py: Python<'py>) -> Bound<'py, PyType> {
+        py.get_type::<pyo3::types::PyString>()
+    }
+
+    #[classattr]
+    fn expected_type_description() -> &'static str {
+        "a string"
+    }
+
+    #[classattr]
+    fn valid_choices<'py>(py: Python<'py>) -> Bound<'py, PyAny> {
+        py.None().into_bound(py)
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn compute_value<'py>(
+        cls: &Bound<'py, PyType>,
+        raw_value: Option<&Bound<'py, PyAny>>,
+        address: Bound<'py, Address>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let value_or_default = ScalarField::compute_value(cls, raw_value, address.clone(), py)?;
+        if !value_or_default.is_none() {
+            let valid_choices = cls.getattr(intern!(py, "valid_choices"))?;
+            if !valid_choices.is_none() {
+                let as_list = pyo3::types::PyList::new(py, [&value_or_default])?;
+                validate_choices(
+                    py,
+                    address.as_any(),
+                    &Field::cls_alias(cls)?,
+                    as_list.as_any(),
+                    &valid_choices,
+                )?;
+            }
+        }
+        Ok(value_or_default)
+    }
+}
+
+#[pyclass(subclass, frozen, extends = Field, generic, module = "pants.engine.internals.native_engine")]
+pub struct SequenceField;
+
+#[pymethods]
+impl SequenceField {
+    #[new]
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn __new__(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        Ok(Field::init(cls, raw_value, address, py)?.add_subclass(Self))
+    }
+
+    #[classattr]
+    fn _raw_value_type() -> &'static str {
+        "Iterable[Any] | None"
+    }
+
+    #[classattr]
+    fn default<'py>(py: Python<'py>) -> Bound<'py, PyAny> {
+        py.None().into_bound(py)
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn compute_value<'py>(
+        cls: &Bound<'py, PyType>,
+        raw_value: Option<&Bound<'py, PyAny>>,
+        address: Bound<'py, Address>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let value_or_default = Field::compute_value(cls, raw_value, address.extract()?, py)?;
+        if value_or_default.is_none() {
+            return Ok(value_or_default);
+        }
+        let expected_element_type = cls.getattr(intern!(py, "expected_element_type"))?;
+        if value_or_default.is_instance(&expected_element_type)? {
+            let alias = Field::cls_alias(cls)?;
+            let desc: String = cls
+                .getattr(intern!(py, "expected_type_description"))?
+                .extract()?;
+            return Err(raise_invalid_field_type(
+                py,
+                address.as_any(),
+                &alias,
+                raw_value,
+                &desc,
+            ));
+        }
+        let iter = match value_or_default.try_iter() {
+            Ok(iter) => iter,
+            Err(_) => {
+                let alias = Field::cls_alias(cls)?;
+                let desc: String = cls
+                    .getattr(intern!(py, "expected_type_description"))?
+                    .extract()?;
+                return Err(raise_invalid_field_type(
+                    py,
+                    address.as_any(),
+                    &alias,
+                    raw_value,
+                    &desc,
+                ));
+            }
+        };
+        let mut elements: Vec<Bound<'py, PyAny>> = Vec::new();
+        for item in iter {
+            let item = item?;
+            if !item.is_instance(&expected_element_type)? {
+                let alias = Field::cls_alias(cls)?;
+                let desc: String = cls
+                    .getattr(intern!(py, "expected_type_description"))?
+                    .extract()?;
+                return Err(raise_invalid_field_type(
+                    py,
+                    address.as_any(),
+                    &alias,
+                    raw_value,
+                    &desc,
+                ));
+            }
+            elements.push(item);
+        }
+        Ok(pyo3::types::PyTuple::new(py, &elements)?.into_any())
+    }
+}
+
+#[pyclass(subclass, frozen, extends = SequenceField, module = "pants.engine.internals.native_engine")]
+pub struct StringSequenceField;
+
+#[pymethods]
+impl StringSequenceField {
+    #[new]
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn __new__(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        Ok(Field::init(cls, raw_value, address, py)?
+            .add_subclass(SequenceField)
+            .add_subclass(Self))
+    }
+
+    #[classattr]
+    fn _raw_value_type() -> &'static str {
+        "Iterable[str] | None"
+    }
+
+    #[classattr]
+    fn expected_element_type<'py>(py: Python<'py>) -> Bound<'py, PyType> {
+        py.get_type::<pyo3::types::PyString>()
+    }
+
+    #[classattr]
+    fn expected_type_description() -> &'static str {
+        "an iterable of strings (e.g. a list of strings)"
+    }
+
+    #[classattr]
+    fn valid_choices<'py>(py: Python<'py>) -> Bound<'py, PyAny> {
+        py.None().into_bound(py)
+    }
+
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn compute_value<'py>(
+        cls: &Bound<'py, PyType>,
+        raw_value: Option<&Bound<'py, PyAny>>,
+        address: Bound<'py, Address>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let value_or_default = SequenceField::compute_value(cls, raw_value, address.clone(), py)?;
+        if !value_or_default.is_none() {
+            let valid_choices = cls.getattr(intern!(py, "valid_choices"))?;
+            if !valid_choices.is_none() {
+                validate_choices(
+                    py,
+                    address.as_any(),
+                    &Field::cls_alias(cls)?,
+                    &value_or_default,
+                    &valid_choices,
+                )?;
+            }
+        }
+        Ok(value_or_default)
+    }
+}
+
+#[pyclass(subclass, frozen, extends = Field, module = "pants.engine.internals.native_engine")]
+pub struct AsyncFieldMixin {
+    address: Py<Address>,
+}
+
+#[pymethods]
+impl AsyncFieldMixin {
+    #[new]
+    #[classmethod]
+    #[pyo3(signature = (raw_value, address))]
+    fn __new__(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<Self>> {
+        Ok(
+            Field::init(cls, raw_value, address.clone(), py)?.add_subclass(Self {
+                address: address.unbind(),
+            }),
+        )
+    }
+
+    #[getter]
+    fn address<'py>(&self, py: Python<'py>) -> Bound<'py, Address> {
+        self.address.bind(py).clone()
+    }
+
+    fn __repr__(self_: &Bound<Self>) -> PyResult<String> {
+        let py = self_.py();
+        let cls = self_.get_type();
+        let alias: String = Field::cls_alias(&cls)?;
+        let value = self_.getattr(intern!(py, "value"))?;
+        let address = self_.get().address.bind(py);
+        let mut result = String::new();
+        write!(
+            result,
+            "{cls}(alias='{alias}', address={address}, value={value}"
+        )
+        .unwrap();
+        if let Ok(default) = cls.getattr(intern!(py, "default")) {
+            write!(result, ", default={default}").unwrap();
+        }
+        result.push(')');
+        Ok(result)
+    }
+
+    fn __hash__(self_: &Bound<Self>, py: Python) -> PyResult<isize> {
+        Ok(combine_hashes(&[
+            self_.get_type().hash()?,
+            self_.getattr(intern!(py, "value"))?.hash()?,
+            self_.get().address.bind(py).hash()?,
+        ]))
+    }
+
+    fn __richcmp__<'py>(
+        self_: &Bound<'py, Self>,
+        other: &Bound<'py, PyAny>,
+        op: CompareOp,
+        py: Python,
+    ) -> PyResult<PyComparedBool> {
+        let is_eq = if other.is_instance_of::<AsyncFieldMixin>() {
+            let other_afm = other.cast::<AsyncFieldMixin>()?;
+            self_.get_type().eq(other.get_type())?
+                && self_
+                    .getattr(intern!(py, "value"))?
+                    .eq(other.getattr(intern!(py, "value"))?)?
+                && self_
+                    .get()
+                    .address
+                    .bind(py)
+                    .eq(other_afm.get().address.bind(py))?
+        } else {
+            false
+        };
+        Ok(PyComparedBool(match op {
+            CompareOp::Eq => Some(is_eq),
+            CompareOp::Ne => Some(!is_eq),
+            _ => None,
+        }))
     }
 }
