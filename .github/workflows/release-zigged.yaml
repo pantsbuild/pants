@@ -1,0 +1,238 @@
+# This is an experimental workflow using zig/cargo-zigbuild to perform cross compilation.
+# 
+# Note: In lieu of using non-GitHub `setup-` actions, I've just manually grabbed binaries/zips and cached them here
+# to avoid as many pointless indirections as possible.
+#
+# Issues compiling from Linux to MacOS:
+# https://github.com/aws/aws-lc-rs/issues/512
+# https://codeberg.org/ziglang/zig/issues/31189
+#
+# TODO: SHA256 check the downloads
+# TODO: Verify attestations of `gh release download`ed files
+# TODO: Expose cache keys as outputs (or ENV vars)
+#
+
+name: Cross-compile Rust
+on:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_ZIGBUILD_VERSION: "0.22.1"
+  PROTOC_HOME: "compilation-tools/protoc"
+  PROTOC_VERSION: "34.1"
+  # TODO: Organize to only use a single version - since we can't use env in env
+  PBS_VERSION: "20260325"
+  PBS_VERSION_FULL: "3.14.3+20260325"
+  PYTHON_MAJOR_MINOR: "3.14"
+  ZIG_HOME: "compilation-tools/zig"
+  ZIG_VERSION: "0.15.2"
+
+jobs:
+  setup-deps:
+    name: Setup dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      # ================================
+      # zig
+      # ================================
+      - name: Cache Zig
+        id: cache-zig
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.ZIG_HOME }}
+          key: cache-zig-${{ runner.os }}-${{ runner.arch }}-${{ env.ZIG_VERSION }}
+
+      - name: Setup Zig
+        if: steps.cache-zig.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ env.ZIG_HOME }}"
+          ZIG_ARCHIVE="zig-x86_64-linux-${{ env.ZIG_VERSION }}.tar.xz"
+
+          curl -v -L "https://ziglang.org/download/${{ env.ZIG_VERSION }}/$ZIG_ARCHIVE" \
+            -o "/tmp/$ZIG_ARCHIVE"
+          
+          tar xf "/tmp/$ZIG_ARCHIVE" \
+            --directory "${{ env.ZIG_HOME }}" \
+            --strip-components=1
+
+      # ================================
+      # cargo-zigbuild
+      # ================================
+      # TODO: This will be under the rust-cache eventually
+      - name: Cache cargo-zigbuild
+        id: cache-cargo-zigbuild
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/bin/cargo-zigbuild
+          key: cache-cargo-zigbuild-${{ runner.os }}-${{ runner.arch }}-${{ env.CARGO_ZIGBUILD_VERSION }}
+
+      - name: Setup cargo-zigbuild
+        if: steps.cache-cargo-zigbuild.outputs.cache-hit != 'true'
+        run: cargo install --locked cargo-zigbuild --version ${{ env.CARGO_ZIGBUILD_VERSION }}
+
+      # ================================
+      # protoc
+      # ================================
+      - name: Cache protoc
+        id: cache-protoc
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.PROTOC_HOME }}
+          key: cache-protoc-${{ runner.os }}-${{ runner.arch }}-${{ env.PROTOC_VERSION }}
+
+      - name: Setup protoc
+        if: steps.cache-protoc.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ env.PROTOC_HOME }}"
+          PROTOC_ZIP="protoc-${{ env.PROTOC_VERSION }}-linux-x86_64.zip"
+
+          gh release download v${{ env.PROTOC_VERSION }} \
+            --repo protocolbuffers/protobuf \
+            --pattern $PROTOC_ZIP \
+            --dir /tmp/
+
+          unzip /tmp/$PROTOC_ZIP -d "${{ env.PROTOC_HOME }}"
+
+
+  build:
+    name: Build ${{ matrix.config.target }}
+    runs-on: ubuntu-latest
+    needs: setup-deps
+    env:
+      PBS_PLATFORM_DIR: "/tmp/pbs"
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config: # Redundant today
+          - target: aarch64-unknown-linux-gnu
+            pbs: aarch64-unknown-linux-gnu
+          - target: x86_64-unknown-linux-gnu
+            pbs: x86_64-unknown-linux-gnu
+          - target: aarch64-apple-darwin
+            pbs: aarch64-apple-darwin
+          - target: x86_64-apple-darwin
+            pbs: x86_64-apple-darwin
+    
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Print matrix configuration
+        run: |
+          set -euo pipefail
+
+          echo "target=${{ matrix.config.target }}"
+          echo "pbs=${{ matrix.config.pbs }}"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_MAJOR_MINOR }}
+
+      # ================================
+      # Restore Caches
+      # ================================
+      - name: Restore Zig
+        uses: actions/cache/restore@v5
+        id: restore-zig
+        with:
+          path: ${{ env.ZIG_HOME }}
+          key: cache-zig-${{ runner.os }}-${{ runner.arch }}-${{ env.ZIG_VERSION }}
+          fail-on-cache-miss: true
+
+      - name: Restore cargo-zigbuild cache
+        uses: actions/cache/restore@v5
+        id: restore-cargo-zigbuild
+        with:
+          path: ~/.cargo/bin/cargo-zigbuild
+          key: cache-cargo-zigbuild-${{ runner.os }}-${{ runner.arch }}-${{ env.CARGO_ZIGBUILD_VERSION }}
+          fail-on-cache-miss: true
+
+      - name: Restore protoc
+        id: restore-protoc
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.PROTOC_HOME }}
+          key: cache-protoc-${{ runner.os }}-${{ runner.arch }}-${{ env.PROTOC_VERSION }}
+          fail-on-cache-miss: true
+
+      # ================================
+      # PBS
+      # ================================
+      - name: Cache target PBS python
+        id: cache-target-pbs
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.PBS_PLATFORM_DIR }}
+          key: cache-target-pbs-${{ runner.os }}-${{ runner.arch }}-${{ matrix.config.pbs }}
+
+      # TODO: Manually save this after this step - rather than waiting on success of compilation
+      - name: Setup target PBS Python
+        if: steps.cache-target-pbs.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p "${{ env.PBS_PLATFORM_DIR }}"
+          PBS_ARCHIVE="cpython-${{ env.PBS_VERSION_FULL }}-${{ matrix.config.pbs }}-install_only_stripped.tar.gz"
+
+          gh release download ${{ env.PBS_VERSION }} \
+            --repo astral-sh/python-build-standalone \
+            --pattern "$PBS_ARCHIVE" \
+            --dir /tmp/
+
+          tar xf "/tmp/$PBS_ARCHIVE" \
+            --directory "${{ env.PBS_PLATFORM_DIR }}" \
+            --strip-components=1
+
+      # ================================
+      # Build
+      # ================================
+
+      - name: Setup PATHs
+        run: |
+          set -euo pipefail
+
+          # TODO: I was getting a lot of cache grief between ~ and $HOME - and permission denied elsewhere... I hate GHA
+          echo "${{ github.workspace }}/${{ env.PROTOC_HOME }}/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/${{ env.ZIG_HOME }}" >> $GITHUB_PATH
+
+      - name: Install rust target
+        run: |
+          set -euo pipefail
+          
+          # TODO: Should this be part of the central cache, or add another rust cache?
+          rustup target add ${{ matrix.config.target }}
+
+      - name: Try compiling
+        env:
+          AWS_LC_SYS_NO_JITTER_ENTROPY: "1"
+          PYO3_CROSS_PYTHON_VERSION: "3.14"
+          RUSTFLAGS: "-L ${{ env.PBS_PLATFORM_DIR }}/lib"
+        run: |
+          echo "::notice::PATH=$PATH"
+
+          # TODO: There is no "zig"?
+          # echo "::notice::zig=$(zig --version)"
+          echo "::notice::cargo-zig=$(cargo-zigbuild --version)"
+          echo "::notice::protoc=$(protoc --version)"
+
+          cargo zigbuild \
+            --manifest-path ./src/rust/Cargo.toml \
+            --release \
+            --target ${{ matrix.config.target }}
+
+          # TODO: Remove this: Just seeing what shows up
+          echo "::notice::$(ls -la)"
+          echo "::notice::$(ls -la ./src/rust/target)"
+          echo "::notice::$(ls -la ./src/rust/target/release)"
+          echo "::notice::$(ls -la ./src/rust/target/${{ matrix.config.target }})"
