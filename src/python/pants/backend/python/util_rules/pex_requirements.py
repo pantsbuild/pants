@@ -230,29 +230,30 @@ async def load_lockfile(
 
     metadata_url = PythonLockfileMetadata.metadata_location_for_lockfile(lockfile.url)
     metadata = None
-    try:
-        metadata_digest = await read_file_or_resource(
-            metadata_url,
-            description_of_origin="We squelch errors, so this is never seen by users",
-        )
-        digest_contents = await get_digest_contents(metadata_digest)
-        metadata_bytes = digest_contents[0].content
-        json_dict = json.loads(metadata_bytes)
-        metadata = PythonLockfileMetadata.from_json_dict(
-            json_dict,
-            lockfile_description=f"the lockfile for `{lockfile.resolve_name}`",
-            error_suffix=softwrap(
-                f"""
-                To resolve this error, you will need to regenerate the lockfile by running
-                `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}.
-                """
-            ),
-        )
-        requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
-    except (IntrinsicError, FileNotFoundError):
-        # No metadata file or resource found, so fall through to finding a metadata
-        # header block prepended to the lockfile itself.
-        pass
+    if python_setup.invalid_lockfile_behavior != InvalidLockfileBehavior.ignore:
+        try:
+            metadata_digest = await read_file_or_resource(
+                metadata_url,
+                description_of_origin="We squelch errors, so this is never seen by users",
+            )
+            digest_contents = await get_digest_contents(metadata_digest)
+            metadata_bytes = digest_contents[0].content
+            json_dict = json.loads(metadata_bytes)
+            metadata = PythonLockfileMetadata.from_json_dict(
+                json_dict,
+                lockfile_description=f"the lockfile for `{lockfile.resolve_name}`",
+                error_suffix=softwrap(
+                    f"""
+                    To resolve this error, you will need to regenerate the lockfile by running
+                    `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}.
+                    """
+                ),
+            )
+            requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
+        except (IntrinsicError, FileNotFoundError):
+            # No metadata file or resource found, so fall through to finding a metadata
+            # header block prepended to the lockfile itself.
+            pass
 
     if not metadata:
         if is_pex_native:
