@@ -4,7 +4,9 @@
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::SystemTime;
 
 use itertools::Itertools;
@@ -31,6 +33,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMergeDigests>()?;
     m.add_class::<PyAddPrefix>()?;
     m.add_class::<PyRemovePrefix>()?;
+    m.add_class::<PyPathGlobs>()?;
     m.add_class::<PyFilespecMatcher>()?;
     m.add_class::<PyPathMetadataKind>()?;
     m.add_class::<PyPathMetadata>()?;
@@ -397,40 +400,169 @@ impl PyRemovePrefix {
 // PathGlobs
 // -----------------------------------------------------------------------------
 
-#[allow(dead_code)]
-struct PyPathGlobs(PathGlobs);
+static GLOB_MATCH_ERROR_BEHAVIOR: OnceLock<Py<PyAny>> = OnceLock::new();
+static GLOB_EXPANSION_CONJUNCTION: OnceLock<Py<PyAny>> = OnceLock::new();
 
-impl<'a, 'py> FromPyObject<'a, 'py> for PyPathGlobs {
-    type Error = PyErr;
+fn import_cached<'py>(
+    py: Python<'py>,
+    cache: &OnceLock<Py<PyAny>>,
+    module: &str,
+    name: &str,
+) -> PyResult<Bound<'py, PyAny>> {
+    if let Some(obj) = cache.get() {
+        return Ok(obj.bind(py).clone());
+    }
+    let obj = py.import(module)?.getattr(name)?;
+    let _ = cache.set(obj.clone().unbind());
+    Ok(obj)
+}
 
-    fn extract(obj: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
-        let globs: Vec<String> = obj.getattr("globs")?.extract()?;
+#[pyclass(
+    name = "PathGlobs",
+    frozen,
+    module = "pants.engine.internals.native_engine",
+    from_py_object,
+)]
+#[derive(Clone, Debug)]
+pub struct PyPathGlobs(PathGlobs);
 
-        let description_of_origin_field = obj.getattr("description_of_origin")?;
-        let description_of_origin = if description_of_origin_field.is_none() {
-            None
-        } else {
-            Some(description_of_origin_field.extract()?)
+impl Deref for PyPathGlobs {
+    type Target = PathGlobs;
+
+    fn deref(&self) -> &PathGlobs {
+        &self.0
+    }
+}
+
+/// Extract the string value from a Python enum (has `.value` attr) or a plain string.
+fn extract_enum_value(obj: &Bound<'_, PyAny>) -> PyResult<PyBackedStr> {
+    if let Ok(val) = obj.getattr("value") {
+        val.extract()
+    } else {
+        obj.extract()
+    }
+}
+
+#[pymethods]
+impl PyPathGlobs {
+    #[new]
+    #[pyo3(signature = (globs, glob_match_error_behavior=None, conjunction=None, description_of_origin=None))]
+    fn __new__(
+        globs: &Bound<'_, PyAny>,
+        glob_match_error_behavior: Option<&Bound<'_, PyAny>>,
+        conjunction: Option<&Bound<'_, PyAny>>,
+        description_of_origin: Option<String>,
+    ) -> PyResult<Self> {
+        let mut globs_vec: Vec<String> = PyIterator::from_object(globs)?
+            .map(|item| item.and_then(|v| v.extract::<String>()))
+            .collect::<PyResult<Vec<String>>>()?;
+        globs_vec.sort();
+
+        let behavior_str: &str = match &glob_match_error_behavior {
+            Some(obj) => &extract_enum_value(obj)?,
+            None => "ignore",
         };
 
-        let match_behavior_str: PyBackedStr = obj
-            .getattr("glob_match_error_behavior")?
-            .getattr("value")?
-            .extract()?;
-        let match_behavior =
-            StrictGlobMatching::create(match_behavior_str.as_ref(), description_of_origin)
+        let conjunction_str: &str = match &conjunction {
+            Some(obj) => &extract_enum_value(obj)?,
+            None => "any_match",
+        };
+
+        let strict_match_behavior =
+            StrictGlobMatching::create(behavior_str, description_of_origin)
                 .map_err(PyValueError::new_err)?;
 
-        let conjunction_str: PyBackedStr =
-            obj.getattr("conjunction")?.getattr("value")?.extract()?;
-        let conjunction = GlobExpansionConjunction::create(conjunction_str.as_ref())
-            .map_err(PyValueError::new_err)?;
+        let conjunction =
+            GlobExpansionConjunction::create(conjunction_str).map_err(PyValueError::new_err)?;
 
         Ok(PyPathGlobs(PathGlobs::new(
-            globs,
-            match_behavior,
+            globs_vec,
+            strict_match_behavior,
             conjunction,
         )))
+    }
+
+    #[getter]
+    fn globs<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        PyTuple::new(py, self.0.globs())
+    }
+
+    #[getter]
+    fn glob_match_error_behavior<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let value = match self.0.strict_match_behavior() {
+            StrictGlobMatching::Error(_) => "error",
+            StrictGlobMatching::Warn(_) => "warn",
+            StrictGlobMatching::Ignore => "ignore",
+        };
+        let cls = import_cached(
+            py,
+            &GLOB_MATCH_ERROR_BEHAVIOR,
+            "pants.base.glob_match_error_behavior",
+            "GlobMatchErrorBehavior",
+        )?;
+        cls.call1((value,))
+    }
+
+    #[getter]
+    fn conjunction<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let value = match self.0.conjunction() {
+            GlobExpansionConjunction::AllMatch => "all_match",
+            GlobExpansionConjunction::AnyMatch => "any_match",
+        };
+        let cls = import_cached(
+            py,
+            &GLOB_EXPANSION_CONJUNCTION,
+            "pants.engine.fs",
+            "GlobExpansionConjunction",
+        )?;
+        cls.call1((value,))
+    }
+
+    #[getter]
+    fn description_of_origin(&self) -> Option<&str> {
+        match self.0.strict_match_behavior() {
+            StrictGlobMatching::Error(s) | StrictGlobMatching::Warn(s) => Some(s.as_str()),
+            StrictGlobMatching::Ignore => None,
+        }
+    }
+
+    fn __hash__(&self) -> u64 {
+        let mut s = DefaultHasher::new();
+        self.0.hash(&mut s);
+        s.finish()
+    }
+
+    fn __repr__(&self) -> String {
+        let globs_repr = self.0.globs().iter().map(|g| format!("'{g}'")).join(", ");
+        let behavior = match self.0.strict_match_behavior() {
+            StrictGlobMatching::Error(_) => "error",
+            StrictGlobMatching::Warn(_) => "warn",
+            StrictGlobMatching::Ignore => "ignore",
+        };
+        let conjunction = match self.0.conjunction() {
+            GlobExpansionConjunction::AllMatch => "all_match",
+            GlobExpansionConjunction::AnyMatch => "any_match",
+        };
+        let origin = match self.0.strict_match_behavior() {
+            StrictGlobMatching::Error(s) | StrictGlobMatching::Warn(s) => {
+                format!("'{s}'")
+            }
+            StrictGlobMatching::Ignore => "None".to_string(),
+        };
+        format!(
+            "PathGlobs(globs=({globs_repr},), \
+             glob_match_error_behavior=<GlobMatchErrorBehavior.{behavior}: '{behavior}'>, \
+             conjunction=<GlobExpansionConjunction.{conjunction}: '{conjunction}'>, \
+             description_of_origin={origin})"
+        )
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> Option<bool> {
+        match op {
+            CompareOp::Eq => Some(**self == **other),
+            CompareOp::Ne => Some(**self != **other),
+            _ => None,
+        }
     }
 }
 

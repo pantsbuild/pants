@@ -354,6 +354,18 @@ impl PathGlobs {
         }
     }
 
+    pub fn globs(&self) -> &[String] {
+        &self.globs
+    }
+
+    pub fn strict_match_behavior(&self) -> &StrictGlobMatching {
+        &self.strict_match_behavior
+    }
+
+    pub fn conjunction(&self) -> &GlobExpansionConjunction {
+        &self.conjunction
+    }
+
     pub fn parse(self) -> Result<glob_matching::PreparedPathGlobs, String> {
         glob_matching::PreparedPathGlobs::create(
             self.globs,

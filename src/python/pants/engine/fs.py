@@ -23,6 +23,7 @@ from pants.engine.internals.native_engine import Digest as Digest
 from pants.engine.internals.native_engine import FileDigest as FileDigest
 from pants.engine.internals.native_engine import MergeDigests as MergeDigests
 from pants.engine.internals.native_engine import PathMetadata, PathNamespace
+from pants.engine.internals.native_engine import PathGlobs as PathGlobs
 from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
 from pants.util.frozendict import FrozenDict
@@ -141,61 +142,6 @@ class GlobExpansionConjunction(Enum):
 
     any_match = "any_match"
     all_match = "all_match"
-
-
-@dataclass(frozen=True)
-class PathGlobs:
-    globs: tuple[str, ...]
-    glob_match_error_behavior: GlobMatchErrorBehavior
-    conjunction: GlobExpansionConjunction
-    description_of_origin: str | None
-
-    def __init__(
-        self,
-        globs: Iterable[str],
-        glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore,
-        conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
-        description_of_origin: str | None = None,
-    ) -> None:
-        """A request to find files given a set of globs.
-
-        The syntax supported is roughly Git's glob syntax. Use `*` for globs, `**` for recursive
-        globs, and `!` for ignores.
-
-        :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
-            with `!`, e.g. `!ignore.py`.
-        :param glob_match_error_behavior: whether to warn or error upon match failures
-        :param conjunction: whether all `globs` must match or only at least one must match
-        :param description_of_origin: a human-friendly description of where this PathGlobs request
-            is coming from, used to improve the error message for unmatched globs. For example,
-            this might be the text string "the option `--isort-config`".
-        """
-
-        # NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method
-        # will need to be aware of any changes to this object's definition.
-        object.__setattr__(self, "globs", tuple(sorted(globs)))
-        object.__setattr__(self, "glob_match_error_behavior", glob_match_error_behavior)
-        object.__setattr__(self, "conjunction", conjunction)
-        object.__setattr__(self, "description_of_origin", description_of_origin)
-        self.__post_init__()
-
-    def __post_init__(self) -> None:
-        if self.glob_match_error_behavior == GlobMatchErrorBehavior.ignore:
-            if self.description_of_origin:
-                raise ValueError(
-                    "You provided a `description_of_origin` value when `glob_match_error_behavior` "
-                    "is set to `ignore`. The `ignore` value means that the engine will never "
-                    "generate an error when the globs are generated, so `description_of_origin` "
-                    "won't end up ever being used. Please either change "
-                    "`glob_match_error_behavior` to `warn` or `error`, or remove "
-                    "`description_of_origin`."
-                )
-        else:
-            if not self.description_of_origin:
-                raise ValueError(
-                    "Please provide a `description_of_origin` so that the error message is more "
-                    "helpful to users when their globs fail to match."
-                )
 
 
 @dataclass(frozen=True)
