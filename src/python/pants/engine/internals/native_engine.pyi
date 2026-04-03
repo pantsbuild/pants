@@ -13,13 +13,14 @@ from io import RawIOBase
 from pathlib import Path
 from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import (
     CreateDigest,
     DigestContents,
     DigestEntries,
     DigestSubset,
+    GlobExpansionConjunction,
     NativeDownloadFile,
-    PathGlobs,
     PathMetadataRequest,
     PathMetadataResult,
     Paths,
@@ -667,6 +668,37 @@ class FilespecMatcher:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
     def matches(self, paths: Sequence[str]) -> list[str]: ...
+
+class PathGlobs:
+    def __init__(
+        self,
+        globs: Iterable[str],
+        glob_match_error_behavior: GlobMatchErrorBehavior = ...,
+        conjunction: GlobExpansionConjunction = ...,
+        description_of_origin: str | None = None,
+    ) -> None:
+        """A request to find files given a set of globs.
+        The syntax supported is roughly Git's glob syntax. Use `*` for globs, `**` for recursive
+        globs, and `!` for ignores.
+        :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
+            with `!`, e.g. `!ignore.py`.
+        :param glob_match_error_behavior: whether to warn or error upon match failures
+        :param conjunction: whether all `globs` must match or only at least one must match
+        :param description_of_origin: a human-friendly description of where this PathGlobs request
+            is coming from, used to improve the error message for unmatched globs. For example,
+            this might be the text string "the option `--isort-config`".
+        """
+    @property
+    def globs(self) -> tuple[str, ...]: ...
+    @property
+    def glob_match_error_behavior(self) -> GlobMatchErrorBehavior: ...
+    @property
+    def conjunction(self) -> GlobExpansionConjunction: ...
+    @property
+    def description_of_origin(self) -> str | None: ...
+    def __eq__(self, other: PathGlobs | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
 
 EMPTY_DIGEST: Digest
 EMPTY_FILE_DIGEST: FileDigest
