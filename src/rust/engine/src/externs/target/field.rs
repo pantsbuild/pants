@@ -17,7 +17,7 @@ use super::util::{NoFieldValue, combine_hashes, raise_invalid_field_type, valida
 
 #[pyclass(subclass, frozen, module = "pants.engine.internals.native_engine")]
 pub struct Field {
-    value: Py<PyAny>,
+    pub(crate) value: Py<PyAny>,
 }
 
 #[pymethods]
@@ -184,6 +184,15 @@ impl Field {
         Ok(PyClassInitializer::from(Self::__new__(
             cls, raw_value, address, py,
         )?))
+    }
+
+    pub fn compute_value_from_bound<'py>(
+        cls: &Bound<'py, PyType>,
+        raw_value: Option<&Bound<'py, PyAny>>,
+        address: Bound<'py, Address>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        Self::compute_value(cls, raw_value, address.extract()?, py)
     }
 
     pub fn cls_none_is_valid_value(cls: &Bound<'_, PyAny>) -> PyResult<bool> {
@@ -592,7 +601,22 @@ impl StringSequenceField {
 
 #[pyclass(subclass, frozen, extends = Field, module = "pants.engine.internals.native_engine")]
 pub struct AsyncFieldMixin {
-    address: Py<Address>,
+    pub(crate) address: Py<Address>,
+}
+
+impl AsyncFieldMixin {
+    pub fn init(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<AsyncFieldMixin>> {
+        Ok(
+            Field::init(cls, raw_value, address.clone(), py)?.add_subclass(Self {
+                address: address.unbind(),
+            }),
+        )
+    }
 }
 
 #[pymethods]

@@ -124,7 +124,7 @@ impl UnionMembership {
     }
 
     fn get<'a>(&self, union_type: &'a Bound<PyType>) -> PyResult<Bound<'a, PyTuple>> {
-        self.get_members_tuple(union_type)
+        self.get_members(union_type)
             .unwrap_or_else(|| Ok(PyTuple::empty(union_type.py())))
     }
 
@@ -143,7 +143,7 @@ impl UnionMembership {
     }
 
     fn __getitem__<'a>(&self, union_type: &'a Bound<PyType>) -> PyResult<Bound<'a, PyTuple>> {
-        self.get_members_tuple(union_type).unwrap_or_else(move || {
+        self.get_members(union_type).unwrap_or_else(move || {
             Err(exceptions::PyIndexError::new_err(format!(
                 "'{}' is not registered as a union.",
                 TypeId::new(union_type)
@@ -161,7 +161,7 @@ impl UnionMembership {
 }
 
 impl UnionMembership {
-    fn get_members_tuple<'a>(
+    pub fn get_members<'a>(
         &self,
         union_type: &'a Bound<PyType>,
     ) -> Option<PyResult<Bound<'a, PyTuple>>> {
