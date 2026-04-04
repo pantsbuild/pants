@@ -34,6 +34,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAddPrefix>()?;
     m.add_class::<PyRemovePrefix>()?;
     m.add_class::<PyPathGlobs>()?;
+    m.add_class::<PyFilespec>()?;
     m.add_class::<PyFilespecMatcher>()?;
     m.add_class::<PyPathMetadataKind>()?;
     m.add_class::<PyPathMetadata>()?;
@@ -421,7 +422,7 @@ fn import_cached<'py>(
     name = "PathGlobs",
     frozen,
     module = "pants.engine.internals.native_engine",
-    from_py_object,
+    from_py_object
 )]
 #[derive(Clone, Debug)]
 pub struct PyPathGlobs(PathGlobs);
@@ -431,6 +432,17 @@ impl Deref for PyPathGlobs {
 
     fn deref(&self) -> &PathGlobs {
         &self.0
+    }
+}
+
+impl PyPathGlobs {
+    pub(crate) fn new(
+        mut globs: Vec<String>,
+        strict_match_behavior: StrictGlobMatching,
+        conjunction: GlobExpansionConjunction,
+    ) -> Self {
+        globs.sort();
+        Self(PathGlobs::new(globs, strict_match_behavior, conjunction))
     }
 }
 
@@ -468,9 +480,8 @@ impl PyPathGlobs {
             None => "any_match",
         };
 
-        let strict_match_behavior =
-            StrictGlobMatching::create(behavior_str, description_of_origin)
-                .map_err(PyValueError::new_err)?;
+        let strict_match_behavior = StrictGlobMatching::create(behavior_str, description_of_origin)
+            .map_err(PyValueError::new_err)?;
 
         let conjunction =
             GlobExpansionConjunction::create(conjunction_str).map_err(PyValueError::new_err)?;
@@ -567,6 +578,90 @@ impl PyPathGlobs {
 }
 
 // -----------------------------------------------------------------------------
+// Filespec
+// -----------------------------------------------------------------------------
+
+#[pyclass(
+    name = "Filespec",
+    frozen,
+    module = "pants.engine.internals.native_engine",
+    from_py_object
+)]
+#[derive(Clone, Debug)]
+pub struct PyFilespec {
+    includes: Vec<String>,
+    excludes: Vec<String>,
+}
+
+impl PyFilespec {
+    pub(crate) fn new(includes: Vec<String>, excludes: Vec<String>) -> Self {
+        Self { includes, excludes }
+    }
+}
+
+#[pymethods]
+impl PyFilespec {
+    #[getter]
+    fn includes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyList>> {
+        pyo3::types::PyList::new(py, &self.includes)
+    }
+
+    #[getter]
+    fn excludes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyList>> {
+        pyo3::types::PyList::new(py, &self.excludes)
+    }
+
+    fn __getitem__(&self, key: &str, py: Python) -> PyResult<Py<pyo3::types::PyList>> {
+        match key {
+            "includes" => Ok(pyo3::types::PyList::new(py, &self.includes)?.unbind()),
+            "excludes" => Ok(pyo3::types::PyList::new(py, &self.excludes)?.unbind()),
+            _ => Err(pyo3::exceptions::PyKeyError::new_err(key.to_string())),
+        }
+    }
+
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
+        if let Ok(other_fs) = other.extract::<PyRef<PyFilespec>>() {
+            return Ok(self.includes == other_fs.includes && self.excludes == other_fs.excludes);
+        }
+        if let Ok(dict) = other.cast::<pyo3::types::PyDict>() {
+            let includes: Vec<String> = dict
+                .get_item("includes")?
+                .map(|v| v.extract::<Vec<String>>())
+                .transpose()?
+                .unwrap_or_default();
+            if includes != self.includes {
+                return Ok(false);
+            }
+            let excludes: Vec<String> = dict
+                .get_item("excludes")?
+                .map(|v| v.extract::<Vec<String>>())
+                .transpose()?
+                .unwrap_or_default();
+            return Ok(excludes == self.excludes);
+        }
+        Ok(false)
+    }
+
+    fn __repr__(&self) -> String {
+        if self.excludes.is_empty() {
+            format!("Filespec(includes={:?})", self.includes)
+        } else {
+            format!(
+                "Filespec(includes={:?}, excludes={:?})",
+                self.includes, self.excludes
+            )
+        }
+    }
+
+    fn __hash__(&self) -> u64 {
+        let mut s = DefaultHasher::new();
+        self.includes.hash(&mut s);
+        self.excludes.hash(&mut s);
+        s.finish()
+    }
+}
+
+// -----------------------------------------------------------------------------
 // FilespecMatcher
 // -----------------------------------------------------------------------------
 
@@ -574,15 +669,23 @@ impl PyPathGlobs {
 #[derive(Debug)]
 pub struct PyFilespecMatcher(FilespecMatcher);
 
+impl PyFilespecMatcher {
+    pub(crate) fn from_vecs(
+        includes: Vec<String>,
+        excludes: Vec<String>,
+        py: Python,
+    ) -> PyResult<Self> {
+        let matcher =
+            py.detach(|| FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err))?;
+        Ok(Self(matcher))
+    }
+}
+
 #[pymethods]
 impl PyFilespecMatcher {
     #[new]
     fn __new__(includes: Vec<String>, excludes: Vec<String>, py: Python) -> PyResult<Self> {
-        // Parsing the globs has shown up in benchmarks
-        // (https://github.com/pantsbuild/pants/issues/16122), so we use py.detach().
-        let matcher =
-            py.detach(|| FilespecMatcher::new(includes, excludes).map_err(PyValueError::new_err))?;
-        Ok(Self(matcher))
+        Self::from_vecs(includes, excludes, py)
     }
 
     fn __hash__(&self) -> u64 {

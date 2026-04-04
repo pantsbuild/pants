@@ -1,6 +1,7 @@
 // Copyright 2026 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::sync::OnceLock;
 
@@ -11,6 +12,8 @@ use pyo3::prelude::*;
 
 static INVALID_FIELD_TYPE_EXCEPTION: OnceLock<Py<PyAny>> = OnceLock::new();
 static INVALID_FIELD_CHOICE_EXCEPTION: OnceLock<Py<PyAny>> = OnceLock::new();
+static INVALID_FIELD_EXCEPTION: OnceLock<Py<PyAny>> = OnceLock::new();
+pub static GENERATE_SOURCES_REQUEST: OnceLock<Py<PyAny>> = OnceLock::new();
 
 pub fn combine_hashes(hashes: &[isize]) -> isize {
     let mut hasher = FnvHasher::default();
@@ -20,7 +23,7 @@ pub fn combine_hashes(hashes: &[isize]) -> isize {
     hasher.finish() as isize
 }
 
-pub fn get_cached_exception<'py>(
+pub fn import_target_attr<'py>(
     py: Python<'py>,
     cache: &OnceLock<Py<PyAny>>,
     name: &str,
@@ -40,7 +43,7 @@ pub fn raise_invalid_field_type(
     raw_value: Option<&Bound<PyAny>>,
     expected_type_desc: &str,
 ) -> PyErr {
-    match get_cached_exception(
+    match import_target_attr(
         py,
         &INVALID_FIELD_TYPE_EXCEPTION,
         "InvalidFieldTypeException",
@@ -78,7 +81,7 @@ pub fn validate_choices(
     for choice in values.try_iter()? {
         let choice = choice?;
         if !choices_set.contains(&choice)? {
-            let exc_cls = get_cached_exception(
+            let exc_cls = import_target_attr(
                 py,
                 &INVALID_FIELD_CHOICE_EXCEPTION,
                 "InvalidFieldChoiceException",
@@ -91,6 +94,68 @@ pub fn validate_choices(
         }
     }
     Ok(())
+}
+
+/// Python-style repr for a string: `'foo'`
+pub struct PyRepr<'a>(pub &'a str);
+
+impl fmt::Display for PyRepr<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "'{}'", self.0)
+    }
+}
+
+/// Python-style repr for a string list: `['a', 'b']`
+pub struct PyReprList<'a, T: AsRef<str>>(pub &'a [T]);
+
+impl<T: AsRef<str>> fmt::Display for PyReprList<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[")?;
+        for (i, s) in self.0.iter().enumerate() {
+            if i > 0 {
+                f.write_str(", ")?;
+            }
+            write!(f, "'{}'", s.as_ref())?;
+        }
+        f.write_str("]")
+    }
+}
+
+/// Joins a directory path and name, mimicking Python's `os.path.join` semantics
+/// where an absolute `name` resets the path.
+pub fn join_path(dirpath: &str, name: &str) -> String {
+    if name.starts_with('/') || dirpath.is_empty() {
+        name.to_string()
+    } else {
+        format!("{dirpath}/{name}")
+    }
+}
+
+/// Prefixes a glob pattern with a directory path. Handles `!` exclusion globs.
+pub fn prefix_glob(dirpath: &str, glob: &str) -> String {
+    match glob.strip_prefix('!') {
+        Some(rest) => {
+            let mut s = String::with_capacity(1 + dirpath.len() + 1 + rest.len());
+            s.push('!');
+            s.push_str(dirpath);
+            if !dirpath.is_empty() {
+                s.push('/');
+            }
+            s.push_str(rest);
+            s
+        }
+        None => join_path(dirpath, glob),
+    }
+}
+
+pub fn raise_invalid_field(py: Python, msg: String) -> PyErr {
+    match import_target_attr(py, &INVALID_FIELD_EXCEPTION, "InvalidFieldException") {
+        Ok(exc_cls) => match exc_cls.call1((msg,)) {
+            Ok(exc) => PyErr::from_value(exc),
+            Err(e) => e,
+        },
+        Err(e) => e,
+    }
 }
 
 #[pyclass(name = "_NoValue", from_py_object)]
