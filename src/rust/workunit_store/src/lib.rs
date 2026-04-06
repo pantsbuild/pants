@@ -275,20 +275,22 @@ impl Workunit {
             self.name
         };
 
-        let duration_suffix: Option<String> = if identifier.starts_with("Scheduling: ") {
-            None
-        } else {
-            let dur = match &self.state {
-                WorkunitState::Completed { time_span } => {
-                    format_workunit_duration(Duration::from(time_span.duration))
-                }
-                WorkunitState::Started { start_time, .. } => {
-                    let elapsed = start_time.elapsed().unwrap_or_default();
-                    format_workunit_duration(elapsed)
+        let duration_suffix: Option<String> =
+            if identifier.starts_with("Scheduling: ") {
+                None
+            } else {
+                match &self.state {
+                    WorkunitState::Completed { time_span } => Some(format!(
+                        " ({})",
+                        format_workunit_duration(Duration::from(time_span.duration))
+                    )),
+                    WorkunitState::Started { start_time, .. } if canceled => Some(format!(
+                        " ({})",
+                        format_workunit_duration(start_time.elapsed().unwrap_or_default())
+                    )),
+                    _ => None,
                 }
             };
-            Some(format!(" ({dur})"))
-        };
 
         /* This length calculation doesn't treat multi-byte unicode charcters identically
          * to single-byte ones for the purpose of figuring out where to truncate the string. But that's
