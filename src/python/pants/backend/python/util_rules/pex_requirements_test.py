@@ -13,6 +13,8 @@ from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, Pytho
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
 from pants.backend.python.util_rules.pex_requirements import (
+    LoadedLockfile,
+    LoadedLockfileRequest,
     Lockfile,
     ResolvePexConfig,
     ResolvePexConstraintsFile,
@@ -22,6 +24,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     strip_comments_from_pex_json_lockfile,
     validate_metadata,
 )
+from pants.backend.python.util_rules.pex_requirements import rules as pex_requirements_rules
 from pants.core.util_rules.lockfile_metadata import (
     BEGIN_LOCKFILE_HEADER,
     END_LOCKFILE_HEADER,
@@ -29,6 +32,7 @@ from pants.core.util_rules.lockfile_metadata import (
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import comma_separated_list
@@ -425,3 +429,23 @@ class TestResolvePexConfigPexArgs:
 
         assert "--wheel" in self.simple_config_args(no_binary=["foo", ":none:"])
         assert "--only-build" not in " ".join(self.simple_config_args(no_binary=["foo", ":none:"]))
+
+
+def test_load_lockfile_ignores_unknown_sidecar_metadata_version() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *pex_requirements_rules(),
+            QueryRule(LoadedLockfile, [LoadedLockfileRequest]),
+        ],
+    )
+    rule_runner.set_options(["--python-invalid-lockfile-behavior=ignore"])
+    rule_runner.write_files(
+        {
+            "lock.json": "{}",
+            "lock.json.metadata": json.dumps({"version": 9999}),
+        }
+    )
+
+    lockfile = Lockfile(url="lock.json", url_description_of_origin="test", resolve_name="a")
+    result = rule_runner.request(LoadedLockfile, [LoadedLockfileRequest(lockfile)])
+    assert result.metadata is None
