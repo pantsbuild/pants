@@ -18,6 +18,7 @@ from typing import TypeVar
 import packaging.specifiers
 import packaging.version
 from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name as canonicalize_project_name
 
 from pants.backend.python.subsystems import uv as uv_subsystem
 from pants.backend.python.subsystems.setup import PexBuilder, PythonSetup
@@ -547,6 +548,35 @@ def _check_uv_preconditions(
     return None
 
 
+def _parse_direct_ref_names(top_level_requirements: tuple[str, ...]) -> frozenset[str]:
+    """Extract canonicalized names from direct references in lockfile requirements.
+
+    Assumes PEX-serialized requirement strings normalize to ``name @ url``.
+    """
+    names: set[str] = set()
+    for req_str in top_level_requirements:
+        if not isinstance(req_str, str) or " @ " not in req_str:
+            continue
+        name_part = req_str.split(" @ ", 1)[0]
+        name = name_part.split("[", 1)[0].strip()
+        names.add(canonicalize_project_name(name))
+    return frozenset(names)
+
+
+def _format_lockfile_requirement(req: dict, direct_ref_names: frozenset[str] = frozenset()) -> str:
+    """Format a locked requirement for uv as ``name @ url`` or ``name==version``."""
+    name = req["project_name"]
+    normalized = canonicalize_project_name(name)
+    if normalized in direct_ref_names:
+        artifacts: Sequence = req.get("artifacts") or ()
+        first = artifacts[0] if len(artifacts) >= 1 else None
+        if isinstance(first, Mapping):
+            url = first.get("url")
+            if isinstance(url, str) and url:
+                return f"{name} @ {url}"
+    return f"{name}=={req['version']}"
+
+
 @rule
 async def _build_uv_venv(
     uv_request: _UvVenvRequest,
@@ -578,12 +608,21 @@ async def _build_uv_venv(
                     c.content for c in digest_contents if c.path == loaded_lockfile.lockfile_path
                 )
                 lockfile_data = json.loads(lockfile_bytes)
+                direct_ref_names = _parse_direct_ref_names(
+                    tuple(lockfile_data.get("requirements") or ())
+                )
                 all_resolved_reqs = tuple(
-                    f"{req['project_name']}=={req['version']}"
+                    _format_lockfile_requirement(req, direct_ref_names)
                     for resolve in lockfile_data.get("locked_resolves", ())
                     for req in resolve.get("locked_requirements", ())
                 )
-            except (json.JSONDecodeError, KeyError, StopIteration) as e:
+            except (
+                json.JSONDecodeError,
+                KeyError,
+                StopIteration,
+                TypeError,
+                AttributeError,
+            ) as e:
                 logger.warning(
                     "pex_builder=uv: failed to parse lockfile for %s: %s. "
                     "Falling back to transitive uv resolution.",
