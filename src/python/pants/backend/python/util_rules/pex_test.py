@@ -39,6 +39,8 @@ from pants.backend.python.util_rules.pex import (
     _BuildPexPythonSetup,
     _BuildPexRequirementsSetup,
     _determine_pex_python_and_platforms,
+    _format_lockfile_requirement,
+    _parse_direct_ref_names,
     _setup_pex_requirements,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
@@ -1084,3 +1086,202 @@ def test_uv_pex_builder_skipped_for_internal_only(rule_runner: RuleRunner) -> No
     assert set(parse_requirements(req_strings)).issubset(
         set(parse_requirements(pex_info["requirements"]))
     )
+
+
+@pytest.mark.parametrize(
+    ("top_level_requirements", "expected"),
+    [
+        ((), frozenset()),
+        (("requests==2.31.0", "numpy>=1.26", "six"), frozenset()),
+        (("my-pkg @ git+https://github.com/org/repo.git@abc123",), frozenset({"my-pkg"})),
+        (
+            ("custom-lib @ https://internal.example.com/custom_lib-2.0.whl",),
+            frozenset({"custom-lib"}),
+        ),
+        (("local-pkg @ file:///wheels/local_pkg-1.0.whl",), frozenset({"local-pkg"})),
+        (
+            (
+                "my-pkg[extra1,extra2] @ git+https://github.com/org/repo.git@v1 ; "
+                "python_version >= '3.8'",
+            ),
+            frozenset({"my-pkg"}),
+        ),
+        (
+            (
+                "requests==2.31.0",
+                "my-vcs-pkg @ git+https://github.com/org/repo.git@abc",
+                "numpy>=1.26",
+                "custom-lib @ https://internal.example.com/pkg.whl",
+                "local-pkg @ file:///wheels/pkg.whl",
+            ),
+            frozenset({"my-vcs-pkg", "custom-lib", "local-pkg"}),
+        ),
+        (
+            ("My_Package.Name @ git+https://github.com/org/repo.git@v1",),
+            frozenset({"my-package-name"}),
+        ),
+    ],
+)
+def test_parse_direct_ref_names(
+    top_level_requirements: tuple[str, ...], expected: frozenset[str]
+) -> None:
+    assert _parse_direct_ref_names(top_level_requirements) == expected
+
+
+def _lockfile_req(
+    project_name: str,
+    version: str,
+    artifacts: object = None,
+    *,
+    include_artifacts: bool = True,
+) -> dict[str, object]:
+    req: dict[str, object] = {"project_name": project_name, "version": version}
+    if include_artifacts:
+        req["artifacts"] = artifacts
+    return req
+
+
+@pytest.mark.parametrize(
+    ("req", "direct_ref_names", "expected"),
+    [
+        (
+            _lockfile_req(
+                "requests",
+                "2.31.0",
+                [
+                    {
+                        "url": "https://files.pythonhosted.org/packages/requests-2.31.0-py3-none-any.whl"
+                    },
+                    {"url": "https://files.pythonhosted.org/packages/requests-2.31.0.tar.gz"},
+                ],
+            ),
+            frozenset(),
+            "requests==2.31.0",
+        ),
+        (
+            _lockfile_req(
+                "hdrhistogram",
+                "0.10.3",
+                [{"url": "https://files.pythonhosted.org/packages/hdrhistogram-0.10.3.whl"}],
+            ),
+            frozenset(),
+            "hdrhistogram==0.10.3",
+        ),
+        (
+            _lockfile_req(
+                "my-pkg",
+                "0.1.0",
+                [{"url": "git+https://github.com/org/repo.git@abc123"}],
+            ),
+            frozenset({"my-pkg"}),
+            "my-pkg @ git+https://github.com/org/repo.git@abc123",
+        ),
+        (
+            _lockfile_req(
+                "my-pkg",
+                "0.1.0",
+                [{"url": "git+ssh://git@github.com/org/repo.git@abc123"}],
+            ),
+            frozenset({"my-pkg"}),
+            "my-pkg @ git+ssh://git@github.com/org/repo.git@abc123",
+        ),
+        (
+            _lockfile_req(
+                "my-pkg",
+                "1.0.0",
+                [{"url": "git+file:///local/repos/my-pkg@v1.0"}],
+            ),
+            frozenset({"my-pkg"}),
+            "my-pkg @ git+file:///local/repos/my-pkg@v1.0",
+        ),
+        (
+            _lockfile_req(
+                "hg-pkg",
+                "1.0.0",
+                [{"url": "hg+https://hg.example.com/repo@tip"}],
+            ),
+            frozenset({"hg-pkg"}),
+            "hg-pkg @ hg+https://hg.example.com/repo@tip",
+        ),
+        (
+            _lockfile_req(
+                "custom-lib",
+                "2.0.0",
+                [
+                    {
+                        "url": "https://internal.example.com/packages/custom_lib-2.0.0-py3-none-any.whl"
+                    }
+                ],
+            ),
+            frozenset({"custom-lib"}),
+            "custom-lib @ https://internal.example.com/packages/custom_lib-2.0.0-py3-none-any.whl",
+        ),
+        (
+            _lockfile_req(
+                "local-pkg",
+                "1.0.0",
+                [{"url": "file:///wheels/local_pkg-1.0.0-py3-none-any.whl"}],
+            ),
+            frozenset({"local-pkg"}),
+            "local-pkg @ file:///wheels/local_pkg-1.0.0-py3-none-any.whl",
+        ),
+        (
+            _lockfile_req(
+                "my_vcs_pkg",
+                "1.0.0",
+                [{"url": "git+https://github.com/org/repo.git@v1"}],
+            ),
+            frozenset({"my-vcs-pkg"}),
+            "my_vcs_pkg @ git+https://github.com/org/repo.git@v1",
+        ),
+        (
+            _lockfile_req(
+                "multi-pkg",
+                "1.0.0",
+                [
+                    {"url": "https://primary.example.com/pkg.whl"},
+                    {"url": "https://mirror.example.com/pkg.whl"},
+                ],
+            ),
+            frozenset({"multi-pkg"}),
+            "multi-pkg @ https://primary.example.com/pkg.whl",
+        ),
+        (
+            _lockfile_req(
+                "any-pkg",
+                "1.0.0",
+                [{"url": "git+https://example.com/repo.git@v1"}],
+            ),
+            frozenset(),
+            "any-pkg==1.0.0",
+        ),
+    ],
+)
+def test_format_lockfile_requirement(
+    req: dict, direct_ref_names: frozenset[str], expected: str
+) -> None:
+    assert _format_lockfile_requirement(req, direct_ref_names) == expected
+
+
+def test_format_lockfile_requirement_defaults_to_name_equals_version() -> None:
+    req = _lockfile_req(
+        "any-pkg",
+        "1.0.0",
+        [{"url": "git+https://example.com/repo.git@v1"}],
+    )
+    assert _format_lockfile_requirement(req) == "any-pkg==1.0.0"
+
+
+@pytest.mark.parametrize(
+    "req",
+    [
+        _lockfile_req("mystery", "1.0.0", []),
+        _lockfile_req("mystery", "1.0.0", include_artifacts=False),
+        _lockfile_req("mystery", "1.0.0", None),
+        _lockfile_req("mystery", "1.0.0", [None]),
+        _lockfile_req("mystery", "1.0.0", [{"hash": "aaa"}]),
+        _lockfile_req("mystery", "1.0.0", [{"url": ""}]),
+    ],
+)
+def test_format_lockfile_requirement_falls_back_for_invalid_or_missing_artifacts(req: dict) -> None:
+    assert _format_lockfile_requirement(req, frozenset({"mystery"})) == "mystery==1.0.0"
