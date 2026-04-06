@@ -269,15 +269,14 @@ impl Workunit {
             (WorkunitState::Completed { .. }, _) => "Completed:",
         };
 
-        let duration_str: Option<String> = match &self.state {
+        let duration_str = match &self.state {
             WorkunitState::Completed { time_span } => {
-                Some(format_workunit_duration(std::time::Duration::from(time_span.duration)))
+                format_workunit_duration(std::time::Duration::from(time_span.duration))
             }
-            WorkunitState::Started { start_time, .. } if canceled => {
+            WorkunitState::Started { start_time, .. } => {
                 let elapsed = start_time.elapsed().unwrap_or_default();
-                Some(format_workunit_duration(elapsed))
+                format_workunit_duration(elapsed)
             }
-            _ => None,
         };
 
         let identifier = if let Some(ref s) = metadata.desc {
@@ -309,8 +308,7 @@ impl Workunit {
 
         log!(
             self.level,
-            "{state} {effective_identifier}{}{message}",
-            duration_str.as_deref().unwrap_or("")
+            "{state} {effective_identifier}{duration_str}{message}",
         );
     }
 }
