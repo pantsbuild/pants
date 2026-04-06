@@ -441,11 +441,14 @@ async def setup_pytest_for_target(
             else:
                 timeout_seconds = timeout
 
-    run_description = request.field_sets[0].address.spec
-    if len(request.field_sets) > 1:
-        run_description = (
-            f"batch of {run_description} and {len(request.field_sets) - 1} other files"
-        )
+    if test_subsystem.show_all_batch_targets and len(request.field_sets) > 1:
+        run_description = ", ".join(fs.address.spec for fs in request.field_sets)
+    else:
+        run_description = request.field_sets[0].address.spec
+        if len(request.field_sets) > 1:
+            run_description = (
+                f"batch of {run_description} and {len(request.field_sets) - 1} other files"
+            )
     process = await setup_venv_pex_process(
         VenvPexProcess(
             pytest_runner_pex,
@@ -533,11 +536,14 @@ async def run_python_tests(
     last_result = results.last
 
     def warning_description() -> str:
-        description = batch.elements[0].address.spec
-        if len(batch.elements) > 1:
-            description = (
-                f"batch containing {description} and {len(batch.elements) - 1} other files"
-            )
+        if test_subsystem.show_all_batch_targets and len(batch.elements) > 1:
+            description = ", ".join(fs.address.spec for fs in batch.elements)
+        else:
+            description = batch.elements[0].address.spec
+            if len(batch.elements) > 1:
+                description = (
+                    f"batch containing {description} and {len(batch.elements) - 1} other files"
+                )
         if batch.partition_metadata.description:
             description = f"{description} ({batch.partition_metadata.description})"
         return description
