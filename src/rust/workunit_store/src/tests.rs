@@ -242,7 +242,24 @@ fn format_duration_just_under_minute() {
 
 #[test]
 fn format_duration_exactly_one_minute() {
-    assert_eq!(format_workunit_duration(Duration::from_secs(60)), "1m 0.0s");
+    assert_eq!(format_workunit_duration(Duration::from_secs(60)), "1m");
+}
+
+#[test]
+fn format_duration_exact_multiple_minutes() {
+    assert_eq!(format_workunit_duration(Duration::from_secs(120)), "2m");
+}
+
+#[test]
+fn format_duration_negligible_seconds_omitted() {
+    // 60.04s is below the 0.05 threshold, so seconds are omitted
+    assert_eq!(format_workunit_duration(Duration::from_secs_f64(60.04)), "1m");
+}
+
+#[test]
+fn format_duration_just_above_seconds_threshold() {
+    // 60.1s is above the 0.05 threshold, so seconds are shown
+    assert_eq!(format_workunit_duration(Duration::from_secs_f64(60.1)), "1m 0.1s");
 }
 
 #[test]

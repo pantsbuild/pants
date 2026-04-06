@@ -33,7 +33,11 @@ pub(crate) fn format_workunit_duration(duration: Duration) -> String {
     if total_secs >= 60.0 {
         let mins = (total_secs / 60.0).floor() as u64;
         let secs = total_secs % 60.0;
-        format!("{mins}m {secs:.1}s")
+        if secs < 0.05 {
+            format!("{mins}m")
+        } else {
+            format!("{mins}m {secs:.1}s")
+        }
     } else {
         format!("{total_secs:.1}s")
     }
