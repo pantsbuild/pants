@@ -276,6 +276,7 @@ def run_test_rule(
         shard="",
         batch_size=1,
         show_rerun_command=show_rerun_command,
+        show_all_batch_targets=False,
     )
     debug_adapter_subsystem = create_subsystem(
         DebugAdapterSubsystem,
