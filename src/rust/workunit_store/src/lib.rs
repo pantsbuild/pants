@@ -269,20 +269,25 @@ impl Workunit {
             (WorkunitState::Completed { .. }, _) => "Completed:",
         };
 
-        let duration_str = match &self.state {
-            WorkunitState::Completed { time_span } => {
-                format_workunit_duration(Duration::from(time_span.duration))
-            }
-            WorkunitState::Started { start_time, .. } => {
-                let elapsed = start_time.elapsed().unwrap_or_default();
-                format_workunit_duration(elapsed)
-            }
-        };
-
         let identifier = if let Some(ref s) = metadata.desc {
             s.as_str()
         } else {
             self.name
+        };
+
+        let duration_suffix: Option<String> = if identifier.starts_with("Scheduling: ") {
+            None
+        } else {
+            let dur = match &self.state {
+                WorkunitState::Completed { time_span } => {
+                    format_workunit_duration(Duration::from(time_span.duration))
+                }
+                WorkunitState::Started { start_time, .. } => {
+                    let elapsed = start_time.elapsed().unwrap_or_default();
+                    format_workunit_duration(elapsed)
+                }
+            };
+            Some(format!(" ({dur})"))
         };
 
         /* This length calculation doesn't treat multi-byte unicode charcters identically
@@ -308,7 +313,8 @@ impl Workunit {
 
         log!(
             self.level,
-            "{state} {effective_identifier} ({duration_str}){message}",
+            "{state} {effective_identifier}{}{message}",
+            duration_suffix.as_deref().unwrap_or(""),
         );
     }
 }
