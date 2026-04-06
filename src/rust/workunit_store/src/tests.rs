@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use internment::Intern;
 
-use crate::{Level, ParentIds, SpanId, WorkunitMetadata, WorkunitState, WorkunitStore, format_workunit_duration};
+use crate::{Level, ParentIds, SpanId, WorkunitMetadata, WorkunitState, WorkunitStore, format_workunit_duration_ms};
 
 #[test]
 fn heavy_hitters_basic() {
@@ -227,49 +227,41 @@ fn wu_level(span_id: u64, parent_id: Option<u64>, level: Level) -> AnonymousWork
 
 #[test]
 fn format_duration_sub_second() {
-    let duration = Duration::from_millis(123);
-    assert_eq!(format_workunit_duration(duration), " (0.12s)");
+    assert_eq!(format_workunit_duration_ms(Duration::from_millis(123)), "0.1s");
 }
 
 #[test]
 fn format_duration_seconds() {
-    let duration = Duration::from_secs_f64(12.345);
-    assert_eq!(format_workunit_duration(duration), " (12.35s)");
+    assert_eq!(format_workunit_duration_ms(Duration::from_secs_f64(12.345)), "12.3s");
 }
 
 #[test]
 fn format_duration_just_under_minute() {
-    let duration = Duration::from_secs_f64(59.99);
-    assert_eq!(format_workunit_duration(duration), " (59.99s)");
+    assert_eq!(format_workunit_duration_ms(Duration::from_secs_f64(59.5)), "59.5s");
 }
 
 #[test]
 fn format_duration_exactly_one_minute() {
-    let duration = Duration::from_secs(60);
-    assert_eq!(format_workunit_duration(duration), " (1m 0.0s)");
+    assert_eq!(format_workunit_duration_ms(Duration::from_secs(60)), "1m 0.0s");
 }
 
 #[test]
 fn format_duration_minutes_and_seconds() {
-    let duration = Duration::from_secs_f64(90.5);
-    assert_eq!(format_workunit_duration(duration), " (1m 30.5s)");
+    assert_eq!(format_workunit_duration_ms(Duration::from_secs_f64(90.5)), "1m 30.5s");
 }
 
 #[test]
 fn format_duration_multiple_minutes() {
-    let duration = Duration::from_secs_f64(185.7);
-    assert_eq!(format_workunit_duration(duration), " (3m 5.7s)");
+    assert_eq!(format_workunit_duration_ms(Duration::from_secs_f64(185.7)), "3m 5.7s");
 }
 
 #[test]
 fn format_duration_zero() {
-    let duration = Duration::from_secs(0);
-    assert_eq!(format_workunit_duration(duration), " (0.00s)");
+    assert_eq!(format_workunit_duration_ms(Duration::from_secs(0)), "0.0s");
 }
 
 #[test]
 fn format_duration_over_one_hour() {
     // 1 hour 30 minutes 45.5 seconds = 5445.5 seconds
-    let duration = Duration::from_secs_f64(5445.5);
-    assert_eq!(format_workunit_duration(duration), " (90m 45.5s)");
+    assert_eq!(format_workunit_duration_ms(Duration::from_secs_f64(5445.5)), "90m 45.5s");
 }

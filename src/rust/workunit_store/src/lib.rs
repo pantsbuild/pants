@@ -28,21 +28,6 @@ use tokio::task_local;
 
 mod metrics;
 
-/// Formats a duration for display in workunit completion logs.
-///
-/// For durations under 60 seconds, returns " (X.XXs)".
-/// For durations of 60 seconds or more, returns " (Xm Y.Ys)".
-pub(crate) fn format_workunit_duration(duration: Duration) -> String {
-    let total_secs = duration.as_secs_f64();
-    if total_secs >= 60.0 {
-        let mins = (total_secs / 60.0).floor() as u64;
-        let secs = total_secs % 60.0;
-        format!(" ({mins}m {secs:.1}s)")
-    } else {
-        format!(" ({total_secs:.2}s)")
-    }
-}
-
 ///
 /// A unique id for a single run or `--loop` iteration of Pants within a single Scheduler.
 ///
@@ -271,11 +256,11 @@ impl Workunit {
 
         let duration_str = match &self.state {
             WorkunitState::Completed { time_span } => {
-                format_workunit_duration(std::time::Duration::from(time_span.duration))
+                format_workunit_duration_ms(Duration::from(time_span.duration))
             }
             WorkunitState::Started { start_time, .. } => {
                 let elapsed = start_time.elapsed().unwrap_or_default();
-                format_workunit_duration(elapsed)
+                format_workunit_duration_ms(elapsed)
             }
         };
 
@@ -308,7 +293,7 @@ impl Workunit {
 
         log!(
             self.level,
-            "{state} {effective_identifier}{duration_str}{message}",
+            "{state} {effective_identifier} ({duration_str}){message}",
         );
     }
 }
@@ -799,7 +784,14 @@ impl WorkunitStore {
 }
 
 pub fn format_workunit_duration_ms(duration: Duration) -> String {
-    format!("{:.1}s", duration.as_secs_f64())
+    let total_secs = duration.as_secs_f64();
+    if total_secs >= 60.0 {
+        let mins = (total_secs / 60.0).floor() as u64;
+        let secs = total_secs % 60.0;
+        format!("{mins}m {secs:.1}s")
+    } else {
+        format!("{total_secs:.1}s")
+    }
 }
 
 ///
