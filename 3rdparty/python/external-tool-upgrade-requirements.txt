@@ -1,6 +1,6 @@
 packaging==26.0
-requests==2.32.5
+requests==2.33.1
 tqdm==4.67.3
-types-requests==2.32.4.20260107
-types-tqdm==4.67.3.20260205
+types-requests==2.33.0.20260327
+types-tqdm==4.67.3.20260303
 pytest==9.0.2
