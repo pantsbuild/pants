@@ -94,13 +94,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-bootstrap-Linux-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: |-
@@ -203,13 +203,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-bootstrap-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: |-
@@ -319,13 +319,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-bootstrap-macOS14-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
         path: |-
@@ -415,7 +415,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
@@ -505,7 +505,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-wheels-and-pex-Linux-x86_64
         overwrite: 'true'
@@ -605,7 +605,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-wheels-and-pex-macOS14-ARM64
         overwrite: 'true'
@@ -624,7 +624,7 @@ jobs:
       with:
         fetch-depth: 10
     - name: Install MSYS2
-      uses: msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda
+      uses: msys2/setup-msys2@cafece8e6baf9247cf9b1bf95097b0b983cc558d
       with:
         install: base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf
         msystem: UCRT64
@@ -787,7 +787,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -802,7 +802,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-lint-Linux-x86_64
         overwrite: 'true'
@@ -905,7 +905,7 @@ jobs:
         cache: false
         go-version: 1.24.9
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: src/python/pants
@@ -932,7 +932,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-Linux-ARM64
         overwrite: 'true'
@@ -1034,7 +1034,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1061,7 +1061,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-0_10-Linux-x86_64
         overwrite: 'true'
@@ -1163,7 +1163,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1190,7 +1190,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-1_10-Linux-x86_64
         overwrite: 'true'
@@ -1292,7 +1292,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1319,7 +1319,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-2_10-Linux-x86_64
         overwrite: 'true'
@@ -1421,7 +1421,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1448,7 +1448,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-3_10-Linux-x86_64
         overwrite: 'true'
@@ -1550,7 +1550,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1577,7 +1577,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-4_10-Linux-x86_64
         overwrite: 'true'
@@ -1679,7 +1679,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1706,7 +1706,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-5_10-Linux-x86_64
         overwrite: 'true'
@@ -1808,7 +1808,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1835,7 +1835,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-6_10-Linux-x86_64
         overwrite: 'true'
@@ -1937,7 +1937,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1964,7 +1964,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-7_10-Linux-x86_64
         overwrite: 'true'
@@ -2066,7 +2066,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2093,7 +2093,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-8_10-Linux-x86_64
         overwrite: 'true'
@@ -2195,7 +2195,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2222,7 +2222,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-9_10-Linux-x86_64
         overwrite: 'true'
@@ -2291,7 +2291,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
         path: src/python/pants
@@ -2318,7 +2318,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-python-test-macOS14-ARM64
         overwrite: 'true'
