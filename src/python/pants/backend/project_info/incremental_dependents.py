@@ -15,7 +15,9 @@ import json
 import logging
 import os
 from dataclasses import dataclass
+
 from pants.base.build_environment import get_pants_cachedir
+from pants.engine.addresses import Address
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import help_text
