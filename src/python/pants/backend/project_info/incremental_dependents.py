@@ -15,10 +15,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any
-
 from pants.base.build_environment import get_pants_cachedir
-from pants.engine.addresses import Address
 from pants.option.option_types import BoolOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import help_text
@@ -45,31 +42,6 @@ class IncrementalDependents(Subsystem):
 
 
 # ---------------------------------------------------------------------------
-# Address serialization
-# ---------------------------------------------------------------------------
-
-
-def address_to_json(addr: Address) -> list[Any]:
-    """Serialize an Address to a JSON-friendly list.
-
-    Format: [spec_path, target_name, generated_name_or_null, {params} or null]
-    """
-    params = dict(addr.parameters) if addr.parameters else None
-    return [addr.spec_path, addr.target_name, addr.generated_name, params]
-
-
-def address_from_json(data: list[Any]) -> Address:
-    """Reconstruct an Address from its JSON representation."""
-    spec_path, target_name, generated_name, params = data
-    return Address(
-        spec_path,
-        target_name=target_name,
-        generated_name=generated_name,
-        parameters=params if params else None,
-    )
-
-
-# ---------------------------------------------------------------------------
 # Persisted graph helpers
 # ---------------------------------------------------------------------------
 
@@ -79,8 +51,8 @@ _CACHE_VERSION = 2  # v2: stores structured address components
 @dataclass(frozen=True)
 class CachedEntry:
     fingerprint: str
-    # Each dep is stored as a list: [spec_path, target_name, generated_name, params]
-    deps_json: tuple[tuple[Any, ...], ...]
+    # Dependencies stored as address spec strings (e.g. "src/python/foo/bar.py:lib")
+    deps: tuple[str, ...]
 
 
 def get_cache_path() -> str:
@@ -139,7 +111,11 @@ def save_persisted_graph(
         with open(tmp_path, "w") as f:
             json.dump(data, f, separators=(",", ":"))
         os.replace(tmp_path, path)
-        logger.debug("Saved incremental dep graph cache with %d entries to %s", len(entries), path)
+        logger.debug(
+            "Saved incremental dep graph cache with %d entries to %s",
+            len(entries),
+            path,
+        )
     except OSError as e:
         logger.warning("Failed to save incremental dep graph cache: %s", e)
         try:

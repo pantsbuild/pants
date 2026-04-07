@@ -106,7 +106,7 @@ async def map_addresses_to_dependents(
 
     # Step 2: Classify targets as cached or changed
     changed_targets = []
-    cached_results: list[tuple[Address, tuple[str, ...]]] = []
+    cached_results: list[tuple[Address, CachedEntry]] = []
 
     for tgt in all_targets:
         spec = tgt.address.spec
@@ -114,7 +114,7 @@ async def map_addresses_to_dependents(
 
         cached_entry = previous.get(spec)
         if cached_entry is not None and cached_entry.fingerprint == fingerprint:
-            cached_results.append((tgt.address, cached_entry.deps))
+            cached_results.append((tgt.address, cached_entry))
         else:
             changed_targets.append(tgt)
 
@@ -145,14 +145,15 @@ async def map_addresses_to_dependents(
     # Step 4: Build the reverse dependency map from merged results
     address_to_dependents: dict[Address, set[Address]] = defaultdict(set)
 
-    # Process cached results (deps are stored as address spec strings)
-    for addr, dep_specs in cached_results:
-        for dep_spec in dep_specs:
-            try:
-                dep_addr = Address.parse(dep_spec)
+    # Build a spec → Address lookup from all_targets for resolving cached specs
+    spec_to_address: dict[str, Address] = {tgt.address.spec: tgt.address for tgt in all_targets}
+
+    # Process cached results (deps stored as address spec strings)
+    for addr, entry in cached_results:
+        for dep_spec in entry.deps:
+            dep_addr = spec_to_address.get(dep_spec)
+            if dep_addr is not None:
                 address_to_dependents[dep_addr].add(addr)
-            except Exception:
-                logger.debug("Could not parse cached dep address: %s", dep_spec)
 
     # Process freshly resolved results
     for tgt, deps in zip(changed_targets, fresh_deps_per_target):
@@ -163,9 +164,8 @@ async def map_addresses_to_dependents(
     new_entries: dict[str, CachedEntry] = {}
 
     # Carry forward cached entries
-    for addr, dep_specs in cached_results:
-        spec = addr.spec
-        new_entries[spec] = previous[spec]
+    for addr, entry in cached_results:
+        new_entries[addr.spec] = entry
 
     # Add fresh entries
     for tgt, deps in zip(changed_targets, fresh_deps_per_target):
