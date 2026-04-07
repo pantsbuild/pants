@@ -1042,9 +1042,7 @@ async def run_tests(
                 "source": result.result_metadata.source(run_id).value
             }
         console.print_stderr(
-            _format_test_summary(
-                result, run_id, console, test_subsystem.show_all_batch_targets
-            )
+            _format_test_summary(result, run_id, console, test_subsystem.show_all_batch_targets)
         )
 
         if result.extra_output and result.extra_output.files:
