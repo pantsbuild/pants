@@ -1,11 +1,22 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
+import logging
+import time
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 
+from pants.backend.project_info.incremental_dependents import (
+    CachedEntry,
+    IncrementalDependents,
+    compute_source_fingerprint,
+    get_cache_path,
+    load_persisted_graph,
+    save_persisted_graph,
+)
+from pants.base.build_environment import get_buildroot
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
@@ -22,6 +33,8 @@ from pants.option.option_types import BoolOption, EnumOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -41,21 +54,138 @@ class DependentsOutputFormat(Enum):
 
 
 @rule(desc="Map all targets to their dependents", level=LogLevel.DEBUG)
-async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> AddressToDependents:
-    dependencies_per_target = await concurrently(
-        resolve_dependencies(
-            DependenciesRequest(
-                tgt.get(Dependencies), should_traverse_deps_predicate=AlwaysTraverseDeps()
-            ),
-            **implicitly(),
+async def map_addresses_to_dependents(
+    all_targets: AllUnexpandedTargets,
+    incremental_cfg: IncrementalDependents,
+) -> AddressToDependents:
+    """Build a reverse dependency map (target -> set of its dependents).
+
+    When incremental mode is enabled via `--incremental-dependents-enabled`, the forward
+    dependency graph is persisted to disk. On subsequent runs, only targets whose source
+    files have changed need their dependencies re-resolved, dramatically reducing wall time
+    for large repos.
+    """
+    if not incremental_cfg.enabled:
+        # Original behavior: resolve all dependencies from scratch.
+        dependencies_per_target = await concurrently(
+            resolve_dependencies(
+                DependenciesRequest(
+                    tgt.get(Dependencies),
+                    should_traverse_deps_predicate=AlwaysTraverseDeps(),
+                ),
+                **implicitly(),
+            )
+            for tgt in all_targets
         )
-        for tgt in all_targets
+
+        address_to_dependents = defaultdict(set)
+        for tgt, dependencies in zip(all_targets, dependencies_per_target):
+            for dependency in dependencies:
+                address_to_dependents[dependency].add(tgt.address)
+        return AddressToDependents(
+            FrozenDict(
+                {
+                    addr: FrozenOrderedSet(dependents)
+                    for addr, dependents in address_to_dependents.items()
+                }
+            )
+        )
+
+    # --- Incremental mode ---
+    start_time = time.time()
+    buildroot = get_buildroot()
+    cache_path = get_cache_path()
+
+    # Step 1: Load previous graph
+    previous = load_persisted_graph(cache_path, buildroot)
+    logger.warning(
+        "Incremental dep graph: loaded %d cached entries from %s",
+        len(previous),
+        cache_path,
     )
 
-    address_to_dependents = defaultdict(set)
-    for tgt, dependencies in zip(all_targets, dependencies_per_target):
-        for dependency in dependencies:
-            address_to_dependents[dependency].add(tgt.address)
+    # Step 2: Classify targets as cached or changed
+    changed_targets = []
+    cached_results: list[tuple[Address, tuple[str, ...]]] = []
+
+    for tgt in all_targets:
+        spec = tgt.address.spec
+        fingerprint = compute_source_fingerprint(tgt.address, buildroot)
+
+        cached_entry = previous.get(spec)
+        if cached_entry is not None and cached_entry.fingerprint == fingerprint:
+            cached_results.append((tgt.address, cached_entry.deps))
+        else:
+            changed_targets.append(tgt)
+
+    cache_hits = len(cached_results)
+    cache_misses = len(changed_targets)
+    logger.warning(
+        "Incremental dep graph: %d cached, %d changed (out of %d total targets)",
+        cache_hits,
+        cache_misses,
+        len(all_targets),
+    )
+
+    # Step 3: Resolve deps only for changed targets
+    if changed_targets:
+        fresh_deps_per_target = await concurrently(
+            resolve_dependencies(
+                DependenciesRequest(
+                    tgt.get(Dependencies),
+                    should_traverse_deps_predicate=AlwaysTraverseDeps(),
+                ),
+                **implicitly(),
+            )
+            for tgt in changed_targets
+        )
+    else:
+        fresh_deps_per_target = []
+
+    # Step 4: Build the reverse dependency map from merged results
+    address_to_dependents: dict[Address, set[Address]] = defaultdict(set)
+
+    # Process cached results (deps are stored as address spec strings)
+    for addr, dep_specs in cached_results:
+        for dep_spec in dep_specs:
+            try:
+                dep_addr = Address.parse(dep_spec)
+                address_to_dependents[dep_addr].add(addr)
+            except Exception:
+                logger.debug("Could not parse cached dep address: %s", dep_spec)
+
+    # Process freshly resolved results
+    for tgt, deps in zip(changed_targets, fresh_deps_per_target):
+        for dep_addr in deps:
+            address_to_dependents[dep_addr].add(tgt.address)
+
+    # Step 5: Save the updated forward graph for next run
+    new_entries: dict[str, CachedEntry] = {}
+
+    # Carry forward cached entries
+    for addr, dep_specs in cached_results:
+        spec = addr.spec
+        new_entries[spec] = previous[spec]
+
+    # Add fresh entries
+    for tgt, deps in zip(changed_targets, fresh_deps_per_target):
+        spec = tgt.address.spec
+        fingerprint = compute_source_fingerprint(tgt.address, buildroot)
+        new_entries[spec] = CachedEntry(
+            fingerprint=fingerprint,
+            deps=tuple(dep.spec for dep in deps),
+        )
+
+    save_persisted_graph(cache_path, buildroot, new_entries)
+
+    elapsed = time.time() - start_time
+    logger.warning(
+        "Incremental dep graph: completed in %.1fs (%d from cache, %d resolved fresh)",
+        elapsed,
+        cache_hits,
+        cache_misses,
+    )
+
     return AddressToDependents(
         FrozenDict(
             {
