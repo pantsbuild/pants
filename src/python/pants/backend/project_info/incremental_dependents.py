@@ -124,17 +124,27 @@ def save_persisted_graph(
             pass
 
 
+def _sha256_file(path: str) -> str | None:
+    """Return the SHA-256 hex digest of a file's contents, or None if unreadable."""
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
 def compute_source_fingerprint(target_address: Address, buildroot: str) -> str:
-    """Compute a fast fingerprint for a target based on its source files' mtime+size.
+    """Compute a content-based fingerprint for a target.
 
-    We use the target's spec_path (directory) and the BUILD file as the primary
-    signal. For file-level targets (generated targets with a file name), we also
-    include that specific file's mtime+size.
+    Uses SHA-256 of file contents (not mtime) so the cache is portable across
+    machines — critical for CI where git clone sets all mtimes to the same value.
 
-    This is a fast proxy that avoids hydrating sources through the Pants engine.
-    The fingerprint changes whenever:
-    - The BUILD file defining the target changes
-    - The specific source file (for generated targets) changes
+    The fingerprint includes:
+    - The BUILD file defining the target
+    - The specific source file (for generated/file-level targets)
     """
     hasher = hashlib.sha256()
 
@@ -144,14 +154,12 @@ def compute_source_fingerprint(target_address: Address, buildroot: str) -> str:
 
     for build_name in ("BUILD", "BUILD.pants"):
         build_file = os.path.join(build_dir, build_name)
-        try:
-            st = os.stat(build_file)
-            hasher.update(f"BUILD:{build_file}:{st.st_mtime_ns}:{st.st_size}".encode())
-        except OSError:
-            pass
+        digest = _sha256_file(build_file)
+        if digest:
+            hasher.update(f"BUILD:{build_file}:{digest}".encode())
 
     # For file-addressed targets (e.g. python_source generated from python_sources),
-    # include the file's own mtime+size.
+    # include the file's own content hash.
     if target_address.is_generated_target and target_address.generated_name:
         gen_name = target_address.generated_name
         candidate = (
@@ -159,17 +167,13 @@ def compute_source_fingerprint(target_address: Address, buildroot: str) -> str:
             if spec_path
             else os.path.join(buildroot, gen_name)
         )
-        try:
-            st = os.stat(candidate)
-            hasher.update(f"SRC:{candidate}:{st.st_mtime_ns}:{st.st_size}".encode())
-        except OSError:
+        digest = _sha256_file(candidate)
+        if digest:
+            hasher.update(f"SRC:{candidate}:{digest}".encode())
+        elif candidate != os.path.join(buildroot, gen_name):
             # Also try as a path directly from buildroot
-            candidate2 = os.path.join(buildroot, gen_name)
-            if candidate2 != candidate:
-                try:
-                    st = os.stat(candidate2)
-                    hasher.update(f"SRC:{candidate2}:{st.st_mtime_ns}:{st.st_size}".encode())
-                except OSError:
-                    pass
+            digest = _sha256_file(os.path.join(buildroot, gen_name))
+            if digest:
+                hasher.update(f"SRC:{gen_name}:{digest}".encode())
 
     return hasher.hexdigest()
