@@ -24,7 +24,6 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.subsystems.uv import DownloadedUv
 from pants.backend.python.target_types import EntryPoint, PexCompletePlatformsField
 from pants.backend.python.util_rules import pex_test_utils
-from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import (
@@ -47,6 +46,7 @@ from pants.backend.python.util_rules.pex import (
     _UvVenvRequest,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
+from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
@@ -1037,7 +1037,9 @@ def test_build_uv_venv_uses_exported_lockfile_with_no_deps(rule_runner: RuleRunn
     uv_request, lockfile, loaded_lockfile = create_uv_venv_test_inputs(
         rule_runner, description="test uv export path"
     )
-    exported_digest = rule_runner.make_snapshot({"__uv_requirements.txt": "ansicolors==1.1.8\n"}).digest
+    exported_digest = rule_runner.make_snapshot(
+        {"__uv_requirements.txt": "ansicolors==1.1.8\n"}
+    ).digest
     install_argv: tuple[str, ...] | None = None
 
     def mock_fallible_to_exec_result_or_raise(*args, **kwargs):
