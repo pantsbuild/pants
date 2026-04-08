@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
 import logging
+import os
 import time
 from collections import defaultdict
 from collections.abc import Iterable
@@ -10,7 +11,6 @@ from enum import Enum
 
 from pants.backend.project_info.incremental_dependents import (
     CachedEntry,
-    IncrementalDependents,
     compute_source_fingerprint,
     get_cache_path,
     load_persisted_graph,
@@ -56,16 +56,15 @@ class DependentsOutputFormat(Enum):
 @rule(desc="Map all targets to their dependents", level=LogLevel.DEBUG)
 async def map_addresses_to_dependents(
     all_targets: AllUnexpandedTargets,
-    incremental_cfg: IncrementalDependents,
 ) -> AddressToDependents:
     """Build a reverse dependency map (target -> set of its dependents).
 
-    When incremental mode is enabled via `--incremental-dependents-enabled`, the forward
-    dependency graph is persisted to disk. On subsequent runs, only targets whose source
-    files have changed need their dependencies re-resolved, dramatically reducing wall time
-    for large repos.
+    When incremental mode is enabled via the PANTS_INCREMENTAL_DEPENDENTS environment
+    variable, the forward dependency graph is persisted to disk. On subsequent runs,
+    only targets whose source files have changed need their dependencies re-resolved,
+    dramatically reducing wall time for large repos.
     """
-    if not incremental_cfg.enabled:
+    if not os.environ.get("PANTS_INCREMENTAL_DEPENDENTS"):
         # Original behavior: resolve all dependencies from scratch.
         dependencies_per_target = await concurrently(
             resolve_dependencies(

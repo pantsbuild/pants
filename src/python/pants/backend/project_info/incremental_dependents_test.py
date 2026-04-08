@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import os
-import textwrap
 from pathlib import Path
 
 import pytest
@@ -24,7 +23,6 @@ from pants.backend.project_info.incremental_dependents import (
 from pants.engine.addresses import Address
 from pants.engine.target import Dependencies, Tags, Target
 from pants.testutil.rule_runner import RuleRunner
-
 
 # ---------------------------------------------------------------------------
 # Test fixtures
@@ -96,9 +94,7 @@ class TestSaveAndLoadPersistedGraph:
         Path(tmp_cache).write_text("not json{{{")
         assert load_persisted_graph(tmp_cache, "/fake") == {}
 
-    def test_load_wrong_version_returns_empty(
-        self, tmp_cache: str, tmp_buildroot: str
-    ) -> None:
+    def test_load_wrong_version_returns_empty(self, tmp_cache: str, tmp_buildroot: str) -> None:
         Path(tmp_cache).write_text(
             json.dumps({"version": 999, "buildroot": tmp_buildroot, "entries": {}})
         )
@@ -256,9 +252,10 @@ class TestIncrementalDependentsIntegration:
         args = []
         if transitive:
             args.append("--transitive")
+        env_override = {}
         if incremental:
-            args.append("--incremental-dependents-enabled")
-        result = rule_runner.run_goal_rule(DependentsGoal, args=[*args, *targets])
+            env_override["PANTS_INCREMENTAL_DEPENDENTS"] = "1"
+        result = rule_runner.run_goal_rule(DependentsGoal, args=[*args, *targets], env=env_override)
         return sorted(result.stdout.strip().splitlines()) if result.stdout.strip() else []
 
     def test_incremental_matches_standard_direct(self, rule_runner: RuleRunner) -> None:
@@ -273,9 +270,7 @@ class TestIncrementalDependentsIntegration:
         incremental = self._run_dependents(rule_runner, ["base"], incremental=True)
         assert standard == incremental
 
-    def test_incremental_matches_standard_transitive(
-        self, rule_runner: RuleRunner
-    ) -> None:
+    def test_incremental_matches_standard_transitive(self, rule_runner: RuleRunner) -> None:
         rule_runner.write_files(
             {
                 "base/BUILD": "tgt()",
@@ -283,12 +278,8 @@ class TestIncrementalDependentsIntegration:
                 "leaf/BUILD": "tgt(dependencies=['mid'])",
             }
         )
-        standard = self._run_dependents(
-            rule_runner, ["base"], transitive=True, incremental=False
-        )
-        incremental = self._run_dependents(
-            rule_runner, ["base"], transitive=True, incremental=True
-        )
+        standard = self._run_dependents(rule_runner, ["base"], transitive=True, incremental=False)
+        incremental = self._run_dependents(rule_runner, ["base"], transitive=True, incremental=True)
         assert standard == incremental
 
     def test_incremental_no_dependents(self, rule_runner: RuleRunner) -> None:
@@ -332,13 +323,13 @@ class TestIncrementalDependentsIntegration:
         assert standard == incremental
 
     def test_disabled_by_default(self, rule_runner: RuleRunner) -> None:
-        """When --incremental-dependents-enabled is not set, standard mode is used."""
+        """When PANTS_INCREMENTAL_DEPENDENTS is not set, standard mode is used."""
         rule_runner.write_files(
             {
                 "base/BUILD": "tgt()",
                 "leaf/BUILD": "tgt(dependencies=['base'])",
             }
         )
-        # Should work without --incremental-dependents-enabled
+        # Should work without PANTS_INCREMENTAL_DEPENDENTS
         result = self._run_dependents(rule_runner, ["base"], incremental=False)
         assert result == ["leaf:leaf"]
