@@ -560,10 +560,10 @@ async def _build_uv_venv(
         uv_request.description,
     )
 
-    # Try to export the lockfile via `pex3 lock export` so we can pass pinned
-    # versions with --no-deps (reproducible).  This uses Pex's stable CLI rather
-    # than parsing the internal lockfile JSON directly.
-    # Fall back to letting uv resolve transitively if no lockfile.
+    # Try to export a subset of the lockfile via `pex3 lock export-subset` so we
+    # can pass only the needed locked requirements with --no-deps (reproducible).
+    # This uses Pex's stable CLI rather than parsing the internal lockfile JSON
+    # directly.  Fall back to letting uv resolve transitively if no lockfile.
     exported_reqs_digest: Digest | None = None
     reqs_file = "pylock.toml"
 
@@ -579,16 +579,18 @@ async def _build_uv_venv(
                 export_result = await fallible_to_exec_result_or_raise(
                     **implicitly(
                         PexCliProcess(
-                            subcommand=("lock", "export"),
+                            subcommand=("lock", "export-subset"),
                             extra_args=(
+                                *uv_request.req_strings,
+                                "--lock",
+                                loaded_lockfile.lockfile_path,
                                 "--format",
                                 "pep-751",
                                 "-o",
                                 reqs_file,
-                                loaded_lockfile.lockfile_path,
                             ),
                             additional_input_digest=loaded_lockfile.lockfile_digest,
-                            description=f"Export lockfile for {uv_request.description}",
+                            description=f"Export lockfile subset for {uv_request.description}",
                             output_files=(reqs_file,),
                         )
                     )
@@ -596,7 +598,7 @@ async def _build_uv_venv(
                 exported_reqs_digest = export_result.output_digest
             except ProcessExecutionFailure as e:
                 logger.warning(
-                    "pex_builder=uv: failed to export lockfile for %s: %s. "
+                    "pex_builder=uv: failed to export lockfile subset for %s: %s. "
                     "Falling back to transitive uv resolution.",
                     uv_request.description,
                     e,
@@ -606,7 +608,7 @@ async def _build_uv_venv(
 
     if use_exported_lockfile:
         logger.debug(
-            "pex_builder=uv: using exported lockfile with --no-deps for %s",
+            "pex_builder=uv: using exported lockfile subset with --no-deps for %s",
             uv_request.description,
         )
         assert exported_reqs_digest is not None

@@ -1046,10 +1046,14 @@ def test_build_uv_venv_uses_exported_lockfile_with_no_deps(rule_runner: RuleRunn
         nonlocal install_argv
         req = args[0]
         if isinstance(req, PexCliProcess):
-            assert req.subcommand == ("lock", "export")
+            assert req.subcommand == ("lock", "export-subset")
             assert "--format" in req.extra_args
             export_format = req.extra_args[req.extra_args.index("--format") + 1]
             assert export_format in {"pip-no-hashes", "pep-751"}
+            # Verify requirement strings are passed as positional args.
+            assert "ansicolors==1.1.8" in req.extra_args
+            # Verify --lock is used instead of positional lockfile path.
+            assert "--lock" in req.extra_args
             return SimpleNamespace(output_digest=exported_digest)
         assert isinstance(req, Process)
         if req.argv[1:3] == ("pip", "install"):
