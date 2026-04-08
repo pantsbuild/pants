@@ -580,31 +580,17 @@ When generating HTML, XML, and JSON reports, you can automatically open the repo
 
 ### Coverage with test sharding
 
-Pants supports running a subset of tests on each CI runner using the `--shard` flag:
+When using the `--shard` flag to split tests across CI runners, each shard only exercises a fraction of your test targets. The per-shard coverage report will be artificially low. To get accurate coverage you need to combine the binary `.coverage` files from all shards.
 
-```bash
-# Run the first half of tests on one runner, the second half on another
-❯ pants test --shard=0/2 ::
-❯ pants test --shard=1/2 ::
-```
+#### Configuration
 
-When sharding, each runner only exercises ~1/N of your test targets, so the per-shard coverage report is artificially low. You must combine the binary `.coverage` files from all shards to get an accurate result.
-
-#### Step 1: generate binary coverage data
-
-Include `"raw"` in your reports so Pants writes the binary `.coverage` file (required for combining):
+Add `"raw"` to your coverage reports so Pants writes the `.coverage` binary, and set `relative_files = true` so that `coverage combine` can match paths across different sandbox directories:
 
 ```toml title="pants.ci.toml"
 [coverage-py]
 report = ["raw", "xml", "console"]
 output_dir = "coverage-report"
-# Do NOT set fail_under here — per-shard coverage is artificially low.
-# Enforce fail_under after combining all shards instead.
 ```
-
-#### Step 2: configure `relative_files = true`
-
-This is **required** for cross-shard merging. Pants runs each shard in its own sandbox directory, so absolute paths in `.coverage` files differ between shards. `relative_files = true` lets `coverage combine` match files across sandboxes by resolving paths relative to the repository root.
 
 ```ini title=".coveragerc"
 [run]
@@ -612,24 +598,24 @@ relative_files = true
 branch = true
 ```
 
-#### Step 3: upload per-shard artifacts (GitHub Actions)
+:::caution Don't set `fail_under` in `[coverage-py]` when sharding
+Each shard only runs a fraction of your targets, so per-shard coverage is intentionally incomplete. Setting `fail_under` in `pants.toml` or `pants.ci.toml` will cause every shard to fail. Enforce the threshold after combining all shards instead.
+:::
 
-`actions/upload-artifact` skips dotfiles by default. Set `include-hidden-files: true` so the `.coverage` binary is included:
+#### Merging coverage reports
+
+After all shards complete, collect their `.coverage` binaries, combine them with `coverage combine`, and generate the final report. The following example uses GitHub Actions, but the same approach applies to any CI system:
 
 ```yaml title=".github/workflows/ci.yml"
-- name: Upload coverage reports
+# In each shard job: upload the coverage output
+- name: Upload coverage
   uses: actions/upload-artifact@v4
   with:
     name: coverage-shard-${{ matrix.shard }}
-    include-hidden-files: true  # Required: .coverage is a dotfile
+    include-hidden-files: true  # .coverage is a dotfile
     path: coverage-report/
-```
 
-#### Step 4: combine binaries and generate the final report
-
-After all shards complete, download their artifacts, copy the `.coverage` binaries to your repository root (so `relative_files` path resolution works), combine them, and then enforce any coverage threshold:
-
-```yaml title=".github/workflows/ci.yml"
+# Post-shard job: combine and enforce threshold
 coverage-report:
   needs: [test]
   runs-on: ubuntu-latest
@@ -643,12 +629,10 @@ coverage-report:
         path: all-coverage/
         merge-multiple: false
 
-    - name: Combine coverage across shards
+    - name: Combine and report
       run: |
         pip install coverage
 
-        # Rename each shard's .coverage to a unique name at the repo root
-        # (required so relative_files resolves against the repo root)
         idx=0
         for f in $(find all-coverage/ -name ".coverage" -not -name ".coverage.*"); do
           cp "$f" ".coverage.shard${idx}"
@@ -657,17 +641,11 @@ coverage-report:
 
         coverage combine --rcfile=.coveragerc .coverage.shard*
         coverage xml   --rcfile=.coveragerc -o coverage-report/coverage.xml
-
-        # Enforce threshold only after combining — not per shard
         coverage report --rcfile=.coveragerc --fail-under=80
 ```
 
-:::caution Don't set `fail_under` in `[coverage-py]` when sharding
-Each shard only runs a fraction of your targets, so per-shard coverage is intentionally incomplete. Setting `fail_under` in `pants.toml` or `pants.ci.toml` will cause every shard to fail. Remove it from your Pants config and enforce it via `coverage report --fail-under` after merging all shard binaries.
-:::
-
 :::note `global_report` and sharding
-If `[coverage-py] global_report = true` is set, per-shard reports will show 0% for all files that shard didn't touch. The setting remains useful for the final merged report — consider applying it only in the post-merge step rather than in `pants.ci.toml`.
+With `[coverage-py] global_report = true`, per-shard reports show 0% for untouched files. Consider applying this setting only in the post-merge step rather than in `pants.ci.toml`.
 :::
 
 ## JUnit XML results
