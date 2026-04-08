@@ -275,9 +275,7 @@ impl Workunit {
             self.name
         };
 
-        let duration_suffix: Option<String> = if !metadata.log_duration {
-            None
-        } else {
+        let duration_suffix: Option<String> = if metadata.log_duration {
             match &self.state {
                 WorkunitState::Completed { time_span } => Some(format!(
                     " ({})",
@@ -289,6 +287,8 @@ impl Workunit {
                 )),
                 _ => None,
             }
+        } else {
+            None
         };
 
         /* This length calculation doesn't treat multi-byte unicode charcters identically
