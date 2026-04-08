@@ -548,6 +548,28 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
 
+    _resolves_to_uploaded_prior_to = DictOption[str](
+        help=softwrap(
+            f"""
+            Filter packages by upload time when generating lockfiles, only considering
+            packages that were uploaded before the specified datetime. This is useful for
+            creating reproducible lockfiles that reflect the state of a package index at a
+            specific point in time.  Only applies to packages from remote indexes,
+            not local files or VCS requirements.
+
+            For example:
+            `{{'python-default': '2025-03-16T00:00:00Z'}}`.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            See https://pip.pypa.io/en/stable/user_guide/#filtering-by-upload-time for more
+            information and valid formats.
+            """
+        ),
+        advanced=True,
+    )
+
     invalid_lockfile_behavior = EnumOption(
         default=InvalidLockfileBehavior.error,
         help=softwrap(
@@ -955,6 +977,13 @@ class PythonSetup(Subsystem):
         return self._resolves_to_option_helper(
             self._resolves_to_complete_platforms,
             "resolves_to_complete_platforms",
+        )
+
+    @memoized_method
+    def resolves_to_uploaded_prior_to(self) -> dict[str, str]:
+        return self._resolves_to_option_helper(
+            self._resolves_to_uploaded_prior_to,
+            "resolves_to_uploaded_prior_to",
         )
 
     @property

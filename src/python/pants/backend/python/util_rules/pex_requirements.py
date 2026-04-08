@@ -383,6 +383,7 @@ class ResolvePexConfig:
     path_mappings: tuple[str, ...]
     lock_style: str
     complete_platforms: tuple[str, ...]
+    uploaded_prior_to: str | None
 
     def pex_args(self) -> Iterator[str]:
         """Arguments for Pex for indexes/--find-links, manylinux, and path mappings.
@@ -433,6 +434,9 @@ class ResolvePexConfig:
         yield from (f"--exclude={exclude}" for exclude in self.excludes)
         yield from (f"--source={source}" for source in self.sources)
 
+        if self.uploaded_prior_to:
+            yield f"--uploaded-prior-to={self.uploaded_prior_to}"
+
 
 @dataclass(frozen=True)
 class ResolvePexConfigRequest(EngineAwareParameter):
@@ -470,6 +474,7 @@ async def determine_resolve_pex_config(
             path_mappings=python_repos.path_mappings,
             lock_style="universal",  # Default to universal when no resolve name
             complete_platforms=(),  # No complete platforms by default
+            uploaded_prior_to=None,
         )
 
     no_binary = python_setup.resolves_to_no_binary().get(request.resolve_name) or []
@@ -481,6 +486,7 @@ async def determine_resolve_pex_config(
     complete_platforms = tuple(
         python_setup.resolves_to_complete_platforms().get(request.resolve_name) or []
     )
+    uploaded_prior_to = python_setup.resolves_to_uploaded_prior_to().get(request.resolve_name)
 
     constraints_file: ResolvePexConstraintsFile | None = None
     _constraints_file_path = python_setup.resolves_to_constraints_file().get(request.resolve_name)
@@ -534,6 +540,7 @@ async def determine_resolve_pex_config(
         path_mappings=python_repos.path_mappings,
         lock_style=lock_style,
         complete_platforms=complete_platforms,
+        uploaded_prior_to=uploaded_prior_to,
     )
 
 
@@ -568,6 +575,7 @@ def validate_metadata(
         sources=resolve_config.sources,
         lock_style=resolve_config.lock_style,
         complete_platforms=resolve_config.complete_platforms,
+        uploaded_prior_to=resolve_config.uploaded_prior_to,
     )
     if validation:
         return
@@ -631,6 +639,13 @@ def _common_failure_reasons(
             """
             - The `manylinux` argument has changed from when the lockfile was generated.
             (manylinux is set via the option `[python].resolver_manylinux`)
+            """
+        )
+    if InvalidPythonLockfileReason.UPLOADED_PRIOR_TO_MISMATCH in failure_reasons:
+        yield softwrap(
+            """
+            - The `uploaded_prior_to` argument has changed from when the lockfile was generated.
+            (uploaded_prior_to is set via the option `[python].resolves_to_uploaded_prior_to`)
             """
         )
 

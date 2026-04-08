@@ -191,6 +191,7 @@ def test_validate_lockfiles(
             path_mappings=(),
             lock_style="universal",
             complete_platforms=(),
+            uploaded_prior_to=None,
         ),
     )
 
@@ -374,6 +375,7 @@ class TestResolvePexConfigPexArgs:
                 path_mappings=[],
                 lock_style="universal",
                 complete_platforms=(),
+                uploaded_prior_to=None,
             ).pex_args()
         )
 
@@ -429,6 +431,29 @@ class TestResolvePexConfigPexArgs:
 
         assert "--wheel" in self.simple_config_args(no_binary=["foo", ":none:"])
         assert "--only-build" not in " ".join(self.simple_config_args(no_binary=["foo", ":none:"]))
+
+    def test_uploaded_prior_to(self):
+        args = self.simple_config_args()
+        assert "--uploaded-prior-to" not in " ".join(args)
+
+        args = tuple(
+            ResolvePexConfig(
+                indexes=[],
+                find_links=[],
+                manylinux=None,
+                constraints_file=None,
+                no_binary=FrozenOrderedSet(),
+                only_binary=FrozenOrderedSet(),
+                excludes=FrozenOrderedSet(),
+                overrides=FrozenOrderedSet(),
+                sources=FrozenOrderedSet(),
+                path_mappings=[],
+                lock_style="universal",
+                complete_platforms=(),
+                uploaded_prior_to="2023-09-20",
+            ).pex_args()
+        )
+        assert "--uploaded-prior-to=2023-09-20" in args
 
 
 def test_load_lockfile_ignores_unknown_sidecar_metadata_version() -> None:
