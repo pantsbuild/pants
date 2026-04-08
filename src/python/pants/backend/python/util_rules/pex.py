@@ -44,6 +44,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
+    LockfileFormat,
     Resolve,
     ResolvePexConfigRequest,
     determine_resolve_pex_config,
@@ -571,7 +572,7 @@ async def _build_uv_venv(
             uv_request.requirements.from_superset, **implicitly()
         )
         loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
-        if loaded_lockfile.is_pex_native:
+        if loaded_lockfile.lockfile_format == LockfileFormat.Pex:
             try:
                 digest_contents = await get_digest_contents(loaded_lockfile.lockfile_digest)
                 lockfile_bytes = next(
@@ -793,7 +794,7 @@ async def _setup_pex_requirements(
     if loaded_lockfile:
         argv = (
             ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
-            if loaded_lockfile.is_pex_native
+            if loaded_lockfile.lockfile_format == LockfileFormat.Pex
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
             else [
                 "--requirement",
@@ -843,7 +844,7 @@ async def _setup_pex_requirements(
         loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
 
         # NB: This is also validated in the constructor.
-        assert loaded_lockfile.is_pex_native
+        assert loaded_lockfile.lockfile_format == LockfileFormat.Pex
         if not reqs_info.req_strings:
             return _BuildPexRequirementsSetup([], [], concurrency_available)
 

@@ -17,7 +17,11 @@ from pants.backend.python.subsystems.python_tool_base import get_lockfile_interp
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
-from pants.backend.python.util_rules.pex_requirements import LoadedLockfile, Lockfile
+from pants.backend.python.util_rules.pex_requirements import (
+    LoadedLockfile,
+    Lockfile,
+    LockfileFormat,
+)
 from pants.core.goals.update_build_files import (
     FormatWithBlackRequest,
     FormatWithBuildifierRequest,
@@ -185,7 +189,7 @@ def test_get_lockfile_interpreter_constraints() -> None:
             "black.lock",
             metadata=metadata,
             requirement_estimate=1,
-            is_pex_native=True,
+            lockfile_format=LockfileFormat.Pex,
             as_constraints_strings=None,
             original_lockfile=Lockfile(
                 "black.lock", url_description_of_origin="foo", resolve_name="black"

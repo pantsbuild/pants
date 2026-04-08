@@ -34,6 +34,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfileRequest,
     Lockfile,
+    LockfileFormat,
     PexRequirements,
     Resolve,
     load_lockfile,
@@ -570,7 +571,7 @@ async def _determine_requirements_for_pex_from_targets(
         loaded_lockfile = await load_lockfile(
             LoadedLockfileRequest(chosen_resolve.lockfile), **implicitly()
         )
-        pex_native_subsetting_supported = loaded_lockfile.is_pex_native
+        pex_native_subsetting_supported = loaded_lockfile.lockfile_format == LockfileFormat.Pex
         if loaded_lockfile.as_constraints_strings:
             requirements = dataclasses.replace(
                 requirements,

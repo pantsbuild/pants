@@ -8,6 +8,7 @@ import json
 import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -48,6 +49,13 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+class LockfileFormat(Enum):
+    Pex = "pex"
+    # The very old, deprecated constraints-based "lockfile" that should
+    # be removed entirely.
+    ConstraintsDeprecated = "constraints_deprecated"
 
 
 @dataclass(frozen=True)
@@ -101,10 +109,10 @@ class LoadedLockfile:
     # An estimate of the number of requirements in this lockfile, to be used as a heuristic for
     # available parallelism.
     requirement_estimate: int
-    # True if the loaded lockfile is in PEX's native format.
-    is_pex_native: bool
-    # If !is_pex_native, the lockfile parsed as constraints strings, for use when the lockfile
-    # needs to be subsetted (see #15031, ##12222).
+    # The format of the loaded lockfile.
+    lockfile_format: LockfileFormat
+    # If lockfile_format is ConstraintsDeprecated, the lockfile parsed as constraints strings,
+    # for use when the lockfile needs to be subsetted (see #15031, ##12222).
     as_constraints_strings: FrozenOrderedSet[str] | None
     # The original file or file content (which may not have identical content to the output
     # `lockfile_digest`).
@@ -225,7 +233,11 @@ async def load_lockfile(
 
     lockfile_contents = await get_digest_contents(lockfile_digest)
     lock_bytes = lockfile_contents[0].content
-    is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
+    lockfile_format = (
+        LockfileFormat.Pex
+        if is_probably_pex_json_lockfile(lock_bytes)
+        else LockfileFormat.ConstraintsDeprecated
+    )
     constraints_strings = None
 
     metadata_url = PythonLockfileMetadata.metadata_location_for_lockfile(lockfile.url)
@@ -256,7 +268,7 @@ async def load_lockfile(
             pass
 
     if not metadata:
-        if is_pex_native:
+        if lockfile_format == LockfileFormat.Pex:
             header_delimiter = "//"
             stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
             lockfile_digest = await create_digest(
@@ -286,7 +298,7 @@ async def load_lockfile(
         lockfile_path,
         metadata,
         requirement_estimate,
-        is_pex_native,
+        lockfile_format,
         constraints_strings,
         original_lockfile=lockfile,
     )
