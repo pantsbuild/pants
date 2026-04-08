@@ -75,3 +75,35 @@ def test_pnpm_project_sandbox_provides_append_only_cache_at_expected_location(
     )  # Disable caches for this process to avoid flakiness
     rule_runner.request(ProcessResult, [process])
     assert (named_caches_dir / "pnpm_home/marker.txt").is_file()
+
+
+def test_output_files_are_relative_to_working_directory(rule_runner: RuleRunner):
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "packageManager": "pnpm@9.5.0",
+                    "scripts": {},
+                }
+            ),
+        }
+    )
+    project_env = rule_runner.request(
+        NodeJsProjectEnvironment,
+        [NodeJSProjectEnvironmentRequest(Address("src/js", generated_name="ham"))],
+    )
+    process = rule_runner.request(
+        Process,
+        [
+            NodeJsProjectEnvironmentProcess(
+                project_env,
+                ("run", "pretend"),
+                description="Test output_files relativization.",
+                output_files=("src/js/out.txt",),
+            )
+        ],
+    )
+    assert process.output_files == ("out.txt",)

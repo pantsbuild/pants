@@ -148,8 +148,9 @@ async def setup_nodejs_project_environment_process(
     merged = await merge_digests(MergeDigests((req.input_digest, lockfile_digest, project_digest)))
 
     args = req.targeted_args()
-    output_files = req.output_files
-    output_directories = req.output_directories
+    root_dir = req.env.root_dir
+    output_files = tuple(fast_relpath(f, root_dir) for f in req.output_files)
+    output_directories = tuple(fast_relpath(d, root_dir) for d in req.output_directories)
     per_package_caches = FrozenDict(
         {
             key: os.path.join(req.env.package_dir(), value)
