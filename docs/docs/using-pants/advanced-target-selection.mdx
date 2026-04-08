@@ -206,6 +206,10 @@ For other goals, you can leverage shell piping to partition the input targets in
 pants list :: | awk 'NR % 5 == 0' | xargs pants package
 ```
 
+:::tip Coverage and sharding
+When using `--shard` with test coverage enabled, each shard only exercises a fraction of your targets, producing artificially low coverage numbers. You need to combine the binary `.coverage` files from all shards in a post-shard CI step to get accurate results. See [Coverage with test sharding](../python/goals/test.mdx#coverage-with-test-sharding) for the full configuration and CI workflow.
+:::
+
 ## Using CLI aliases
 
 If setting tags on individual targets is not feasible, there are a few other options available to refer to multiple targets.
