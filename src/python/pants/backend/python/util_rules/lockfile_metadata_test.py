@@ -18,6 +18,7 @@ from pants.backend.python.util_rules.lockfile_metadata import (
     PythonLockfileMetadataV3,
     PythonLockfileMetadataV4,
     PythonLockfileMetadataV5,
+    PythonLockfileMetadataV7,
 )
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.util.pip_requirement import PipRequirement
@@ -44,6 +45,7 @@ def test_metadata_json_round_trip() -> None:
         sources=set(),
         lock_style="universal",
         complete_platforms=(),
+        uploaded_prior_to=None,
     )
     output_metadata = PythonLockfileMetadata.from_json_dict(
         json.loads(input_metadata.to_json()), "", ""
@@ -66,6 +68,7 @@ def test_metadata_header_round_trip() -> None:
         sources=set(),
         lock_style="universal",
         complete_platforms=(),
+        uploaded_prior_to=None,
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock", delimeter="#"
@@ -362,6 +365,7 @@ def test_is_valid_for_v1(user_digest, expected_digest, user_ic, expected_ic, mat
                 sources=set(),
                 lock_style=None,
                 complete_platforms=(),
+                uploaded_prior_to=None,
             )
         )
         == matches
@@ -441,6 +445,7 @@ def test_is_valid_for_interpreter_constraints_and_requirements(
             sources=set(),
             lock_style=None,
             complete_platforms=(),
+            uploaded_prior_to=None,
         )
         assert result.failure_reasons == set(expected)
 
@@ -468,6 +473,7 @@ def test_is_valid_for_v3_metadata() -> None:
         sources=set(),
         lock_style=None,
         complete_platforms=(),
+        uploaded_prior_to=None,
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.CONSTRAINTS_FILE_MISMATCH,
@@ -502,6 +508,7 @@ def test_is_valid_for_v4_metadata() -> None:
         sources=set(),
         lock_style=None,
         complete_platforms=(),
+        uploaded_prior_to=None,
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.EXCLUDES_MISMATCH,
@@ -535,7 +542,43 @@ def test_is_valid_for_v5_metadata() -> None:
         sources=set(),
         lock_style=None,
         complete_platforms=(),
+        uploaded_prior_to=None,
     )
     assert result.failure_reasons == {
         InvalidPythonLockfileReason.SOURCES_MISMATCH,
+    }
+
+
+def test_is_valid_for_v7_metadata() -> None:
+    result = PythonLockfileMetadataV7(
+        InterpreterConstraints([]),
+        reqset(),
+        manylinux="manylinux2014",
+        requirement_constraints={PipRequirement.parse("c1")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
+        excludes=set(),
+        overrides={"cowsay==1.0.0"},
+        sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
+        uploaded_prior_to="2023-09-20",
+    ).is_valid_for(
+        expected_invalidation_digest="",
+        user_interpreter_constraints=InterpreterConstraints([]),
+        interpreter_universe=INTERPRETER_UNIVERSE,
+        user_requirements=reqset(),
+        manylinux="manylinux2014",
+        requirement_constraints={PipRequirement.parse("c1")},
+        only_binary={"bdist"},
+        no_binary={"sdist"},
+        excludes=set(),
+        overrides={"cowsay==1.0.0"},
+        sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
+        uploaded_prior_to="2025-01-01",
+    )
+    assert result.failure_reasons == {
+        InvalidPythonLockfileReason.UPLOADED_PRIOR_TO_MISMATCH,
     }

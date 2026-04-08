@@ -161,6 +161,7 @@ def test_get_lockfile_interpreter_constraints() -> None:
         sources=set(),
         lock_style="universal",
         complete_platforms=(),
+        uploaded_prior_to=None,
     )
 
     def assert_ics(
