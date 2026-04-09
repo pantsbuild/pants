@@ -8,7 +8,7 @@ import json
 import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum, auto
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -51,11 +51,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class LockfileFormat(Enum):
-    Pex = "pex"
+class LockfileFormat(StrEnum):
+    Pex = auto()
     # The very old, deprecated constraints-based "lockfile" that should
     # be removed entirely.
-    ConstraintsDeprecated = "constraints_deprecated"
+    ConstraintsDeprecated = auto()
 
 
 @dataclass(frozen=True)
