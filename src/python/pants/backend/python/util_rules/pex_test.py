@@ -47,6 +47,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
     Lockfile,
+    LockfileFormat,
     PexRequirements,
     Resolve,
     ResolvePexConfig,
@@ -703,7 +704,9 @@ def test_setup_pex_requirements() -> None:
             lockfile_path,
             metadata=None,
             requirement_estimate=2,
-            is_pex_native=is_pex_lock,
+            lockfile_format=LockfileFormat.Pex
+            if is_pex_lock
+            else LockfileFormat.ConstraintsDeprecated,
             as_constraints_strings=None,
             original_lockfile=lockfile_obj,
         )
