@@ -65,8 +65,8 @@ create_exception!(native_engine, EngineError, PyException);
 create_exception!(native_engine, IntrinsicError, EngineError);
 create_exception!(native_engine, IncorrectProductError, EngineError);
 
+#[pyclass(from_py_object)]
 #[derive(Clone)]
-#[pyclass]
 pub struct PyFailure(pub Failure);
 
 #[pymethods]

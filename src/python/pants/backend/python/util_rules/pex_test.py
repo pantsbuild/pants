@@ -47,6 +47,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
     Lockfile,
+    LockfileFormat,
     PexRequirements,
     Resolve,
     ResolvePexConfig,
@@ -703,7 +704,9 @@ def test_setup_pex_requirements() -> None:
             lockfile_path,
             metadata=None,
             requirement_estimate=2,
-            is_pex_native=is_pex_lock,
+            lockfile_format=LockfileFormat.Pex
+            if is_pex_lock
+            else LockfileFormat.ConstraintsDeprecated,
             as_constraints_strings=None,
             original_lockfile=lockfile_obj,
         )
@@ -737,6 +740,7 @@ def test_setup_pex_requirements() -> None:
                     sources=FrozenOrderedSet(),
                     lock_style="universal",
                     complete_platforms=(),
+                    uploaded_prior_to=None,
                 ),
                 "pants.backend.python.util_rules.pex.get_req_strings": lambda _: PexRequirementsInfo(
                     (
@@ -903,6 +907,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         sources=set(),
         lock_style="universal",
         complete_platforms=(),
+        uploaded_prior_to=None,
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 

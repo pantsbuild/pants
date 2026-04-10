@@ -3,6 +3,8 @@
 version: 2
 updates:
   - package-ecosystem: "github-actions"
+    cooldown:
+      default-days: 7
     directory: "/"
     groups:
       gha-deps:
@@ -21,6 +23,8 @@ updates:
       interval: "monthly"
 
   - package-ecosystem: "cargo"
+    cooldown:
+      default-days: 7
     directory: "/src/rust"
     ignore:
       # No longer developed, referred to 1.3.3 as complete, lots of drama (https://sr.ht/~stygianentity/bincode/ and https://old.reddit.com/r/rust/comments/1pnz1iz/bincode_development_has_ceased_permanently/)
@@ -50,6 +54,8 @@ updates:
       interval: "monthly"
   
   - package-ecosystem: pip
+    cooldown:
+      default-days: 7
     directory: "/3rdparty/python"
     groups:
       python-security-updates:
@@ -76,6 +82,8 @@ updates:
       interval: "monthly"
 
   - package-ecosystem: "npm"
+    cooldown:
+      default-days: 7
     directories: 
       - "build-support/**/*"
       - "src/python/pants/backend/javascript/**/*"

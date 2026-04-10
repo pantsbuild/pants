@@ -25,7 +25,6 @@ from typing import (
     ClassVar,
     Generic,
     Protocol,
-    Self,
     TypeVar,
     cast,
     final,
@@ -49,13 +48,20 @@ from pants.engine.internals.dep_rules import (
     DependencyRuleApplication,
 )
 from pants.engine.internals.native_engine import NO_VALUE as NO_VALUE  # noqa: F401
+from pants.engine.internals.native_engine import AsyncFieldMixin as AsyncFieldMixin
+from pants.engine.internals.native_engine import BoolField as BoolField  # noqa: F401
 from pants.engine.internals.native_engine import Field as Field
+from pants.engine.internals.native_engine import ScalarField as ScalarField
+from pants.engine.internals.native_engine import SequenceField as SequenceField  # noqa: F401
+from pants.engine.internals.native_engine import StringField as StringField
+from pants.engine.internals.native_engine import StringSequenceField as StringSequenceField
+from pants.engine.internals.native_engine import TriBoolField as TriBoolField  # noqa: F401
 from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks  # noqa: F401
 from pants.engine.rules import rule
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
 from pants.source.filespec import Filespec, FilespecMatcher
-from pants.util.collections import ensure_list, ensure_str_list
+from pants.util.collections import ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
 from pants.util.frozendict import FrozenDict
@@ -72,92 +78,6 @@ logger = logging.getLogger(__name__)
 # Type alias to express the intent that the type should be immutable and hashable. There's nothing
 # to actually enforce this, outside of convention. Maybe we could develop a MyPy plugin?
 ImmutableValue = Any
-
-
-# NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter which
-# order you use for inheriting the field template vs. the mixin.
-class AsyncFieldMixin(Field):
-    """A mixin to store the field's original `Address` for use during hydration by the engine.
-
-    Typically, you should also create a dataclass representing the hydrated value and another for
-    the request, then a rule to go from the request to the hydrated value. The request class should
-    store the async field as a property.
-
-    (Why use the request class as the rule input, rather than the field itself? It's a wrapper so
-    that subclasses of the async field work properly, given that the engine uses exact type IDs.
-    This is like WrappedTarget.)
-
-    For example:
-
-        class Sources(StringSequenceField, AsyncFieldMixin):
-            alias = "sources"
-
-            # Often, async fields will want to define entry points like this to allow subclasses to
-            # change behavior.
-            def validate_resolved_files(self, files: Sequence[str]) -> None:
-                pass
-
-
-        @dataclass(frozen=True)
-        class HydrateSourcesRequest:
-            field: Sources
-
-
-        @dataclass(frozen=True)
-        class HydratedSources:
-            snapshot: Snapshot
-
-
-        @rule
-        async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
-            digest = await path_globs_to_digest(PathGlobs(request.field.value))
-            result = await digest_to_snapshot(digest)
-            request.field.validate_resolved_files(result.files)
-            ...
-            return HydratedSources(result)
-
-    Then, call sites can `await` if they need to hydrate the field, even if they subclassed
-    the original async field to have custom behavior:
-
-        sources1 = hydrate_sources(HydrateSourcesRequest(my_tgt.get(Sources)))
-        sources2 = hydrate_sources(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
-    """
-
-    address: Address
-
-    @final
-    def __new__(cls, raw_value: Any | None, address: Address) -> Self:
-        obj = super().__new__(cls, raw_value, address)  # type: ignore[call-arg]
-        # N.B.: We store the address here and not in the Field base class, because the memory usage
-        # of storing this value in every field was shown to be excessive / lead to performance
-        # issues.
-        object.__setattr__(obj, "address", address)
-        return obj
-
-    def __repr__(self) -> str:
-        params = [
-            f"alias={self.alias!r}",
-            f"address={self.address}",
-            f"value={self.value!r}",
-        ]
-        if hasattr(self, "default"):
-            params.append(f"default={self.default!r}")
-        return f"{self.__class__}({', '.join(params)})"
-
-    def __hash__(self) -> int:
-        return hash((self.__class__, self.value, self.address))
-
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, AsyncFieldMixin):
-            return False
-        return (
-            self.__class__ == other.__class__
-            and self.value == other.value
-            and self.address == other.address
-        )
-
-    def __ne__(self, other: Any) -> bool:
-        return not (self == other)
 
 
 @union
@@ -1763,74 +1683,6 @@ class UnrecognizedTargetTypeException(InvalidTargetException):
 T = TypeVar("T")
 
 
-class ScalarField(Generic[T], Field):
-    """A field with a scalar value (vs. a compound value like a sequence or dict).
-
-    Subclasses must define the class properties `expected_type` and `expected_type_description`.
-    They should also override the type hints for the classmethod `compute_value` so that we use the
-    correct type annotation in generated documentation.
-
-        class Example(ScalarField):
-            alias = "example"
-            expected_type = MyPluginObject
-            expected_type_description = "a `my_plugin` object"
-
-            @classmethod
-            def compute_value(
-                cls, raw_value: Optional[MyPluginObject], address: Address
-            ) -> Optional[MyPluginObject]:
-                return super().compute_value(raw_value, address=address)
-    """
-
-    expected_type: ClassVar[type[T]]
-    expected_type_description: ClassVar[str]
-    value: T | None
-    default: ClassVar[T | None] = None
-
-    @classmethod
-    def compute_value(cls, raw_value: Any | None, address: Address) -> T | None:
-        value_or_default = super().compute_value(raw_value, address)
-        if value_or_default is not None and not isinstance(value_or_default, cls.expected_type):
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                raw_value,
-                expected_type=cls.expected_type_description,
-            )
-        return value_or_default
-
-
-class BoolField(Field):
-    """A field whose value is a boolean.
-
-    Subclasses must either set `default: bool` or `required = True` so that the value is always
-    defined.
-    """
-
-    value: bool
-    default: ClassVar[bool]
-
-    @classmethod
-    def compute_value(cls, raw_value: bool, address: Address) -> bool:  # type: ignore[override]
-        value_or_default = super().compute_value(raw_value, address)
-        if not isinstance(value_or_default, bool):
-            raise InvalidFieldTypeException(
-                address, cls.alias, raw_value, expected_type="a boolean"
-            )
-        return value_or_default
-
-
-class TriBoolField(ScalarField[bool]):
-    """A field whose value is a boolean or None, which is meant to represent a tri-state."""
-
-    expected_type = bool
-    expected_type_description = "a boolean or None"
-
-    @classmethod
-    def compute_value(cls, raw_value: bool | None, address: Address) -> bool | None:
-        return super().compute_value(raw_value, address)
-
-
 class ValidNumbers(Enum):
     """What range of numbers are allowed for IntField and FloatField."""
 
@@ -1877,70 +1729,6 @@ class FloatField(ScalarField[float]):
         value_or_default = super().compute_value(raw_value, address)
         cls.valid_numbers.validate(value_or_default, cls.alias, address)
         return value_or_default
-
-
-class StringField(ScalarField[str]):
-    """A field whose value is a string.
-
-    If you expect the string to only be one of several values, set the class property
-    `valid_choices`.
-    """
-
-    expected_type = str
-    expected_type_description = "a string"
-    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None] = None
-
-    @classmethod
-    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
-        value_or_default = super().compute_value(raw_value, address)
-        if value_or_default is not None and cls.valid_choices is not None:
-            _validate_choices(
-                address, cls.alias, [value_or_default], valid_choices=cls.valid_choices
-            )
-        return value_or_default
-
-
-class SequenceField(Generic[T], Field):
-    """A field whose value is a homogeneous sequence.
-
-    Subclasses must define the class properties `expected_element_type` and
-    `expected_type_description`. They should also override the type hints for the classmethod
-    `compute_value` so that we use the correct type annotation in generated documentation.
-
-        class Example(SequenceField):
-            alias = "example"
-            expected_element_type = MyPluginObject
-            expected_type_description = "an iterable of `my_plugin` objects"
-
-            @classmethod
-            def compute_value(
-                cls, raw_value: Optional[Iterable[MyPluginObject]], address: Address
-            ) -> Optional[Tuple[MyPluginObject, ...]]:
-                return super().compute_value(raw_value, address=address)
-    """
-
-    expected_element_type: ClassVar[type]
-    expected_type_description: ClassVar[str]
-    value: tuple[T, ...] | None
-    default: ClassVar[tuple[T, ...] | None] = None
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Iterable[Any] | None, address: Address
-    ) -> tuple[T, ...] | None:
-        value_or_default = super().compute_value(raw_value, address)
-        if value_or_default is None:
-            return None
-        try:
-            ensure_list(value_or_default, expected_type=cls.expected_element_type)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                raw_value,
-                expected_type=cls.expected_type_description,
-            )
-        return tuple(value_or_default)
 
 
 class TupleSequenceField(Generic[T], Field):
@@ -1997,21 +1785,6 @@ class TupleSequenceField(Generic[T], Field):
             validated.append(cast(tuple[T, ...], element))
 
         return tuple(validated)
-
-
-class StringSequenceField(SequenceField[str]):
-    expected_element_type = str
-    expected_type_description = "an iterable of strings (e.g. a list of strings)"
-    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None] = None
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Iterable[str] | None, address: Address
-    ) -> tuple[str, ...] | None:
-        value_or_default = super().compute_value(raw_value, address)
-        if value_or_default and cls.valid_choices is not None:
-            _validate_choices(address, cls.alias, value_or_default, valid_choices=cls.valid_choices)
-        return value_or_default
 
 
 class DictStringToStringField(Field):
@@ -2125,25 +1898,6 @@ class DictStringToStringSequenceField(Field):
             except ValueError:
                 raise invalid_type_exception
         return FrozenDict(result)
-
-
-def _validate_choices(
-    address: Address,
-    field_alias: str,
-    values: Iterable[Any],
-    *,
-    valid_choices: type[Enum] | tuple[Any, ...],
-) -> None:
-    _valid_choices = set(
-        valid_choices
-        if isinstance(valid_choices, tuple)
-        else (choice.value for choice in valid_choices)
-    )
-    for choice in values:
-        if choice not in _valid_choices:
-            raise InvalidFieldChoiceException(
-                address, field_alias, choice, valid_choices=_valid_choices
-            )
 
 
 # -----------------------------------------------------------------------------------------------

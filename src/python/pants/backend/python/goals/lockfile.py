@@ -267,6 +267,7 @@ async def generate_lockfile(
         sources=set(pip_args_setup.resolve_config.sources),
         lock_style=req.lock_style,
         complete_platforms=req.complete_platforms,
+        uploaded_prior_to=pip_args_setup.resolve_config.uploaded_prior_to,
     )
     regenerate_command = (
         generate_lockfiles_subsystem.custom_command
