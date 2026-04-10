@@ -471,6 +471,30 @@ def test_target_validate() -> None:
         FortranTarget({FortranVersion.alias: "bad"}, Address("", target_name="t"))
 
 
+def test_target_rejects_multiple_sources_fields() -> None:
+    """Regression test for https://github.com/pantsbuild/pants/issues/17132."""
+
+    class PrimarySources(MultipleSourcesField):
+        alias = "sources"
+        default = ("*.ext",)
+
+    class ExtraSources(MultipleSourcesField):
+        alias = "extra_sources"
+
+    class InvalidMultiSourcesTarget(Target):
+        alias = "invalid_multi_sources"
+        core_fields = (FortranVersion, PrimarySources, ExtraSources)
+
+    with pytest.raises(InvalidTargetException) as exc:
+        InvalidMultiSourcesTarget(
+            {FortranVersion.alias: "v1", PrimarySources.alias: ["a.ext"], ExtraSources.alias: ["b"]},
+            Address("", target_name="t"),
+        )
+    assert "multiple fields that subclass `SourcesField`" in str(exc.value)
+    assert "`extra_sources`" in str(exc.value)
+    assert "`sources`" in str(exc.value)
+
+
 def test_target_residence_dir() -> None:
     assert FortranTarget({}, Address("some_dir/subdir")).residence_dir == "some_dir/subdir"
     assert (
