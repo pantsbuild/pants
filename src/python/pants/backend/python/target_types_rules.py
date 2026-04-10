@@ -358,7 +358,7 @@ _EntryPointsDictType = dict[str, dict[str, str]]
 
 def _classify_entry_points(
     all_entry_points: _EntryPointsDictType,
-) -> Generator[tuple[bool, str, str, str], None, None]:
+) -> Generator[tuple[bool, str, str, str]]:
     """Looks at each entry point to see if it is a target address or not.
 
     Yields tuples: is_target, category, name, entry_point_str.

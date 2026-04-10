@@ -1,17 +1,14 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashSet;
-use std::fs::File;
-use std::fs::canonicalize;
-use std::fs::create_dir_all;
+use std::collections::BTreeSet;
+use std::fs::{File, canonicalize, create_dir_all};
 
 use options::BuildRoot;
 use options::fromfile::FromfileExpander;
 use tempfile::tempdir;
 
-use crate::config::ConfigFinder;
-use crate::config::InterpolationMap;
+use crate::config::{ConfigFinder, InterpolationMap};
 
 #[test]
 fn test_config_discovery() {
@@ -25,16 +22,16 @@ fn test_config_discovery() {
     create_dir_all(&subsubdir).unwrap();
 
     // This file above the buildroot should never be discovered.
-    let file_outside_buildroot = tmp_dir_path.join("pants.toml");
+    let file_outside_buildroot = tmp_dir_path.join("pantsng.toml");
 
     // Configs under the buildroot, each of which may be discovered depending on the context.
-    let root_config = buildroot_dir.join("pants.toml");
-    let root_linux_config = buildroot_dir.as_path().join("pants_linux.toml");
-    let dir_config = dir.join("pants.toml");
-    let dir_ci_config = dir.join("pants_01.ci.toml");
-    let dir_arm64_config = dir.join("pants_02.arm64.toml");
-    let subsubdir_config = subsubdir.join("pants.toml");
-    let subsubdir_ci_macos_config = subsubdir.join("pants_ci.macos.toml");
+    let root_config = buildroot_dir.join("pantsng.toml");
+    let root_linux_config = buildroot_dir.as_path().join("pantsng_linux.toml");
+    let dir_config = dir.join("pantsng.toml");
+    let dir_ci_config = dir.join("pantsng_01.ci.toml");
+    let dir_arm64_config = dir.join("pantsng_02.arm64.toml");
+    let subsubdir_config = subsubdir.join("pantsng.toml");
+    let subsubdir_ci_macos_config = subsubdir.join("pantsng_ci.macos.toml");
 
     let buildroot = BuildRoot::for_path(canonicalize(buildroot_dir.to_path_buf()).unwrap());
 
@@ -47,15 +44,19 @@ fn test_config_discovery() {
     File::create(subsubdir_config.as_path()).unwrap();
     File::create(subsubdir_ci_macos_config.as_path()).unwrap();
 
-    let config_finder = ConfigFinder::new(
-        buildroot.clone(),
-        FromfileExpander::relative_to(buildroot.clone()),
-        InterpolationMap::new(),
-    )
-    .unwrap();
+    let mk_config_finder = |context: BTreeSet<String>| -> ConfigFinder {
+        ConfigFinder::new(
+            buildroot.clone(),
+            FromfileExpander::relative_to(buildroot.clone()),
+            InterpolationMap::new(),
+            context,
+        )
+        .unwrap()
+    };
 
+    let config_finder = mk_config_finder(BTreeSet::new());
     let configs = config_finder
-        .get_applicable_config_files(&subsubdir, &HashSet::new())
+        .get_applicable_config_files(&subsubdir)
         .unwrap();
     assert_eq!(
         vec![
@@ -66,11 +67,9 @@ fn test_config_discovery() {
         configs
     );
 
+    let config_finder = mk_config_finder(BTreeSet::from(["ci".to_string(), "linux".to_string()]));
     let configs = config_finder
-        .get_applicable_config_files(
-            &subsubdir,
-            &HashSet::from(["ci".to_string(), "linux".to_string()]),
-        )
+        .get_applicable_config_files(&subsubdir)
         .unwrap();
     assert_eq!(
         vec![
@@ -83,11 +82,9 @@ fn test_config_discovery() {
         configs
     );
 
+    let config_finder = mk_config_finder(BTreeSet::from(["ci".to_string(), "macos".to_string()]));
     let configs = config_finder
-        .get_applicable_config_files(
-            &subsubdir,
-            &HashSet::from(["ci".to_string(), "macos".to_string()]),
-        )
+        .get_applicable_config_files(&subsubdir)
         .unwrap();
     assert_eq!(
         vec![
@@ -100,11 +97,9 @@ fn test_config_discovery() {
         configs
     );
 
+    let config_finder = mk_config_finder(BTreeSet::from(["ci".to_string(), "arm64".to_string()]));
     let configs = config_finder
-        .get_applicable_config_files(
-            &subsubdir,
-            &HashSet::from(["ci".to_string(), "arm64".to_string()]),
-        )
+        .get_applicable_config_files(&subsubdir)
         .unwrap();
     assert_eq!(
         vec![

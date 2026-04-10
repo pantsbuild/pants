@@ -22,9 +22,9 @@ from pants.backend.python.dependency_inference.module_mapper import (
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonAssetPaths,
-    ParsedPythonDependencies,
     ParsedPythonImports,
     ParsePythonDependenciesRequest,
+    PythonFileDependencies,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     parse_python_dependencies as parse_python_dependencies_get,
@@ -44,11 +44,11 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import ancestor_files, pex
 from pants.backend.python.util_rules.ancestor_files import AncestorFilesRequest, find_ancestor_files
-from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core import target_types
 from pants.core.target_types import AllAssetTargetsByPath, map_assets_by_path
 from pants.core.util_rules import stripped_source_files
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.unowned_dependency_behavior import (
     UnownedDependencyError,
     UnownedDependencyUsage,
@@ -368,24 +368,22 @@ async def _handle_unowned_imports(
 async def _exec_parse_deps(
     field_set: PythonImportDependenciesInferenceFieldSet,
     python_setup: PythonSetup,
-) -> ParsedPythonDependencies:
-    interpreter_constraints = InterpreterConstraints.create_from_field_sets(
-        [field_set], python_setup
-    )
+) -> PythonFileDependencies:
+    source = await determine_source_files(SourceFilesRequest([field_set.source]))
     resp = await parse_python_dependencies_get(
         ParsePythonDependenciesRequest(
-            field_set.source,
-            interpreter_constraints,
+            source,
         ),
         **implicitly(),
     )
-    return resp
+    assert len(resp.path_to_deps) == 1
+    return next(iter(resp.path_to_deps.values()))
 
 
 @dataclass(frozen=True)
 class ResolvedParsedPythonDependenciesRequest:
     field_set: PythonImportDependenciesInferenceFieldSet
-    parsed_dependencies: ParsedPythonDependencies
+    parsed_dependencies: PythonFileDependencies
     resolve: str | None
 
 

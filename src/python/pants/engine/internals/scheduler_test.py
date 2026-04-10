@@ -11,7 +11,6 @@ import pytest
 
 from pants.base.exceptions import IncorrectProductError
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.selectors import Get
 from pants.engine.rules import concurrently, implicitly, rule
 from pants.engine.unions import UnionRule, union
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
@@ -300,29 +299,6 @@ def test_polymorphic_call_by_name() -> None:
 # -----------------------------------------------------------------------------------------------
 
 
-@pytest.mark.call_by_type
-def test_outlined_get() -> None:
-    def create_outlined_get() -> Get[int]:
-        return Get(int, str, "hello")
-
-    @rule
-    async def uses_outlined_get() -> int:
-        return await create_outlined_get()
-
-    rule_runner = RuleRunner(
-        rules=[
-            uses_outlined_get,
-            QueryRule(int, []),
-        ],
-    )
-    # Fails because the creation of the `Get` was out-of-lined into a separate function.
-    with pytest.raises(ExecutionError) as exc:
-        rule_runner.request(int, [])
-    assert (
-        "Get(int, str, hello) was not detected in your @rule body at rule compile time."
-    ) in str(exc.value.args[0])
-
-
 @dataclass(frozen=True)
 class SomeInput:
     s: str
@@ -461,6 +437,7 @@ def test_trace_includes_rule_exception_traceback() -> None:
          Traceback (most recent call last):
            File LOCATION-INFO, in nested_raise
              fn_raises()
+             ~~~~~~~~~^^
            File LOCATION-INFO, in fn_raises
              raise Exception("An exception!")
          Exception: An exception!

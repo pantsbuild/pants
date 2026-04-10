@@ -25,10 +25,14 @@ Thanks to Pants's execution engine, your plugins will automatically bring you th
 - Concurrent execution.
 - Remote execution.
 
-:::danger The Plugin API is not yet stable
-While we'll try our best to limit changes, the Plugin API does not yet follow the [Deprecation Policy](../releases/deprecation-policy.mdx). Components of the API may change between minor versions—e.g. 2.7 to 2.8—without a deprecation.
+:::caution Plugin API Stability
+The Plugin API is now considered largely stable.
 
-We will document changes at [Plugin upgrade guide](./common-plugin-tasks/plugin-upgrade-guide.mdx).
+- We are still working on integrating the Plugin API into the Pants [Deprecation Policy](../releases/deprecation-policy.mdx),
+and some API @rules may yet be renamed for consistency and clarity, so the API is not officially subject to that policy yet.
+However the API has not changed substantually in several releases, and we do not anticipate major changes in the future.
+
+- We will continue to document changes in the [Plugin upgrade guide](./common-plugin-tasks/plugin-upgrade-guide.mdx).
 :::
 
 ## Core concepts
@@ -154,7 +158,7 @@ We strongly recommend to set up a dedicated "resolve" (lockfile) for your plugin
 
 To set up a dedicated resolve for your plugins, update your `pants.toml` as follows:
 
-```python title="pants.toml"
+```toml title="pants.toml"
 [python]
 enable_resolves = true
 # The repository's own constraints.
@@ -182,7 +186,7 @@ See [Third-party dependencies](../python/overview/third-party-dependencies.mdx) 
 
 Pants plugins can be published to PyPI and consumed by other Pants users.
 
-As mentioned above: the plugin API is still unstable, and so supporting multiple versions of Pants with a single plugin version may be challenging. Give careful consideration to who you expect to consume the plugin, and what types of maintenance guarantees you hope to provide.
+As mentioned above: the plugin API is largely stable, but can still evolve over time like any API. and so you may wish to give careful consideration to who you expect to consume the plugin, which versions of Pants it should support, and what types of maintenance guarantees you hope to provide.
 
 ### Thirdparty dependencies
 

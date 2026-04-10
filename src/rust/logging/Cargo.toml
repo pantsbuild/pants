@@ -14,8 +14,6 @@ num_enum = { workspace = true }
 parking_lot = { workspace = true }
 regex = { workspace = true }
 stdio = { path = "../stdio" }
-tokio = { workspace = true }
-uuid = { workspace = true, features = ["v4"] }
 
 [build-dependencies]
 cargo_metadata = "0.23"

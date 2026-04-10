@@ -253,7 +253,7 @@ mod err {
     }
 
     impl ParseError {
-        pub(super) fn new<S: AsRef<str>>(template: S) -> ParseError {
+        pub(crate) fn new<S: AsRef<str>>(template: S) -> ParseError {
             let template_ref = template.as_ref();
             assert!(
                 template_ref.contains("{name}"),

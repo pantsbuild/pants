@@ -197,6 +197,7 @@ impl CommandRunner {
     /// This function also returns a vector of all `Digest`s referenced directly and indirectly by
     /// the `ActionResult` suitable for passing to `Store::ensure_remote_has_recursive`. (The
     /// digests may include both File and Tree digests.)
+    #[allow(deprecated)] // TODO: Move to REAPI `output_path` instead of `output_files` and `output_directories`.
     pub(crate) async fn make_action_result(
         &self,
         command: &Command,
@@ -240,6 +241,7 @@ impl CommandRunner {
                     path: output_directory.to_owned(),
                     tree_digest: Some(tree_digest.into()),
                     is_topologically_sorted: false,
+                    ..Default::default()
                 });
         }
 
@@ -503,6 +505,7 @@ impl process_execution::CommandRunner for CommandRunner {
         let use_remote_cache = request.cache_scope == ProcessCacheScope::Always
             || request.cache_scope == ProcessCacheScope::Successful;
 
+        let proc_descr = log::log_enabled!(Level::Debug).then(|| request.description.clone());
         let (result, hit_cache) = if self.cache_read && use_remote_cache {
             self.speculate_read_action_cache(
                 context.clone(),
@@ -527,15 +530,33 @@ impl process_execution::CommandRunner for CommandRunner {
         {
             let command_runner = self.clone();
             let result = result.clone();
-            let write_fut =
-                in_workunit!("remote_cache_write", Level::Trace, |workunit| async move {
+            let write_fut = in_workunit!("remote_cache_write", Level::Trace, |workunit| {
+                async move {
                     workunit.increment_counter(Metric::RemoteCacheWriteAttempts, 1);
                     let write_result = command_runner
                         .update_action_cache(&result, &command, action_digest, command_digest)
                         .await;
                     match write_result {
-                        Ok(_) => workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1),
+                        Ok(_) => {
+                            if let Some(proc_descr) = &proc_descr {
+                                log::debug!(
+                                    "remote cache updated for: {:?} digest={:?} response={:?}",
+                                    proc_descr,
+                                    action_digest,
+                                    result
+                                );
+                            }
+                            workunit.increment_counter(Metric::RemoteCacheWriteSuccesses, 1)
+                        },
                         Err(err) => {
+                            if let Some(proc_descr) = &proc_descr {
+                                log::debug!(
+                                    "remote cache update failed for: {:?} digest={:?} response={:?}",
+                                    proc_descr,
+                                    action_digest,
+                                    result
+                                );
+                            }
                             command_runner
                                 .log_cache_error(err.to_string(), CacheErrorType::WriteError);
                             workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
@@ -543,7 +564,8 @@ impl process_execution::CommandRunner for CommandRunner {
                     };
                 }
                 // NB: We must box the future to avoid a stack overflow.
-                .boxed());
+                .boxed()
+            });
             let task_name = format!("remote cache write {action_digest:?}");
             context
                 .tail_tasks

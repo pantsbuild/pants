@@ -22,7 +22,7 @@ You can write a plugin to add custom kwarg generation logic.
 Note: there may only be at most one applicable plugin per target customizing the kwargs for the `setup()` function.
 
 :::note Example
-See [here](https://github.com/pantsbuild/pants/blob/master/pants-plugins/internal_plugins/releases/register.py) for an example that Pants uses internally for its `python_distribution` targets. This plugin demonstrates reading from the file system to set the `version` and `long_description` kwargs, along with adding hardcoded kwargs.
+See [here](https://github.com/pantsbuild/pants/blob/main/pants-plugins/internal_plugins/releases/register.py) for an example that Pants uses internally for its `python_distribution` targets. This plugin demonstrates reading from the file system to set the `version` and `long_description` kwargs, along with adding hardcoded kwargs.
 :::
 
 1. Set up a subclass of `SetupKwargsRequest`
@@ -218,6 +218,6 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
 
 Refer to these guides for additional things you may want to do in your plugin:
 
-- [Read from options](../the-rules-api/options-and-subsystems.mdx). Also see [here](https://github.com/pantsbuild/pants/blob/master/pants-plugins/internal_plugins/releases/register.py) for an example.
+- [Read from options](../the-rules-api/options-and-subsystems.mdx). Also see [here](https://github.com/pantsbuild/pants/blob/main/pants-plugins/internal_plugins/releases/register.py) for an example.
 - [Read values from the target](../the-rules-api/rules-and-the-target-api.mdx) using the Target API.
 - [Run a `Process`](../the-rules-api/processes.mdx), such as `git`. Also see [Installing tools](../the-rules-api/installing-tools.mdx).

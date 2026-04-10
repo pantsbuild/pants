@@ -65,6 +65,7 @@ pub use scope::{GoalInfo, Scope};
 use serde::Deserialize;
 use std::any::Any;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt;
 use std::fmt::Debug;
 use std::fs;
 use std::hash::Hash;
@@ -128,6 +129,77 @@ pub enum Val {
     Dict(HashMap<String, Val>),
 }
 
+struct ValConversionError<'a> {
+    expected_type: &'static str,
+    given_val: &'a Val,
+}
+
+impl fmt::Display for ValConversionError<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Expected value of type {} but given value `{:?}`",
+            self.expected_type, self.given_val,
+        )
+    }
+}
+
+trait FromVal: Parseable {
+    fn from_val(val: &Val) -> Result<Self, ValConversionError<'_>>;
+}
+
+impl FromVal for String {
+    fn from_val(val: &Val) -> Result<String, ValConversionError<'_>> {
+        if let Val::String(string) = val {
+            Ok(string.to_owned())
+        } else {
+            Err(ValConversionError {
+                expected_type: "string",
+                given_val: val,
+            })
+        }
+    }
+}
+
+impl FromVal for bool {
+    fn from_val(val: &Val) -> Result<bool, ValConversionError<'_>> {
+        if let Val::Bool(boolean) = val {
+            Ok(*boolean)
+        } else {
+            Err(ValConversionError {
+                expected_type: "bool",
+                given_val: val,
+            })
+        }
+    }
+}
+
+impl FromVal for i64 {
+    fn from_val(val: &Val) -> Result<i64, ValConversionError<'_>> {
+        if let Val::Int(integer) = val {
+            Ok(*integer)
+        } else {
+            Err(ValConversionError {
+                expected_type: "integer",
+                given_val: val,
+            })
+        }
+    }
+}
+
+impl FromVal for f64 {
+    fn from_val(val: &Val) -> Result<f64, ValConversionError<'_>> {
+        if let Val::Float(float) = val {
+            Ok(*float)
+        } else {
+            Err(ValConversionError {
+                expected_type: "float",
+                given_val: val,
+            })
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ListEditAction {
     Replace,
@@ -179,42 +251,29 @@ pub trait OptionsSource: Send + Sync {
     /// Get the int option identified by `id` from this source.
     /// Errors when this source has an option value for `id` but that value is not an int.
     ///
-    /// The default implementation looks for a string value for `id` and then attempts to parse it as
-    /// an int value.
-    ///
-    fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
-        if let Some(value) = self.get_string(id)? {
-            i64::parse(&value)
-                .map(Some)
-                .map_err(|e| e.render(self.display(id)))
-        } else {
-            Ok(None)
-        }
-    }
+    fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String>;
 
     ///
     /// Get the float option identified by `id` from this source.
-    /// Errors when this source has an option value for `id` but that value is not a float or an int
-    /// that we can coerce to a float.
+    /// Errors when this source has an option value for `id` but that value is not a float.
     ///
-    /// The default implementation looks for a string value for `id` and then attempts to parse it as
-    /// a float value.
+    fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String>;
+
     ///
-    fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
-        if let Some(value) = self.get_string(id)? {
-            let parsed_as_float = f64::parse(&value)
-                .map(Some)
-                .map_err(|e| e.render(self.display(id)));
-            if parsed_as_float.is_err() {
-                // See if we can parse as an int and coerce it to a float.
-                if let Ok(i) = i64::parse(&value) {
-                    return Ok(Some(i as f64));
-                }
+    /// Get the float option identified by `id` from this source.
+    /// Errors when this source has an option value for `id` but that value is not a float or
+    /// an int that we can coerce to a float.
+    ///
+    fn get_float_loose(&self, id: &OptionId) -> Result<Option<f64>, String> {
+        let parsed_as_float = self.get_float(id);
+        if parsed_as_float.is_err() {
+            // See if we can parse as an int and coerce it to a float.
+            if let Ok(Some(i)) = self.get_int(id) {
+                return Ok(Some(i as f64));
             }
-            parsed_as_float
-        } else {
-            Ok(None)
         }
+        // If both error, return the first error, since that references "float".
+        parsed_as_float
     }
 
     ///
@@ -248,7 +307,7 @@ pub trait OptionsSource: Send + Sync {
     fn get_dict(&self, id: &OptionId) -> Result<Option<Vec<DictEdit>>, String>;
 }
 
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, Hash, PartialEq)]
 pub enum Source {
     Default,
     Config { ordinal: usize, path: String }, // TODO: Should be a PathBuf
@@ -385,7 +444,10 @@ impl OptionParser {
     ) -> Result<OptionParser, String> {
         let has_provided_configs = config_sources.is_some();
 
-        let buildroot = buildroot.unwrap_or(BuildRoot::find()?);
+        let buildroot = match buildroot {
+            Some(buildroot) => buildroot,
+            None => BuildRoot::find()?,
+        };
         let buildroot_string = buildroot.convert_to_string()?;
 
         let mut sources: BTreeMap<Source, Arc<dyn OptionsSource>> = BTreeMap::new();
@@ -394,7 +456,7 @@ impl OptionParser {
         let fromfile_expander = FromfileExpander::relative_to(buildroot.clone());
 
         let mut seed_values =
-            HashMap::from_iter(env.env.iter().map(|(k, v)| (format!("env.{k}"), v.clone())));
+            BTreeMap::from_iter(env.env.iter().map(|(k, v)| (format!("env.{k}"), v.clone())));
 
         // We bootstrap options in several steps.
 
@@ -469,7 +531,7 @@ impl OptionParser {
         let subdir = |subdir_name: &str, default: &str| -> Result<String, String> {
             Ok(parser
                 .parse_string(
-                    &OptionId::new(Scope::Global, ["pants", subdir_name].iter(), None)?,
+                    &OptionId::new(Scope::Global, ["pants", subdir_name], None)?,
                     &path_join(&buildroot_string, default),
                 )?
                 .value
@@ -693,7 +755,9 @@ impl OptionParser {
         id: &OptionId,
         default: Option<f64>,
     ) -> Result<OptionalOptionValue<'_, f64>, String> {
-        self.parse_scalar(id, default.as_ref(), |source, id| source.get_float(id))
+        self.parse_scalar(id, default.as_ref(), |source, id| {
+            source.get_float_loose(id)
+        })
     }
 
     pub fn parse_string_optional(

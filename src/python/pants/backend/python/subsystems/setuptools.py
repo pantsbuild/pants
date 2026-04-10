@@ -9,6 +9,8 @@ from pants.backend.python.target_types import PythonProvidesField
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.rules import collect_rules
 
+# pants: infer-dep(setuptools.lock*)
+
 
 @dataclass(frozen=True)
 class PythonDistributionFieldSet(PackageFieldSet):

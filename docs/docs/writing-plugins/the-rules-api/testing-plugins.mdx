@@ -153,12 +153,12 @@ We can write this test:
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Snapshot
 from pants.engine.internals.graph import hydrate_sources
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, Target, Sources
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, MultipleSourcesField, Target
 from pants.testutil.rule_runner import run_rule_with_mocks
 
 class MockTarget(Target):
     alias = "mock_target"
-    core_fields = (Sources,)
+    core_fields = (MultipleSourcesField,)
 
 
 def test_find_needle_in_haystack() -> None:
@@ -442,16 +442,14 @@ Given this rule signature for running the linter Bandit:
 
 ```python
 @rule
-async def bandit_lint(
-    request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
-) -> LintResults:
+async def bandit_lint(batch: BanditRequest.Batch) -> LintResult:
     ...
 ```
 
 We can write a test like this:
 
 ```python
-from pants.core.goals.lint import LintResult, LintResults
+from pants.core.goals.lint import LintResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 @pytest.fixture
@@ -459,7 +457,7 @@ def rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=[
             *bandit_rules(),
-            QueryRule(LintResults, [BanditRequest]),
+            QueryRule(LintResult, [BanditRequest.Batch]),
         ],
         target_types=[PythonSourceTarget]
     )
@@ -470,11 +468,11 @@ def test_bandit(rule_runner: RuleRunner) -> None:
     ...
 
     # Run Bandit rule.
-    bandit_request = BanditRequest(...)
-    lint_results = rule_runner.request(LintResults, [bandit_request])
+    bandit_batch = BanditRequest.Batch(...)
+    lint_result = rule_runner.request(LintResult, [bandit_batch])
 ```
 
-Note that our `@rule` takes 3 parameters, but we only explicitly included `BanditRequest` in the inputs. This is possible because the engine knows how to compute all [Subsystems](./options-and-subsystems.mdx) based on the initial input to the graph. See [Concepts](./concepts.mdx).
+Note that the lint rule now takes a `Batch` object as input. The engine knows how to compute all [Subsystems](./options-and-subsystems.mdx) based on the initial input to the graph. See [Concepts](./concepts.mdx).
 
 We are happy [to help](/community/members) figure out what rules to register, and what inputs to pass to `rule_runner.request()`. It can also help to [visualize the rule graph](./tips-and-debugging.mdx) when running your code in production. If you're missing an input that you need, the engine will error explaining that there is no way to compute your `OutputType`.
 

@@ -11,6 +11,7 @@ from pants.backend.python.target_types import (
     PexBinaryDefaults,
     PexCheckField,
     PexCompletePlatformsField,
+    PexCompressField,
     PexEmitWarningsField,
     PexEntryPointField,
     PexEnvField,
@@ -92,6 +93,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     shebang: PexShebangField
     strip_env: PexStripEnvField
     complete_platforms: PexCompletePlatformsField
+    compress: PexCompressField
     layout: PexLayoutField
     execution_mode: PexExecutionModeField
     include_requirements: PexIncludeRequirementsField
@@ -141,6 +143,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append("--sh-boot")
         if self.check.value is not None:
             args.append(f"--check={self.check.value}")
+        if self.compress.value is False:
+            args.append("--no-compress")
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
         if self.strip_env.value is False:

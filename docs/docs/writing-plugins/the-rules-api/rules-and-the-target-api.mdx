@@ -232,7 +232,7 @@ async def demo(...) -> Foo:
 If you need the transitive dependencies of a target, use `transitive_targets()`.
 
 ```python
-from pants.engine.internals graph import transitive_targets
+from pants.engine.internals.graph import transitive_targets
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 from pants.engine.rules import implicitly, rule
 
@@ -439,7 +439,7 @@ from pants.engine.rules import rule
 from pants.engine.target import SourcesField
 
 @rule
-async demo(...) -> Foo:
+async def demo(...) -> Foo:
     ...
     unstripped_sources: SourceFiles = await determine_source_files(
         SourceFilesRequest([target.get(SourcesField)])

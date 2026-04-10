@@ -21,7 +21,7 @@ pub use metrics::{Metric, ObservationMetric};
 use parking_lot::Mutex;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{VisitMap, Visitable};
-use rand::Rng;
+use rand::RngExt;
 use smallvec::SmallVec;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task_local;
@@ -771,7 +771,7 @@ impl WorkunitStore {
 }
 
 pub fn format_workunit_duration_ms(duration: Duration) -> String {
-    format!("{:.2}s", (duration.as_millis() as f64) / 1000.0)
+    format!("{:.1}s", duration.as_secs_f64())
 }
 
 ///

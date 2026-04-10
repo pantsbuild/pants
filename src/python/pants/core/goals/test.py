@@ -51,7 +51,12 @@ from pants.engine.internals.graph import find_valid_field_sets, resolve_targets
 from pants.engine.internals.session import RunId
 from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
 from pants.engine.intrinsics import merge_digests, run_interactive_process_in_environment
-from pants.engine.process import FallibleProcessResult, InteractiveProcess, ProcessResultMetadata
+from pants.engine.process import (
+    FallibleProcessResult,
+    InteractiveProcess,
+    ProcessCacheScope,
+    ProcessResultMetadata,
+)
 from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
     FieldSet,
@@ -586,6 +591,11 @@ class TestSubsystem(GoalSubsystem):
         default=False,
         help="Force the tests to run, even if they could be satisfied from cache.",
     )
+
+    @property
+    def default_process_cache_scope(self) -> ProcessCacheScope:
+        return ProcessCacheScope.PER_SESSION if self.force else ProcessCacheScope.SUCCESSFUL
+
     output = EnumOption(
         default=ShowOutput.FAILED,
         help="Show stdout/stderr for these tests.",

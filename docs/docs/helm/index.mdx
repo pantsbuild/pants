@@ -63,7 +63,7 @@ Created src/helm/example/BUILD:
   - Add helm_chart target example
 ```
 
-If your workspace contains any Helm unit tests (under a `tests` folder), Pants will also idenfity them and create `helm_unittest_tests` targets for them. Additionally, if your unit tests also have snapshots (under a `tests/__snapshot__` folder), `tailor` will identify those files as test snapshots and will create `resources` targets for them. See "Snapshot testing" below for more info.
+If your workspace contains any Helm unit tests (under a `tests` folder), Pants will also identify them and create `helm_unittest_tests` targets for them. Additionally, if your unit tests also have snapshots (under a `tests/__snapshot__` folder), `tailor` will identify those files as test snapshots and will create `resources` targets for them. See "Snapshot testing" below for more info.
 
 ## Basic operations
 
@@ -111,7 +111,6 @@ This must first be enabled by activating the Trivy backend:
 backend_packages = ["pants.backend.experimental.helm.lint.trivy"]
 ```
 
-### Package
 ### Package
 
 Packing helm charts is supported out of the box via the Pants' `package` goal. The final package will be saved as a `.tgz` file under the `dist` folder at your source root.

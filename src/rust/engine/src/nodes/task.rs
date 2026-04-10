@@ -80,7 +80,7 @@ impl Task {
         let entry = edges
             .entry_for(&dependency_key)
             .or_else(|| {
-                // The Get might have involved a @union: if so, include its in_scope types in the
+                // The Call might have involved a @union: if so, include its in_scope types in the
                 // lookup.
                 let in_scope_types = call
                     .input_types
@@ -99,86 +99,24 @@ impl Task {
         select(context, call.args, call.args_arity, params, entry).await
     }
 
-    // Handles the case where a generator produces a `Get` for an unknown `@rule`.
-    async fn gen_get(
-        context: &Context,
-        mut params: Params,
-        entry: Intern<rule_graph::Entry<Rule>>,
-        get: externs::Get,
-    ) -> NodeResult<Value> {
-        let dependency_key =
-            DependencyKey::new(get.output).provided_params(get.inputs.iter().map(|t| *t.type_id()));
-        params.extend(get.inputs.iter().cloned());
-
-        let edges = context
-            .core
-            .rule_graph
-            .edges_for_inner(&entry)
-            .ok_or_else(|| throw(format!("No edges for task {entry:?} exist!")))?;
-
-        // Find the entry for the Get.
-        let entry = edges
-            .entry_for(&dependency_key)
-            .or_else(|| {
-                // The Get might have involved a @union: if so, include its in_scope types in the
-                // lookup.
-                let in_scope_types = get
-                    .input_types
-                    .iter()
-                    .find_map(|t| t.union_in_scope_types())?;
-                edges.entry_for(
-                    &DependencyKey::new(get.output)
-                        .provided_params(get.inputs.iter().map(|k| *k.type_id()))
-                        .in_scope_params(in_scope_types),
-                )
-            })
-            .ok_or_else(|| {
-                if get.input_types.iter().any(|t| t.is_union()) {
-                    throw(format!(
-            "Invalid Get. Because an input type for `{get}` was annotated with `@union`, \
-             the value for that type should be a member of that union. Did you \
-             intend to register a `UnionRule`? If not, you may be using the incorrect \
-             explicitly declared type.",
-          ))
-                } else {
-                    // NB: The Python constructor for `Get()` will have already errored if
-                    // `type(input) != input_type`.
-                    throw(format!(
-                        "{get} was not detected in your @rule body at rule compile time. \
-             Was the `Get` constructor called in a non async-function, or \
-             was it inside an async function defined after the @rule? \
-             Make sure the `Get` is defined before or inside the @rule body.",
-                    ))
-                }
-            })?;
-        select(context.clone(), None, 0, params, entry).await
-    }
-
-    // Handles the case where a generator produces either a `Get` or a generator.
-    fn gen_get_or_generator(
+    // Handles the case where a generator produces a generator.
+    fn gen_generator(
         context: &Context,
         params: Params,
         entry: Intern<rule_graph::Entry<Rule>>,
-        gog: externs::GetOrGenerator,
+        generator: Value,
     ) -> BoxFuture<'_, NodeResult<Value>> {
         async move {
-            match gog {
-                externs::GetOrGenerator::Get(get) => {
-                    Self::gen_get(context, params, entry, get).await
-                }
-                externs::GetOrGenerator::Generator(generator) => {
-                    // TODO: The generator may run concurrently with any other generators requested in an
-                    // `All`/`concurrently` (due to `future::try_join_all`), and so it needs its own workunit.
-                    // Should look into removing this constraint: possibly by running all generators from an
-                    // `All` on a tokio `LocalSet`.
-                    in_workunit!("generator", Level::Trace, |workunit| async move {
-                        let (value, _type_id) =
-                            Self::generate(context, workunit, params, entry, generator).await?;
-                        Ok(value)
-                    })
-                    .await
-                }
-            }
+            // TODO: The generator may run concurrently with any other generators requested in an
+            // `All`/`concurrently` (due to `future::try_join_all`), and so it needs its own workunit.
+            // Should look into removing this constraint: possibly by running all generators from an
+            // `All` on a tokio `LocalSet`.
+            in_workunit!("generator", Level::Trace, |workunit| async move {
+                let (value, _type_id) =
+                    Self::generate(context, workunit, params, entry, generator).await?;
+                Ok(value)
+            })
+            .await
         }
         .boxed()
     }
@@ -226,24 +164,13 @@ impl Task {
                         Err(failure) => break Err(failure),
                     }
                 }
-                GeneratorResponse::Get(get) => {
+                GeneratorResponse::All(generators) => {
                     let _blocking_token = workunit.blocking();
-                    let result = Self::gen_get(context, params.clone(), entry, get).await;
-                    match result {
-                        Ok(value) => {
-                            input = GeneratorInput::Arg(value);
-                        }
-                        Err(throw @ Failure::Throw { .. }) => {
-                            input = GeneratorInput::Err(PyErr::from(throw));
-                        }
-                        Err(failure) => break Err(failure),
-                    }
-                }
-                GeneratorResponse::All(gogs) => {
-                    let _blocking_token = workunit.blocking();
-                    let get_futures = gogs
+                    let get_futures = generators
                         .into_iter()
-                        .map(|gog| Self::gen_get_or_generator(context, params.clone(), entry, gog))
+                        .map(|generator| {
+                            Self::gen_generator(context, params.clone(), entry, generator)
+                        })
                         .collect::<Vec<_>>();
                     match future::try_join_all(get_futures).await {
                         Ok(values) => {

@@ -401,6 +401,40 @@ def test_non_hermetic_venv_scripts(rule_runner: PythonRuleRunner) -> None:
     assert bob_sys_path_entry in non_hermetic_results.sys_path
 
 
+def test_no_compress_arg(rule_runner: PythonRuleRunner) -> None:
+    def get_size(address, output_name):
+        tgt = rule_runner.get_target(address)
+        field_set = PexBinaryFieldSet.create(tgt)
+        result = rule_runner.request(BuiltPackage, [field_set])
+        rule_runner.write_digest(result.digest)
+        return os.path.join(rule_runner.build_root, output_name)
+
+    rule_runner.write_files(
+        {
+            "src/py/project/BUILD": dedent(
+                """\
+                python_requirement(name="cowsay", requirements=["cowsay==6.1"])
+                pex_binary(
+                    name="compress",
+                    dependencies=[":cowsay"],
+                )
+                pex_binary(
+                    name="no-compress",
+                    dependencies=[":cowsay"],
+                    compress=False,
+                )
+                """
+            ),
+        }
+    )
+
+    assert get_size(
+        Address("src/py/project", target_name="compress"), "src.py.project/compress.pex"
+    ) < get_size(
+        Address("src/py/project", target_name="no-compress"), "src.py.project/no-compress.pex"
+    )
+
+
 def test_sh_boot_plumb(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {

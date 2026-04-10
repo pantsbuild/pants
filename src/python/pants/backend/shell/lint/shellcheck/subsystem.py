@@ -20,10 +20,10 @@ class Shellcheck(TemplatedExternalTool):
 
     default_version = "v0.10.0"
     default_known_versions = [
-        "v0.10.0|macos_arm64 |bbd2f14826328eee7679da7221f2bc3afb011f6a928b848c80c321f6046ddf81|7205756",
-        "v0.10.0|macos_x86_64|ef27684f23279d112d8ad84e0823642e43f838993bbb8c0963db9b58a90464c2|4371632",
         "v0.10.0|linux_arm64 |324a7e89de8fa2aed0d0c28f3dab59cf84c6d74264022c00c22af665ed1a09bb|4291764",
         "v0.10.0|linux_x86_64|6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87|2404716",
+        "v0.10.0|macos_arm64 |bbd2f14826328eee7679da7221f2bc3afb011f6a928b848c80c321f6046ddf81|7205756",
+        "v0.10.0|macos_x86_64|ef27684f23279d112d8ad84e0823642e43f838993bbb8c0963db9b58a90464c2|4371632",
     ]
 
     default_url_template = (

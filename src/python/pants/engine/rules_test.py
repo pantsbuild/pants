@@ -74,14 +74,7 @@ def fmt_rule(
     params_str = (
         f"{optional_line_sep}{params}{optional_line_sep}" if len(type_hints) > 1 else params
     )
-    gets_str = ""
-    if gets:
-        get_members = f",{line_sep}".join(
-            f"Get({product_subject_pair[0]}, [{product_subject_pair[1]}])"
-            for product_subject_pair in gets
-        )
-        gets_str = f", gets=[{optional_line_sep}{get_members}{optional_line_sep}]"
-    return f"@rule({fmt_rust_function(rule)}({params_str}) -> {product}{gets_str})"
+    return f"@rule({fmt_rust_function(rule)}({params_str}) -> {product})"
 
 
 @dataclass(frozen=True)

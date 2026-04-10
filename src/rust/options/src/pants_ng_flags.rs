@@ -3,8 +3,8 @@
 
 use crate::fromfile::FromfileExpander;
 use crate::id::NameTransform;
-use crate::parse::{ParseError, Parseable};
-use crate::{DictEdit, ListEdit, OptionsSource};
+use crate::parse::ParseError;
+use crate::{DictEdit, FromVal, ListEdit, OptionsSource};
 use crate::{OptionId, Scope};
 use std::any::Any;
 use std::collections::HashMap;
@@ -36,19 +36,31 @@ impl PantsNgFlagsReader {
             .and_then(|hm| hm.get(&id.name_underscored()))
     }
 
+    fn get_scalar<T: FromVal>(&self, id: &OptionId) -> Result<Option<T>, String> {
+        if let Some(vals) = self.get_vals(id) {
+            // We take the last item, so that the rightmost flag wins.
+            if let Some(opt_val) = vals.last() {
+                return self
+                    .fromfile_expander
+                    .expand::<T>(opt_val.clone().ok_or_else(|| {
+                        format!("Expected list option {} to have a value.", self.display(id))
+                    })?)
+                    .map_err(|e| e.render(id.name_underscored()));
+            }
+        }
+        Ok(None)
+    }
+
     fn to_bool(&self, val: &Option<String>) -> Result<Option<bool>, ParseError> {
         // An arg can represent a bool either by having an explicit value parseable as a bool,
         // or by having no value (in which case it represents true).
         match val {
-            Some(value) => match self.fromfile_expander.expand(value.to_string())? {
-                Some(s) => bool::parse(&s).map(Some),
-                _ => Ok(None),
-            },
+            Some(value) => self.fromfile_expander.expand::<bool>(value.to_string()),
             None => Ok(Some(true)),
         }
     }
 
-    fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
+    fn get_list<T: FromVal>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let mut edits = vec![];
         if let Some(vals) = self.get_vals(id) {
             for opt_val in vals {
@@ -93,18 +105,7 @@ impl OptionsSource for PantsNgFlagsReader {
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
-        if let Some(vals) = self.get_vals(id) {
-            // We take the last item, so that the rightmost flag wins.
-            if let Some(opt_val) = vals.last() {
-                return self
-                    .fromfile_expander
-                    .expand(opt_val.clone().ok_or_else(|| {
-                        format!("Expected list option {} to have a value.", self.display(id))
-                    })?)
-                    .map_err(|e| e.render(id.name_underscored()));
-            }
-        }
-        Ok(None)
+        self.get_scalar::<String>(id)
     }
 
     fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
@@ -117,6 +118,14 @@ impl OptionsSource for PantsNgFlagsReader {
             }
         };
         Ok(None)
+    }
+
+    fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
+        self.get_scalar::<i64>(id)
+    }
+
+    fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
+        self.get_scalar::<f64>(id)
     }
 
     fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {

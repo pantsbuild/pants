@@ -101,7 +101,7 @@ async def test_shell_command(
     for _ in range(test_subsystem.attempts_default):
         result = await run_prepared_adhoc_process(
             **implicitly({shell_process: AdhocProcessRequest})
-        )  # noqa: PNT30: retry loop
+        )
         results.append(result)
         if result.process_result.exit_code == 0:
             break

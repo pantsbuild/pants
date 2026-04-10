@@ -42,9 +42,19 @@ class LockfileGenerator(enum.Enum):
     POETRY = "poetry"
 
 
+@enum.unique
+class PexBuilder(enum.Enum):
+    pex = "pex"
+    uv = "uv"
+
+
 RESOLVE_OPTION_KEY__DEFAULT = "__default__"
 
 _T = TypeVar("_T")
+
+
+DEFAULT_TEST_FILE_GLOBS = ("test_*.py", "*_test.py", "tests.py")
+DEFAULT_TESTUTIL_FILE_GLOBS = ("conftest.py", "test_*.pyi", "*_test.pyi", "tests.pyi")
 
 
 class PythonSetup(Subsystem):
@@ -62,6 +72,7 @@ class PythonSetup(Subsystem):
         "3.11",
         "3.12",
         "3.13",
+        "3.14",
     ]
 
     _interpreter_constraints = StrListOption(
@@ -307,6 +318,23 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    pex_builder = EnumOption(
+        default=PexBuilder.pex,
+        help=softwrap(
+            """
+            Which tool to use for installing dependencies when building PEX files.
+
+            - `pex` (default): Use pip via PEX.
+            - `uv` (experimental): Pre-install dependencies into a uv venv, then pass it
+              to PEX via `--venv-repository`. When a PEX-native lockfile is available,
+              uv installs the exact pinned versions with `--no-deps`.
+
+            Only applies to non-internal, non-cross-platform PEX builds. Other builds
+            silently fall back to pip.
+            """
+        ),
+        advanced=True,
+    )
     _resolves_to_interpreter_constraints = DictOption[list[str]](
         help=softwrap(
             """
@@ -520,6 +548,28 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
 
+    _resolves_to_uploaded_prior_to = DictOption[str](
+        help=softwrap(
+            f"""
+            Filter packages by upload time when generating lockfiles, only considering
+            packages that were uploaded before the specified datetime. This is useful for
+            creating reproducible lockfiles that reflect the state of a package index at a
+            specific point in time.  Only applies to packages from remote indexes,
+            not local files or VCS requirements.
+
+            For example:
+            `{{'python-default': '2025-03-16T00:00:00Z'}}`.
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+
+            See https://pip.pypa.io/en/stable/user_guide/#filtering-by-upload-time for more
+            information and valid formats.
+            """
+        ),
+        advanced=True,
+    )
+
     invalid_lockfile_behavior = EnumOption(
         default=InvalidLockfileBehavior.error,
         help=softwrap(
@@ -719,6 +769,59 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    tailor_test_file_globs = StrListOption(
+        default=list(DEFAULT_TEST_FILE_GLOBS),
+        help=softwrap(
+            """
+        Globs to match your test files. Used to decide which files should tailor
+        python_tests() vs python_sources() targets.
+
+        NB: This doesn't change the default set of files that a target owns, just the files
+          that trigger tailoring of a target. If you need those to match (and you almost always do)
+          then you should also create custom target type macros whose globs match these, and list
+          them as substitutes for python_tests() and python_sources() in `[tailor].alias_mapping`.
+          (see {doc_url("docs/writing-plugins/macros")} and
+          {doc_url("reference/goals/tailor#alias_mapping")}).
+
+        For example, you can set `[python].tailor_test_file_globs` to `["*_mytests.py"]`, and then
+        create `my_pants_macros.py` with:
+
+        ```
+        def my_python_tests(**kwargs):
+            if "sources" not in kwargs:
+                kwargs["sources"] = ["*_mytests.py"]
+            python_tests(**kwargs)
+
+
+        def my_python_sources(**kwargs):
+            if "sources" not in kwargs:
+                kwargs["sources"] = ["*.py", "!*_mytests.py"]
+            python_sources(**kwargs)
+        ```
+
+        And set the following in `pants.toml`:
+
+        [global]
+        build_file_prelude_globs = ["my_pants_macros.py"]
+
+        [tailor]
+        alias_mapping = { python_sources = "my_python_sources", python_tests = "my_python_tests" }
+        """
+        ),
+        metavar="glob",
+    )
+    tailor_testutils_file_globs = StrListOption(
+        default=list(DEFAULT_TESTUTIL_FILE_GLOBS),
+        help=softwrap(
+            """
+        Globs to match your testutil files. Used to decide which files should tailor
+        python_test_utils() vs python_sources() targets.
+
+        See tailor_test_file_globs above for caveats and usage.
+        """
+        ),
+        metavar="glob",
+    )
     macos_big_sur_compatibility = BoolOption(
         default=False,
         help=softwrap(
@@ -874,6 +977,13 @@ class PythonSetup(Subsystem):
         return self._resolves_to_option_helper(
             self._resolves_to_complete_platforms,
             "resolves_to_complete_platforms",
+        )
+
+    @memoized_method
+    def resolves_to_uploaded_prior_to(self) -> dict[str, str]:
+        return self._resolves_to_option_helper(
+            self._resolves_to_uploaded_prior_to,
+            "resolves_to_uploaded_prior_to",
         )
 
     @property

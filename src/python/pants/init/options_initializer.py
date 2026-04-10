@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
-import importlib
+import importlib.util
 import logging
 import sys
 from collections.abc import Iterator

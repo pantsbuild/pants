@@ -19,7 +19,7 @@ use protos::pb::google::longrunning::{
     CancelOperationRequest, Operation, operations_client::OperationsClient,
 };
 use protos::pb::google::rpc::{PreconditionFailure, Status as StatusProto};
-use rand::Rng;
+use rand::RngExt;
 use remexec::{
     Action, Command, ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, ServerCapabilities,
     WaitExecutionRequest, capabilities_client::CapabilitiesClient,

@@ -10,6 +10,8 @@ from pants.engine.rules import collect_rules
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 
+# pants: infer-dep(add_trailing_comma.lock*)
+
 
 class AddTrailingComma(PythonToolBase):
     options_scope = "add-trailing-comma"

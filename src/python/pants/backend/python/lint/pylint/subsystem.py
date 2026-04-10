@@ -36,6 +36,8 @@ from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(pylint.lock*)
+
 
 @dataclass(frozen=True)
 class PylintFieldSet(FieldSet):
@@ -61,7 +63,10 @@ class Pylint(PythonToolBase):
     help_short = "The Pylint linter for Python code (https://www.pylint.org/)."
 
     default_main = ConsoleScript("pylint")
-    default_requirements = ["pylint>=2.13.0,<3"]
+    default_requirements = ["pylint>=4.0.0,<5"]
+
+    register_interpreter_constraints = True
+    default_interpreter_constraints = ["CPython>=3.10,<3.15"]
 
     default_lockfile_resource = ("pants.backend.python.lint.pylint", "pylint.lock")
 

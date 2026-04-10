@@ -37,9 +37,11 @@ If your system Python is not the version Pants expects (currently Python 3.11), 
 - [Fedora](https://packages.fedoraproject.org/pkgs/python3.11/python3.11/)
 - [ASDF](https://github.com/asdf-community/asdf-python)
 - [PyEnv](https://github.com/pyenv/pyenv)
-  Providers that sometimes cause issues include:
+
+Providers that sometimes cause issues include:
 - Ubuntu Deadsnakes
-  You also need to have the protobuf compiler and LLVM clang installed. On Debian derivatives, these can be installed using `apt install clang protobuf-compiler`.
+
+You also need to have the protobuf compiler and LLVM clang installed. On Debian derivatives, these can be installed using `apt install clang protobuf-compiler`.
 
 Then, run `pants` to set up the Python virtual environment and compile the engine.
 
@@ -156,6 +158,6 @@ More on getting started can be found [here](https://code.visualstudio.com/docs/d
 1. After forking and cloning `pantsbuild/pants`, start VS Code and run the `Dev Containers: Open Folder in Container...` command from the *Command Palette...* (`F1`) and select the Pants project folder.
 2. The VS Code window (instance) will reload and start building the dev container. A progress notification provides status updates.
 3. After the build completes, VS Code will automatically connect to the container. You can now work with the repository source code in this independent environment.
-4. Pants sets up its development virtualenv at `~/.cache/pants/pants_dev_deps/<venv_fingerprint>.venv/`. Point VS Code to the `bin/python` file in this folder by running the `Python: Select Interpreter` command from the *Command Palette...* (`F1`), and then `Enter interpreter path...`. You may need to restart your *terminal*. See [Configure your IDE (optional)](https://www.pantsbuild.org/docs/contributor-setup#configure-your-ide-optional).
+4. Pants sets up its development virtualenv at `~/.cache/pants/pants_dev_deps/<venv_fingerprint>.venv/`. Point VS Code to the `bin/python` file in this folder by running the `Python: Select Interpreter` command from the *Command Palette...* (`F1`), and then `Enter interpreter path...`. You may need to restart your *terminal*. See [Configure your IDE (optional)](#configure-your-ide-optional).
 
 More on starting a dev container can be found [here](https://code.visualstudio.com/docs/devcontainers/containers#_picking-your-quick-start).

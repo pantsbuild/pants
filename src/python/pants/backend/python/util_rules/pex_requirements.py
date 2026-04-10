@@ -8,6 +8,7 @@ import json
 import logging
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from enum import StrEnum, auto
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
@@ -48,6 +49,13 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+class LockfileFormat(StrEnum):
+    Pex = auto()
+    # The very old, deprecated constraints-based "lockfile" that should
+    # be removed entirely.
+    ConstraintsDeprecated = auto()
 
 
 @dataclass(frozen=True)
@@ -101,10 +109,10 @@ class LoadedLockfile:
     # An estimate of the number of requirements in this lockfile, to be used as a heuristic for
     # available parallelism.
     requirement_estimate: int
-    # True if the loaded lockfile is in PEX's native format.
-    is_pex_native: bool
-    # If !is_pex_native, the lockfile parsed as constraints strings, for use when the lockfile
-    # needs to be subsetted (see #15031, ##12222).
+    # The format of the loaded lockfile.
+    lockfile_format: LockfileFormat
+    # If lockfile_format is ConstraintsDeprecated, the lockfile parsed as constraints strings,
+    # for use when the lockfile needs to be subsetted (see #15031, ##12222).
     as_constraints_strings: FrozenOrderedSet[str] | None
     # The original file or file content (which may not have identical content to the output
     # `lockfile_digest`).
@@ -225,37 +233,42 @@ async def load_lockfile(
 
     lockfile_contents = await get_digest_contents(lockfile_digest)
     lock_bytes = lockfile_contents[0].content
-    is_pex_native = is_probably_pex_json_lockfile(lock_bytes)
+    lockfile_format = (
+        LockfileFormat.Pex
+        if is_probably_pex_json_lockfile(lock_bytes)
+        else LockfileFormat.ConstraintsDeprecated
+    )
     constraints_strings = None
 
     metadata_url = PythonLockfileMetadata.metadata_location_for_lockfile(lockfile.url)
     metadata = None
-    try:
-        metadata_digest = await read_file_or_resource(
-            metadata_url,
-            description_of_origin="We squelch errors, so this is never seen by users",
-        )
-        digest_contents = await get_digest_contents(metadata_digest)
-        metadata_bytes = digest_contents[0].content
-        json_dict = json.loads(metadata_bytes)
-        metadata = PythonLockfileMetadata.from_json_dict(
-            json_dict,
-            lockfile_description=f"the lockfile for `{lockfile.resolve_name}`",
-            error_suffix=softwrap(
-                f"""
-                To resolve this error, you will need to regenerate the lockfile by running
-                `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}.
-                """
-            ),
-        )
-        requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
-    except (IntrinsicError, FileNotFoundError):
-        # No metadata file or resource found, so fall through to finding a metadata
-        # header block prepended to the lockfile itself.
-        pass
+    if python_setup.invalid_lockfile_behavior != InvalidLockfileBehavior.ignore:
+        try:
+            metadata_digest = await read_file_or_resource(
+                metadata_url,
+                description_of_origin="We squelch errors, so this is never seen by users",
+            )
+            digest_contents = await get_digest_contents(metadata_digest)
+            metadata_bytes = digest_contents[0].content
+            json_dict = json.loads(metadata_bytes)
+            metadata = PythonLockfileMetadata.from_json_dict(
+                json_dict,
+                lockfile_description=f"the lockfile for `{lockfile.resolve_name}`",
+                error_suffix=softwrap(
+                    f"""
+                    To resolve this error, you will need to regenerate the lockfile by running
+                    `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}.
+                    """
+                ),
+            )
+            requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
+        except (IntrinsicError, FileNotFoundError):
+            # No metadata file or resource found, so fall through to finding a metadata
+            # header block prepended to the lockfile itself.
+            pass
 
     if not metadata:
-        if is_pex_native:
+        if lockfile_format == LockfileFormat.Pex:
             header_delimiter = "//"
             stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
             lockfile_digest = await create_digest(
@@ -285,7 +298,7 @@ async def load_lockfile(
         lockfile_path,
         metadata,
         requirement_estimate,
-        is_pex_native,
+        lockfile_format,
         constraints_strings,
         original_lockfile=lockfile,
     )
@@ -382,6 +395,7 @@ class ResolvePexConfig:
     path_mappings: tuple[str, ...]
     lock_style: str
     complete_platforms: tuple[str, ...]
+    uploaded_prior_to: str | None
 
     def pex_args(self) -> Iterator[str]:
         """Arguments for Pex for indexes/--find-links, manylinux, and path mappings.
@@ -432,6 +446,9 @@ class ResolvePexConfig:
         yield from (f"--exclude={exclude}" for exclude in self.excludes)
         yield from (f"--source={source}" for source in self.sources)
 
+        if self.uploaded_prior_to:
+            yield f"--uploaded-prior-to={self.uploaded_prior_to}"
+
 
 @dataclass(frozen=True)
 class ResolvePexConfigRequest(EngineAwareParameter):
@@ -469,6 +486,7 @@ async def determine_resolve_pex_config(
             path_mappings=python_repos.path_mappings,
             lock_style="universal",  # Default to universal when no resolve name
             complete_platforms=(),  # No complete platforms by default
+            uploaded_prior_to=None,
         )
 
     no_binary = python_setup.resolves_to_no_binary().get(request.resolve_name) or []
@@ -480,6 +498,7 @@ async def determine_resolve_pex_config(
     complete_platforms = tuple(
         python_setup.resolves_to_complete_platforms().get(request.resolve_name) or []
     )
+    uploaded_prior_to = python_setup.resolves_to_uploaded_prior_to().get(request.resolve_name)
 
     constraints_file: ResolvePexConstraintsFile | None = None
     _constraints_file_path = python_setup.resolves_to_constraints_file().get(request.resolve_name)
@@ -533,6 +552,7 @@ async def determine_resolve_pex_config(
         path_mappings=python_repos.path_mappings,
         lock_style=lock_style,
         complete_platforms=complete_platforms,
+        uploaded_prior_to=uploaded_prior_to,
     )
 
 
@@ -567,6 +587,7 @@ def validate_metadata(
         sources=resolve_config.sources,
         lock_style=resolve_config.lock_style,
         complete_platforms=resolve_config.complete_platforms,
+        uploaded_prior_to=resolve_config.uploaded_prior_to,
     )
     if validation:
         return
@@ -630,6 +651,13 @@ def _common_failure_reasons(
             """
             - The `manylinux` argument has changed from when the lockfile was generated.
             (manylinux is set via the option `[python].resolver_manylinux`)
+            """
+        )
+    if InvalidPythonLockfileReason.UPLOADED_PRIOR_TO_MISMATCH in failure_reasons:
+        yield softwrap(
+            """
+            - The `uploaded_prior_to` argument has changed from when the lockfile was generated.
+            (uploaded_prior_to is set via the option `[python].resolves_to_uploaded_prior_to`)
             """
         )
 

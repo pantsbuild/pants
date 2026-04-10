@@ -253,10 +253,10 @@ def test_get_git_version() -> None:
     result: GitTagVersion = run_rule_with_mocks(
         get_git_repo_version,
         rule_args=[BuildRoot, ""],
-        mock_calls=[
+        mock_calls={
             "pants.core.util_rules.system_binaries.find_binary": mock_binary_paths,
             "pants.engine.process.execute_process_or_raise": mock_process_git_describe,
-        ],
+        },
     )
     assert result == GitTagVersion("10.6.1")
 ```

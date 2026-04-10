@@ -29,6 +29,8 @@ from pants.option.option_types import DictOption
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize, softwrap
 
+# pants: infer-dep(k8s_parser.lock*)
+
 logger = logging.getLogger(__name__)
 
 _HELM_K8S_PARSER_SOURCE = "k8s_parser_main.py"

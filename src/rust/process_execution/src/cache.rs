@@ -271,6 +271,7 @@ impl CommandRunner {
                 path: String::new(),
                 tree_digest: Some((&result.output_directory.as_digest()).into()),
                 is_topologically_sorted: false,
+                ..Default::default()
             }],
             stdout_digest: Some((&stdout_digest).into()),
             stderr_digest: Some((&stderr_digest).into()),

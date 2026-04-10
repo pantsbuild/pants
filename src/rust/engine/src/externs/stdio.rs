@@ -49,6 +49,10 @@ impl PyStdioRead {
     fn seekable(&self) -> bool {
         false
     }
+
+    fn flush(&self) {}
+
+    fn close(&self) {}
 }
 
 /// A Python file-like that proxies to the `stdio` module, which implements thread-local output.
@@ -91,4 +95,6 @@ impl PyStdioWrite {
     fn flush(&self) {
         // All of our destinations are line-buffered.
     }
+
+    fn close(&self) {}
 }

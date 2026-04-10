@@ -7,9 +7,7 @@ publish = false
 
 [dependencies]
 clap = { workspace = true, features = ["string"] }
-dirs-next = { workspace = true }
 env_logger = { workspace = true }
-errno = { workspace = true }
 fuser = { workspace = true }
 futures = { workspace = true }
 grpc_util = { path = "../../grpc_util" }
@@ -23,7 +21,6 @@ task_executor = { path = "../../task_executor" }
 time = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
 tokio-stream = { workspace = true, features = ["signal"] }
-workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]
 bytes = { workspace = true }

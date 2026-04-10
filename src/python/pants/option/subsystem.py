@@ -224,7 +224,6 @@ class Subsystem(metaclass=_SubsystemMeta):
                     # in a map passed to **implicitly(), and our call to this rule uses a
                     # positional arg and an empty **implicitly(), so input_types are empty here.
                     input_types=tuple(),
-                    is_effect=False,
                 ),
             ),
             masked_types=(),
@@ -261,7 +260,6 @@ class Subsystem(metaclass=_SubsystemMeta):
                     # in a map passed to **implicitly(), and our call to this rule uses a
                     # positional arg and an empty **implicitly(), so input_types are empty here.
                     input_types=tuple(),
-                    is_effect=False,
                 ),
             ),
             masked_types=(),

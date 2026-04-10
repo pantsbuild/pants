@@ -65,6 +65,7 @@ from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
 from pants.engine.internals import options_parsing
 from pants.engine.internals.parametrize import Parametrize
 from pants.goal import anonymous_telemetry, stats_aggregator
+from pants.ng import register as register_ng
 from pants.source import source_root
 from pants.vcs import git
 from pants.version import PANTS_SEMVER
@@ -92,6 +93,8 @@ def rules():
         *run.rules(),
         *tailor.rules(),
         *test.rules(),
+        # Pants NG rules
+        *register_ng.rules(),
         # util_rules
         *adhoc_binaries.rules(),
         *anonymous_telemetry.rules(),

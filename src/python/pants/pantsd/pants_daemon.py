@@ -20,7 +20,7 @@ from pants.engine.internals.native_engine import PyExecutor, PyNailgunServer
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import initialize_stdio, pants_log_path
 from pants.init.util import init_workdir
-from pants.option.bootstrap_options import LocalStoreOptions
+from pants.option.bootstrap_options import BootstrapOptions, LocalStoreOptions
 from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
@@ -246,5 +246,9 @@ def launch_new_pantsd_instance():
     options_bootstrapper = OptionsBootstrapper.create(
         args=sys.argv, env=os.environ, allow_pantsrc=True
     )
+
+    bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+    BootstrapOptions.maybe_enable_stack_trampoline(bootstrap_options)
+
     daemon = PantsDaemon.create(options_bootstrapper)
     daemon.run_sync()

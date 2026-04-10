@@ -538,7 +538,7 @@ async def _nodejs_search_paths(
         expanded.append(nvm_path)
     for s in paths:
         if s == "<PATH>":
-            expanded.extend(await environment_path_variable(**implicitly()))  # noqa: PNT30: Linear search
+            expanded.extend(await environment_path_variable(**implicitly()))
         elif s in special_strings:
             expanded.extend(special_strings[s])
         elif s == "<NVM>" or s == "<NVM_LOCAL>":

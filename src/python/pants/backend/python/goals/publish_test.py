@@ -11,13 +11,15 @@ import pytest
 from pants.backend.python.goals.publish import (
     PublishPythonPackageFieldSet,
     PublishPythonPackageRequest,
+    PythonDistCheckSkipRequest,
     rules,
 )
 from pants.backend.python.macros.python_artifact import PythonArtifact
+from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import PythonDistribution, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.core.goals.package import BuiltPackage, BuiltPackageArtifact
-from pants.core.goals.publish import PublishPackages, PublishProcesses
+from pants.core.goals.publish import CheckSkipResult, PublishPackages, PublishProcesses
 from pants.core.util_rules.config_files import rules as config_files_rules
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST
@@ -37,6 +39,7 @@ def rule_runner() -> PythonRuleRunner:
             *pex_from_targets.rules(),
             *rules(),
             QueryRule(PublishProcesses, [PublishPythonPackageRequest]),
+            QueryRule(CheckSkipResult, [PythonDistCheckSkipRequest]),
         ],
         target_types=[PythonSourcesGeneratorTarget, PythonDistribution],
         objects={"python_artifact": PythonArtifact},
@@ -58,7 +61,7 @@ def set_options(rule_runner: PythonRuleRunner, options: list | None = None) -> P
 
 
 @pytest.fixture
-def packages():
+def packages() -> tuple[BuiltPackage, ...]:
     return (
         BuiltPackage(
             EMPTY_DIGEST,
@@ -93,7 +96,9 @@ def project_files(
     }
 
 
-def request_publish_processes(rule_runner: PythonRuleRunner, packages) -> PublishProcesses:
+def request_publish_processes(
+    rule_runner: PythonRuleRunner, packages: tuple[BuiltPackage, ...]
+) -> PublishProcesses:
     tgt = rule_runner.get_target(Address("src", target_name="dist"))
     fs = PublishPythonPackageFieldSet.create(tgt)
     return rule_runner.request(PublishProcesses, [fs._request(packages)])
@@ -115,7 +120,7 @@ def assert_package(
         assert package.process is None
 
 
-def test_twine_upload(rule_runner, packages) -> None:
+def test_twine_upload(rule_runner: PythonRuleRunner, packages: tuple[BuiltPackage, ...]) -> None:
     rule_runner.write_files(project_files(skip_twine=False))
     result = request_publish_processes(rule_runner, packages)
 
@@ -167,25 +172,29 @@ def test_twine_upload(rule_runner, packages) -> None:
     )
 
 
-def test_skip_twine(rule_runner, packages) -> None:
-    rule_runner.write_files(project_files(skip_twine=True))
-    result = request_publish_processes(rule_runner, packages)
-
-    assert len(result) == 1
-    assert_package(
-        result[0],
-        expect_names=(
-            "my-package-0.1.0.tar.gz",
-            "my_package-0.1.0-py3-none-any.whl",
-        ),
-        expect_description="(by `skip_twine` on src:dist)",
-        expect_process=None,
+@pytest.mark.parametrize("skip_twine", [True, False])
+@pytest.mark.parametrize("repositories", [[], ["@pypi", "@private"]])
+@pytest.mark.parametrize("skip_twine_config", [True, False])
+def test_check_if_skip_upload(
+    rule_runner: PythonRuleRunner,
+    skip_twine: bool,
+    repositories: list[str],
+    skip_twine_config: bool,
+) -> None:
+    expected = bool(repositories) and not (skip_twine or skip_twine_config)
+    rule_runner.set_options(["--twine-skip" if skip_twine_config else "--no-twine-skip"])
+    rule_runner.write_files(project_files(skip_twine=skip_twine, repositories=repositories))
+    tgt = rule_runner.get_target(Address("src", target_name="dist"))
+    request = PythonDistCheckSkipRequest(
+        publish_fs=PublishPythonPackageFieldSet.create(tgt),
+        package_fs=PythonDistributionFieldSet.create(tgt),
     )
-
-    # Skip twine globally from config option.
-    rule_runner.set_options(["--twine-skip"])
-    result = request_publish_processes(rule_runner, packages)
-    assert len(result) == 0
+    result = rule_runner.request(CheckSkipResult, [request])
+    if expected:
+        assert not result.skipped_packages
+    else:
+        assert len(result.skipped_packages) == 1
+        assert result.skipped_packages[0].names == ("my-package",)
 
 
 @pytest.mark.parametrize(
@@ -209,7 +218,12 @@ def test_skip_twine(rule_runner, packages) -> None:
         # ),
     ],
 )
-def test_twine_cert_arg(rule_runner, packages, options, cert_arg) -> None:
+def test_twine_cert_arg(
+    rule_runner: PythonRuleRunner,
+    packages: tuple[BuiltPackage, ...],
+    options: list[str],
+    cert_arg: str | None,
+) -> None:
     ca_cert_path = rule_runner.write_files({"conf/ca_certs.pem": ""})[0]
     rule_runner.write_files(project_files(repositories=["@private"]))
     set_options(rule_runner, [opt.format(ca_cert_path) for opt in options])

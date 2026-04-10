@@ -213,7 +213,7 @@ You might want to use git to generate the version for your images, but you
 can't directly run git commands in a BUILD file. You can use a
 `.pants.bootstrap` file as a workaround:
 
-```python title=".pants.bootstrap"
+```shell title=".pants.bootstrap"
 #!/bin/sh
 
 VERSION="${VERSION:-$(git describe --tags --dirty --match "[0-9\.]*" || echo 0.0.1)}"

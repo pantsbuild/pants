@@ -3,6 +3,7 @@
 #
 # Editing Github Actions directly will fail in CI, instead edit this file and run:
 # `pants run src/python/pants_release/generate_github_workflows.py`
+#
 
 from __future__ import annotations
 
@@ -33,12 +34,14 @@ def action(name: str) -> str:
         "download-artifact": "actions/download-artifact@v7",
         "free-disk-space": "jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be",
         "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
-        "msys2": "msys2/setup-msys2@v2",
-        "rust-cache": "Swatinem/rust-cache@v2.8.2",
+        "msys2": "msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda",
+        "rust-cache": "Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4",
         "setup-go": "actions/setup-go@v6",
         "setup-java": "actions/setup-java@v5",
         "setup-node": "actions/setup-node@v6",
-        "setup-protoc": "arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623",
+        # TODO: If arduino accept https://github.com/arduino/setup-protoc/pull/113 we
+        #  can reference the upstream SHA. Until then we use our fork.
+        "setup-protoc": "benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85",
         "setup-python": "actions/setup-python@v6",
         "slack-github-action": "slackapi/slack-github-action@v2.1.1",
         "upload-artifact": "actions/upload-artifact@v6",
@@ -84,7 +87,7 @@ CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
 # We don't specify a patch version so that we get the latest, which comes pre-installed:
 #  https://github.com/actions/setup-python#available-versions-of-python
 # NOTE: The last entry becomes the default
-_BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
+_BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
 
 PYTHON_VERSIONS_PER_PLATFORM = {
     Platform.LINUX_X86_64: _BASE_PYTHON_VERSIONS,
@@ -388,9 +391,11 @@ def install_jdk() -> Step:
 def install_go() -> list[Step]:
     def go_cfg(go_version: str) -> Step:
         return {
-            "name": "Install Go",
+            "name": f"Install Go {go_version}",
             "uses": action("setup-go"),
-            "with": {"go-version": go_version},
+            # We use this action to install Go for testing against, but our repo is not a golang
+            # repo, and has no go.mod, so module caching would fail and is therefore disabled.
+            "with": {"go-version": go_version, "cache": False},
         }
 
     return [go_cfg(go_version) for go_version in ("1.25.3", "1.24.9")]
@@ -399,7 +404,7 @@ def install_go() -> list[Step]:
 def install_python_headers_in_manylinux_container() -> Step:
     return {
         "name": "Install Python headers",
-        "run": "yum install -y python3.11-devel",
+        "run": "echo 'no-op'",
     }
 
 
@@ -1000,6 +1005,7 @@ def build_wheels_job(
                     echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
                     """
                 ),
             },

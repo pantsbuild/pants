@@ -2,20 +2,19 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::any::Any;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::env;
 use std::ffi::OsString;
 
 use super::id::{NameTransform, OptionId};
 use super::{DictEdit, OptionsSource};
-use crate::ListEdit;
 use crate::fromfile::FromfileExpander;
-use crate::parse::Parseable;
 use crate::scope::Scope;
+use crate::{FromVal, ListEdit};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Env {
-    pub(crate) env: HashMap<String, String>,
+    pub env: BTreeMap<String, String>,
 }
 
 #[derive(Debug)]
@@ -25,7 +24,7 @@ pub struct DroppedEnvVars {
 }
 
 impl Env {
-    pub fn new(env: HashMap<String, String>) -> Self {
+    pub fn new(env: BTreeMap<String, String>) -> Self {
         Self { env }
     }
 
@@ -37,7 +36,7 @@ impl Env {
     where
         I: Iterator<Item = (OsString, OsString)>,
     {
-        let mut env: HashMap<String, String> = HashMap::with_capacity(env_os.size_hint().0);
+        let mut env: BTreeMap<String, String> = BTreeMap::new();
         let mut dropped = DroppedEnvVars {
             non_utf8_keys: Vec::new(),
             keys_with_non_utf8_values: Vec::new(),
@@ -87,7 +86,19 @@ impl EnvReader {
         names
     }
 
-    fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
+    fn get_scalar<T: FromVal>(&self, id: &OptionId) -> Result<Option<T>, String> {
+        for env_var_name in &Self::env_var_names(id) {
+            if let Some(value) = self.env.env.get(env_var_name) {
+                return self
+                    .fromfile_expander
+                    .expand::<T>(value.to_owned())
+                    .map_err(|e| e.render(self.display(id)));
+            }
+        }
+        Ok(None)
+    }
+
+    fn get_list<T: FromVal>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         for env_var_name in &Self::env_var_names(id) {
             if let Some(value) = self.env.env.get(env_var_name) {
                 return self
@@ -119,25 +130,19 @@ impl OptionsSource for EnvReader {
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
-        for env_var_name in &Self::env_var_names(id) {
-            if let Some(value) = self.env.env.get(env_var_name) {
-                return self
-                    .fromfile_expander
-                    .expand(value.to_owned())
-                    .map_err(|e| e.render(self.display(id)));
-            }
-        }
-        Ok(None)
+        self.get_scalar::<String>(id)
     }
 
     fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
-        if let Some(value) = self.get_string(id)? {
-            bool::parse(&value)
-                .map(Some)
-                .map_err(|e| e.render(self.display(id)))
-        } else {
-            Ok(None)
-        }
+        self.get_scalar::<bool>(id)
+    }
+
+    fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
+        self.get_scalar::<i64>(id)
+    }
+
+    fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
+        self.get_scalar::<f64>(id)
     }
 
     fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {

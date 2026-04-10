@@ -6,7 +6,7 @@ from __future__ import annotations
 import os.path
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -17,6 +17,8 @@ from pants.engine.rules import Rule, collect_rules
 from pants.engine.target import FieldSet, Target
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
+
+# pants: infer-dep(sqlfluff.lock*)
 
 
 @dataclass(frozen=True)
@@ -30,7 +32,7 @@ class SqlfluffFieldSet(FieldSet):
         return tgt.get(SkipSqlfluffField).value
 
 
-class SqlfluffMode(str, Enum):
+class SqlfluffMode(StrEnum):
     LINT = "lint"
     FIX = "fix"
     FMT = "format"

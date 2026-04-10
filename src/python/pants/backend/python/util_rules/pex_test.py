@@ -47,6 +47,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
     Lockfile,
+    LockfileFormat,
     PexRequirements,
     Resolve,
     ResolvePexConfig,
@@ -703,7 +704,9 @@ def test_setup_pex_requirements() -> None:
             lockfile_path,
             metadata=None,
             requirement_estimate=2,
-            is_pex_native=is_pex_lock,
+            lockfile_format=LockfileFormat.Pex
+            if is_pex_lock
+            else LockfileFormat.ConstraintsDeprecated,
             as_constraints_strings=None,
             original_lockfile=lockfile_obj,
         )
@@ -737,6 +740,7 @@ def test_setup_pex_requirements() -> None:
                     sources=FrozenOrderedSet(),
                     lock_style="universal",
                     complete_platforms=(),
+                    uploaded_prior_to=None,
                 ),
                 "pants.backend.python.util_rules.pex.get_req_strings": lambda _: PexRequirementsInfo(
                     (
@@ -903,6 +907,7 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         sources=set(),
         lock_style="universal",
         complete_platforms=(),
+        uploaded_prior_to=None,
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 
@@ -969,3 +974,118 @@ experimental_wrap_as_resources(name="codegen", inputs=[':complete_platforms'], )
     # Verify the result
     assert len(complete_platforms) == 1
     assert complete_platforms.digest != EMPTY_DIGEST
+
+
+def test_uv_pex_builder_resolves_dependencies(rule_runner: RuleRunner) -> None:
+    """When pex_builder=uv, PEX should be built via uv venv + --venv-repository."""
+    req_strings = ["six==1.12.0", "jsonschema==2.6.0"]
+    requirements = PexRequirements(req_strings)
+    pex_info = create_pex_and_get_pex_info(
+        rule_runner,
+        requirements=requirements,
+        additional_pants_args=("--python-pex-builder=uv",),
+        internal_only=False,
+    )
+    assert set(parse_requirements(req_strings)).issubset(
+        set(parse_requirements(pex_info["requirements"]))
+    )
+
+
+def test_uv_pex_builder_includes_transitive_dependencies(rule_runner: RuleRunner) -> None:
+    """uv builder must install transitive dependencies, not just direct ones.
+
+    `requests` depends on urllib3, certifi, charset-normalizer, idna - the PEX
+    must be able to import these at runtime even though only `requests` is declared.
+    We verify by actually executing the PEX and importing a transitive dep.
+    """
+    sources = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                (
+                    FileContent(
+                        "main.py",
+                        # Import both the direct dep and a transitive dep (certifi).
+                        b"import requests; import certifi; print(f'requests=={requests.__version__}'); print(f'certifi_where={certifi.where()}')",
+                    ),
+                )
+            ),
+        ],
+    )
+    pex_data = create_pex_and_get_all_data(
+        rule_runner,
+        pex_type=Pex,
+        requirements=PexRequirements(["requests==2.31.0"]),
+        main=EntryPoint("main"),
+        sources=sources,
+        additional_pants_args=("--python-pex-builder=uv",),
+        internal_only=False,
+    )
+    pex_exe = (
+        f"./{pex_data.sandbox_path}"
+        if pex_data.is_zipapp
+        else os.path.join(pex_data.sandbox_path, "__main__.py")
+    )
+    process = Process(
+        argv=(pex_exe,),
+        env={"PATH": os.getenv("PATH", "")},
+        input_digest=pex_data.pex.digest,
+        description="Run uv-built pex and verify transitive deps are importable",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert b"requests==2.31.0" in result.stdout
+    assert b"certifi_where=" in result.stdout
+
+
+def test_uv_pex_builder_execution(rule_runner: RuleRunner) -> None:
+    """PEX built via uv builder should actually execute and import installed packages."""
+    sources = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                (
+                    FileContent(
+                        "main.py",
+                        b"import six; print(f'six=={six.__version__}')",
+                    ),
+                )
+            ),
+        ],
+    )
+    pex_data = create_pex_and_get_all_data(
+        rule_runner,
+        pex_type=Pex,
+        requirements=PexRequirements(["six==1.12.0"]),
+        main=EntryPoint("main"),
+        sources=sources,
+        additional_pants_args=("--python-pex-builder=uv",),
+        internal_only=False,
+    )
+    pex_exe = (
+        f"./{pex_data.sandbox_path}"
+        if pex_data.is_zipapp
+        else os.path.join(pex_data.sandbox_path, "__main__.py")
+    )
+    process = Process(
+        argv=(pex_exe,),
+        env={"PATH": os.getenv("PATH", "")},
+        input_digest=pex_data.pex.digest,
+        description="Run uv-built pex and verify import works",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert result.stdout == b"six==1.12.0\n"
+
+
+def test_uv_pex_builder_skipped_for_internal_only(rule_runner: RuleRunner) -> None:
+    """Internal-only PEXes should fall back to the default pip path even with pex_builder=uv."""
+    req_strings = ["six==1.12.0"]
+    requirements = PexRequirements(req_strings)
+    pex_info = create_pex_and_get_pex_info(
+        rule_runner,
+        requirements=requirements,
+        additional_pants_args=("--python-pex-builder=uv",),
+        internal_only=True,
+    )
+    assert set(parse_requirements(req_strings)).issubset(
+        set(parse_requirements(pex_info["requirements"]))
+    )

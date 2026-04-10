@@ -32,6 +32,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     ResolvePexConfigRequest,
     determine_resolve_pex_config,
 )
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import (
     DEFAULT_TOOL_LOCKFILE,
     GenerateLockfile,
@@ -46,11 +47,24 @@ from pants.core.goals.generate_lockfiles import (
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
 from pants.engine.addresses import UnparsedAddressInputs
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    FileContent,
+    GlobExpansionConjunction,
+    MergeDigests,
+    PathGlobs,
+)
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.intrinsics import create_digest, get_digest_contents, merge_digests
-from pants.engine.process import ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.intrinsics import (
+    create_digest,
+    get_digest_contents,
+    merge_digests,
+    path_globs_to_digest,
+)
+from pants.engine.process import ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule
@@ -158,12 +172,25 @@ async def generate_lockfile(
         # platform arguments - PEX will lock for the current platform only
         target_system_args = ()
 
-    result = await fallible_to_exec_result_or_raise(
+    if generate_lockfiles_subsystem.sync:
+        existing_lockfile_digest = await path_globs_to_digest(
+            PathGlobs(
+                globs=(req.lockfile_dest,),
+                # We ignore errors, since the lockfile may not exist.
+                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+                conjunction=GlobExpansionConjunction.any_match,
+            )
+        )
+    else:
+        existing_lockfile_digest = EMPTY_DIGEST
+
+    output_flag = "--lock" if generate_lockfiles_subsystem.sync else "--output"
+    result = await execute_process_or_raise(
         **implicitly(
             PexCliProcess(
-                subcommand=("lock", "create"),
+                subcommand=("lock", "sync" if generate_lockfiles_subsystem.sync else "create"),
                 extra_args=(
-                    f"--output={req.lockfile_dest}",
+                    f"{output_flag}={req.lockfile_dest}",
                     f"--style={req.lock_style}",
                     "--pip-version",
                     python_setup.pip_version,
@@ -196,7 +223,7 @@ async def generate_lockfile(
                 ),
                 additional_input_digest=await merge_digests(
                     MergeDigests(
-                        [pip_args_setup.digest]
+                        [existing_lockfile_digest, pip_args_setup.digest]
                         + ([complete_platforms.digest] if complete_platforms else [])
                     )
                 ),
@@ -240,6 +267,7 @@ async def generate_lockfile(
         sources=set(pip_args_setup.resolve_config.sources),
         lock_style=req.lock_style,
         complete_platforms=req.complete_platforms,
+        uploaded_prior_to=pip_args_setup.resolve_config.uploaded_prior_to,
     )
     regenerate_command = (
         generate_lockfiles_subsystem.custom_command
@@ -334,13 +362,13 @@ async def setup_user_lockfile_requests(
         return UserGenerateLockfiles()
 
     resolve_to_requirements_fields = defaultdict(set)
-    find_links: set[str] = set()
+    resolve_to_find_links: dict[str, set[str]] = defaultdict(set)
     for tgt in all_targets:
         if not tgt.has_fields((PythonRequirementResolveField, PythonRequirementsField)):
             continue
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
         resolve_to_requirements_fields[resolve].add(tgt[PythonRequirementsField])
-        find_links.update(tgt[PythonRequirementFindLinksField].value or ())
+        resolve_to_find_links[resolve].update(tgt[PythonRequirementFindLinksField].value or ())
 
     tools = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
@@ -352,7 +380,7 @@ async def setup_user_lockfile_requests(
                     requirements=PexRequirements.req_strings_from_requirement_fields(
                         resolve_to_requirements_fields[resolve]
                     ),
-                    find_links=FrozenOrderedSet(find_links),
+                    find_links=FrozenOrderedSet(resolve_to_find_links[resolve]),
                     interpreter_constraints=InterpreterConstraints(
                         python_setup.resolves_to_interpreter_constraints.get(
                             resolve, python_setup.interpreter_constraints
@@ -381,7 +409,7 @@ async def setup_user_lockfile_requests(
             out.add(
                 GeneratePythonLockfile(
                     requirements=FrozenOrderedSet(sorted(tool.requirements)),
-                    find_links=FrozenOrderedSet(find_links),
+                    find_links=FrozenOrderedSet(),
                     interpreter_constraints=ic,
                     resolve_name=resolve,
                     lockfile_dest=DEFAULT_TOOL_LOCKFILE,

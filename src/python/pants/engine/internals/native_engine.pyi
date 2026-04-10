@@ -1,11 +1,16 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# pants: infer-dep(native_engine.so)
+# pants: infer-dep(native_engine.so.metadata)
+
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
+from enum import Enum
 from io import RawIOBase
+from pathlib import Path
 from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
@@ -21,9 +26,9 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
-    NativeParsedDockerfileInfo,
-    NativeParsedJavascriptDependencies,
-    NativeParsedPythonDependencies,
+    NativeDockerfileInfo,
+    NativeJavascriptFileDependencies,
+    NativePythonFileDependencies,
 )
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import RunId, SessionValues
@@ -44,6 +49,38 @@ from pants.engine.process import (
 
 class PyFailure:
     def get_error(self) -> Exception | None: ...
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+class FrozenDict(Mapping[K, V]):
+    """A wrapper around a normal `dict` that removes all methods to mutate the instance and that
+    implements __hash__.
+
+    This should be used instead of normal dicts when working with the engine because normal dicts
+    are not safe to use.
+    """
+
+    @overload
+    def __new__(cls, __items: Iterable[tuple[K, V]], **kwargs: V) -> Self: ...
+    @overload
+    def __new__(cls, __other: Mapping[K, V], **kwargs: V) -> Self: ...
+    @overload
+    def __new__(cls, **kwargs: V) -> Self: ...
+    @classmethod
+    def deep_freeze(cls, data: Mapping[K, V]) -> Self: ...
+    @staticmethod
+    def frozen(to_freeze: Mapping[K, V]) -> FrozenDict[K, V]: ...
+    def __getitem__(self, k: K) -> V: ...
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[K]: ...
+    def __reversed__(self) -> Iterator[K]: ...
+    def __eq__(self, other: Any) -> Any: ...
+    def __lt__(self, other: Any) -> bool: ...
+    def __or__(self, other: Any) -> FrozenDict[K, V]: ...
+    def __ror__(self, other: Any) -> FrozenDict[K, V]: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
 
 # ------------------------------------------------------------------------------
 # Address
@@ -398,6 +435,8 @@ class Field:
 
     value: ImmutableValue | None
 
+    _raw_value_type: ClassVar[str]
+
     def __init__(self, raw_value: Any | None, address: Address) -> None: ...
     @classmethod
     def compute_value(cls, raw_value: Any | None, address: Address) -> ImmutableValue:
@@ -409,6 +448,128 @@ class Field:
         The resulting value must be hashable (and should be immutable).
         """
         ...
+
+_ST = TypeVar("_ST")
+
+class ScalarField(Field, Generic[_ST]):
+    expected_type: ClassVar[type[_ST]]
+    expected_type_description: ClassVar[str]
+    value: _ST | None
+    default: ClassVar[_ST | None] = None
+
+    @classmethod
+    def compute_value(cls, raw_value: Any | None, address: Address) -> _ST | None: ...
+
+class BoolField(ScalarField[bool]):
+    """A field whose value is a boolean.
+
+    Subclasses must either set `default: bool` or `required = True` so that the value is always
+    defined.
+    """
+
+    expected_type: ClassVar[type[bool]]
+    expected_type_description: ClassVar[str]
+    value: bool
+    default: ClassVar[bool]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool, address: Address) -> bool: ...  # type: ignore[override]
+
+class TriBoolField(ScalarField[bool]):
+    """A field whose value is a boolean or None, which is meant to represent a tri-state."""
+
+    expected_type: ClassVar[type[bool]]
+    expected_type_description: ClassVar[str]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool | None, address: Address) -> bool | None: ...
+
+class StringField(ScalarField[str]):
+    expected_type: ClassVar[type[str]]
+    expected_type_description: ClassVar[str]
+    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None]
+
+    @classmethod
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None: ...
+
+_ET = TypeVar("_ET")
+
+class SequenceField(Field, Generic[_ET]):
+    expected_element_type: ClassVar[type]
+    expected_type_description: ClassVar[str]
+    value: tuple[_ET, ...] | None
+    default: ClassVar[tuple[_ET, ...] | None] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[Any] | None, address: Address
+    ) -> tuple[_ET, ...] | None: ...
+
+class StringSequenceField(SequenceField[str]):
+    expected_element_type: ClassVar[type[str]]
+    expected_type_description: ClassVar[str]
+    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[str, ...] | None: ...
+
+# NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter
+# which order you use for inheriting the field template vs. the mixin.
+class AsyncFieldMixin(Field):
+    """A mixin to store the field's original `Address` for use during hydration by the engine.
+
+    Typically, you should also create a dataclass representing the hydrated value and another for
+    the request, then a rule to go from the request to the hydrated value. The request class should
+    store the async field as a property.
+
+    (Why use the request class as the rule input, rather than the field itself? It's a wrapper so
+    that subclasses of the async field work properly, given that the engine uses exact type IDs.
+    This is like WrappedTarget.)
+
+    For example:
+
+        class Sources(StringSequenceField, AsyncFieldMixin):
+            alias = "sources"
+
+            # Often, async fields will want to define entry points like this to allow subclasses to
+            # change behavior.
+            def validate_resolved_files(self, files: Sequence[str]) -> None:
+                pass
+
+
+        @dataclass(frozen=True)
+        class HydrateSourcesRequest:
+            field: Sources
+
+
+        @dataclass(frozen=True)
+        class HydratedSources:
+            snapshot: Snapshot
+
+
+        @rule
+        async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
+            digest = await path_globs_to_digest(PathGlobs(request.field.value))
+            result = await digest_to_snapshot(digest)
+            request.field.validate_resolved_files(result.files)
+            ...
+            return HydratedSources(result)
+
+    Then, call sites can `await` if they need to hydrate the field, even if they subclassed
+    the original async field to have custom behavior:
+
+        sources1 = hydrate_sources(HydrateSourcesRequest(my_tgt.get(Sources)))
+        sources2 = hydrate_sources(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
+    """
+
+    address: Address
+
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: Any) -> bool: ...
+    def __ne__(self, other: Any) -> bool: ...
+    def __repr__(self) -> str: ...
 
 # ------------------------------------------------------------------------------
 # FS
@@ -592,13 +753,13 @@ async def interactive_process(
 async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
 async def parse_dockerfile_info(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedDockerfileInfo: ...
+) -> tuple[tuple[str, NativeDockerfileInfo]]: ...
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedPythonDependencies: ...
+) -> tuple[tuple[str, NativePythonFileDependencies]]: ...
 async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedJavascriptDependencies: ...
+) -> tuple[tuple[str, NativeJavascriptFileDependencies]]: ...
 async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult: ...
 
 # ------------------------------------------------------------------------------
@@ -680,6 +841,16 @@ class PyOptionId:
         self, *components: str, scope: str | None = None, switch: str | None = None
     ) -> None: ...
 
+class PyNgInvocation:
+    @staticmethod
+    def empty() -> PyNgInvocation: ...
+    @staticmethod
+    def from_args(args: tuple[str, ...]) -> PyNgInvocation: ...
+    def global_flag_strings(self) -> tuple[str, ...]: ...
+    def specs(self) -> tuple[str, ...]: ...
+    def goals(self) -> tuple[str, ...]: ...
+    def passthru(self) -> tuple[str, ...]: ...
+
 class PyPantsCommand:
     def builtin_or_auxiliary_goal(self) -> str | None: ...
     def goals(self) -> list[str]: ...
@@ -704,6 +875,7 @@ def py_bin_name() -> str: ...
 class PyOptionParser:
     def __init__(
         self,
+        buildroot: Path | None,
         args: Sequence[str] | None,
         env: dict[str, str],
         configs: Sequence[PyConfigSource] | None,
@@ -717,19 +889,62 @@ class PyOptionParser:
     def get_float(self, option_id: PyOptionId, default: float | None) -> OptionValue[float]: ...
     def get_string(self, option_id: PyOptionId, default: str | None) -> OptionValue[str]: ...
     def get_bool_list(
-        self, option_id: PyOptionId, default: list[bool]
+        self, option_id: PyOptionId, default: Iterable[bool]
     ) -> OptionValue[list[bool]]: ...
-    def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionValue[list[int]]: ...
+    def get_int_list(
+        self, option_id: PyOptionId, default: Iterable[int]
+    ) -> OptionValue[list[int]]: ...
     def get_float_list(
-        self, option_id: PyOptionId, default: list[float]
+        self, option_id: PyOptionId, default: Iterable[float]
     ) -> OptionValue[list[float]]: ...
     def get_string_list(
-        self, option_id: PyOptionId, default: list[str]
+        self, option_id: PyOptionId, default: Iterable[str]
     ) -> OptionValue[list[str]]: ...
     def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionValue[dict]: ...
     def get_command(self) -> PyPantsCommand: ...
     def get_unconsumed_flags(self) -> dict[str, list[str]]: ...
     def validate_config(self, valid_keys: dict[str, set[str]]) -> list[str]: ...
+
+class PyNgOptionsReader:
+    # Useful in tests.
+    def __init__(
+        self,
+        buildroot: Path,
+        flags: dict[str, dict[str, tuple[str | None, ...]]],
+        env: dict[str, str],
+        configs: Sequence[PyConfigSource],
+    ) -> None: ...
+    def get_bool(self, option_id: PyOptionId, default: bool | None) -> OptionValue[bool]: ...
+    def get_int(self, option_id: PyOptionId, default: int | None) -> OptionValue[int]: ...
+    def get_float(self, option_id: PyOptionId, default: float | None) -> OptionValue[float]: ...
+    def get_string(self, option_id: PyOptionId, default: str | None) -> OptionValue[str]: ...
+    def get_bool_list(
+        self, option_id: PyOptionId, default: list[bool] | tuple[bool]
+    ) -> OptionValue[list[bool]]: ...
+    def get_int_list(
+        self, option_id: PyOptionId, default: list[int] | tuple[int]
+    ) -> OptionValue[list[int]]: ...
+    def get_float_list(
+        self, option_id: PyOptionId, default: list[float] | tuple[float]
+    ) -> OptionValue[list[float]]: ...
+    def get_string_list(
+        self, option_id: PyOptionId, default: list[str] | tuple[str]
+    ) -> OptionValue[list[str]]: ...
+    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionValue[dict]: ...
+
+class PyNgSourcePartition:
+    def paths(self) -> tuple[str, ...]: ...
+    def options_reader(self) -> PyNgOptionsReader: ...
+
+class PyNgOptions:
+    def __init__(
+        self,
+        pants_invocation: PyNgInvocation,
+        env: dict[str, str],
+        include_derivation: bool,
+    ) -> None: ...
+    def get_options_reader_for_dir(self, dir: str) -> PyNgOptionsReader: ...
+    def partition_sources(self, paths: tuple[str, ...]) -> tuple[PyNgSourcePartition, ...]: ...
 
 # ------------------------------------------------------------------------------
 # Testutil
@@ -767,9 +982,8 @@ class InferenceMetadata:
     def __repr__(self) -> str: ...
 
 class NativeDependenciesRequest:
-    """A request to parse the dependencies of a file.
+    """A request to parse the dependencies of a set of files.
 
-    * The `digest` is expected to contain exactly one source file.
     * Depending on the implementation, a `metadata` structure
       can be passed. It will be supplied to the native parser, and
       it will be incorporated into the cache key.
@@ -862,10 +1076,6 @@ def tasks_add_call(
     vtable_entries: Sequence[tuple[type, str]] | None,
     in_scope_types: Sequence[type] | None,
 ) -> None: ...
-def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None: ...
-def tasks_add_get_union(
-    tasks: PyTasks, output_type: type, input_types: Sequence[type], in_scope_types: Sequence[type]
-) -> None: ...
 def tasks_add_query(tasks: PyTasks, output_type: type, input_types: Sequence[type]) -> None: ...
 def execution_add_root_select(
     scheduler: PyScheduler,
@@ -929,9 +1139,6 @@ def validate_reachability(scheduler: PyScheduler) -> None: ...
 def rule_graph_consumed_types(
     scheduler: PyScheduler, param_types: Sequence[type], product_type: type
 ) -> list[type]: ...
-def rule_graph_rule_gets(
-    scheduler: PyScheduler,
-) -> dict[Callable, list[tuple[type, list[type], Callable]]]: ...
 def rule_graph_visualize(scheduler: PyScheduler, path: str) -> None: ...
 def rule_subgraph_visualize(
     scheduler: PyScheduler, param_types: Sequence[type], product_type: type, path: str
@@ -953,7 +1160,6 @@ _Input = TypeVar("_Input")
 class PyGeneratorResponseCall:
     rule_id: str
     output_type: type
-    input_types: Sequence[type]
     inputs: Sequence[Any]
 
     @overload
@@ -983,36 +1189,6 @@ class PyGeneratorResponseCall:
         rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
-        input_arg0: type[_Input] | _Input,
-        input_arg1: _Input | None = None,
-    ) -> None: ...
-
-class PyGeneratorResponseGet(Generic[_Output]):
-    output_type: type[_Output]
-    input_types: Sequence[type]
-    inputs: Sequence[Any]
-
-    @overload
-    def __init__(self, output_type: type[_Output]) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: dict[Any, type],
-    ) -> None: ...
-    @overload
-    def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: type[_Input],
-        input_arg1: _Input,
-    ) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...

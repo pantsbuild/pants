@@ -75,7 +75,7 @@ async def _executable_path(binary_names: Iterable[str], search_paths: Iterable[s
     option."""
     for name in binary_names:
         binary_paths = await find_binary(
-            BinaryPathRequest(  # noqa: PNT30: requires triage
+            BinaryPathRequest(
                 binary_name=name,
                 search_path=search_paths,
                 test=BinaryPathTest(args=["-v"]),
