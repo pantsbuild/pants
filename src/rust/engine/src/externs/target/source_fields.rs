@@ -1,7 +1,8 @@
 // Copyright 2026 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::sync::OnceLock;
+use std::borrow::Cow;
+use std::sync::{Arc, OnceLock};
 
 use fs::{GlobExpansionConjunction, StrictGlobMatching};
 use pyo3::exceptions::PyValueError;
@@ -12,7 +13,7 @@ use pyo3::pyclass_init::PyClassInitializer;
 use pyo3::types::{PyRange, PyString, PyTuple, PyType};
 
 use crate::externs::address::Address;
-use crate::externs::fs::{PyFilespec, PyFilespecMatcher, PyPathGlobs};
+use crate::externs::fs::{Globs, PyFilespec, PyFilespecMatcher, PyPathGlobs};
 use crate::externs::unions::UnionMembership;
 
 use super::field::{AsyncFieldMixin, Field};
@@ -40,10 +41,11 @@ fn split_globs(self_: &Bound<'_, SourcesField>) -> PyResult<(Vec<String>, Vec<St
     Ok((includes, excludes))
 }
 
+type SplitGlobs = (Arc<Globs>, Arc<Globs>);
+
 #[pyclass(subclass, frozen, extends = AsyncFieldMixin, module = "pants.engine.internals.native_engine")]
 pub struct SourcesField {
-    split_globs_cache: OnceLock<(Vec<String>, Vec<String>)>,
-    filespec_cache: OnceLock<Py<PyFilespec>>,
+    split_globs_cache: OnceLock<SplitGlobs>,
     filespec_matcher_cache: OnceLock<Py<PyFilespecMatcher>>,
 }
 
@@ -57,21 +59,20 @@ impl SourcesField {
         Ok(
             AsyncFieldMixin::init(cls, raw_value, address, py)?.add_subclass(Self {
                 split_globs_cache: OnceLock::new(),
-                filespec_cache: OnceLock::new(),
                 filespec_matcher_cache: OnceLock::new(),
             }),
         )
     }
 
-    fn cached_split_globs<'py>(
-        self_: &'py Bound<'py, Self>,
-    ) -> PyResult<&'py (Vec<String>, Vec<String>)> {
+    fn cached_split_globs<'py>(self_: &'py Bound<'py, Self>) -> PyResult<&'py SplitGlobs> {
         let inner = self_.get();
         if let Some(cached) = inner.split_globs_cache.get() {
             return Ok(cached);
         }
-        let result = split_globs(self_)?;
-        let _ = inner.split_globs_cache.set(result);
+        let (includes, excludes) = split_globs(self_)?;
+        let _ = inner
+            .split_globs_cache
+            .set((Globs::new(includes), Globs::new(excludes)));
         Ok(inner.split_globs_cache.get().unwrap())
     }
 }
@@ -190,7 +191,7 @@ impl SourcesField {
                 let alias = Field::cls_alias(&cls)?;
                 let alias_repr = PyRepr(&alias);
                 let pluralize = py.import("pants.util.strutil")?.getattr("pluralize")?;
-                let num_str: String = pluralize.call1((num_files, "file"))?.extract()?;
+                let num_str: PyBackedStr = pluralize.call1((num_files, "file"))?.extract()?;
                 return Err(raise_invalid_field(
                     py,
                     format!(
@@ -281,16 +282,9 @@ impl SourcesField {
     }
 
     #[getter]
-    fn filespec<'py>(self_: &Bound<'py, Self>, py: Python<'py>) -> PyResult<Py<PyFilespec>> {
-        let inner = self_.get();
-        if let Some(cached) = inner.filespec_cache.get() {
-            return Ok(cached.clone_ref(py));
-        }
-
+    fn filespec(self_: &Bound<'_, Self>) -> PyResult<PyFilespec> {
         let (includes, excludes) = Self::cached_split_globs(self_)?;
-        let result = Py::new(py, PyFilespec::new(includes.clone(), excludes.clone()))?;
-        let _ = inner.filespec_cache.set(result.clone_ref(py));
-        Ok(result)
+        Ok(PyFilespec::new(Arc::clone(includes), Arc::clone(excludes)))
     }
 
     #[getter]
@@ -306,7 +300,7 @@ impl SourcesField {
         let (includes, excludes) = Self::cached_split_globs(self_)?;
         let result = Py::new(
             py,
-            PyFilespecMatcher::from_vecs(includes.clone(), excludes.clone(), py)?,
+            PyFilespecMatcher::from_slices(includes, Cow::Borrowed(&**excludes), py)?,
         )?;
         let _ = inner.filespec_matcher_cache.set(result.clone_ref(py));
         Ok(result)

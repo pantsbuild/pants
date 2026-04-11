@@ -7,6 +7,7 @@ use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::pyclass_init::PyClassInitializer;
 use pyo3::types::PyType;
 
@@ -207,16 +208,16 @@ impl Field {
         cls.getattr("required")?.extract()
     }
 
-    pub fn cls_alias(cls: &Bound<'_, PyAny>) -> PyResult<String> {
+    pub fn cls_alias(cls: &Bound<'_, PyAny>) -> PyResult<PyBackedStr> {
         // TODO: All of these methods should use interned attr names.
         cls.getattr("alias")?.extract()
     }
 
-    pub fn cls_removal_version(cls: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    pub fn cls_removal_version(cls: &Bound<'_, PyAny>) -> PyResult<Option<PyBackedStr>> {
         cls.getattr("removal_version")?.extract()
     }
 
-    pub fn cls_removal_hint(cls: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    pub fn cls_removal_hint(cls: &Bound<'_, PyAny>) -> PyResult<Option<PyBackedStr>> {
         cls.getattr("removal_hint")?.extract()
     }
 
@@ -292,8 +293,8 @@ impl ScalarField {
         if !value_or_default.is_none() {
             let expected_type = cls.getattr(intern!(py, "expected_type"))?;
             if !value_or_default.is_instance(&expected_type)? {
-                let alias: String = Field::cls_alias(cls)?;
-                let expected_type_desc: String = cls
+                let alias = Field::cls_alias(cls)?;
+                let expected_type_desc: PyBackedStr = cls
                     .getattr(intern!(py, "expected_type_description"))?
                     .extract()?;
                 return Err(raise_invalid_field_type(
@@ -486,7 +487,7 @@ impl SequenceField {
         let expected_element_type = cls.getattr(intern!(py, "expected_element_type"))?;
         if value_or_default.is_instance(&expected_element_type)? {
             let alias = Field::cls_alias(cls)?;
-            let desc: String = cls
+            let desc: PyBackedStr = cls
                 .getattr(intern!(py, "expected_type_description"))?
                 .extract()?;
             return Err(raise_invalid_field_type(
@@ -501,7 +502,7 @@ impl SequenceField {
             Ok(iter) => iter,
             Err(_) => {
                 let alias = Field::cls_alias(cls)?;
-                let desc: String = cls
+                let desc: PyBackedStr = cls
                     .getattr(intern!(py, "expected_type_description"))?
                     .extract()?;
                 return Err(raise_invalid_field_type(
@@ -518,7 +519,7 @@ impl SequenceField {
             let item = item?;
             if !item.is_instance(&expected_element_type)? {
                 let alias = Field::cls_alias(cls)?;
-                let desc: String = cls
+                let desc: PyBackedStr = cls
                     .getattr(intern!(py, "expected_type_description"))?
                     .extract()?;
                 return Err(raise_invalid_field_type(
@@ -645,7 +646,7 @@ impl AsyncFieldMixin {
     fn __repr__(self_: &Bound<Self>) -> PyResult<String> {
         let py = self_.py();
         let cls = self_.get_type();
-        let alias: String = Field::cls_alias(&cls)?;
+        let alias = Field::cls_alias(&cls)?;
         let value = self_.getattr(intern!(py, "value"))?;
         let address = self_.get().address.bind(py);
         let mut result = String::new();

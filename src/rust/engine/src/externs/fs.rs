@@ -1,12 +1,13 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::time::SystemTime;
 
 use itertools::Itertools;
@@ -581,20 +582,52 @@ impl PyPathGlobs {
 // Filespec
 // -----------------------------------------------------------------------------
 
+#[derive(Debug)]
+pub struct Globs {
+    strings: Box<[String]>,
+    py_tuple: OnceLock<Py<PyTuple>>,
+}
+
+impl Deref for Globs {
+    type Target = [String];
+
+    fn deref(&self) -> &[String] {
+        &self.strings
+    }
+}
+
+impl Globs {
+    pub fn new(strings: Vec<String>) -> Arc<Self> {
+        Arc::new(Self {
+            strings: strings.into(),
+            py_tuple: OnceLock::new(),
+        })
+    }
+
+    pub fn to_py_tuple<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        if let Some(cached) = self.py_tuple.get() {
+            return Ok(cached.bind(py).clone());
+        }
+        let tuple = PyTuple::new(py, &*self.strings)?;
+        let _ = self.py_tuple.set(tuple.clone().unbind());
+        Ok(tuple)
+    }
+}
+
 #[pyclass(
     name = "Filespec",
     frozen,
     module = "pants.engine.internals.native_engine",
-    from_py_object
+    skip_from_py_object
 )]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct PyFilespec {
-    includes: Vec<String>,
-    excludes: Vec<String>,
+    includes: Arc<Globs>,
+    excludes: Arc<Globs>,
 }
 
 impl PyFilespec {
-    pub(crate) fn new(includes: Vec<String>, excludes: Vec<String>) -> Self {
+    pub(crate) fn new(includes: Arc<Globs>, excludes: Arc<Globs>) -> Self {
         Self { includes, excludes }
     }
 }
@@ -602,26 +635,26 @@ impl PyFilespec {
 #[pymethods]
 impl PyFilespec {
     #[getter]
-    fn includes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyList>> {
-        pyo3::types::PyList::new(py, &self.includes)
+    fn includes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        self.includes.to_py_tuple(py)
     }
 
     #[getter]
-    fn excludes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyList>> {
-        pyo3::types::PyList::new(py, &self.excludes)
+    fn excludes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        self.excludes.to_py_tuple(py)
     }
 
-    fn __getitem__(&self, key: &str, py: Python) -> PyResult<Py<pyo3::types::PyList>> {
+    fn __getitem__<'py>(&self, key: &str, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         match key {
-            "includes" => Ok(pyo3::types::PyList::new(py, &self.includes)?.unbind()),
-            "excludes" => Ok(pyo3::types::PyList::new(py, &self.excludes)?.unbind()),
+            "includes" => self.includes.to_py_tuple(py),
+            "excludes" => self.excludes.to_py_tuple(py),
             _ => Err(pyo3::exceptions::PyKeyError::new_err(key.to_string())),
         }
     }
 
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
         if let Ok(other_fs) = other.extract::<PyRef<PyFilespec>>() {
-            return Ok(self.includes == other_fs.includes && self.excludes == other_fs.excludes);
+            return Ok(**self.includes == **other_fs.includes && **self.excludes == **other_fs.excludes);
         }
         if let Ok(dict) = other.cast::<pyo3::types::PyDict>() {
             let includes: Vec<String> = dict
@@ -629,7 +662,7 @@ impl PyFilespec {
                 .map(|v| v.extract::<Vec<String>>())
                 .transpose()?
                 .unwrap_or_default();
-            if includes != self.includes {
+            if *includes != **self.includes {
                 return Ok(false);
             }
             let excludes: Vec<String> = dict
@@ -637,26 +670,26 @@ impl PyFilespec {
                 .map(|v| v.extract::<Vec<String>>())
                 .transpose()?
                 .unwrap_or_default();
-            return Ok(excludes == self.excludes);
+            return Ok(*excludes == **self.excludes);
         }
         Ok(false)
     }
 
     fn __repr__(&self) -> String {
         if self.excludes.is_empty() {
-            format!("Filespec(includes={:?})", self.includes)
+            format!("Filespec(includes={:?})", &*self.includes)
         } else {
             format!(
                 "Filespec(includes={:?}, excludes={:?})",
-                self.includes, self.excludes
+                &*self.includes, &*self.excludes
             )
         }
     }
 
     fn __hash__(&self) -> u64 {
         let mut s = DefaultHasher::new();
-        self.includes.hash(&mut s);
-        self.excludes.hash(&mut s);
+        (*self.includes).hash(&mut s);
+        (*self.excludes).hash(&mut s);
         s.finish()
     }
 }
@@ -670,9 +703,9 @@ impl PyFilespec {
 pub struct PyFilespecMatcher(FilespecMatcher);
 
 impl PyFilespecMatcher {
-    pub(crate) fn from_vecs(
-        includes: Vec<String>,
-        excludes: Vec<String>,
+    pub(crate) fn from_slices(
+        includes: &[String],
+        excludes: Cow<'_, [String]>,
         py: Python,
     ) -> PyResult<Self> {
         let matcher =
@@ -685,7 +718,7 @@ impl PyFilespecMatcher {
 impl PyFilespecMatcher {
     #[new]
     fn __new__(includes: Vec<String>, excludes: Vec<String>, py: Python) -> PyResult<Self> {
-        Self::from_vecs(includes, excludes, py)
+        Self::from_slices(&includes, Cow::Owned(excludes), py)
     }
 
     fn __hash__(&self) -> u64 {
