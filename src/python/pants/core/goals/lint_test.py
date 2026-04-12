@@ -176,7 +176,7 @@ def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
         yield from subclasses
 
 
-def mock_target_partitioner(__implicitly: tuple) -> Partitions[MockLinterFieldSet, Any]:
+def mock_target_partitioner(__implicitly: tuple) -> Partitions[MockLinterFieldSet | str, Any]:
     request, typ = next(iter(__implicitly[0].items()))
     assert typ == LintTargetsRequest.PartitionRequest
     if type(request) is SkippedRequest.PartitionRequest:

@@ -3,14 +3,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum
 from typing import TYPE_CHECKING, Union
 
 # Note: several of these types are re-exported as the public API of `engine/fs.py`.
-from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior as GlobMatchErrorBehavior
+from pants.base.glob_match_error_behavior import (  # noqa: F401
+    GlobMatchErrorBehavior as GlobMatchErrorBehavior,
+)
 from pants.engine.collection import Collection
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.internals.native_engine import EMPTY_DIGEST as EMPTY_DIGEST  # noqa: F401
@@ -22,8 +24,8 @@ from pants.engine.internals.native_engine import AddPrefix as AddPrefix
 from pants.engine.internals.native_engine import Digest as Digest
 from pants.engine.internals.native_engine import FileDigest as FileDigest
 from pants.engine.internals.native_engine import MergeDigests as MergeDigests
-from pants.engine.internals.native_engine import PathMetadata, PathNamespace
 from pants.engine.internals.native_engine import PathGlobs as PathGlobs
+from pants.engine.internals.native_engine import PathMetadata, PathNamespace
 from pants.engine.internals.native_engine import RemovePrefix as RemovePrefix
 from pants.engine.internals.native_engine import Snapshot as Snapshot
 from pants.util.frozendict import FrozenDict
