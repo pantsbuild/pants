@@ -207,7 +207,7 @@ pants list :: | awk 'NR % 5 == 0' | xargs pants package
 ```
 
 :::tip Coverage and sharding
-When using `--shard` with test coverage enabled, each shard only exercises a fraction of your targets, producing artificially low coverage numbers. You need to combine the binary `.coverage` files from all shards in a post-shard CI step to get accurate results. See [Coverage with test sharding](../python/goals/test.mdx#coverage-with-test-sharding) for the full configuration and CI workflow.
+When using `--shard` with test coverage enabled, each shard only exercises a fraction of your targets, producing artificially low coverage numbers. You need to combine the coverage data from all shards in a post-shard CI step to get accurate results. To learn how to do this for Python see [Coverage with test sharding](../python/goals/test.mdx#coverage-with-test-sharding) for the full configuration and CI workflow.
 :::
 
 ## Using CLI aliases
