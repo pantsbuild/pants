@@ -13,7 +13,6 @@ from io import RawIOBase
 from pathlib import Path
 from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
 
-
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import (
     CreateDigest,
@@ -619,7 +618,7 @@ class SourcesField(AsyncFieldMixin):
     @staticmethod
     def prefix_glob_with_dirpath(dirpath: str, glob: str) -> str: ...
     def _prefix_glob_with_address(self, glob: str) -> str: ...
-    def path_globs(self, unmatched_build_file_globs: Any) -> Any: ...
+    def path_globs(self, unmatched_build_file_globs: Any) -> PathGlobs: ...
     @classmethod
     def can_generate(cls, output_type: type[SourcesField], union_membership: Any) -> bool:
         """Can this field be used to generate the output_type?
@@ -643,7 +642,7 @@ class SourcesField(AsyncFieldMixin):
         ...
     @property
     def filespec(self) -> Filespec:
-        """The original globs, returned in the Filespec dict format.
+        """The original globs, returned in the Filespec.
 
         The globs will be relativized to the build root.
         """
@@ -666,7 +665,9 @@ class MultipleSourcesField(SourcesField):
     @property
     def globs(self) -> tuple[str, ...]: ...
     @classmethod
-    def compute_value(cls, raw_value: Iterable[str] | None, address: Any) -> tuple[str, ...] | None: ...
+    def compute_value(
+        cls, raw_value: Iterable[str] | None, address: Any
+    ) -> tuple[str, ...] | None: ...
 
 class OptionalSingleSourceField(SourcesField):
     """The `source: str` field.
@@ -809,7 +810,6 @@ class FilespecMatcher:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
     def matches(self, paths: Sequence[str]) -> list[str]: ...
-
 
 class Filespec:
     """The original globs for a SourcesField, with includes and excludes.

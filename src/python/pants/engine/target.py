@@ -37,8 +37,6 @@ from pants.engine.collection import Collection
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
-    GlobExpansionConjunction,
-    GlobMatchErrorBehavior,
     PathGlobs,
     Paths,
     Snapshot,
@@ -51,24 +49,26 @@ from pants.engine.internals.native_engine import NO_VALUE as NO_VALUE  # noqa: F
 from pants.engine.internals.native_engine import AsyncFieldMixin as AsyncFieldMixin
 from pants.engine.internals.native_engine import BoolField as BoolField  # noqa: F401
 from pants.engine.internals.native_engine import Field as Field
-from pants.engine.internals.native_engine import ScalarField as ScalarField
-from pants.engine.internals.native_engine import SequenceField as SequenceField  # noqa: F401
-from pants.engine.internals.native_engine import StringField as StringField
-from pants.engine.internals.native_engine import StringSequenceField as StringSequenceField
-from pants.engine.internals.native_engine import TriBoolField as TriBoolField  # noqa: F401
 from pants.engine.internals.native_engine import (  # noqa: F401
     MultipleSourcesField as MultipleSourcesField,
 )
 from pants.engine.internals.native_engine import (  # noqa: F401
     OptionalSingleSourceField as OptionalSingleSourceField,
 )
-from pants.engine.internals.native_engine import SingleSourceField as SingleSourceField  # noqa: F401
+from pants.engine.internals.native_engine import ScalarField as ScalarField
+from pants.engine.internals.native_engine import SequenceField as SequenceField  # noqa: F401
+from pants.engine.internals.native_engine import (
+    SingleSourceField as SingleSourceField,  # noqa: F401
+)
 from pants.engine.internals.native_engine import SourcesField as SourcesField
+from pants.engine.internals.native_engine import StringField as StringField
+from pants.engine.internals.native_engine import StringSequenceField as StringSequenceField
+from pants.engine.internals.native_engine import TriBoolField as TriBoolField  # noqa: F401
 from pants.engine.internals.target_adaptor import SourceBlock, SourceBlocks  # noqa: F401
 from pants.engine.rules import rule
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass, union
 from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
-from pants.source.filespec import Filespec, FilespecMatcher
+from pants.source.filespec import Filespec
 from pants.util.collections import ensure_str_list
 from pants.util.dirutil import fast_relpath
 from pants.util.docutil import bin_name, doc_url
