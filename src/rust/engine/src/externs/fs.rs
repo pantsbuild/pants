@@ -654,7 +654,9 @@ impl PyFilespec {
 
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
         if let Ok(other_fs) = other.extract::<PyRef<PyFilespec>>() {
-            return Ok(**self.includes == **other_fs.includes && **self.excludes == **other_fs.excludes);
+            return Ok(
+                **self.includes == **other_fs.includes && **self.excludes == **other_fs.excludes
+            );
         }
         if let Ok(dict) = other.cast::<pyo3::types::PyDict>() {
             let includes: Vec<String> = dict
