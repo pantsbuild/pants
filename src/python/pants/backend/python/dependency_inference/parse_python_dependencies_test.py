@@ -51,17 +51,20 @@ def assert_deps_parsed(
     filename: str = "project/foo.py",
     string_imports: bool = True,
     string_imports_min_dots: int = 2,
+    ignored_string_imports: list[str] | None = None,
     assets: bool = True,
     assets_min_slashes: int = 1,
 ) -> None:
     expected_imports = expected_imports or {}
     expected_assets = expected_assets or []
     expected_explicit_deps = expected_explicit_deps or {}
+    ignored_string_imports = ignored_string_imports or []
 
     rule_runner.set_options(
         [
             f"--python-infer-string-imports={string_imports}",
             f"--python-infer-string-imports-min-dots={string_imports_min_dots}",
+            f"--python-infer-ignored-string-imports={ignored_string_imports}",
             f"--python-infer-assets={assets}",
             f"--python-infer-assets-min-slashes={assets_min_slashes}",
             "--python-infer-use-rust-parser",
@@ -383,6 +386,46 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
     )
     assert_deps_parsed(
         rule_runner, content, string_imports=False, expected_imports={}, assets=False
+    )
+
+
+def test_ignored_string_imports(rule_runner: RuleRunner) -> None:
+    content = dedent(
+        """\
+        modules = [
+            "a.b.c",
+            "a.b.c.d",
+            "x.y.z",
+            "foo.generated.module",
+        ]
+        """
+    )
+    assert_deps_parsed(
+        rule_runner,
+        content,
+        assets=False,
+        ignored_string_imports=["a.b.c", "foo.generated"],
+        expected_imports={
+            "x.y.z": ImpInfo(lineno=4, weak=True),
+        },
+    )
+
+
+def test_ignored_string_imports_does_not_affect_assets(rule_runner: RuleRunner) -> None:
+    content = dedent(
+        """\
+        paths = [
+            "data/subdir/file.json",
+            "other/subdir/thing.txt",
+        ]
+        """
+    )
+    assert_deps_parsed(
+        rule_runner,
+        content,
+        string_imports=False,
+        ignored_string_imports=["data.subdir.file"],
+        expected_assets=["data/subdir/file.json", "other/subdir/thing.txt"],
     )
 
 

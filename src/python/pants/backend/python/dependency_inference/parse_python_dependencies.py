@@ -87,6 +87,13 @@ class ParserScript:
 _scripts_package = "pants.backend.python.dependency_inference.scripts"
 
 
+def _is_ignored_string_import(module_path: str, ignored_paths: tuple[str, ...]) -> bool:
+    return any(
+        module_path == ignored_path or module_path.startswith(f"{ignored_path}.")
+        for ignored_path in ignored_paths
+    )
+
+
 async def get_scripts_digest(scripts_package: str, filenames: Iterable[str]) -> Digest:
     scripts = [read_resource(scripts_package, filename) for filename in filenames]
     assert all(script is not None for script in scripts)
@@ -130,6 +137,9 @@ async def parse_python_dependencies(
             for string, line in native_result.string_candidates.items():
                 if (
                     python_infer_subsystem.string_imports
+                    and not _is_ignored_string_import(
+                        string, python_infer_subsystem.ignored_string_imports
+                    )
                     and string.count(".") >= python_infer_subsystem.string_imports_min_dots
                     and all(part.isidentifier() for part in string.split("."))
                 ):
