@@ -6,9 +6,9 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar, cast, final
+from typing import TYPE_CHECKING, ClassVar, final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -38,8 +38,11 @@ from pants.engine.target import (
 )
 from pants.engine.unions import union
 from pants.util.docutil import bin_name, doc_url
-from pants.util.frozendict import FrozenDict
+from pants.util.meta import classproperty
 from pants.util.strutil import help_text, softwrap
+
+if TYPE_CHECKING:
+    from pants.backend.docker.util_rules.docker_build_context import DockerBuildContext
 
 # Common help text to be applied to each field that supports value interpolation.
 _interpolation_help = (
@@ -155,21 +158,6 @@ class DockerImageTagsField(StringSequenceField):
     )
 
 
-class DockerImageTargetStageField(StringField):
-    alias = "target_stage"
-    help = help_text(
-        """
-        Specify target build stage, rather than building the entire `Dockerfile`.
-
-        When using multi-stage build, you may name your stages, and can target them when building
-        to only selectively build a certain stage. See also the `--docker-build-target-stage`
-        option.
-
-        Read more about [multi-stage Docker builds](https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)
-        """
-    )
-
-
 class DockerImageDependenciesField(Dependencies):
     supports_transitive_excludes = True
 
@@ -238,29 +226,319 @@ class DockerImageSkipPushField(BoolField):
 OptionValueFormatter = Callable[[str], str]
 
 
-class DockerBuildOptionFieldMixin(ABC):
-    """Inherit this mixin class to provide options to `docker build`."""
+class ValidateOptionsMixin(Field, ABC):
+    def validate_options(self, options: DockerOptions, context: DockerBuildContext) -> bool:
+        """Hook method telling Pants to ignore this option in certain contexts.
 
+        Can also be used to throw errors simply by raising an exception.
+        """
+        return True
+
+
+class DockerBuildOptionsFieldMixin(ValidateOptionsMixin, ABC):
     docker_build_option: ClassVar[str]
 
+    @classmethod
     @abstractmethod
-    def option_values(
-        self, *, value_formatter: OptionValueFormatter, global_build_hosts_options: dict
+    def compute_docker_build_options(
+        cls, value, *, docker: DockerOptions, value_formatter: OptionValueFormatter
     ) -> Iterator[str]:
-        """Subclasses must implement this, to turn their `self.value` into none, one or more option
-        values."""
+        """Subclasses must implement this, to turn `value` into none, one or more option values."""
 
+    def docker_build_options(
+        self, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        return self.compute_docker_build_options(
+            self.value, docker=docker, value_formatter=value_formatter
+        )
+
+
+class DockerBuildOptionFieldValueMixin(DockerBuildOptionsFieldMixin, ABC):
+    """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
+    to `docker build`."""
+
+    @classmethod
     @final
-    def options(
-        self, value_formatter: OptionValueFormatter, global_build_hosts_options
+    def compute_docker_build_options(
+        cls, value, *, docker: DockerOptions, value_formatter: OptionValueFormatter
     ) -> Iterator[str]:
-        for value in self.option_values(
-            value_formatter=value_formatter, global_build_hosts_options=global_build_hosts_options
-        ):
-            yield from (self.docker_build_option, value)
+        if value is not None:
+            yield f"{cls.docker_build_option}={value}"
 
 
-class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictStringToStringField):
+class DockerBuildOptionFieldMultiValueMixin(StringSequenceField, DockerBuildOptionsFieldMixin, ABC):
+    """Inherit this mixin class to provide options in the form of `--flag=value1,value2` to `docker
+    build`."""
+
+    @classmethod
+    @final
+    def compute_docker_build_options(
+        cls,
+        value: Sequence[str] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
+    ) -> Iterator[str]:
+        if value:
+            yield f"{cls.docker_build_option}={','.join(value)}"
+
+
+class DockerBuildOptionFieldMultiValueDictMixin(
+    DictStringToStringField, DockerBuildOptionsFieldMixin, ABC
+):
+    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2`
+    to `docker build`."""
+
+    @classmethod
+    @final
+    def compute_docker_build_options(
+        cls,
+        value: Mapping[str, str] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
+    ) -> Iterator[str]:
+        if value:
+            yield f"{cls.docker_build_option}=" + ",".join(
+                f"{key}={value_formatter(v)}" for key, v in value.items()
+            )
+
+
+class DockerBuildOptionFieldListOfMultiValueDictMixin(
+    ListOfDictStringToStringField, DockerBuildOptionsFieldMixin, ABC
+):
+    """Inherit this mixin class to provide multiple key-value options to docker build:
+
+    `--flag=key1=value1,key2=value2 --flag=key3=value3,key4=value4`
+    """
+
+    @classmethod
+    @final
+    def compute_docker_build_options(
+        cls,
+        value: Sequence[Mapping[str, str]] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
+    ) -> Iterator[str]:
+        if value:
+            for item in value:
+                yield f"{cls.docker_build_option}=" + ",".join(
+                    f"{key}={value_formatter(v)}" for key, v in item.items()
+                )
+
+
+class DockerBuildOptionFlagFieldMixin(BoolField, DockerBuildOptionsFieldMixin, ABC):
+    """Inherit this mixin class to provide optional flags (i.e. add `--flag` only when the value is
+    `True`) to `docker build`."""
+
+    @classmethod
+    @final
+    def compute_docker_build_options(
+        cls, value: bool, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        if value:
+            yield f"{cls.docker_build_option}"
+
+
+class BuildctlOptionsFieldMixin(ValidateOptionsMixin, ABC):
+    buildctl_option: ClassVar[str]
+
+    @classmethod
+    @abstractmethod
+    def compute_buildctl_options(
+        cls, value, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        """Subclasses must implement this, to turn `value` into none, one or more option values."""
+
+    def buildctl_options(
+        self, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        return self.compute_buildctl_options(
+            self.value, docker=docker, value_formatter=value_formatter
+        )
+
+
+class DockerBuildkitPassthroughFieldMixin(
+    BuildctlOptionsFieldMixin, DockerBuildOptionsFieldMixin, ABC
+):
+    @classproperty
+    def docker_build_option(cls) -> str:
+        return cls.buildctl_option
+
+    @classmethod
+    def compute_docker_build_options(
+        cls, value, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        return cls.compute_buildctl_options(value, docker=docker, value_formatter=value_formatter)
+
+
+class BuildctlOptionFieldMultiValueDictMixin(
+    DictStringToStringField, BuildctlOptionsFieldMixin, ABC
+):
+    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2`
+    to `buildctl build`."""
+
+    @classmethod
+    @final
+    def compute_buildctl_options(
+        cls,
+        value: Mapping[str, str] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
+    ) -> Iterator[str]:
+        if value:
+            yield f"{cls.buildctl_option}=" + ",".join(
+                f"{key}={value_formatter(v)}" for key, v in value.items()
+            )
+
+
+class BuildctlOptionFieldListOfMultiValueDictMixin(
+    ListOfDictStringToStringField, BuildctlOptionsFieldMixin, ABC
+):
+    """Inherit this mixin class to provide multiple key-value options to buildctl build:
+
+    `--flag=key1=value1,key2=value2 --flag=key3=value3,key4=value4`
+    """
+
+    @classmethod
+    @final
+    def compute_buildctl_options(
+        cls,
+        value: Sequence[Mapping[str, str]] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
+    ) -> Iterator[str]:
+        if value:
+            for item in value:
+                yield f"{cls.buildctl_option}=" + ",".join(
+                    f"{key}={value_formatter(v)}" for key, v in item.items()
+                )
+
+
+class BuildctlOptionFieldValueMixin(BuildctlOptionsFieldMixin, ABC):
+    """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
+    to `buildctl build`."""
+
+    @classmethod
+    @final
+    def compute_buildctl_options(
+        cls, value, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        if value is not None:
+            yield f"{cls.buildctl_option}={value}"
+
+
+class BuildctlLayeredOptionFieldValueMixin(BuildctlOptionsFieldMixin, ABC):
+    """Inherit this mixin class to provide layered options (i.e. option in the form of `--flag
+    suboption=value`) to `buildctl build`.
+
+    You can override the option-value delimiter (default is `=`) by setting the
+    `suboption_value_delimiter` class variable.
+    """
+
+    suboption: ClassVar[str]
+    suboption_value_delimiter: ClassVar[str] = "="
+
+    @classmethod
+    @final
+    def compute_buildctl_options(
+        cls, value, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        if value is not None:
+            yield cls.buildctl_option
+            yield f"{cls.suboption}{cls.suboption_value_delimiter}{value}"
+
+
+class BuildctlOptionFieldMultiValueMixin(StringSequenceField, BuildctlOptionsFieldMixin, ABC):
+    """Inherit this mixin class to provide options in the form of `--flag=value1,value2` to
+    `buildctl build`."""
+
+    @classmethod
+    @final
+    def compute_buildctl_options(
+        cls,
+        value: Sequence[str] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
+    ) -> Iterator[str]:
+        if value:
+            yield f"{cls.buildctl_option}={','.join(value)}"
+
+
+class BuildctlLayeredOptionFieldMultiValueMixin(
+    StringSequenceField, BuildctlOptionsFieldMixin, ABC
+):
+    """Inherit this mixin class to provide layered options in the form of `--flag
+    suboption=value1,value2` to `buildctl build`.
+
+    You can override the option-values delimiter (default is `=`) by setting the
+    `suboption_value_delimiter` class variable.
+    """
+
+    suboption: ClassVar[str]
+    suboption_value_delimiter: ClassVar[str] = "="
+
+    @classmethod
+    @final
+    def compute_buildctl_options(
+        cls,
+        value: Sequence[str] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
+    ) -> Iterator[str]:
+        if value:
+            yield cls.buildctl_option
+            yield f"{cls.suboption}{cls.suboption_value_delimiter}{','.join(value)}"
+
+
+class BuildctlOptionFlagFieldMixin(BoolField, BuildctlOptionsFieldMixin, ABC):
+    """Inherit this mixin class to provide optional flags (i.e. add `--flag` only when the value is
+    `True`) to `buildctl build`."""
+
+    @classmethod
+    @final
+    def compute_buildctl_options(
+        cls, value: bool, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        if value:
+            yield f"{cls.buildctl_option}"
+
+
+class DockerImageTargetStageField(
+    DockerBuildOptionFieldValueMixin, BuildctlLayeredOptionFieldValueMixin, StringField
+):
+    alias = "target_stage"
+    help = help_text(
+        """
+        Specify target build stage, rather than building the entire `Dockerfile`.
+
+        When using multi-stage build, you may name your stages, and can target them when building
+        to only selectively build a certain stage. See also the `--docker-build-target-stage`
+        option.
+
+        Read more about [multi-stage Docker builds](https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage)
+        """
+    )
+    docker_build_option = "--target"
+    buildctl_option = "--opt"
+    suboption = "target"
+
+    @staticmethod
+    def validate_options(options: DockerOptions, context: DockerBuildContext) -> bool:
+        # Defer to global option if set and matches a stage
+        return options.build_target_stage not in context.stages
+
+
+class DockerImageBuildImageLabelsOptionField(
+    DockerBuildOptionsFieldMixin,
+    BuildctlOptionsFieldMixin,
+    DictStringToStringField,
+):
     alias = "image_labels"
     help = help_text(
         f"""
@@ -273,13 +551,34 @@ class DockerImageBuildImageLabelsOptionField(DockerBuildOptionFieldMixin, DictSt
         """
     )
     docker_build_option = "--label"
+    buildctl_option = "--opt"
 
-    def option_values(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
-        for label, value in (self.value or {}).items():
-            yield f"{label}={value_formatter(value)}"
+    @classmethod
+    def compute_docker_build_options(
+        cls,
+        value: Mapping[str, str] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
+    ) -> Iterator[str]:
+        for label, v in (value or {}).items():
+            yield cls.docker_build_option
+            yield f"{label}={value_formatter(v)}"
+
+    @classmethod
+    def compute_buildctl_options(
+        cls,
+        value: Mapping[str, str] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
+    ) -> Iterator[str]:
+        for label, v in (value or {}).items():
+            yield cls.buildctl_option
+            yield f"label:{label}={value_formatter(v)}"
 
 
-class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStringToStringField):
+class DockerImageBuildImageExtraHostsField(DockerBuildOptionsFieldMixin, DictStringToStringField):
     alias = "extra_build_hosts"
     help = help_text(
         """
@@ -290,57 +589,25 @@ class DockerImageBuildImageExtraHostsField(DockerBuildOptionFieldMixin, DictStri
     )
     docker_build_option = "--add-host"
 
-    def option_values(
-        self, value_formatter: OptionValueFormatter, global_build_hosts_options: dict = {}
+    @classmethod
+    def compute_docker_build_options(
+        cls,
+        value: Mapping[str, str] | None,
+        *,
+        docker: DockerOptions,
+        value_formatter: OptionValueFormatter,
     ) -> Iterator[str]:
-        if self.value:
-            merged_values = {**global_build_hosts_options, **self.value}
-            for label, value in merged_values.items():
-                yield f"{label}:{value_formatter(value)}"
-
-
-class DockerBuildOptionFieldMultiValueDictMixin(DictStringToStringField):
-    """Inherit this mixin class to provide options in the form of `--flag=key1=value1,key2=value2`
-    to `docker build`."""
-
-    docker_build_option: ClassVar[str]
-
-    @final
-    def options(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
-        if self.value:
-            yield f"{self.docker_build_option}=" + ",".join(
-                f"{key}={value_formatter(value)}" for key, value in self.value.items()
-            )
-
-
-class DockerBuildOptionFieldListOfMultiValueDictMixin(ListOfDictStringToStringField):
-    """Inherit this mixin class to provide multiple key-value options to docker build:
-
-    `--flag=key1=value1,key2=value2 --flag=key3=value3,key4=value4`
-    """
-
-    docker_build_option: ClassVar[str]
-
-    @final
-    def options(self, value_formatter: OptionValueFormatter, **kwargs) -> Iterator[str]:
-        if self.value:
-            for item in self.value:
-                yield f"{self.docker_build_option}=" + ",".join(
-                    f"{key}={value_formatter(value)}" for key, value in item.items()
-                )
-
-
-class DockerBuildKitOptionField:
-    """Mixin to indicate a BuildKit-specific option."""
-
-    @abstractmethod
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]: ...
-
-    required_help = "This option requires BuildKit to be enabled via the Docker subsystem options."
+        if value:
+            merged_values = {**docker.build_hosts, **value}
+            for label, v in merged_values.items():
+                yield cls.docker_build_option
+                yield f"{label}:{value_formatter(v)}"
 
 
 class DockerImageBuildImageCacheToField(
-    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
+    DockerBuildOptionFieldMultiValueDictMixin,
+    BuildctlOptionFieldMultiValueDictMixin,
+    DictStringToStringField,
 ):
     alias = "cache_to"
     help = help_text(
@@ -351,7 +618,7 @@ class DockerImageBuildImageCacheToField(
         multiple cache sources - Pants will pass these as multiple `--cache_from` arguments to the
         Docker CLI. Docker will only use the first cache hit (i.e. the image exists) in the build.
 
-        {DockerBuildKitOptionField.required_help}
+        If you're using the legacy builder, this option is not supported.
 
         Example:
 
@@ -371,19 +638,24 @@ class DockerImageBuildImageCacheToField(
         """
     )
     docker_build_option = "--cache-to"
+    buildctl_option = "--export-cache"
+
+    @staticmethod
+    def validate_options(options: DockerOptions, context: DockerBuildContext) -> bool:
+        return not options.build_no_cache
 
 
 class DockerImageBuildImageCacheFromField(
     DockerBuildOptionFieldListOfMultiValueDictMixin,
+    BuildctlOptionFieldListOfMultiValueDictMixin,
     ListOfDictStringToStringField,
-    DockerBuildKitOptionField,
 ):
     alias = "cache_from"
     help = help_text(
         f"""
         Use external cache sources when building the image.
 
-        {DockerBuildKitOptionField.required_help}
+        If you're using the legacy builder, this option is not supported.
 
         Example:
 
@@ -409,18 +681,20 @@ class DockerImageBuildImageCacheFromField(
         """
     )
     docker_build_option = "--cache-from"
+    buildctl_option = "--import-cache"
+
+    @staticmethod
+    def validate_options(options: DockerOptions, context: DockerBuildContext) -> bool:
+        return not options.build_no_cache
 
 
-class DockerImageBuildImageOutputField(
-    DockerBuildOptionFieldMultiValueDictMixin, DictStringToStringField, DockerBuildKitOptionField
-):
+class DockerImageBuildImageOutputField(DictStringToStringField):
     alias = "output"
-    default = FrozenDict({"type": "docker"})
     help = help_text(
         f"""
         Sets the export action for the build result.
 
-        {DockerBuildKitOptionField.required_help}
+        If you're using the legacy builder, this option is not supported.
 
         When using `pants publish` to publish Docker images to a registry, the output type
         must be 'docker', as `publish` expects that the built images exist in the local
@@ -429,11 +703,12 @@ class DockerImageBuildImageOutputField(
         {_interpolation_help.format(kind="Values")}
         """
     )
-    docker_build_option = "--output"
 
 
 class DockerImageBuildSecretsOptionField(
-    AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
+    AsyncFieldMixin,
+    ValidateOptionsMixin,
+    DictStringToStringField,
 ):
     alias = "secrets"
     help = help_text(
@@ -459,9 +734,12 @@ class DockerImageBuildSecretsOptionField(
         """
     )
 
+    buildctl_option = "--secret"
     docker_build_option = "--secret"
 
-    def option_values(self, **kwargs) -> Iterator[str]:
+    def buildctl_options(
+        self, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
         # os.path.join() discards preceding parts if encountering an abs path, e.g. if the secret
         # `path` is an absolute path, the `buildroot` and `spec_path` will not be considered.  Also,
         # an empty path part is ignored.
@@ -471,11 +749,19 @@ class DockerImageBuildSecretsOptionField(
                 self.address.spec_path if re.match(r"\.{1,2}/", path) else "",
                 os.path.expanduser(path),
             )
-
+            yield self.buildctl_option
             yield f"id={secret},src={os.path.normpath(full_path)}"
 
+    def docker_build_options(
+        self, *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        return self.buildctl_options(docker=docker, value_formatter=value_formatter)
 
-class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequenceField):
+
+class DockerImageBuildSSHOptionField(
+    DockerBuildkitPassthroughFieldMixin,
+    StringSequenceField,
+):
     alias = "ssh"
     default = ()
     help = help_text(
@@ -493,34 +779,15 @@ class DockerImageBuildSSHOptionField(DockerBuildOptionFieldMixin, StringSequence
         """
     )
 
-    docker_build_option = "--ssh"
+    buildctl_option = "--ssh"
 
-    def option_values(self, **kwargs) -> Iterator[str]:
-        yield from cast("tuple[str]", self.value)
-
-
-class DockerBuildOptionFieldValueMixin(Field):
-    """Inherit this mixin class to provide unary options (i.e. option in the form of `--flag=value`)
-    to `docker build`."""
-
-    docker_build_option: ClassVar[str]
-
-    @final
-    def options(self, *args, **kwargs) -> Iterator[str]:
-        if self.value is not None:
-            yield f"{self.docker_build_option}={self.value}"
-
-
-class DockerBuildOptionFieldMultiValueMixin(StringSequenceField):
-    """Inherit this mixin class to provide options in the form of `--flag=value1,value2` to `docker
-    build`."""
-
-    docker_build_option: ClassVar[str]
-
-    @final
-    def options(self, *args, **kwargs) -> Iterator[str]:
-        if self.value:
-            yield f"{self.docker_build_option}={','.join(list(self.value))}"
+    @classmethod
+    def compute_buildctl_options(
+        cls, value: Sequence[str], *, docker: DockerOptions, value_formatter: OptionValueFormatter
+    ) -> Iterator[str]:
+        for v in value:
+            yield cls.buildctl_option
+            yield v
 
 
 class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolField):
@@ -535,18 +802,6 @@ class DockerImageBuildPullOptionField(DockerBuildOptionFieldValueMixin, BoolFiel
         """
     )
     docker_build_option = "--pull"
-
-
-class DockerBuildOptionFlagFieldMixin(BoolField, ABC):
-    """Inherit this mixin class to provide optional flags (i.e. add `--flag` only when the value is
-    `True`) to `docker build`."""
-
-    docker_build_option: ClassVar[str]
-
-    @final
-    def options(self, *args, **kwargs) -> Iterator[str]:
-        if self.value:
-            yield f"{self.docker_build_option}"
 
 
 class DockerImageBuildSquashOptionField(DockerBuildOptionFlagFieldMixin):
@@ -576,7 +831,9 @@ class DockerImageBuildNetworkOptionField(DockerBuildOptionFieldValueMixin, Strin
 
 
 class DockerImageBuildPlatformOptionField(
-    DockerBuildOptionFieldMultiValueMixin, StringSequenceField
+    DockerBuildOptionFieldMultiValueMixin,
+    BuildctlLayeredOptionFieldMultiValueMixin,
+    StringSequenceField,
 ):
     alias = "build_platform"
     default = None
@@ -586,6 +843,8 @@ class DockerImageBuildPlatformOptionField(
         """
     )
     docker_build_option = "--platform"
+    buildctl_option = "--opt"
+    suboption = "platform"
 
 
 class DockerImageRunExtraArgsField(StringSequenceField):
