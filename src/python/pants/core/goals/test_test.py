@@ -41,6 +41,7 @@ from pants.core.goals.test import (
     run_tests,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+from pants.core.target_types import GenericTarget
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.addresses import Address
@@ -752,6 +753,44 @@ def test_runtime_package_dependencies() -> None:
     built_package = result[0]
     snapshot = rule_runner.request(Snapshot, [built_package.digest])
     assert snapshot.files == ("src.py/main.pex",)
+
+
+def test_runtime_package_dependencies_via_generic_target() -> None:
+    """A `target()` listed in runtime_package_dependencies should be unwrapped so that its
+    packageable dependencies are built, rather than being silently ignored."""
+    rule_runner = PythonRuleRunner(
+        rules=[
+            build_runtime_package_dependencies,
+            *pex_from_targets.rules(),
+            *package_pex_binary.rules(),
+            *python_target_type_rules(),
+            QueryRule(BuiltPackageDependencies, [BuildPackageDependenciesRequest]),
+        ],
+        target_types=[PythonSourcesGeneratorTarget, PexBinary, GenericTarget],
+    )
+    rule_runner.set_options(args=[], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+
+    rule_runner.write_files(
+        {
+            "src/py/main_a.py": "",
+            "src/py/main_b.py": "",
+            "src/py/BUILD": dedent(
+                """\
+                pex_binary(name='bin_a', entry_point='main_a.py')
+                pex_binary(name='bin_b', entry_point='main_b.py')
+                target(
+                    name='all_bins',
+                    dependencies=[':bin_a', ':bin_b'],
+                )
+                """
+            ),
+        }
+    )
+    input_field = RuntimePackageDependenciesField(["src/py:all_bins"], Address("fake"))
+    result = rule_runner.request(
+        BuiltPackageDependencies, [BuildPackageDependenciesRequest(input_field)]
+    )
+    assert len(result) == 2
 
 
 def test_timeout_calculation() -> None:
