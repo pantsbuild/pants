@@ -453,6 +453,8 @@ impl Sandboxer {
         // Pass the calling code's global log level to the sandboxer process.
         // TODO: Check for a relevant per-target log level?
         cmd.env("RUST_LOG", PANTS_LOGGER.global_level().as_str());
+        cmd.stdin(Stdio::null());
+        cmd.stdout(Stdio::null());
         cmd.stderr(Stdio::from(logfile.into_std().await));
 
         debug!(
