@@ -3107,13 +3107,18 @@ def test_global_extra_options_overridden_by_target_extra_options(
 def test_global_build_no_cache_options_exits(
     rule_runner: RuleRunner,
 ) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_EXTRA_OPTIONS": '["--no-cache"]',
+        },
+    )
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
                 """\
                 docker_image(
                   name="img1",
-                  no_cache=True,
                 )
                 """
             ),
@@ -3139,8 +3144,7 @@ def test_global_build_no_cache_options_overridden_by_target_extra_options(
                 """\
                 docker_image(
                   name="img1",
-                  no_cache=False,
-                  extra_build_options=["--no_cache"],
+                  extra_build_options=["--no-cache"],
                 )
                 """
             ),
