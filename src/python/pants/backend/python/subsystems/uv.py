@@ -21,14 +21,13 @@ class Uv(TemplatedExternalTool):
     name = "uv"
     help = "The uv Python package manager (https://github.com/astral-sh/uv)."
 
-    default_version = "0.6.15"
+    default_version = "0.11.6"
     default_known_versions = [
-        "0.6.15|macos_x86_64|97adf61511c0f6ea42c090443c38d8d71116b78ae626363f9f149924c91ae886|16612743",
-        "0.6.15|macos_arm64|1c5b25f75c6438b6910dbc4c6903debe53f31ee14aee55d02243dfe7bf7c9f72|15356260",
-        "0.6.15|linux_x86_64|78289c93836cb32b8b24e3216b5b316e7fdf483365de2fc571844d308387e8a4|17337856",
-        "0.6.15|linux_arm64|183cebae8c9d91bbd48219f9006a5c0c41c90a075d6724aec53a7ea0503c665a|15820802",
+        "0.11.6|macos_arm64 |4b69a4e366ec38cd5f305707de95e12951181c448679a00dce2a78868dfc9f5b|20807020",
+        "0.11.6|linux_x86_64|aa342a53abe42364093506d7704214d2cdca30b916843e520bc67759a5d20132|24460747",
+        "0.11.6|linux_arm64 |d14ebd6f200047264152daaf97b8bd36c7885a5033e9e8bba8366cb0049c0d00|22576913",
     ]
-    version_constraints = ">=0.6.0,<1.0"
+    version_constraints = ">=0.7.4,<1.0"
 
     default_url_template = (
         "https://github.com/astral-sh/uv/releases/download/{version}/uv-{platform}.tar.gz"
@@ -37,7 +36,6 @@ class Uv(TemplatedExternalTool):
         "linux_arm64": "aarch64-unknown-linux-musl",
         "linux_x86_64": "x86_64-unknown-linux-musl",
         "macos_arm64": "aarch64-apple-darwin",
-        "macos_x86_64": "x86_64-apple-darwin",
     }
 
     def generate_exe(self, plat: Platform) -> str:
