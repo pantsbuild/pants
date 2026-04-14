@@ -51,17 +51,20 @@ def assert_deps_parsed(
     filename: str = "project/foo.py",
     string_imports: bool = True,
     string_imports_min_dots: int = 2,
+    string_import_ignore: list[str] | None = None,
     assets: bool = True,
     assets_min_slashes: int = 1,
 ) -> None:
     expected_imports = expected_imports or {}
     expected_assets = expected_assets or []
     expected_explicit_deps = expected_explicit_deps or {}
+    string_import_ignore = string_import_ignore or []
 
     rule_runner.set_options(
         [
             f"--python-infer-string-imports={string_imports}",
             f"--python-infer-string-imports-min-dots={string_imports_min_dots}",
+            f"--python-infer-string-import-ignore={string_import_ignore}",
             f"--python-infer-assets={assets}",
             f"--python-infer-assets-min-slashes={assets_min_slashes}",
             "--python-infer-use-rust-parser",
@@ -383,6 +386,48 @@ def test_imports_from_strings(rule_runner: RuleRunner, min_dots: int) -> None:
     )
     assert_deps_parsed(
         rule_runner, content, string_imports=False, expected_imports={}, assets=False
+    )
+
+
+def test_string_import_ignore(rule_runner: RuleRunner) -> None:
+    content = dedent(
+        """\
+        modules = [
+            "a.b.c",
+            "a.b.c.d",
+            "x.y.z",
+            "foo.generated.module",
+            "foo.generated.deep.module",
+        ]
+        """
+    )
+    assert_deps_parsed(
+        rule_runner,
+        content,
+        assets=False,
+        string_import_ignore=["a.b.c", "foo.generated.*"],
+        expected_imports={
+            "a.b.c.d": ImpInfo(lineno=3, weak=True),
+            "x.y.z": ImpInfo(lineno=4, weak=True),
+        },
+    )
+
+
+def test_string_import_ignore_does_not_affect_assets(rule_runner: RuleRunner) -> None:
+    content = dedent(
+        """\
+        paths = [
+            "data/subdir/file.json",
+            "other/subdir/thing.txt",
+        ]
+        """
+    )
+    assert_deps_parsed(
+        rule_runner,
+        content,
+        string_imports=False,
+        string_import_ignore=["data.subdir.file"],
+        expected_assets=["data/subdir/file.json", "other/subdir/thing.txt"],
     )
 
 
