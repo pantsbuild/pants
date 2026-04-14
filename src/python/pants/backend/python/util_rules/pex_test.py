@@ -7,10 +7,10 @@ import os.path
 import pkgutil
 import re
 import shutil
+import subprocess
 import textwrap
 import zipfile
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 import requests
@@ -21,7 +21,6 @@ from packaging.version import Version
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.subsystems.uv import DownloadedUv
 from pants.backend.python.target_types import EntryPoint, PexCompletePlatformsField
 from pants.backend.python.util_rules import pex_test_utils
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -38,15 +37,12 @@ from pants.backend.python.util_rules.pex import (
     VenvPex,
     VenvPexProcess,
     _build_pex_description,
-    _build_uv_venv,
     _BuildPexPythonSetup,
     _BuildPexRequirementsSetup,
     _determine_pex_python_and_platforms,
     _setup_pex_requirements,
-    _UvVenvRequest,
 )
 from pants.backend.python.util_rules.pex import rules as pex_rules
-from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
@@ -978,169 +974,106 @@ experimental_wrap_as_resources(name="codegen", inputs=[':complete_platforms'], )
     assert complete_platforms.digest != EMPTY_DIGEST
 
 
-def create_uv_venv_test_inputs(
-    rule_runner: RuleRunner,
-    *,
-    description: str,
-) -> tuple[_UvVenvRequest, Lockfile, LoadedLockfile]:
-    resolve = Resolve("python-default", False)
-    lockfile = Lockfile(
-        "3rdparty/python/default.lock", url_description_of_origin="test", resolve_name=resolve.name
-    )
-    loaded_lockfile = LoadedLockfile(
-        lockfile_digest=rule_runner.make_snapshot_of_empty_files([lockfile.url]).digest,
-        lockfile_path=lockfile.url,
-        metadata=None,
-        requirement_estimate=1,
-        is_pex_native=True,
-        as_constraints_strings=None,
-        original_lockfile=lockfile,
-    )
-    uv_request = _UvVenvRequest(
-        req_strings=("ansicolors==1.1.8",),
-        requirements=PexRequirements(("ansicolors==1.1.8",), from_superset=resolve),
-        python_path="/usr/bin/python3",
-        description=description,
-    )
-    return uv_request, lockfile, loaded_lockfile
+def test_uv_pex_builder_vcs_requirement_with_lockfile(tmp_path) -> None:
+    """uv builder should handle VCS requirements via pex3 lock export-subset.
 
-
-def run_uv_venv_with_mocks(
-    uv_request: _UvVenvRequest,
-    lockfile: Lockfile,
-    loaded_lockfile: LoadedLockfile,
-    *,
-    mock_fallible_to_exec_result_or_raise,
-    mock_create_digest=None,
-):
-    pex_env = SimpleNamespace(append_only_caches={})
-    pex_env.in_sandbox = lambda *, working_directory: pex_env
-    pex_env.environment_dict = lambda *, python_configured: {}
-
-    return run_rule_with_mocks(
-        _build_uv_venv,
-        rule_args=[uv_request, pex_env],
-        mock_calls={
-            "pants.backend.python.subsystems.uv.download_uv_binary": lambda: DownloadedUv(
-                digest=EMPTY_DIGEST,
-                exe="uv",
-                args_for_uv_pip_install=(),
-            ),
-            "pants.backend.python.util_rules.pex_requirements.get_lockfile_for_resolve": lambda _: lockfile,
-            "pants.backend.python.util_rules.pex_requirements.load_lockfile": lambda _: loaded_lockfile,
-            "pants.engine.process.fallible_to_exec_result_or_raise": mock_fallible_to_exec_result_or_raise,
-            "pants.engine.intrinsics.create_digest": mock_create_digest or (lambda _: EMPTY_DIGEST),
-            "pants.engine.intrinsics.merge_digests": lambda _: EMPTY_DIGEST,
-        },
+    Without lock export-subset, VCS requirements in a lockfile would be formatted
+    as ``name==version`` which loses the VCS URL, causing uv to fail resolution.
+    """
+    rule_runner = RuleRunner(
+        rules=[
+            *pex_test_utils.rules(),
+            *pex_rules(),
+            *lockfile.rules(),
+            QueryRule(GenerateLockfileResult, [GeneratePythonLockfile]),
+        ],
+        bootstrap_args=[f"--named-caches-dir={tmp_path}"],
     )
 
-
-def test_build_uv_venv_uses_exported_lockfile_with_no_deps(rule_runner: RuleRunner) -> None:
-    uv_request, lockfile, loaded_lockfile = create_uv_venv_test_inputs(
-        rule_runner, description="test uv export path"
-    )
-    exported_digest = rule_runner.make_snapshot(
-        {"__uv_requirements.txt": "ansicolors==1.1.8\n"}
-    ).digest
-    install_argv: tuple[str, ...] | None = None
-
-    def mock_fallible_to_exec_result_or_raise(*args, **kwargs):
-        nonlocal install_argv
-        req = args[0]
-        if isinstance(req, PexCliProcess):
-            assert req.subcommand == ("lock", "export-subset")
-            assert "--format" in req.extra_args
-            export_format = req.extra_args[req.extra_args.index("--format") + 1]
-            assert export_format in {"pip-no-hashes", "pep-751"}
-            # Verify requirement strings are passed as positional args.
-            assert "ansicolors==1.1.8" in req.extra_args
-            # Verify --lock is used instead of positional lockfile path.
-            assert "--lock" in req.extra_args
-            return SimpleNamespace(output_digest=exported_digest)
-        assert isinstance(req, Process)
-        if req.argv[1:3] == ("pip", "install"):
-            install_argv = req.argv
-        return SimpleNamespace(output_digest=EMPTY_DIGEST)
-
-    def mock_create_digest(request: CreateDigest) -> Digest:
-        for entry in request:
-            assert not (isinstance(entry, FileContent) and entry.path == "__uv_requirements.txt"), (
-                "exported lockfile path should not synthesize requirements content"
-            )
-        return EMPTY_DIGEST
-
-    result = run_uv_venv_with_mocks(
-        uv_request,
-        lockfile,
-        loaded_lockfile,
-        mock_fallible_to_exec_result_or_raise=mock_fallible_to_exec_result_or_raise,
-        mock_create_digest=mock_create_digest,
-    )
-
-    assert result.venv_digest == EMPTY_DIGEST
-    assert install_argv is not None
-    assert "--no-deps" in install_argv
-
-
-def test_build_uv_venv_falls_back_when_lock_export_has_no_digest(rule_runner: RuleRunner) -> None:
-    uv_request, lockfile, loaded_lockfile = create_uv_venv_test_inputs(
-        rule_runner, description="test uv fallback path"
-    )
-    export_attempts = 0
-    install_argv: tuple[str, ...] | None = None
-    synthesized_reqs: bytes | None = None
-
-    def mock_fallible_to_exec_result_or_raise(*args, **kwargs):
-        nonlocal export_attempts, install_argv
-        req = args[0]
-        if isinstance(req, PexCliProcess):
-            export_attempts += 1
-            return SimpleNamespace(output_digest=None)
-        assert isinstance(req, Process)
-        if req.argv[1:3] == ("pip", "install"):
-            install_argv = req.argv
-        return SimpleNamespace(output_digest=EMPTY_DIGEST)
-
-    def mock_create_digest(request: CreateDigest) -> Digest:
-        nonlocal synthesized_reqs
-        for entry in request:
-            if isinstance(entry, FileContent) and entry.path == "__uv_requirements.txt":
-                synthesized_reqs = entry.content
-        return EMPTY_DIGEST
-
-    result = run_uv_venv_with_mocks(
-        uv_request,
-        lockfile,
-        loaded_lockfile,
-        mock_fallible_to_exec_result_or_raise=mock_fallible_to_exec_result_or_raise,
-        mock_create_digest=mock_create_digest,
-    )
-
-    assert result.venv_digest == EMPTY_DIGEST
-    assert export_attempts == 1
-    assert install_argv is not None
-    assert "--no-deps" not in install_argv
-    assert synthesized_reqs == b"ansicolors==1.1.8\n"
-
-
-def test_build_uv_venv_propagates_unexpected_export_errors(rule_runner: RuleRunner) -> None:
-    uv_request, lockfile, loaded_lockfile = create_uv_venv_test_inputs(
-        rule_runner, description="test unexpected error path"
-    )
-
-    def mock_fallible_to_exec_result_or_raise(*args, **kwargs):
-        req = args[0]
-        if isinstance(req, PexCliProcess):
-            raise ValueError("unexpected failure type")
-        return SimpleNamespace(output_digest=EMPTY_DIGEST)
-
-    with pytest.raises(ValueError, match="unexpected failure type"):
-        run_uv_venv_with_mocks(
-            uv_request,
-            lockfile,
-            loaded_lockfile,
-            mock_fallible_to_exec_result_or_raise=mock_fallible_to_exec_result_or_raise,
+    # Create a minimal Python package in a local git repo.
+    pkg_dir = tmp_path / "projects" / "mypkg"
+    pkg_dir.mkdir(parents=True)
+    (pkg_dir / "pyproject.toml").write_text(
+        textwrap.dedent(
+            """\
+            [build-system]
+            requires = ["setuptools==66.1.0", "wheel==0.37.0"]
+            build-backend = "setuptools.build_meta"
+            """
         )
+    )
+    (pkg_dir / "setup.cfg").write_text(
+        textwrap.dedent(
+            """\
+            [metadata]
+            name = mypkg
+            version = 0.1.0
+            """
+        )
+    )
+    (pkg_dir / "mypkg.py").write_text("hello = 'vcs_ok'\n")
+    subprocess.check_call(["git", "init"], cwd=pkg_dir)
+    subprocess.check_call(["git", "config", "user.name", "dummy"], cwd=pkg_dir)
+    subprocess.check_call(["git", "config", "user.email", "dummy@dummy.com"], cwd=pkg_dir)
+    subprocess.check_call(["git", "add", "--all"], cwd=pkg_dir)
+    subprocess.check_call(["git", "commit", "-m", "initial commit"], cwd=pkg_dir)
+    subprocess.check_call(["git", "branch", "v0.1.0"], cwd=pkg_dir)
+
+    vcs_req = f"mypkg @ git+file://localhost{pkg_dir.as_posix()}@v0.1.0"
+
+    # Generate a PEX-native lockfile containing the VCS requirement.
+    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    lock_result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GeneratePythonLockfile(
+                requirements=FrozenOrderedSet([vcs_req]),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=InterpreterConstraints([">=3.8,<3.15"]),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+                lock_style="universal",
+                complete_platforms=(),
+            )
+        ],
+    )
+    lock_digest_contents = rule_runner.request(DigestContents, [lock_result.digest])
+    assert len(lock_digest_contents) == 1
+    rule_runner.write_files({"test.lock": lock_digest_contents[0].content})
+
+    # Build a PEX with the uv builder using the lockfile resolve.
+    sources = rule_runner.request(
+        Digest,
+        [CreateDigest((FileContent("main.py", b"import mypkg; print(mypkg.hello)"),))],
+    )
+    pex_data = create_pex_and_get_all_data(
+        rule_runner,
+        pex_type=Pex,
+        requirements=PexRequirements(["mypkg"], from_superset=Resolve("test", False)),
+        main=EntryPoint("main"),
+        sources=sources,
+        additional_pants_args=(
+            "--python-pex-builder=uv",
+            "--python-enable-resolves",
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-invalid-lockfile-behavior=ignore",
+        ),
+        internal_only=False,
+    )
+    pex_exe = (
+        f"./{pex_data.sandbox_path}"
+        if pex_data.is_zipapp
+        else os.path.join(pex_data.sandbox_path, "__main__.py")
+    )
+    process = Process(
+        argv=(pex_exe,),
+        env={"PATH": os.getenv("PATH", "")},
+        input_digest=pex_data.pex.digest,
+        description="Run uv-built pex with VCS requirement from lockfile",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+    assert b"vcs_ok" in result.stdout
 
 
 def test_uv_pex_builder_resolves_dependencies(rule_runner: RuleRunner) -> None:
