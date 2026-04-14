@@ -86,13 +86,13 @@ from pants.engine.intrinsics import (
     add_prefix,
     create_digest,
     digest_to_snapshot,
-    get_digest_contents,
     merge_digests,
     remove_prefix,
 )
 from pants.engine.process import (
     Process,
     ProcessCacheScope,
+    ProcessExecutionFailure,
     ProcessResult,
     execute_process_or_raise,
     fallible_to_exec_result_or_raise,
@@ -561,10 +561,13 @@ async def _build_uv_venv(
         uv_request.description,
     )
 
-    # Try to extract the full resolved package list from the lockfile
-    # so we can pass pinned versions with --no-deps (reproducible).
-    # Fall back to letting uv resolve transitively if no lockfile.
-    all_resolved_reqs: tuple[str, ...] = ()
+    # Try to export a subset of the lockfile via `pex3 lock export-subset` so we
+    # can pass only the needed locked requirements with --no-deps (reproducible).
+    # This uses Pex's stable CLI rather than parsing the internal lockfile JSON
+    # directly.  Fall back to letting uv resolve transitively if no lockfile.
+    exported_reqs_digest: Digest | None = None
+    reqs_file = "pylock.toml"
+
     if isinstance(uv_request.requirements, PexRequirements) and isinstance(
         uv_request.requirements.from_superset, Resolve
     ):
@@ -574,42 +577,53 @@ async def _build_uv_venv(
         loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
         if loaded_lockfile.lockfile_format == LockfileFormat.Pex:
             try:
-                digest_contents = await get_digest_contents(loaded_lockfile.lockfile_digest)
-                lockfile_bytes = next(
-                    c.content for c in digest_contents if c.path == loaded_lockfile.lockfile_path
+                export_result = await fallible_to_exec_result_or_raise(
+                    **implicitly(
+                        PexCliProcess(
+                            subcommand=("lock", "export-subset"),
+                            extra_args=(
+                                *uv_request.req_strings,
+                                "--lock",
+                                loaded_lockfile.lockfile_path,
+                                "--format",
+                                "pep-751",
+                                "-o",
+                                reqs_file,
+                            ),
+                            additional_input_digest=loaded_lockfile.lockfile_digest,
+                            description=f"Export lockfile subset for {uv_request.description}",
+                            output_files=(reqs_file,),
+                        )
+                    )
                 )
-                lockfile_data = json.loads(lockfile_bytes)
-                all_resolved_reqs = tuple(
-                    f"{req['project_name']}=={req['version']}"
-                    for resolve in lockfile_data.get("locked_resolves", ())
-                    for req in resolve.get("locked_requirements", ())
-                )
-            except (json.JSONDecodeError, KeyError, StopIteration) as e:
+                exported_reqs_digest = export_result.output_digest
+            except ProcessExecutionFailure as e:
                 logger.warning(
-                    "pex_builder=uv: failed to parse lockfile for %s: %s. "
+                    "pex_builder=uv: failed to export lockfile subset for %s: %s. "
                     "Falling back to transitive uv resolution.",
                     uv_request.description,
                     e,
                 )
-                all_resolved_reqs = ()
 
-    uv_reqs = all_resolved_reqs or uv_request.req_strings
+    use_exported_lockfile = exported_reqs_digest is not None
 
-    if all_resolved_reqs:
+    if use_exported_lockfile:
         logger.debug(
-            "pex_builder=uv: using %d pinned packages from lockfile with --no-deps for %s",
-            len(all_resolved_reqs),
+            "pex_builder=uv: using exported lockfile subset with --no-deps for %s",
             uv_request.description,
         )
+        assert exported_reqs_digest is not None
+        reqs_digest = exported_reqs_digest
     else:
         logger.debug(
             "pex_builder=uv: no lockfile available, using transitive uv resolution for %s",
             uv_request.description,
         )
-
-    reqs_file = "__uv_requirements.txt"
-    reqs_content = "\n".join(uv_reqs) + "\n"
-    reqs_digest = await create_digest(CreateDigest([FileContent(reqs_file, reqs_content.encode())]))
+        reqs_file = "__uv_requirements.txt"
+        reqs_content = "\n".join(uv_request.req_strings) + "\n"
+        reqs_digest = await create_digest(
+            CreateDigest([FileContent(reqs_file, reqs_content.encode())])
+        )
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
     uv_cache_dir = ".cache/uv_cache"
@@ -662,7 +676,7 @@ async def _build_uv_venv(
         os.path.join(_UV_VENV_DIR, "bin", "python"),
         "-r",
         reqs_file,
-        *(("--no-deps",) if all_resolved_reqs else ()),
+        *(("--no-deps",) if use_exported_lockfile else ()),
         *downloaded_uv.args_for_uv_pip_install,
     )
 
