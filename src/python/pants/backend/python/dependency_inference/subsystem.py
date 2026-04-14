@@ -66,19 +66,19 @@ class PythonInferSubsystem(Subsystem):
             """
         ),
     )
-    ignored_string_imports = StrListOption(
+    string_import_ignore = StrListOption(
         default=[],
         help=softwrap(
             """
-            Dynamic import strings that should be ignored for string-based dependency inference.
+            Dotted string values that should be ignored for string-based dependency inference.
 
-            If there are many string values that look like imports but should not become inferred
-            dependencies, you can list them here instead of annotating each occurrence with
+            If there are many string values that look like module or class references but should not
+            become inferred dependencies, you can list them here instead of annotating each occurrence with
             `# pants: no-infer-dep`.
 
-            You can declare a specific import or a package path. For example,
-            `ignored-string-imports=["foo.generated", "acme.plugins.dev_only"]` will ignore
-            both `foo.generated` and nested values such as `foo.generated.loader`.
+            Values are glob patterns matched against the full dotted string. For example,
+            `string-import-ignore=["foo.generated.*", "acme.plugins.dev_only"]` will ignore
+            `foo.generated.loader` and `acme.plugins.dev_only`.
             """
         ),
     )
