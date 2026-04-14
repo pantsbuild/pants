@@ -423,10 +423,10 @@ def get_build_options(
             )
 
     if target_stage:
-        extra_options.extend(("--target", target_stage))
+        extra_options = extra_options + ("--target", target_stage)
 
     if global_build_no_cache_option:
-        extra_options.extend("--no-cache")
+        extra_options = extra_options + ("--no-cache",)
 
     # Append extra options last so that they take precedence over the structured fields above.
     yield from extra_options
