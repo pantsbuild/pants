@@ -80,9 +80,6 @@ class Platform(Enum):
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS14_ARM64}
 SELF_HOSTED = {Platform.LINUX_ARM64}
-CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
-    "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
-)
 
 # We don't specify a patch version so that we get the latest, which comes pre-installed:
 #  https://github.com/actions/setup-python#available-versions-of-python
@@ -2020,34 +2017,6 @@ def generate() -> dict[Path, str]:
         },
     )
 
-    ignore_advisories = " ".join(
-        f"--ignore {adv_id}" for adv_id in CARGO_AUDIT_IGNORED_ADVISORY_IDS
-    )
-    audit_yaml = render_workflow(
-        {
-            "name": "Cargo Audit",
-            "on": {
-                # 08:11 UTC / 12:11AM PST, 1:11AM PDT: arbitrary time after hours.
-                "schedule": [{"cron": "11 8 * * *"}],
-                # Allow manually triggering this workflow
-                "workflow_dispatch": None,
-            },
-            "jobs": {
-                "audit": {
-                    "runs-on": "ubuntu-22.04",
-                    "if": IS_PANTS_OWNER,
-                    "steps": [
-                        *checkout(),
-                        {
-                            "name": "Cargo audit (for security vulnerabilities)",
-                            "run": f"./cargo install cargo-audit --locked\n./cargo audit {ignore_advisories}\n",
-                        },
-                    ],
-                }
-            },
-        }
-    )
-
     cc_jobs, cc_inputs = cache_comparison_jobs_and_inputs()
     cache_comparison_yaml = render_workflow(
         {
@@ -2090,7 +2059,6 @@ def generate() -> dict[Path, str]:
     )
 
     return {
-        Path(".github/workflows/audit.yaml"): audit_yaml,
         Path(".github/workflows/cache_comparison.yaml"): cache_comparison_yaml,
         Path(".github/workflows/test.yaml"): test_yaml,
         Path(".github/workflows/release.yaml"): release_yaml,
