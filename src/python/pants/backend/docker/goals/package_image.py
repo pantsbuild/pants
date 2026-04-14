@@ -387,10 +387,11 @@ def get_build_options(
                 DockerBuildOptionFlagFieldMixin,
             ),
         ):
-   
-            flag = getattr(field_type, "docker_build_option", None) # get the flag name if it exists such as --pull or --network, etc.
+            flag = getattr(
+                field_type, "docker_build_option", None
+            )  # get the flag name if it exists such as --pull or --network, etc.
             if flag and flag in overridden_flags:
-                continue # skip this field since its flag is already covered by extra_options
+                continue  # skip this field since its flag is already covered by extra_options
 
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias

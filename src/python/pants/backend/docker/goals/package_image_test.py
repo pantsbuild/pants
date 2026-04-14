@@ -2974,6 +2974,7 @@ def test_field_set_pushes_on_package(output: dict | None, expected: bool) -> Non
     )
     assert field_set.pushes_on_package() is expected
 
+
 def test_global_build_extra_options(rule_runner: RuleRunner) -> None:
     """Global build_extra_options from [docker] should be passed to the docker build command."""
     rule_runner.set_options(
@@ -3066,6 +3067,7 @@ def test_extra_build_options_overrides_pull_field(rule_runner: RuleRunner) -> No
         build_process_assertions=check_build_process,
     )
 
+
 def test_global_extra_options_overridden_by_target_extra_options(
     rule_runner: RuleRunner,
 ) -> None:
@@ -3127,13 +3129,14 @@ def test_global_build_no_cache_options_exits(
 
     def check_build_process(result: DockerImageBuildProcess):
         argv = result.process.argv
-        assert "--no-cache" in argv 
+        assert "--no-cache" in argv
 
     assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
         build_process_assertions=check_build_process,
     )
+
 
 def test_global_build_no_cache_options_overridden_by_target_extra_options(
     rule_runner: RuleRunner,
@@ -3153,7 +3156,7 @@ def test_global_build_no_cache_options_overridden_by_target_extra_options(
 
     def check_build_process(result: DockerImageBuildProcess):
         argv = result.process.argv
-        assert "--no-cache" in argv 
+        assert "--no-cache" in argv
 
     assert_build_process(
         rule_runner,
