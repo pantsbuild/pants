@@ -11,7 +11,7 @@
         "minikube": "none"
       },
       "ghcr.io/devcontainers/features/python:1": {
-        "version": "3.11.11"
+        "version": "3.14.4"
       },
       "ghcr.io/devcontainers/features/rust:1": {
         "profile": "complete"
@@ -48,9 +48,9 @@
           "python.analysis.extraPaths": ["src/python"],
           "black-formatter.args": ["--config=pyproject.toml"],
           "flake8.args": ["--config=build-support/flake8/.flake8"],
-          "flake8.path": ["dist/export/python/virtualenvs/flake8/3.11.11/bin/flake8"],
+          "flake8.path": ["dist/export/python/virtualenvs/flake8/3.14.4/bin/flake8"],
           "mypy-type-checker.args": ["--config-file=pyproject.toml"],
-          "mypy-type-checker.path": ["dist/export/python/virtualenvs/mypy/3.11.11/bin/mypy"],
+          "mypy-type-checker.path": ["dist/export/python/virtualenvs/mypy/3.14.4/bin/mypy"],
           "rust-analyzer.linkedProjects": ["src/rust/engine/Cargo.toml"]
         }
       }
