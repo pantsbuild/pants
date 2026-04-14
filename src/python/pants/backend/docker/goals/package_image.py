@@ -423,13 +423,12 @@ def get_build_options(
                 )
             )
 
-    if target_stage:
+    if target_stage and "--target" not in overridden_flags:
         extra_options = extra_options + ("--target", target_stage)
 
-    if global_build_no_cache_option:
+    if global_build_no_cache_option and "--no-cache" not in overridden_flags:
         extra_options = extra_options + ("--no-cache",)
 
-    # Append extra options last so that they take precedence over the structured fields above.
     yield from extra_options
 
 

@@ -3006,7 +3006,7 @@ def test_global_build_extra_options(rule_runner: RuleRunner) -> None:
 
 
 def test_extra_build_options_global_and_target_merged(rule_runner: RuleRunner) -> None:
-    """Global options come first; per-target options come last."""
+    """Global options and per-target options should be merged correctly."""
     rule_runner.set_options(
         [],
         env={
@@ -3072,7 +3072,7 @@ def test_global_extra_options_overridden_by_target_extra_options(
     rule_runner: RuleRunner,
 ) -> None:
     """When both global and target extra options specify the same flag, the target wins
-    (it comes last) and the global does not appear."""
+    and the global does not appear."""
     rule_runner.set_options(
         [],
         env={
