@@ -6,6 +6,7 @@ import logging
 import os
 from collections.abc import Iterable
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 
 from pants.backend.python.dependency_inference.subsystem import PythonInferSubsystem
 from pants.core.util_rules.source_files import SourceFiles
@@ -87,11 +88,8 @@ class ParserScript:
 _scripts_package = "pants.backend.python.dependency_inference.scripts"
 
 
-def _is_ignored_string_import(module_path: str, ignored_paths: tuple[str, ...]) -> bool:
-    return any(
-        module_path == ignored_path or module_path.startswith(f"{ignored_path}.")
-        for ignored_path in ignored_paths
-    )
+def _is_ignored_string_import(module_path: str, ignored_patterns: tuple[str, ...]) -> bool:
+    return any(fnmatchcase(module_path, ignored_pattern) for ignored_pattern in ignored_patterns)
 
 
 async def get_scripts_digest(scripts_package: str, filenames: Iterable[str]) -> Digest:
@@ -138,7 +136,7 @@ async def parse_python_dependencies(
                 if (
                     python_infer_subsystem.string_imports
                     and not _is_ignored_string_import(
-                        string, python_infer_subsystem.ignored_string_imports
+                        string, python_infer_subsystem.string_import_ignore
                     )
                     and string.count(".") >= python_infer_subsystem.string_imports_min_dots
                     and all(part.isidentifier() for part in string.split("."))
