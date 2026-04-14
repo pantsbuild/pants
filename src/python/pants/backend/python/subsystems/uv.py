@@ -21,12 +21,12 @@ class Uv(TemplatedExternalTool):
     name = "uv"
     help = "The uv Python package manager (https://github.com/astral-sh/uv)."
 
-    default_version = "0.6.14"
+    default_version = "0.6.15"
     default_known_versions = [
-        "0.6.14|macos_x86_64|1d8ecb2eb3b68fb50e4249dc96ac9d2458dc24068848f04f4c5b42af2fd26552|16276555",
-        "0.6.14|macos_arm64|4ea4731010fbd1bc8e790e07f199f55a5c7c2c732e9b77f85e302b0bee61b756|15138933",
-        "0.6.14|linux_x86_64|0cac4df0cb3457b154f2039ae471e89cd4e15f3bd790bbb3cb0b8b40d940b93e|17032361",
-        "0.6.14|linux_arm64|94e22c4be44d205def456427639ca5ca1c1a9e29acc31808a7b28fdd5dcf7f17|15577079",
+        "0.6.15|macos_x86_64|97adf61511c0f6ea42c090443c38d8d71116b78ae626363f9f149924c91ae886|16612743",
+        "0.6.15|macos_arm64|1c5b25f75c6438b6910dbc4c6903debe53f31ee14aee55d02243dfe7bf7c9f72|15356260",
+        "0.6.15|linux_x86_64|78289c93836cb32b8b24e3216b5b316e7fdf483365de2fc571844d308387e8a4|17337856",
+        "0.6.15|linux_arm64|183cebae8c9d91bbd48219f9006a5c0c41c90a075d6724aec53a7ea0503c665a|15820802",
     ]
     version_constraints = ">=0.6.0,<1.0"
 
