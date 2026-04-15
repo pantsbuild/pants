@@ -1,9 +1,10 @@
-name: Create Dev Release PR
+name: Create Alpha Release PR
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: The release version to create (e.g. 2.42.4.dev2).
+        description: The release version to create (e.g. 2.42.4a0).
         required: true
 
 defaults:
@@ -20,7 +21,7 @@ jobs:
         run: "true"
 
   github-pr:
-    name: Create a dev release pull request
+    name: Create an alpha release pull request
     needs: org-check
     runs-on: ubuntu-latest
     permissions:
@@ -41,12 +42,12 @@ jobs:
               echo "::error::An input 'version' must be specified"
               exit 1
 
-          elif (( ${#version} > 13 )); then
-              echo "::error::The input 'version' must be smaller than 14 characters (i.e. allows '2.99.99.dev99')"
+          elif (( ${#version} > 10 )); then
+              echo "::error::The input 'version' must be smaller than 11 characters (i.e. allows '2.99.99a99')"
               exit 1
 
-          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+)?$ ]]; then
-              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCH (1.2.3) with an optional 'dev' specifier (8.9.10.dev99)"
+          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(a[0-9]+)?$ ]]; then
+              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCH (1.2.3) with an optional 'a' specifier (8.9.10a99)"
               exit 1
           fi
 
@@ -77,6 +78,36 @@ jobs:
                     -e "Worker Pants (Pantsbuild GitHub Automation Bot)" \
                 | sed 's/^/+ /'
           } > CONTRIBUTORS.md
+
+      - name: Create empty release notes for upcoming version
+        env:
+          RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
+          TEMPLATE_PATH: docs/notes/release-notes-template.md
+        run: |
+          if [[ -z "$RELEASE_VERSION" ]]; then
+              echo "::error::The 'release_version' was empty"
+              exit 1
+          fi
+          
+          MAJOR_MINOR=$(echo "$RELEASE_VERSION" | grep -oE '^[0-9]+\.[0-9]+')
+          MAJOR=$(echo "$MAJOR_MINOR" | grep -oE '^[0-9]+')
+          MINOR=$(echo "$MAJOR_MINOR" | grep -oE '[0-9]+$')
+
+          if [[ -z "$MAJOR" || -z "$MINOR" ]]; then
+              echo "::error::Failed to extract major/minor version components from $RELEASE_VERSION"
+              exit 1
+          fi
+
+          INCREMENTED_MINOR=$((MINOR + 1))
+          NEXT_NOTES_PATH="docs/notes/${MAJOR}.${INCREMENTED_MINOR}.x.md"
+
+          if [[ -f "$NEXT_NOTES_PATH" ]]; then
+            echo "::notice::Upcoming release notes already exists at ${NEXT_NOTES_PATH}. Skipping creation..."
+          else
+            echo "::notice::No release notes found at ${NEXT_NOTES_PATH}. Creating..."
+            cp "$TEMPLATE_PATH" "$NEXT_NOTES_PATH"
+            sed -i "1s/MAJOR\.MINOR/${MAJOR}.${INCREMENTED_MINOR}/" "$NEXT_NOTES_PATH"
+          fi
 
       - name: Commit changes and create pull request
         env:
