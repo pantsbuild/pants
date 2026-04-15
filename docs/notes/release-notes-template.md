@@ -1,4 +1,4 @@
-# 2.x.y Release Series
+# MAJOR.MINOR.x Release Series
 
 Pants is a fast, scalable, user-friendly build system for codebases of all sizes.
 
