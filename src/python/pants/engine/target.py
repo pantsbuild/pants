@@ -2132,6 +2132,27 @@ class DependenciesRequest(EngineAwareParameter):
         return self.field.address.spec
 
 
+@dataclass(frozen=True)
+class DependenciesMultiRequest(EngineAwareParameter):
+    fields: tuple[Dependencies, ...]
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate = TraverseIfDependenciesField()
+
+    def debug_hint(self) -> str:
+        if not self.fields:
+            return "0 targets"
+        return f"{len(self.fields)} targets, including {self.fields[0].address.spec}"
+
+
+@dataclass(frozen=True)
+class DependenciesMultiResult:
+    """The result of `DependenciesMultiRequest`.
+
+    `dependencies` is index-aligned with the `fields` of the originating `DependenciesMultiRequest`.
+    """
+
+    dependencies: tuple[Addresses, ...]
+
+
 # NB: ExplicitlyProvidedDependenciesRequest does not have a predicate unlike DependenciesRequest.
 @dataclass(frozen=True)
 class ExplicitlyProvidedDependenciesRequest(EngineAwareParameter):
@@ -2291,9 +2312,20 @@ class InferDependenciesRequest(Generic[FS], EngineAwareParameter):
             ]
     """
 
+    # If the implementation has a corresponding multi-file implementation, name that
+    # class here. The dep inference machinery will use it where possible, which may
+    # yield performance benefits.
+    multi_request: ClassVar[type[InferDependenciesMultiRequest[FS]] | None] = None
+
     infer_from: ClassVar[type[FS]]
 
     field_set: FS
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class InferDependenciesMultiRequest(Generic[FS], EngineAwareParameter):
+    field_sets: tuple[FS, ...]
 
 
 @dataclass(frozen=True)
@@ -2310,6 +2342,17 @@ class InferredDependencies:
         """The result of inferring dependencies."""
         object.__setattr__(self, "include", FrozenOrderedSet(sorted(include)))
         object.__setattr__(self, "exclude", FrozenOrderedSet(sorted(exclude)))
+
+
+@dataclass(frozen=True)
+class InferDependenciesMultiResult:
+    """The result of `InferDependenciesMultiRequest`.
+
+    `inferred_dependencies` is index-aligned with the `field_sets` of the originating
+    `InferDependenciesMultiRequest`.
+    """
+
+    inferred_dependencies: tuple[InferredDependencies, ...]
 
 
 @union(in_scope_types=[EnvironmentName])
