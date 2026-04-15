@@ -1246,8 +1246,7 @@ class RuntimePackageDependenciesField(SpecialCasedDependencies):
     )
 
 
-@dataclass(frozen=True)
-class _TraverseGenericTargetDepsOnly(ShouldTraverseDepsPredicate):
+class TraverseGenericTargetDepsOnly(ShouldTraverseDepsPredicate):
     """Traverses deps of `target()` (GenericTarget) entries, stops at all other target types.
 
     Used to unwrap a `target()` alias that groups packageable targets, so that
@@ -1287,7 +1286,7 @@ async def build_runtime_package_dependencies(
     transitive = await transitive_targets(
         TransitiveTargetsRequest(
             [tgt.address for tgt in tgts],
-            should_traverse_deps_predicate=_TraverseGenericTargetDepsOnly(),
+            should_traverse_deps_predicate=TraverseGenericTargetDepsOnly(),
         ),
         **implicitly(),
     )
