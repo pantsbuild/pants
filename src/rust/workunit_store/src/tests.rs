@@ -283,7 +283,3 @@ fn format_duration_over_one_hour() {
     assert_eq!(format_workunit_duration(Duration::from_secs_f64(5445.5)), "90m 45.5s");
 }
 
-#[test]
-fn workunit_metadata_defaults_log_duration_to_true() {
-    assert!(WorkunitMetadata::default().log_duration);
-}

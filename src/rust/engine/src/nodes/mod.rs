@@ -493,14 +493,12 @@ impl Node for NodeKey {
             NodeKey::Task(task) => Some(&task.params),
             _ => None,
         };
-        let log_duration = !matches!(self, NodeKey::ExecuteProcess(..));
         let context2 = context.clone();
 
         in_workunit!(
             workunit_name,
             self.workunit_level(),
             desc = workunit_desc.clone(),
-            log_duration = log_duration,
             user_metadata = {
                 if let Some(params) = maybe_params {
                     Python::attach(|py| {

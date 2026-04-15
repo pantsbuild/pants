@@ -275,20 +275,16 @@ impl Workunit {
             self.name
         };
 
-        let duration_suffix: Option<String> = if metadata.log_duration {
-            match &self.state {
-                WorkunitState::Completed { time_span } => Some(format!(
-                    " ({})",
-                    format_workunit_duration(Duration::from(time_span.duration))
-                )),
-                WorkunitState::Started { start_time, .. } if canceled => Some(format!(
-                    " ({})",
-                    format_workunit_duration(start_time.elapsed().unwrap_or_default())
-                )),
-                _ => None,
-            }
-        } else {
-            None
+        let duration_suffix: Option<String> = match &self.state {
+            WorkunitState::Completed { time_span } => Some(format!(
+                " ({})",
+                format_workunit_duration(Duration::from(time_span.duration))
+            )),
+            WorkunitState::Started { start_time, .. } if canceled => Some(format!(
+                " ({})",
+                format_workunit_duration(start_time.elapsed().unwrap_or_default())
+            )),
+            _ => None,
         };
 
         /* This length calculation doesn't treat multi-byte unicode charcters identically
@@ -360,7 +356,7 @@ pub enum ArtifactOutput {
     Snapshot(Arc<dyn DirectoryDigest>),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct WorkunitMetadata {
     pub desc: Option<String>,
     pub message: Option<String>,
@@ -372,25 +368,6 @@ pub struct WorkunitMetadata {
     pub remote_action: Option<hashing::Digest>,
     pub artifacts: Vec<(String, ArtifactOutput)>,
     pub user_metadata: Vec<(String, UserMetadataItem)>,
-    pub log_duration: bool,
-}
-
-impl Default for WorkunitMetadata {
-    fn default() -> Self {
-        Self {
-            desc: None,
-            message: None,
-            stdout: None,
-            stderr: None,
-            local_command: None,
-            local_action: None,
-            remote_command: None,
-            remote_action: None,
-            artifacts: Vec::new(),
-            user_metadata: Vec::new(),
-            log_duration: true,
-        }
-    }
 }
 
 /// Abstract id for passing user metadata items around
