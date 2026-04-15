@@ -595,6 +595,43 @@ def test_check_javascript_enabled_via_tsconfig(
     assert "Type 'number' is not assignable to type 'string'" in results.results[0].stdout
 
 
+def test_typescript_check_resolves_packages_from_workspace_member_node_modules() -> None:
+    """Regression test for bug: workspace member node_modules is excluded from tsc sandbox.
+
+    When an npm workspace member has a dependency that npm places in
+    `<member>/node_modules/<pkg>` rather than hoisting it to root `node_modules/<pkg>`
+    (e.g. due to a version conflict with the root), that package is absent from the
+    pants tsc sandbox.
+
+    In this test project, `clsx@1.2.1` is installed only at `member/node_modules/clsx`
+    (the lockfile explicitly does not hoist it to root, simulating a version conflict
+    scenario). pants runs `npm ci` from the resolve root, which correctly installs clsx
+    into `member/node_modules/clsx`. However, the sandbox snapshot captures only
+    `node_modules/` (the root), never `member/node_modules/`.
+    """
+    rule_runner = _create_rule_runner("npm")
+    test_files = _load_project_test_files("workspace_member_node_modules")
+    rule_runner.write_files(test_files)
+
+    target = rule_runner.get_target(
+        Address(
+            "workspace_member_node_modules/member/src",
+            target_name="ts_sources",
+            relative_file_path="index.ts",
+        )
+    )
+    field_set = TypeScriptCheckFieldSet.create(target)
+    request = TypeScriptCheckRequest([field_set])
+    results = rule_runner.request(CheckResults, [request])
+
+    assert len(results.results) == 1
+    result = results.results[0]
+    assert result.exit_code == 0, (
+        f"TypeScript check failed - workspace member node_modules likely missing from sandbox.\n"
+        f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    )
+
+
 def test_check_javascript_disabled_via_tsconfig(
     basic_rule_runner: RuleRunnerWithProjectAndPackageManager,
 ) -> None:
