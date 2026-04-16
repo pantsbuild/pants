@@ -26,7 +26,7 @@ from typing_extensions import ParamSpec
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.internals.native_engine import RuleCallTrampoline
 from pants.engine.internals.rule_visitor import collect_awaitables
-from pants.engine.internals.selectors import AwaitableConstraints, Call
+from pants.engine.internals.selectors import AwaitableConstraints
 from pants.engine.internals.selectors import concurrently as concurrently  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
@@ -120,7 +120,7 @@ def _make_rule(
         )
         return cast(
             Callable[P, R],
-            RuleCallTrampoline(canonical_name, return_type, Call, original_func, task_rule),
+            RuleCallTrampoline(canonical_name, return_type, original_func, task_rule),
         )
 
     return wrapper

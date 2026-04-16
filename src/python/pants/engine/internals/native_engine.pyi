@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
 from enum import Enum
 from io import RawIOBase
@@ -1157,7 +1157,7 @@ def hash_prefix_zero_bits(item: str) -> int: ...
 _Output = TypeVar("_Output")
 _Input = TypeVar("_Input")
 
-class PyGeneratorResponseCall:
+class Call:
     rule_id: str
     output_type: type
     inputs: Sequence[Any]
@@ -1192,10 +1192,11 @@ class PyGeneratorResponseCall:
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
+    def __await__(self) -> Generator[Any, None, Any]: ...
+    def __repr__(self) -> str: ...
 
 class RuleCallTrampoline:
-    """
-    The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so
+    """The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so
     each invocation constructs the already-awaitable `Call` directly.
     `__getattribute__` forwards `__doc__` and other introspection attrs to the wrapped function.
     """
@@ -1209,11 +1210,10 @@ class RuleCallTrampoline:
         self,
         rule_id: str,
         output_type: type,
-        call_cls: type,
         wrapped: Callable[..., Any],
         rule: Any,
     ) -> None: ...
-    def __call__(self, *args: Any, __implicitly: Sequence[Any] = (), **kwargs: Any) -> Any: ...
+    def __call__(self, *args: Any, __implicitly: Sequence[Any] = (), **kwargs: Any) -> Call: ...
 
 # ------------------------------------------------------------------------------
 # (uncategorized)

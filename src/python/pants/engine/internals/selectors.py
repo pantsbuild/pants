@@ -8,7 +8,7 @@ from collections.abc import Coroutine, Generator, Iterable
 from dataclasses import dataclass
 from typing import Any, TypeVar, cast, overload
 
-from pants.engine.internals.native_engine import PyGeneratorResponseCall
+from pants.engine.internals.native_engine import Call as Call  # noqa: F401
 from pants.util.strutil import softwrap
 
 _Output = TypeVar("_Output")
@@ -28,17 +28,6 @@ class AwaitableConstraints:
 
     def __str__(self) -> str:
         return repr(self)
-
-
-class Call(PyGeneratorResponseCall):
-    def __await__(
-        self,
-    ) -> Generator[Any, None, Any]:
-        result = yield self
-        return result
-
-    def __repr__(self) -> str:
-        return f"Call({self.rule_id}(...) -> {self.output_type.__name__})"
 
 
 @dataclass(frozen=True)

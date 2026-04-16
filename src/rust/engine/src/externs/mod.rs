@@ -481,7 +481,7 @@ impl PyGeneratorResponseNativeCall {
     }
 }
 
-#[pyclass(subclass)]
+#[pyclass(name = "Call", module = "pants.engine.internals.native_engine")]
 pub struct PyGeneratorResponseCall(RwLock<Option<Call>>);
 
 impl PyGeneratorResponseCall {
@@ -496,15 +496,10 @@ impl PyGeneratorResponseCall {
             ))
         }
     }
-}
 
-#[pymethods]
-impl PyGeneratorResponseCall {
-    #[new]
-    #[pyo3(signature = (rule_id, output_type, args, input_arg0=None))]
-    fn __new__(
-        py: Python,
-        rule_id: String,
+    pub(crate) fn construct(
+        py: Python<'_>,
+        rule_id: &str,
         output_type: &Bound<'_, PyType>,
         args: &Bound<'_, PyTuple>,
         input_arg0: Option<Bound<'_, PyAny>>,
@@ -526,13 +521,28 @@ impl PyGeneratorResponseCall {
         let (input_types, inputs) = interpret_implicit_args(py, input_arg0)?;
 
         Ok(Self(RwLock::new(Some(Call {
-            rule_id: RuleId::from_string(rule_id),
+            rule_id: RuleId::new(rule_id),
             output_type,
             args,
             args_arity,
             input_types,
             inputs,
         }))))
+    }
+}
+
+#[pymethods]
+impl PyGeneratorResponseCall {
+    #[new]
+    #[pyo3(signature = (rule_id, output_type, args, input_arg0=None))]
+    fn __new__(
+        py: Python,
+        rule_id: PyBackedStr,
+        output_type: &Bound<'_, PyType>,
+        args: &Bound<'_, PyTuple>,
+        input_arg0: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        Self::construct(py, &rule_id, output_type, args, input_arg0)
     }
 
     #[getter]
@@ -560,6 +570,61 @@ impl PyGeneratorResponseCall {
             .chain(inner.inputs.iter().map(Key::to_py_object))
             .collect())
     }
+
+    fn __await__(slf: Py<Self>) -> CallAwaitable {
+        CallAwaitable(Mutex::new(Some(slf)))
+    }
+
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        let inner = self.borrow_inner(py)?;
+        let output_type_name = inner.output_type.as_py_type(py).name()?.to_string();
+        Ok(format!(
+            "Call({}(...) -> {output_type_name})",
+            inner.rule_id
+        ))
+    }
+}
+
+/// The iterator returned by `PyGeneratorResponseCall.__await__`. Yields the Call to the
+/// scheduler once, then raises `StopIteration(result)` when the scheduler sends the
+/// rule's result back through `send`.
+#[pyclass(frozen, module = "pants.engine.internals.native_engine")]
+pub struct CallAwaitable(Mutex<Option<Py<PyGeneratorResponseCall>>>);
+
+#[pymethods]
+impl CallAwaitable {
+    fn __iter__(slf: Py<Self>) -> Py<Self> {
+        slf
+    }
+
+    fn __next__(&self, py: Python<'_>) -> PyResult<Py<PyGeneratorResponseCall>> {
+        self.send(py, None)
+    }
+
+    #[pyo3(signature = (value=None))]
+    fn send(
+        &self,
+        py: Python<'_>,
+        value: Option<Py<PyAny>>,
+    ) -> PyResult<Py<PyGeneratorResponseCall>> {
+        let mut state = self.0.lock_py_attached(py);
+        if state.is_some() && matches!(&value, Some(v) if !v.is_none(py)) {
+            return Err(PyTypeError::new_err(
+                "can't send non-None value to a just-started generator",
+            ));
+        }
+        state
+            .take()
+            .ok_or_else(|| PyStopIteration::new_err((value.unwrap_or_else(|| py.None()),)))
+    }
+
+    fn throw(&self, exc: Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        Err(PyErr::from_value(exc))
+    }
+
+    fn close(&self, py: Python<'_>) {
+        *self.0.lock_py_attached(py) = None;
+    }
 }
 
 impl PyGeneratorResponseCall {
@@ -579,7 +644,6 @@ pub struct RuleCallTrampoline {
     rule_id: PyBackedStr,
     #[pyo3(get)]
     output_type: Py<PyType>,
-    call_cls: Py<PyType>,
     #[pyo3(get, name = "__wrapped__")]
     wrapped: Py<PyAny>,
     #[pyo3(get)]
@@ -592,14 +656,12 @@ impl RuleCallTrampoline {
     fn __new__(
         rule_id: PyBackedStr,
         output_type: Py<PyType>,
-        call_cls: Py<PyType>,
         wrapped: Py<PyAny>,
         rule: Py<PyAny>,
     ) -> Self {
         Self {
             rule_id,
             output_type,
-            call_cls,
             wrapped,
             rule,
         }
@@ -611,23 +673,25 @@ impl RuleCallTrampoline {
     }
 
     #[pyo3(signature = (*args, __implicitly=None, **_kwargs))]
-    fn __call__<'py>(
+    fn __call__(
         &self,
-        py: Python<'py>,
-        args: &Bound<'py, PyTuple>,
-        __implicitly: Option<&Bound<'py, PyTuple>>,
-        _kwargs: Option<&Bound<'py, PyDict>>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let call_cls = self.call_cls.bind(py);
-        let output_type = self.output_type.bind(py);
+        py: Python<'_>,
+        args: &Bound<'_, PyTuple>,
+        __implicitly: Option<&Bound<'_, PyTuple>>,
+        _kwargs: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Py<PyGeneratorResponseCall>> {
         let input_arg0 = match __implicitly {
             Some(t) if !t.is_empty() => Some(t.get_item(0)?),
             _ => None,
         };
-        match input_arg0 {
-            Some(arg) => call_cls.call1((&self.rule_id, output_type, args, arg)),
-            None => call_cls.call1((&self.rule_id, output_type, args)),
-        }
+        let call = PyGeneratorResponseCall::construct(
+            py,
+            &self.rule_id,
+            self.output_type.bind(py),
+            args,
+            input_arg0,
+        )?;
+        Py::new(py, call)
     }
 
     /// Forward unknown attribute lookups (`__name__`, `__qualname__`, `__module__`,
