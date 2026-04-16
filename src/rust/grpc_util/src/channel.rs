@@ -129,7 +129,7 @@ mod tests {
     use tower::ServiceExt;
     use tower_service::Service;
 
-    use super::Channel;
+    use super::{Body, Channel};
     use crate::tls::NoVerifier;
 
     const TEST_RESPONSE: &[u8] = b"xyzzy";
@@ -159,7 +159,7 @@ mod tests {
 
         let request = Request::builder()
             .uri(format!("http://{addr}"))
-            .body(tonic::body::empty_body())
+            .body(Body::empty())
             .unwrap();
 
         channel.ready().await.unwrap();
@@ -210,7 +210,7 @@ mod tests {
 
         let request = Request::builder()
             .uri(format!("https://{addr}"))
-            .body(tonic::body::empty_body())
+            .body(Body::empty())
             .unwrap();
 
         channel.ready().await.unwrap();
@@ -361,7 +361,7 @@ mod tests {
         );
         let request = Request::builder()
             .uri(format!("https://{addr}"))
-            .body(tonic::body::empty_body())
+            .body(Body::empty())
             .unwrap();
 
         channel.ready().await.unwrap();
