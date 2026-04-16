@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Generator, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
 from enum import Enum
 from io import RawIOBase
@@ -1194,6 +1194,13 @@ class Call:
     ) -> None: ...
     def __await__(self) -> Generator[Any, None, Any]: ...
     def __repr__(self) -> str: ...
+
+class _Concurrently:
+    calls: tuple[Coroutine[Any, Any, Any] | Call, ...]
+    def __init__(self, calls: tuple[Coroutine[Any, Any, Any] | Call, ...]) -> None: ...
+    def __await__(
+        self,
+    ) -> Generator[tuple[Coroutine[Any, Any, Any] | Call, ...], None, tuple[Any, ...]]: ...
 
 class RuleCallTrampoline:
     """The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so

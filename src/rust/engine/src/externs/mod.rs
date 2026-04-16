@@ -51,6 +51,7 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFailure>()?;
     m.add_class::<PyGeneratorResponseNativeCall>()?;
     m.add_class::<PyGeneratorResponseCall>()?;
+    m.add_class::<PyConcurrently>()?;
     m.add_class::<RuleCallTrampoline>()?;
 
     m.add("EngineError", py.get_type::<EngineError>())?;
@@ -356,8 +357,11 @@ pub(crate) fn generator_send(
     } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>() {
         Ok(GeneratorResponse::NativeCall(call.take(py)?))
     } else if let Ok(get_multi) = response.cast::<PySequence>() {
-        // Was an `All` or `concurrently`. Each item is either a generator (from an async
-        // helper) or a direct `Call` (from a call-by-name `@rule` invocation).
+        // Was an `All` or `concurrently`. Each item is one of:
+        //   * a generator (async helper) — drive via generator_send;
+        //   * a `Call` — dispatch directly via `gen_call`;
+        //   * a `_Concurrently` — nested `concurrently(...)`. Treat its awaiter as a
+        //     generator so the outer engine loop recurses into the inner tuple.
         let items = get_multi
             .try_iter()?
             .map(|item| {
@@ -368,6 +372,9 @@ pub(crate) fn generator_send(
                     call.take(py)
                         .map(AllItem::Call)
                         .map_err(PyValueError::new_err)
+                } else if let Ok(concurrently) = item.extract::<PyRef<PyConcurrently>>() {
+                    let awaiter = Py::new(py, concurrently.awaiter(py))?;
+                    Ok(AllItem::Generator(Value::new(awaiter.into_any())))
                 } else {
                     Err(PyValueError::new_err(format!(
                         "Expected an `All` or `concurrently` to receive calls to rules, \
@@ -571,8 +578,8 @@ impl PyGeneratorResponseCall {
             .collect())
     }
 
-    fn __await__(slf: Py<Self>) -> CallAwaitable {
-        CallAwaitable(Mutex::new(Some(slf)))
+    fn __await__(slf: Py<Self>) -> YieldOnce {
+        YieldOnce::new(slf)
     }
 
     fn __repr__(&self, py: Python) -> PyResult<String> {
@@ -585,28 +592,30 @@ impl PyGeneratorResponseCall {
     }
 }
 
-/// The iterator returned by `PyGeneratorResponseCall.__await__`. Yields the Call to the
-/// scheduler once, then raises `StopIteration(result)` when the scheduler sends the
-/// rule's result back through `send`.
+/// A generator-protocol iterator that yields one value to the engine on the first `send`,
+/// then raises `StopIteration(result)` when the engine sends the result back. Used to
+/// implement `Call.__await__` and `_Concurrently.__await__`.
 #[pyclass(frozen, module = "pants.engine.internals.native_engine")]
-pub struct CallAwaitable(Mutex<Option<Py<PyGeneratorResponseCall>>>);
+pub struct YieldOnce(Mutex<Option<Py<PyAny>>>);
+
+impl YieldOnce {
+    fn new<T>(value: Py<T>) -> Self {
+        Self(Mutex::new(Some(value.into_any())))
+    }
+}
 
 #[pymethods]
-impl CallAwaitable {
+impl YieldOnce {
     fn __iter__(slf: Py<Self>) -> Py<Self> {
         slf
     }
 
-    fn __next__(&self, py: Python<'_>) -> PyResult<Py<PyGeneratorResponseCall>> {
+    fn __next__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.send(py, None)
     }
 
     #[pyo3(signature = (value=None))]
-    fn send(
-        &self,
-        py: Python<'_>,
-        value: Option<Py<PyAny>>,
-    ) -> PyResult<Py<PyGeneratorResponseCall>> {
+    fn send(&self, py: Python<'_>, value: Option<Py<PyAny>>) -> PyResult<Py<PyAny>> {
         let mut state = self.0.lock_py_attached(py);
         if state.is_some() && matches!(&value, Some(v) if !v.is_none(py)) {
             return Err(PyTypeError::new_err(
@@ -624,6 +633,35 @@ impl CallAwaitable {
 
     fn close(&self, py: Python<'_>) {
         *self.0.lock_py_attached(py) = None;
+    }
+}
+
+/// Yielded by `concurrently(...)` to hand a tuple of awaitables (each either a `Call` or a
+/// coroutine from an async helper) to the engine for parallel execution.
+#[pyclass(
+    frozen,
+    name = "_Concurrently",
+    module = "pants.engine.internals.native_engine"
+)]
+pub struct PyConcurrently {
+    calls: Py<PyTuple>,
+}
+
+impl PyConcurrently {
+    pub(crate) fn awaiter(&self, py: Python<'_>) -> YieldOnce {
+        YieldOnce::new(self.calls.clone_ref(py))
+    }
+}
+
+#[pymethods]
+impl PyConcurrently {
+    #[new]
+    fn __new__(calls: Py<PyTuple>) -> Self {
+        Self { calls }
+    }
+
+    fn __await__(&self, py: Python<'_>) -> YieldOnce {
+        self.awaiter(py)
     }
 }
 
