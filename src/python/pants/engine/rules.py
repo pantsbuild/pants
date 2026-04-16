@@ -3,10 +3,9 @@
 
 from __future__ import annotations
 
-import functools
 import inspect
 import sys
-from collections.abc import Callable, Coroutine, Iterable, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from types import FrameType, ModuleType
@@ -25,6 +24,7 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from pants.engine.engine_aware import SideEffecting
+from pants.engine.internals.native_engine import RuleCallTrampoline
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import AwaitableConstraints, Call
 from pants.engine.internals.selectors import concurrently as concurrently  # noqa: F401
@@ -55,17 +55,6 @@ R = TypeVar("R")
 SyncRuleT = Callable[P, R]
 AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
 RuleDecorator = Callable[[SyncRuleT | AsyncRuleT], AsyncRuleT]
-
-
-def _rule_call_trampoline(
-    rule_id: str, output_type: type[Any], func: Callable[P, R]
-) -> Callable[P, R]:
-    @functools.wraps(func)  # type: ignore
-    async def wrapper(*args, __implicitly: Sequence[Any] = (), **kwargs):
-        call = Call(rule_id, output_type, args, *__implicitly)
-        return await call
-
-    return cast(Callable[P, R], wrapper)
 
 
 def _make_rule(
@@ -112,13 +101,12 @@ def _make_rule(
         awaitables = FrozenOrderedSet(collect_awaitables(original_func))
 
         validate_requirements(func_id, parameter_types, awaitables, cacheable)
-        func = _rule_call_trampoline(canonical_name, return_type, original_func)
 
-        # NB: The named definition of the rule ends up wrapped in a trampoline to handle memoization
-        # and implicit arguments for direct by-name calls. But the `TaskRule` takes a reference to
-        # the original unwrapped function, which avoids the need for a special protocol when the
-        # engine invokes a @rule under memoization.
-        func.rule = TaskRule(
+        # NB: The named definition of the rule ends up wrapped in a trampoline to handle
+        # implicit arguments for direct by-name calls. The `TaskRule` takes a reference to
+        # the original unwrapped function, which avoids the need for a special protocol when
+        # the engine invokes a @rule under memoization.
+        task_rule = TaskRule(
             return_type,
             FrozenDict(parameter_types),
             awaitables,
@@ -130,7 +118,10 @@ def _make_rule(
             cacheable=cacheable,
             polymorphic=polymorphic,
         )
-        return func
+        return cast(
+            Callable[P, R],
+            RuleCallTrampoline(canonical_name, return_type, Call, original_func, task_rule),
+        )
 
     return wrapper
 

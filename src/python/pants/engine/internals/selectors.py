@@ -43,9 +43,11 @@ class Call(PyGeneratorResponseCall):
 
 @dataclass(frozen=True)
 class _Concurrently:
-    calls: tuple[Coroutine, ...]
+    # A call-by-name `@rule` invocation returns a `Call` directly; async helpers return
+    # `Coroutine`. The engine accepts both in this sequence.
+    calls: tuple[Coroutine | Call, ...]
 
-    def __await__(self) -> Generator[tuple[Coroutine, ...], None, tuple]:
+    def __await__(self) -> Generator[tuple[Coroutine | Call, ...], None, tuple]:
         result = yield self.calls
         return cast(tuple, result)
 
@@ -238,7 +240,7 @@ async def Concurrently(
         return await _Concurrently(tuple(__arg0))
 
     if (
-        isinstance(__arg0, Coroutine)
+        isinstance(__arg0, (Coroutine, Call))
         and __arg1 is None
         and __arg2 is None
         and __arg3 is None
@@ -253,8 +255,8 @@ async def Concurrently(
         return await _Concurrently((__arg0,))
 
     if (
-        isinstance(__arg0, Coroutine)
-        and isinstance(__arg1, Coroutine)
+        isinstance(__arg0, (Coroutine, Call))
+        and isinstance(__arg1, (Coroutine, Call))
         and __arg2 is None
         and __arg3 is None
         and __arg4 is None
@@ -268,9 +270,9 @@ async def Concurrently(
         return await _Concurrently((__arg0, __arg1))
 
     if (
-        isinstance(__arg0, Coroutine)
-        and isinstance(__arg1, Coroutine)
-        and isinstance(__arg2, Coroutine)
+        isinstance(__arg0, (Coroutine, Call))
+        and isinstance(__arg1, (Coroutine, Call))
+        and isinstance(__arg2, (Coroutine, Call))
         and __arg3 is None
         and __arg4 is None
         and __arg5 is None
@@ -283,10 +285,10 @@ async def Concurrently(
         return await _Concurrently((__arg0, __arg1, __arg2))
 
     if (
-        isinstance(__arg0, Coroutine)
-        and isinstance(__arg1, Coroutine)
-        and isinstance(__arg2, Coroutine)
-        and isinstance(__arg3, Coroutine)
+        isinstance(__arg0, (Coroutine, Call))
+        and isinstance(__arg1, (Coroutine, Call))
+        and isinstance(__arg2, (Coroutine, Call))
+        and isinstance(__arg3, (Coroutine, Call))
         and __arg4 is None
         and __arg5 is None
         and __arg6 is None
@@ -298,11 +300,11 @@ async def Concurrently(
         return await _Concurrently((__arg0, __arg1, __arg2, __arg3))
 
     if (
-        isinstance(__arg0, Coroutine)
-        and isinstance(__arg1, Coroutine)
-        and isinstance(__arg2, Coroutine)
-        and isinstance(__arg3, Coroutine)
-        and isinstance(__arg4, Coroutine)
+        isinstance(__arg0, (Coroutine, Call))
+        and isinstance(__arg1, (Coroutine, Call))
+        and isinstance(__arg2, (Coroutine, Call))
+        and isinstance(__arg3, (Coroutine, Call))
+        and isinstance(__arg4, (Coroutine, Call))
         and __arg5 is None
         and __arg6 is None
         and __arg7 is None
@@ -313,12 +315,12 @@ async def Concurrently(
         return await _Concurrently((__arg0, __arg1, __arg2, __arg3, __arg4))
 
     if (
-        isinstance(__arg0, Coroutine)
-        and isinstance(__arg1, Coroutine)
-        and isinstance(__arg2, Coroutine)
-        and isinstance(__arg3, Coroutine)
-        and isinstance(__arg4, Coroutine)
-        and isinstance(__arg5, Coroutine)
+        isinstance(__arg0, (Coroutine, Call))
+        and isinstance(__arg1, (Coroutine, Call))
+        and isinstance(__arg2, (Coroutine, Call))
+        and isinstance(__arg3, (Coroutine, Call))
+        and isinstance(__arg4, (Coroutine, Call))
+        and isinstance(__arg5, (Coroutine, Call))
         and __arg6 is None
         and __arg7 is None
         and __arg8 is None
@@ -328,13 +330,13 @@ async def Concurrently(
         return await _Concurrently((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5))
 
     if (
-        isinstance(__arg0, Coroutine)
-        and isinstance(__arg1, Coroutine)
-        and isinstance(__arg2, Coroutine)
-        and isinstance(__arg3, Coroutine)
-        and isinstance(__arg4, Coroutine)
-        and isinstance(__arg5, Coroutine)
-        and isinstance(__arg6, Coroutine)
+        isinstance(__arg0, (Coroutine, Call))
+        and isinstance(__arg1, (Coroutine, Call))
+        and isinstance(__arg2, (Coroutine, Call))
+        and isinstance(__arg3, (Coroutine, Call))
+        and isinstance(__arg4, (Coroutine, Call))
+        and isinstance(__arg5, (Coroutine, Call))
+        and isinstance(__arg6, (Coroutine, Call))
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
@@ -343,14 +345,14 @@ async def Concurrently(
         return await _Concurrently((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6))
 
     if (
-        isinstance(__arg0, Coroutine)
-        and isinstance(__arg1, Coroutine)
-        and isinstance(__arg2, Coroutine)
-        and isinstance(__arg3, Coroutine)
-        and isinstance(__arg4, Coroutine)
-        and isinstance(__arg5, Coroutine)
-        and isinstance(__arg6, Coroutine)
-        and isinstance(__arg7, Coroutine)
+        isinstance(__arg0, (Coroutine, Call))
+        and isinstance(__arg1, (Coroutine, Call))
+        and isinstance(__arg2, (Coroutine, Call))
+        and isinstance(__arg3, (Coroutine, Call))
+        and isinstance(__arg4, (Coroutine, Call))
+        and isinstance(__arg5, (Coroutine, Call))
+        and isinstance(__arg6, (Coroutine, Call))
+        and isinstance(__arg7, (Coroutine, Call))
         and __arg8 is None
         and __arg9 is None
         and not __args
@@ -358,15 +360,15 @@ async def Concurrently(
         return await _Concurrently((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7))
 
     if (
-        isinstance(__arg0, Coroutine)
-        and isinstance(__arg1, Coroutine)
-        and isinstance(__arg2, Coroutine)
-        and isinstance(__arg3, Coroutine)
-        and isinstance(__arg4, Coroutine)
-        and isinstance(__arg5, Coroutine)
-        and isinstance(__arg6, Coroutine)
-        and isinstance(__arg7, Coroutine)
-        and isinstance(__arg8, Coroutine)
+        isinstance(__arg0, (Coroutine, Call))
+        and isinstance(__arg1, (Coroutine, Call))
+        and isinstance(__arg2, (Coroutine, Call))
+        and isinstance(__arg3, (Coroutine, Call))
+        and isinstance(__arg4, (Coroutine, Call))
+        and isinstance(__arg5, (Coroutine, Call))
+        and isinstance(__arg6, (Coroutine, Call))
+        and isinstance(__arg7, (Coroutine, Call))
+        and isinstance(__arg8, (Coroutine, Call))
         and __arg9 is None
         and not __args
     ):
@@ -375,17 +377,17 @@ async def Concurrently(
         )
 
     if (
-        isinstance(__arg0, Coroutine)
-        and isinstance(__arg1, Coroutine)
-        and isinstance(__arg2, Coroutine)
-        and isinstance(__arg3, Coroutine)
-        and isinstance(__arg4, Coroutine)
-        and isinstance(__arg5, Coroutine)
-        and isinstance(__arg6, Coroutine)
-        and isinstance(__arg7, Coroutine)
-        and isinstance(__arg8, Coroutine)
-        and isinstance(__arg9, Coroutine)
-        and all(isinstance(arg, Coroutine) for arg in __args)
+        isinstance(__arg0, (Coroutine, Call))
+        and isinstance(__arg1, (Coroutine, Call))
+        and isinstance(__arg2, (Coroutine, Call))
+        and isinstance(__arg3, (Coroutine, Call))
+        and isinstance(__arg4, (Coroutine, Call))
+        and isinstance(__arg5, (Coroutine, Call))
+        and isinstance(__arg6, (Coroutine, Call))
+        and isinstance(__arg7, (Coroutine, Call))
+        and isinstance(__arg8, (Coroutine, Call))
+        and isinstance(__arg9, (Coroutine, Call))
+        and all(isinstance(arg, (Coroutine, Call)) for arg in __args)
     ):
         return await _Concurrently(
             (

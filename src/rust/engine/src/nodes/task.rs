@@ -164,12 +164,17 @@ impl Task {
                         Err(failure) => break Err(failure),
                     }
                 }
-                GeneratorResponse::All(generators) => {
+                GeneratorResponse::All(items) => {
                     let _blocking_token = workunit.blocking();
-                    let get_futures = generators
+                    let get_futures = items
                         .into_iter()
-                        .map(|generator| {
-                            Self::gen_generator(context, params.clone(), entry, generator)
+                        .map(|item| match item {
+                            externs::AllItem::Generator(generator) => {
+                                Self::gen_generator(context, params.clone(), entry, generator)
+                            }
+                            externs::AllItem::Call(call) => {
+                                Self::gen_call(context, params.clone(), entry, call).boxed()
+                            }
                         })
                         .collect::<Vec<_>>();
                     match future::try_join_all(get_futures).await {

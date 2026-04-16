@@ -1193,6 +1193,28 @@ class PyGeneratorResponseCall:
         input_arg1: _Input | None = None,
     ) -> None: ...
 
+class RuleCallTrampoline:
+    """
+    The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so
+    each invocation constructs the already-awaitable `Call` directly.
+    `__getattribute__` forwards `__doc__` and other introspection attrs to the wrapped function.
+    """
+
+    rule_id: str
+    output_type: type
+    rule: Any
+    __wrapped__: Callable[..., Any]
+
+    def __init__(
+        self,
+        rule_id: str,
+        output_type: type,
+        call_cls: type,
+        wrapped: Callable[..., Any],
+        rule: Any,
+    ) -> None: ...
+    def __call__(self, *args: Any, __implicitly: Sequence[Any] = (), **kwargs: Any) -> Any: ...
+
 # ------------------------------------------------------------------------------
 # (uncategorized)
 # ------------------------------------------------------------------------------
