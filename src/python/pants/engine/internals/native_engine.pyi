@@ -1160,7 +1160,8 @@ _Input = TypeVar("_Input")
 class Call:
     rule_id: str
     output_type: type
-    inputs: Sequence[Any]
+    args: tuple[Any, ...]
+    implicit_args: dict[Any, type]
 
     @overload
     def __init__(

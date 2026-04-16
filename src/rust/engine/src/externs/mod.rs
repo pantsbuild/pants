@@ -566,16 +566,24 @@ impl PyGeneratorResponseCall {
     }
 
     #[getter]
-    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
+    fn args<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let inner = self.borrow_inner(py)?;
-        let args: Vec<Py<PyAny>> = inner.args.as_ref().map_or_else(
-            || Ok(Vec::default()),
-            |args| args.to_py_object().extract(py),
-        )?;
-        Ok(args
-            .into_iter()
-            .chain(inner.inputs.iter().map(Key::to_py_object))
-            .collect())
+        match &inner.args {
+            Some(args) => Ok(args.to_py_object().extract(py)?),
+            None => Ok(PyTuple::empty(py)),
+        }
+    }
+
+    /// NB: keyed on the value, mirroring the `{value: declared_type}` shape of `implicitly(...)`
+    /// at the call site so test mocks can read declared types back off the dict.
+    #[getter]
+    fn implicit_args<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let inner = self.borrow_inner(py)?;
+        let d = PyDict::new(py);
+        for (typ, val) in inner.input_types.iter().zip(inner.inputs.iter()) {
+            d.set_item(val.to_py_object(), typ.as_py_type(py))?;
+        }
+        Ok(d)
     }
 
     fn __await__(slf: Py<Self>) -> YieldOnce {
