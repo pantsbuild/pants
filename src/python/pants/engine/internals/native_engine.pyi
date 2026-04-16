@@ -368,6 +368,83 @@ class _NoValue:
 # Marker for unspecified field values that should use the default value if applicable.
 NO_VALUE: _NoValue
 
+class TextBlock:
+    """Block of lines in a file.
+
+    Lines are 1 indexed, `start` is inclusive.
+
+    TextBlock is used as a part of unified diff hunk, thus it can be empty,
+    i.e. count can be equal to 0. In the special case when the file is empty
+    start = 0 and count = 0.
+    """
+
+    start: int
+    count: int
+    end: int
+    def __init__(self, start: int, count: int) -> None: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+
+class Hunk:
+    """Hunk of difference in unified format.
+
+    https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+
+    In the special case when file is created left = None.
+    In the special case when file is deleted right = None.
+    """
+
+    left: TextBlock | None
+    right: TextBlock | None
+    def __init__(self, left: TextBlock | None, right: TextBlock | None) -> None: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+
+class SourceBlock:
+    """Block of lines in a file.
+
+    Lines are 1 indexed, `start` is inclusive, `end` is exclusive.
+
+    SourceBlock is used to describe a set of source lines that are owned by a Target,
+    thus it can't be empty, i.e. `start` must be less than `end`.
+    """
+
+    start: int
+    end: int
+    def __init__(self, start: int, end: int) -> None: ...
+    def __len__(self) -> int: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+    def is_touched_by(self, o: TextBlock) -> bool: ...
+    @classmethod
+    def from_text_block(cls, text_block: TextBlock) -> SourceBlock: ...
+
+class TargetAdaptor:
+    """A light-weight object to store target information before being converted into the Target
+    API."""
+
+    type_alias: str
+    name: str | None
+    kwargs: FrozenDict
+    description_of_origin: str
+    origin_sources_blocks: FrozenDict
+    name_explicitly_set: bool
+    def __init__(
+        self,
+        type_alias: str,
+        name: str | None,
+        __description_of_origin__: str,
+        __origin_sources_blocks__: FrozenDict | None = None,
+        **kwargs: Any,
+    ) -> None: ...
+    def with_new_kwargs(self, **kwargs: Any) -> TargetAdaptor: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __hash__(self) -> int: ...
+
 class Field:
     """A Field.
 

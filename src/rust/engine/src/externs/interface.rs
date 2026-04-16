@@ -68,6 +68,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::register(py, m)?;
     externs::address::register(py, m)?;
     externs::fs::register(m)?;
+    externs::hunk::register(m)?;
     externs::nailgun::register(py, m)?;
     externs::options::register(m)?;
     externs::pants_ng::register(m)?;

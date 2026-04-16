@@ -7,6 +7,7 @@ use std::{fmt, hash};
 
 use deepsize::{DeepSizeOf, known_deep_size};
 use pyo3::FromPyObject;
+use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyType};
 use smallvec::SmallVec;
@@ -617,6 +618,16 @@ pub fn throw(msg: String) -> Failure {
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 #[repr(transparent)]
 pub struct PyComparedBool(pub Option<bool>);
+
+impl PyComparedBool {
+    pub fn eq_ne(op: CompareOp, is_eq: bool) -> Self {
+        Self(match op {
+            CompareOp::Eq => Some(is_eq),
+            CompareOp::Ne => Some(!is_eq),
+            _ => None,
+        })
+    }
+}
 
 impl From<Option<bool>> for PyComparedBool {
     fn from(value: Option<bool>) -> Self {
