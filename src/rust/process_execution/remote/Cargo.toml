@@ -25,7 +25,7 @@ async-oncecell = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }
 rand = { workspace = true }
-tonic = { workspace = true, features = ["transport", "codegen", "tls-ring", "tls-native-roots", "prost"] }
+tonic = { workspace = true, features = ["transport", "codegen", "tls-ring", "tls-native-roots"] }
 process_execution = { path = ".." }
 strum = { workspace = true }
 strum_macros = { workspace = true }

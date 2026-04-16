@@ -11,7 +11,8 @@ prost = { workspace = true }
 prost-build = { workspace = true }
 prost-types = { workspace = true }
 tonic = { workspace = true, features = ["transport", "codegen", "tls-ring", "tls-native-roots"] }
+tonic-prost = { workspace = true }
 
 [build-dependencies]
 prost-build = { workspace = true }
-tonic-build = { workspace = true, features = ["prost"] }
+tonic-prost-build = { workspace = true }

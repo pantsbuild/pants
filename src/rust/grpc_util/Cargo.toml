@@ -25,7 +25,7 @@ rustls-pemfile = { workspace = true }
 tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = { workspace = true }
 tokio-stream = { workspace = true }
-tonic = { workspace = true, features = ["transport", "codegen", "tls-ring", "tls-native-roots", "prost"] }
+tonic = { workspace = true, features = ["transport", "codegen", "tls-ring", "tls-native-roots"] }
 tower = { workspace = true, features = ["limit", "timeout"] }
 tower-layer = { workspace = true }
 tower-service = { workspace = true }
@@ -40,7 +40,7 @@ prost-types = { workspace = true }
 
 [build-dependencies]
 prost-build = { workspace = true }
-tonic-build = { workspace = true }
+tonic-prost-build = { workspace = true }
 
 [lints]
 workspace = true
