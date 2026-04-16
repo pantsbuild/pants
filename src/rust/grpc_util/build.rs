@@ -2,14 +2,10 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use prost_build::Config;
-
-    let config = Config::new();
-
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .build_client(true)
         .build_server(true)
-        .compile_protos_with_config(config, &["protos/test.proto"], &["protos"])?;
+        .compile_protos(&["protos/test.proto"], &["protos"])?;
 
     Ok(())
 }
