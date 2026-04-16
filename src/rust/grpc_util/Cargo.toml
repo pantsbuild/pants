@@ -26,6 +26,7 @@ tokio = { workspace = true, features = ["net", "process", "rt-multi-thread", "sy
 tokio-rustls = { workspace = true }
 tokio-stream = { workspace = true }
 tonic = { workspace = true, features = ["transport", "codegen", "tls-ring", "tls-native-roots"] }
+tonic-prost = { workspace = true }
 tower = { workspace = true, features = ["limit", "timeout"] }
 tower-layer = { workspace = true }
 tower-service = { workspace = true }
