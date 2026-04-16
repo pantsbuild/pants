@@ -12,7 +12,7 @@ use hyper_util::client::legacy::{
 };
 use hyper_util::rt::TokioExecutor;
 use rustls::ClientConfig;
-use tonic::body::BoxBody;
+use tonic::body::Body;
 use tower_service::Service;
 
 // Inspired by https://github.com/LucioFranco/tonic-openssl/blob/master/example/src/client2.rs.
@@ -21,8 +21,8 @@ use tower_service::Service;
 /// `Channel`.
 #[derive(Clone, Debug)]
 pub enum Client {
-    Plain(HyperClient<HttpConnector, BoxBody>),
-    Tls(HyperClient<HttpsConnector<HttpConnector>, BoxBody>),
+    Plain(HyperClient<HttpConnector, Body>),
+    Tls(HyperClient<HttpsConnector<HttpConnector>, Body>),
 }
 
 /// A communication channel which may either communicate using HTTP or HTTP over TLS. This
@@ -75,7 +75,7 @@ impl Channel {
     }
 }
 
-impl Service<http::Request<BoxBody>> for Channel {
+impl Service<http::Request<Body>> for Channel {
     type Response = http::Response<Incoming>;
     type Error = HyperClientError;
     type Future =
@@ -85,7 +85,7 @@ impl Service<http::Request<BoxBody>> for Channel {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, mut req: http::Request<BoxBody>) -> Self::Future {
+    fn call(&mut self, mut req: http::Request<Body>) -> Self::Future {
         // Apparently the schema and authority do not get set by Hyper. Thus, the examples generally
         // copy the URI and replace the scheme and authority with the ones from the initial URI used
         // to configure the client.
