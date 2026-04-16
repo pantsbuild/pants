@@ -2,7 +2,11 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fmt::Write;
+use std::sync::OnceLock;
 
+use fnv::FnvHashMap;
+
+use parking_lot::Mutex;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
@@ -11,10 +15,49 @@ use pyo3::pybacked::PyBackedStr;
 use pyo3::pyclass_init::PyClassInitializer;
 use pyo3::types::PyType;
 
+use crate::TypeId;
 use crate::externs::address::Address;
 use crate::python::PyComparedBool;
 
 use super::util::{NoFieldValue, combine_hashes, raise_invalid_field_type, validate_choices};
+
+static FIELD_TYPE_INFO_CACHE: OnceLock<Mutex<FnvHashMap<TypeId, FieldTypeInfo>>> = OnceLock::new();
+
+struct FieldTypeInfo {
+    none_is_valid_value: bool,
+    deprecated: bool,
+    required: bool,
+    /// Populated lazily the first time the default is needed.
+    default: Option<Py<PyAny>>,
+}
+
+impl FieldTypeInfo {
+    fn resolve(cls: &Bound<'_, PyType>, py: Python) -> PyResult<Self> {
+        let removal_version: Option<PyBackedStr> =
+            cls.getattr(intern!(py, "removal_version"))?.extract()?;
+        Ok(Self {
+            none_is_valid_value: cls.getattr(intern!(py, "none_is_valid_value"))?.extract()?,
+            deprecated: removal_version.is_some(),
+            required: cls.getattr(intern!(py, "required"))?.extract()?,
+            default: None,
+        })
+    }
+}
+
+fn with_field_type_info<R>(
+    cls: &Bound<'_, PyType>,
+    py: Python,
+    f: impl FnOnce(&mut FieldTypeInfo) -> R,
+) -> PyResult<R> {
+    let type_id = TypeId::new(cls);
+    let cache = FIELD_TYPE_INFO_CACHE.get_or_init(|| Mutex::new(FnvHashMap::default()));
+    let mut locked = cache.lock();
+    let info = match locked.entry(type_id) {
+        std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+        std::collections::hash_map::Entry::Vacant(e) => e.insert(FieldTypeInfo::resolve(cls, py)?),
+    };
+    Ok(f(info))
+}
 
 #[pyclass(subclass, frozen, module = "pants.engine.internals.native_engine")]
 pub struct Field {
@@ -37,13 +80,9 @@ impl Field {
         //  to None below.
         Self::check_deprecated(cls, raw_value, &address, py)?;
 
+        let none_is_valid = with_field_type_info(cls, py, |info| info.none_is_valid_value)?;
         let raw_value = match raw_value {
-            Some(value)
-                if value.extract::<NoFieldValue>().is_ok()
-                    && !Self::cls_none_is_valid_value(cls)? =>
-            {
-                None
-            }
+            Some(value) if value.extract::<NoFieldValue>().is_ok() && !none_is_valid => None,
             rv => rv,
         };
 
@@ -97,28 +136,42 @@ impl Field {
         address: PyRef<Address>,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let default = || -> PyResult<Bound<'_, PyAny>> {
-            if Self::cls_required(cls)? {
-                // TODO: Should be `RequiredFieldMissingException`.
-                Err(PyValueError::new_err(format!(
-                    "The `{}` field in target {} must be defined.",
-                    Self::cls_alias(cls)?,
-                    *address,
-                )))
-            } else {
-                Self::cls_default(cls)
-            }
-        };
-
-        let none_is_valid_value = Self::cls_none_is_valid_value(cls)?;
-        match raw_value {
-            Some(value) if none_is_valid_value && value.extract::<NoFieldValue>().is_ok() => {
-                default()
-            }
-            None if none_is_valid_value => Ok(py.None().into_bound(py)),
-            None => default(),
-            Some(value) => Ok(value.clone()),
+        enum Branch<'a, 'py> {
+            Default,
+            NoneValue,
+            Value(&'a Bound<'py, PyAny>),
         }
+
+        with_field_type_info(cls, py, |info| -> PyResult<Bound<'py, PyAny>> {
+            let branch = match raw_value {
+                Some(value)
+                    if info.none_is_valid_value && value.extract::<NoFieldValue>().is_ok() =>
+                {
+                    Branch::Default
+                }
+                None if info.none_is_valid_value => Branch::NoneValue,
+                None => Branch::Default,
+                Some(value) => Branch::Value(value),
+            };
+
+            match branch {
+                Branch::NoneValue => Ok(py.None().into_bound(py)),
+                Branch::Value(value) => Ok(value.clone()),
+                Branch::Default => {
+                    if info.required {
+                        return Err(PyValueError::new_err(format!(
+                            "The `{}` field in target {} must be defined.",
+                            Self::cls_alias(cls)?,
+                            *address,
+                        )));
+                    }
+                    if info.default.is_none() {
+                        info.default = Some(cls.getattr(intern!(py, "default"))?.unbind());
+                    }
+                    Ok(info.default.as_ref().unwrap().bind(py).clone())
+                }
+            }
+        })?
     }
 
     #[getter]
@@ -227,6 +280,10 @@ impl Field {
         address: &Bound<'_, Address>,
         py: Python,
     ) -> PyResult<()> {
+        let is_deprecated = with_field_type_info(cls, py, |info| info.deprecated)?;
+        if !is_deprecated {
+            return Ok(());
+        }
         if address.borrow().is_generated_target() {
             return Ok(());
         }
