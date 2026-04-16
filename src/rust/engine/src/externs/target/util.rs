@@ -158,7 +158,9 @@ pub fn raise_invalid_field(py: Python, msg: String) -> PyErr {
     }
 }
 
-#[pyclass(name = "_NoValue", from_py_object)]
+static NO_VALUE_SINGLETON: OnceLock<Py<NoFieldValue>> = OnceLock::new();
+
+#[pyclass(name = "_NoValue", frozen, from_py_object)]
 #[derive(Clone)]
 pub struct NoFieldValue;
 
@@ -170,5 +172,18 @@ impl NoFieldValue {
 
     fn __repr__(&self) -> &'static str {
         "<NO_VALUE>"
+    }
+}
+
+impl NoFieldValue {
+    pub fn init_singleton(py: Python) {
+        NO_VALUE_SINGLETON
+            .get_or_init(|| Py::new(py, NoFieldValue).expect("failed to create NO_VALUE"));
+    }
+
+    pub fn expect_singleton() -> &'static Py<NoFieldValue> {
+        NO_VALUE_SINGLETON
+            .get()
+            .expect("NO_VALUE singleton not initialized — module not loaded?")
     }
 }

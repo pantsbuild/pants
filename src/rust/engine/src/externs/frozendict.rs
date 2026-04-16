@@ -18,7 +18,7 @@ static EMPTY_FROZEN_DICT: OnceLock<Py<FrozenDict>> = OnceLock::new();
 #[derive(Debug)]
 pub struct FrozenDict {
     data: Py<PyDict>,
-    hash: isize,
+    pub(crate) hash: isize,
 }
 
 impl Hash for FrozenDict {
@@ -197,8 +197,7 @@ impl FrozenDict {
     }
 
     fn keys<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
-        let dict = slf.get().data.bind_borrowed(slf.py());
-        dict.call_method0(intern!(slf.py(), "keys"))
+        Self::py_keys(slf)
     }
 
     fn values<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
@@ -312,6 +311,15 @@ impl FrozenDict {
             data: dict.unbind(),
             hash,
         })
+    }
+
+    pub fn py_keys<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
+        let dict = slf.get().data.bind_borrowed(slf.py());
+        dict.call_method0(intern!(slf.py(), "keys"))
+    }
+
+    pub fn contains(&self, key: &Bound<PyAny>) -> PyResult<bool> {
+        self.data.bind_borrowed(key.py()).contains(key)
     }
 
     pub fn iter(slf: Bound<Self>) -> PyResult<KeyValueIter> {

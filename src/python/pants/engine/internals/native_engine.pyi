@@ -6,12 +6,23 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, KeysView, Mapping, Sequence
 from datetime import datetime
 from enum import Enum
 from io import RawIOBase
 from pathlib import Path
-from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Protocol,
+    Self,
+    TextIO,
+    TypeVar,
+    final,
+    overload,
+)
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import (
@@ -39,6 +50,9 @@ from pants.engine.process import (
     InteractiveProcessResult,
     Process,
 )
+
+if TYPE_CHECKING:
+    from pants.engine.internals.target_adaptor import SourceBlocks
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
@@ -444,6 +458,226 @@ class TargetAdaptor:
     def __repr__(self) -> str: ...
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
+
+class PluginFieldDescriptor:
+    """Descriptor that creates a unique @union type per subclass.
+
+    This is the Rust equivalent of @distinct_union_type_per_subclass.
+    """
+
+    def __get__(self, obj: Any | None, objtype: type | None = None) -> type: ...
+
+_F = TypeVar("_F", bound=Field)
+
+class Target:
+    """A Target represents an addressable set of metadata.
+
+    Set the `help` class property with a description, which will be used in `./pants help`. For the
+    best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
+    hard wrapping (`\n`) to separate distinct paragraphs and/or lists.
+    """
+
+    # Subclasses must define these
+    alias: ClassVar[str]
+    core_fields: ClassVar[tuple[type[Field], ...]]
+    help: ClassVar[str | Callable[[], str]]
+
+    removal_version: ClassVar[str | None] = None
+    removal_hint: ClassVar[str | None] = None
+
+    deprecated_alias: ClassVar[str | None] = None
+    deprecated_alias_removal_version: ClassVar[str | None] = None
+
+    # These get calculated in the constructor
+    address: Address
+    field_values: FrozenDict[type[Field], Field]
+    residence_dir: str
+    name_explicitly_set: bool
+    description_of_origin: str
+    origin_sources_blocks: FrozenDict[str, SourceBlocks]
+    field_types: KeysView[type[Field]]
+
+    PluginField: ClassVar[PluginFieldDescriptor]
+
+    @final
+    def __init__(
+        self,
+        unhydrated_values: Mapping[str, Any],
+        address: Address,
+        # NB: `union_membership` is only optional to facilitate tests. In production, we should
+        # always provide this parameter. This should be safe to do because production code should
+        # rarely directly instantiate Targets and should instead use the engine to request them.
+        union_membership: UnionMembership | None = None,
+        *,
+        name_explicitly_set: bool = True,
+        residence_dir: str | None = None,
+        ignore_unrecognized_fields: bool = False,
+        description_of_origin: str | None = None,
+        origin_sources_blocks: FrozenDict[str, SourceBlocks] | None = None,
+    ) -> None:
+        """Create a target.
+
+        :param unhydrated_values: A mapping of field aliases to their raw values. Any left off
+            fields will either use their default or error if required=True.
+        :param address: How to uniquely identify this target.
+        :param union_membership: Used to determine plugin fields. This must be set in production!
+        :param residence_dir: Where this target "lives". If unspecified, will be the `spec_path`
+            of the `address`, i.e. where the target was either explicitly defined or where its
+            target generator was explicitly defined. Target generators can, however, set this to
+            the directory where the generated target provides metadata for. For example, a
+            file-based target like `python_source` should set this to the parent directory of
+            its file. A file-less target like `go_third_party_package` should keep the default of
+            `address.spec_path`. This field impacts how command line specs work, so that globs
+            like `dir:` know whether to match the target or not.
+        :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
+            intended for when Pants is bootstrapping itself.
+        :param description_of_origin: Where this target was declared, such as a path to BUILD file
+            and line number.
+        """
+        ...
+
+    def __repr__(self) -> str: ...
+    def __str__(self) -> str: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __lt__(self, other: object) -> bool: ...
+    def __gt__(self, other: object) -> bool: ...
+    @final
+    def __getitem__(self, field: type[_F]) -> _F:
+        """Get the requested `Field` instance belonging to this target.
+
+        If the `Field` is not registered on this `Target` type, this method will raise a
+        `KeyError`. To avoid this, you should first call `tgt.has_field()` or `tgt.has_fields()`
+        to ensure that the field is registered, or, alternatively, use `Target.get()`.
+
+        See the docstring for `Target.get()` for how this method handles subclasses of the
+        requested Field and for tips on how to use the returned value.
+        """
+        ...
+
+    @final
+    def get(self, field: type[_F], *, default_raw_value: Any | None = None) -> _F:
+        """Get the requested `Field` instance belonging to this target.
+
+        This will return an instance of the requested field type, e.g. an instance of
+        `InterpreterConstraints`, `SourcesField`, `EntryPoint`, etc. Usually, you will want to
+        grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
+        `SourcesField`, you may need to hydrate the value.).
+
+        This works with subclasses of `Field`. For example, if you subclass `Tags`
+        to define a custom subclass `CustomTags`, both `tgt.get(Tags)` and
+        `tgt.get(CustomTags)` will return the same `CustomTags` instance.
+
+        If the `Field` is not registered on this `Target` type, this will return an instance of
+        the requested Field by using `default_raw_value` to create the instance. Alternatively,
+        first call `tgt.has_field()` or `tgt.has_fields()` to ensure that the field is registered,
+        or, alternatively, use indexing (e.g. `tgt[Compatibility]`) to raise a KeyError when the
+        field is not registered.
+        """
+        ...
+
+    @final
+    def _maybe_get(self, field: type[_F]) -> _F | None: ...
+    @final
+    def has_field(self, field: type[Field]) -> bool:
+        """Check that this target has registered the requested field.
+
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
+        custom subclass `CustomTags`, both `tgt.has_field(Tags)` and
+        `python_tgt.has_field(CustomTags)` will return True.
+        """
+        ...
+
+    @final
+    def has_fields(self, fields: Iterable[type[Field]]) -> bool:
+        """Check that this target has registered all of the requested fields.
+
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
+        custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
+        `python_tgt.has_fields([CustomTags])` will return True.
+        """
+        ...
+
+    @final
+    @classmethod
+    def _has_fields(
+        cls, fields: Iterable[type[Field]], registered_fields: Iterable[type[Field]]
+    ) -> bool: ...
+    @final
+    @classmethod
+    def _find_registered_field_subclass(
+        cls, requested_field: type[_F], registered_fields: Iterable[type[Field]]
+    ) -> type[_F] | None:
+        """Check if the Target has registered a subclass of the requested Field.
+
+        This is necessary to allow targets to override the functionality of common fields. For
+        example, you could subclass `Tags` to define `CustomTags` with a different default. At the
+        same time, we still want to be able to call `tgt.get(Tags)`, in addition to
+        `tgt.get(CustomTags)`.
+        """
+        ...
+
+    @final
+    @classmethod
+    def class_field_types(cls, union_membership: UnionMembership | None) -> Any:
+        """Return all registered Fields belonging to this target type.
+
+        You can also use the instance property `tgt.field_types` to avoid having to pass the
+        parameter UnionMembership.
+        """
+        ...
+
+    @final
+    @classmethod
+    def class_has_field(cls, field: type[Field], union_membership: UnionMembership) -> bool:
+        """Behaves like `Target.has_field()`, but works as a classmethod rather than an instance
+        method."""
+        ...
+
+    @final
+    @classmethod
+    def class_has_fields(
+        cls, fields: Iterable[type[Field]], union_membership: UnionMembership
+    ) -> bool:
+        """Behaves like `Target.has_fields()`, but works as a classmethod rather than an instance
+        method."""
+        ...
+
+    @final
+    @classmethod
+    def class_get_field(cls, field: type[_F], union_membership: UnionMembership) -> type[_F]:
+        """Get the requested Field type registered with this target type.
+
+        This will error if the field is not registered, so you should call Target.class_has_field()
+        first.
+        """
+        ...
+
+    @classmethod
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]: ...
+    @classmethod
+    def register_plugin_field(cls, field: type[Field]) -> UnionRule:
+        """Register a new field on the target type.
+
+        In the `rules()` register.py entry-point, include
+        `MyTarget.register_plugin_field(NewField)`. This will register `NewField` as a first-class
+        citizen. Plugins can use this new field like any other.
+        """
+        ...
+
+    @final
+    @classmethod
+    def _get_field_aliases_to_field_types(
+        cls, field_types: Iterable[type[Field]]
+    ) -> dict[str, type[Field]]: ...
+    def validate(self) -> None:
+        """Validate the target, such as checking for mutually exclusive fields.
+
+        N.B.: The validation should only be of properties intrinsic to the associated files in any
+        context. If the validation only makes sense for certain goals acting on targets; those
+        validations should be done in the associated rules.
+        """
+        ...
 
 class Field:
     """A Field.

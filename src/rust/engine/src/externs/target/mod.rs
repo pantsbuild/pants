@@ -4,6 +4,8 @@
 mod adaptor;
 mod field;
 mod source_fields;
+#[allow(clippy::module_inception)]
+mod target;
 pub(crate) mod util;
 
 use pyo3::prelude::*;
@@ -19,6 +21,7 @@ pub use source_fields::{
 pub use util::NoFieldValue;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    target::register(m)?;
     m.add_class::<SourceBlock>()?;
     m.add_class::<TargetAdaptor>()?;
     m.add_class::<Field>()?;
@@ -35,7 +38,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SingleSourceField>()?;
     m.add_class::<NoFieldValue>()?;
 
-    m.add("NO_VALUE", NoFieldValue)?;
+    NoFieldValue::init_singleton(m.py());
+    m.add("NO_VALUE", NoFieldValue::expect_singleton())?;
 
     Ok(())
 }
