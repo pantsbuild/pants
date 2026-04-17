@@ -1155,6 +1155,7 @@ def hash_prefix_zero_bits(item: str) -> int: ...
 # ------------------------------------------------------------------------------
 
 _Output = TypeVar("_Output")
+_Output_co = TypeVar("_Output_co", covariant=True)
 _Input = TypeVar("_Input")
 
 class Call:
@@ -1196,12 +1197,16 @@ class Call:
     def __await__(self) -> Generator[Any, None, Any]: ...
     def __repr__(self) -> str: ...
 
-class _Concurrently:
-    calls: tuple[Coroutine[Any, Any, Any] | Call, ...]
-    def __init__(self, calls: tuple[Coroutine[Any, Any, Any] | Call, ...]) -> None: ...
+class _Concurrently(Generic[_Output_co]):
+    calls: tuple[Coroutine[Any, Any, Any] | Call | _Concurrently[Any], ...]
+    def __init__(
+        self, calls: tuple[Coroutine[Any, Any, Any] | Call | _Concurrently[Any], ...]
+    ) -> None: ...
     def __await__(
         self,
-    ) -> Generator[tuple[Coroutine[Any, Any, Any] | Call, ...], None, tuple[Any, ...]]: ...
+    ) -> Generator[
+        tuple[Coroutine[Any, Any, Any] | Call | _Concurrently[Any], ...], None, _Output_co
+    ]: ...
 
 class RuleCallTrampoline:
     """The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so

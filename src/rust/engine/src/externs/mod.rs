@@ -648,6 +648,7 @@ impl YieldOnce {
 /// coroutine from an async helper) to the engine for parallel execution.
 #[pyclass(
     frozen,
+    generic,
     name = "_Concurrently",
     module = "pants.engine.internals.native_engine"
 )]
