@@ -237,6 +237,50 @@ docker_image(
 
 For working examples, including multi-platform builds with GitHub Actions, refer to the [example-docker](https://github.com/pantsbuild/example-docker) repository.
 
+### File or Directory Artifact Extraction
+
+Much like, `adhoc_tool` or `shell_command`, the `docker_image` target is able to produce outputs that can be supplied to other targets, see the [docker documentation](https://docs.docker.com/build/building/export/#export-binaries-from-a-build) for docker-sepcific information.
+
+These can be in the form of files or directories that are copied from a build stage in your Dockerfile via `COPY --from=<target_stage> <target_path> <output_path>`. Use the `output_files` field to capture individual files, or `output_directories` to capture entire directories as output.
+
+Files are captured relative to the build root. The example below will output a binary file `src/docker/hello`, and you should see it listed when running `pants run src/docker:list-files`:
+
+```toml title="pants.toml"
+[GLOBAL]
+backend_packages = [
+    "pants.backend.shell",
+    "pants.backend.docker",
+]
+
+[docker]
+use_buildx = true
+```
+
+```python tab={"label":"src/docker/BUILD"}
+docker_image(
+    name="hello",
+    output_files=["hello"],
+    target_stage="artifact"  # If your artifact stage is the last stage, this becomes optional.
+)
+
+run_shell_command(
+    name="list-files",
+    command="ls -latr {chroot}/src/docker",
+    execution_dependencies=[":hello"],
+)
+```
+
+```dockerfile tab={"label":"src/docker/Dockerfile"}
+FROM golang:1.25 AS builder
+WORKDIR /build
+COPY src/go /build
+RUN go build .
+
+FROM scratch AS artifact
+COPY --from=builder /build/hello /hello
+```
+
+
 ### Using buildx with Kubernetes drivers
 
 When using a buildx Kubernetes driver instead of a local Docker engine, you'll need to configure Pants to work with your Kubernetes cluster. Here are the key considerations:
