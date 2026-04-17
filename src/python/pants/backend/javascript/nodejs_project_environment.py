@@ -62,8 +62,11 @@ class NodeJsProjectEnvironment:
     @property
     def node_modules_directories(self) -> Iterable[str]:
         yield "node_modules"
-        if self.package and not self.project.single_workspace:
-            yield os.path.join(self.relative_workspace_directory(), "node_modules")
+        if not self.project.single_workspace:
+            for workspace in self.project.workspaces:
+                if workspace.root_dir != self.project.root_dir:
+                    rel_dir = fast_relpath(workspace.root_dir, self.project.root_dir)
+                    yield os.path.join(rel_dir, "node_modules")
 
     @property
     def target(self) -> Target | None:
