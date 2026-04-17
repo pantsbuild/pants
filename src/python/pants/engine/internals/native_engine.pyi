@@ -1158,7 +1158,7 @@ _Output = TypeVar("_Output")
 _Output_co = TypeVar("_Output_co", covariant=True)
 _Input = TypeVar("_Input")
 
-class Call:
+class Call(Generic[_Output_co]):
     rule_id: str
     output_type: type
     args: tuple[Any, ...]
@@ -1194,39 +1194,41 @@ class Call:
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
-    def __await__(self) -> Generator[Any, None, Any]: ...
+    def __await__(self) -> Generator[Any, None, _Output_co]: ...
     def __repr__(self) -> str: ...
 
 class _Concurrently(Generic[_Output_co]):
-    calls: tuple[Coroutine[Any, Any, Any] | Call | _Concurrently[Any], ...]
+    calls: tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]
     def __init__(
-        self, calls: tuple[Coroutine[Any, Any, Any] | Call | _Concurrently[Any], ...]
+        self, calls: tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]
     ) -> None: ...
     def __await__(
         self,
     ) -> Generator[
-        tuple[Coroutine[Any, Any, Any] | Call | _Concurrently[Any], ...], None, _Output_co
+        tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...], None, _Output_co
     ]: ...
 
-class RuleCallTrampoline:
+class RuleCallTrampoline(Generic[_Output]):
     """The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so
     each invocation constructs the already-awaitable `Call` directly.
     `__getattribute__` forwards `__doc__` and other introspection attrs to the wrapped function.
     """
 
     rule_id: str
-    output_type: type
+    output_type: type[_Output]
     rule: Any
     __wrapped__: Callable[..., Any]
 
     def __init__(
         self,
         rule_id: str,
-        output_type: type,
+        output_type: type[_Output],
         wrapped: Callable[..., Any],
         rule: Any,
     ) -> None: ...
-    def __call__(self, *args: Any, __implicitly: Sequence[Any] = (), **kwargs: Any) -> Call: ...
+    def __call__(
+        self, *args: Any, __implicitly: Sequence[Any] = (), **kwargs: Any
+    ) -> Call[_Output]: ...
 
 # ------------------------------------------------------------------------------
 # (uncategorized)

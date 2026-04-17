@@ -48,142 +48,143 @@ _Out9 = TypeVar("_Out9")
 
 @overload
 def Concurrently(
-    __gets: Iterable[Coroutine[Any, Any, _Output] | _Concurrently[_Output]],
+    __gets: Iterable[Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output]],
 ) -> _Concurrently[tuple[_Output, ...]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get1: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get2: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get3: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get4: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get5: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get6: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get7: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get8: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get9: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    __get10: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
-    *__gets: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
+    __get0: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get1: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get2: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get3: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get4: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get5: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get6: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get7: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get8: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get9: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    __get10: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
+    *__gets: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
 ) -> _Concurrently[tuple[_Output, ...]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Out0] | _Concurrently[_Out0],
-    __get1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1],
-    __get2: Coroutine[Any, Any, _Out2] | _Concurrently[_Out2],
-    __get3: Coroutine[Any, Any, _Out3] | _Concurrently[_Out3],
-    __get4: Coroutine[Any, Any, _Out4] | _Concurrently[_Out4],
-    __get5: Coroutine[Any, Any, _Out5] | _Concurrently[_Out5],
-    __get6: Coroutine[Any, Any, _Out6] | _Concurrently[_Out6],
-    __get7: Coroutine[Any, Any, _Out7] | _Concurrently[_Out7],
-    __get8: Coroutine[Any, Any, _Out8] | _Concurrently[_Out8],
-    __get9: Coroutine[Any, Any, _Out9] | _Concurrently[_Out9],
+    __get0: Coroutine[Any, Any, _Out0] | Call[_Out0] | _Concurrently[_Out0],
+    __get1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1],
+    __get2: Coroutine[Any, Any, _Out2] | Call[_Out2] | _Concurrently[_Out2],
+    __get3: Coroutine[Any, Any, _Out3] | Call[_Out3] | _Concurrently[_Out3],
+    __get4: Coroutine[Any, Any, _Out4] | Call[_Out4] | _Concurrently[_Out4],
+    __get5: Coroutine[Any, Any, _Out5] | Call[_Out5] | _Concurrently[_Out5],
+    __get6: Coroutine[Any, Any, _Out6] | Call[_Out6] | _Concurrently[_Out6],
+    __get7: Coroutine[Any, Any, _Out7] | Call[_Out7] | _Concurrently[_Out7],
+    __get8: Coroutine[Any, Any, _Out8] | Call[_Out8] | _Concurrently[_Out8],
+    __get9: Coroutine[Any, Any, _Out9] | Call[_Out9] | _Concurrently[_Out9],
 ) -> _Concurrently[tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Out0] | _Concurrently[_Out0],
-    __get1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1],
-    __get2: Coroutine[Any, Any, _Out2] | _Concurrently[_Out2],
-    __get3: Coroutine[Any, Any, _Out3] | _Concurrently[_Out3],
-    __get4: Coroutine[Any, Any, _Out4] | _Concurrently[_Out4],
-    __get5: Coroutine[Any, Any, _Out5] | _Concurrently[_Out5],
-    __get6: Coroutine[Any, Any, _Out6] | _Concurrently[_Out6],
-    __get7: Coroutine[Any, Any, _Out7] | _Concurrently[_Out7],
-    __get8: Coroutine[Any, Any, _Out8] | _Concurrently[_Out8],
+    __get0: Coroutine[Any, Any, _Out0] | Call[_Out0] | _Concurrently[_Out0],
+    __get1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1],
+    __get2: Coroutine[Any, Any, _Out2] | Call[_Out2] | _Concurrently[_Out2],
+    __get3: Coroutine[Any, Any, _Out3] | Call[_Out3] | _Concurrently[_Out3],
+    __get4: Coroutine[Any, Any, _Out4] | Call[_Out4] | _Concurrently[_Out4],
+    __get5: Coroutine[Any, Any, _Out5] | Call[_Out5] | _Concurrently[_Out5],
+    __get6: Coroutine[Any, Any, _Out6] | Call[_Out6] | _Concurrently[_Out6],
+    __get7: Coroutine[Any, Any, _Out7] | Call[_Out7] | _Concurrently[_Out7],
+    __get8: Coroutine[Any, Any, _Out8] | Call[_Out8] | _Concurrently[_Out8],
 ) -> _Concurrently[tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Out0] | _Concurrently[_Out0],
-    __get1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1],
-    __get2: Coroutine[Any, Any, _Out2] | _Concurrently[_Out2],
-    __get3: Coroutine[Any, Any, _Out3] | _Concurrently[_Out3],
-    __get4: Coroutine[Any, Any, _Out4] | _Concurrently[_Out4],
-    __get5: Coroutine[Any, Any, _Out5] | _Concurrently[_Out5],
-    __get6: Coroutine[Any, Any, _Out6] | _Concurrently[_Out6],
-    __get7: Coroutine[Any, Any, _Out7] | _Concurrently[_Out7],
+    __get0: Coroutine[Any, Any, _Out0] | Call[_Out0] | _Concurrently[_Out0],
+    __get1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1],
+    __get2: Coroutine[Any, Any, _Out2] | Call[_Out2] | _Concurrently[_Out2],
+    __get3: Coroutine[Any, Any, _Out3] | Call[_Out3] | _Concurrently[_Out3],
+    __get4: Coroutine[Any, Any, _Out4] | Call[_Out4] | _Concurrently[_Out4],
+    __get5: Coroutine[Any, Any, _Out5] | Call[_Out5] | _Concurrently[_Out5],
+    __get6: Coroutine[Any, Any, _Out6] | Call[_Out6] | _Concurrently[_Out6],
+    __get7: Coroutine[Any, Any, _Out7] | Call[_Out7] | _Concurrently[_Out7],
 ) -> _Concurrently[tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Out0] | _Concurrently[_Out0],
-    __get1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1],
-    __get2: Coroutine[Any, Any, _Out2] | _Concurrently[_Out2],
-    __get3: Coroutine[Any, Any, _Out3] | _Concurrently[_Out3],
-    __get4: Coroutine[Any, Any, _Out4] | _Concurrently[_Out4],
-    __get5: Coroutine[Any, Any, _Out5] | _Concurrently[_Out5],
-    __get6: Coroutine[Any, Any, _Out6] | _Concurrently[_Out6],
+    __get0: Coroutine[Any, Any, _Out0] | Call[_Out0] | _Concurrently[_Out0],
+    __get1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1],
+    __get2: Coroutine[Any, Any, _Out2] | Call[_Out2] | _Concurrently[_Out2],
+    __get3: Coroutine[Any, Any, _Out3] | Call[_Out3] | _Concurrently[_Out3],
+    __get4: Coroutine[Any, Any, _Out4] | Call[_Out4] | _Concurrently[_Out4],
+    __get5: Coroutine[Any, Any, _Out5] | Call[_Out5] | _Concurrently[_Out5],
+    __get6: Coroutine[Any, Any, _Out6] | Call[_Out6] | _Concurrently[_Out6],
 ) -> _Concurrently[tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Out0] | _Concurrently[_Out0],
-    __get1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1],
-    __get2: Coroutine[Any, Any, _Out2] | _Concurrently[_Out2],
-    __get3: Coroutine[Any, Any, _Out3] | _Concurrently[_Out3],
-    __get4: Coroutine[Any, Any, _Out4] | _Concurrently[_Out4],
-    __get5: Coroutine[Any, Any, _Out5] | _Concurrently[_Out5],
+    __get0: Coroutine[Any, Any, _Out0] | Call[_Out0] | _Concurrently[_Out0],
+    __get1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1],
+    __get2: Coroutine[Any, Any, _Out2] | Call[_Out2] | _Concurrently[_Out2],
+    __get3: Coroutine[Any, Any, _Out3] | Call[_Out3] | _Concurrently[_Out3],
+    __get4: Coroutine[Any, Any, _Out4] | Call[_Out4] | _Concurrently[_Out4],
+    __get5: Coroutine[Any, Any, _Out5] | Call[_Out5] | _Concurrently[_Out5],
 ) -> _Concurrently[tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Out0] | _Concurrently[_Out0],
-    __get1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1],
-    __get2: Coroutine[Any, Any, _Out2] | _Concurrently[_Out2],
-    __get3: Coroutine[Any, Any, _Out3] | _Concurrently[_Out3],
-    __get4: Coroutine[Any, Any, _Out4] | _Concurrently[_Out4],
+    __get0: Coroutine[Any, Any, _Out0] | Call[_Out0] | _Concurrently[_Out0],
+    __get1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1],
+    __get2: Coroutine[Any, Any, _Out2] | Call[_Out2] | _Concurrently[_Out2],
+    __get3: Coroutine[Any, Any, _Out3] | Call[_Out3] | _Concurrently[_Out3],
+    __get4: Coroutine[Any, Any, _Out4] | Call[_Out4] | _Concurrently[_Out4],
 ) -> _Concurrently[tuple[_Out0, _Out1, _Out2, _Out3, _Out4]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Out0] | _Concurrently[_Out0],
-    __get1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1],
-    __get2: Coroutine[Any, Any, _Out2] | _Concurrently[_Out2],
-    __get3: Coroutine[Any, Any, _Out3] | _Concurrently[_Out3],
+    __get0: Coroutine[Any, Any, _Out0] | Call[_Out0] | _Concurrently[_Out0],
+    __get1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1],
+    __get2: Coroutine[Any, Any, _Out2] | Call[_Out2] | _Concurrently[_Out2],
+    __get3: Coroutine[Any, Any, _Out3] | Call[_Out3] | _Concurrently[_Out3],
 ) -> _Concurrently[tuple[_Out0, _Out1, _Out2, _Out3]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Out0] | _Concurrently[_Out0],
-    __get1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1],
-    __get2: Coroutine[Any, Any, _Out2] | _Concurrently[_Out2],
+    __get0: Coroutine[Any, Any, _Out0] | Call[_Out0] | _Concurrently[_Out0],
+    __get1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1],
+    __get2: Coroutine[Any, Any, _Out2] | Call[_Out2] | _Concurrently[_Out2],
 ) -> _Concurrently[tuple[_Out0, _Out1, _Out2]]: ...
 
 
 @overload
 def Concurrently(
-    __get0: Coroutine[Any, Any, _Out0] | _Concurrently[_Out0],
-    __get1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1],
+    __get0: Coroutine[Any, Any, _Out0] | Call[_Out0] | _Concurrently[_Out0],
+    __get1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1],
 ) -> _Concurrently[tuple[_Out0, _Out1]]: ...
 
 
 def Concurrently(
     __arg0: (
-        Iterable[Coroutine[Any, Any, _Output] | _Concurrently[_Output]]
+        Iterable[Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output]]
         | Coroutine[Any, Any, _Out0]
+        | Call[_Out0]
         | _Concurrently[_Out0]
     ),
-    __arg1: Coroutine[Any, Any, _Out1] | _Concurrently[_Out1] | None = None,
-    __arg2: Coroutine[Any, Any, _Out2] | _Concurrently[_Out2] | None = None,
-    __arg3: Coroutine[Any, Any, _Out3] | _Concurrently[_Out3] | None = None,
-    __arg4: Coroutine[Any, Any, _Out4] | _Concurrently[_Out4] | None = None,
-    __arg5: Coroutine[Any, Any, _Out5] | _Concurrently[_Out5] | None = None,
-    __arg6: Coroutine[Any, Any, _Out6] | _Concurrently[_Out6] | None = None,
-    __arg7: Coroutine[Any, Any, _Out7] | _Concurrently[_Out7] | None = None,
-    __arg8: Coroutine[Any, Any, _Out8] | _Concurrently[_Out8] | None = None,
-    __arg9: Coroutine[Any, Any, _Out9] | _Concurrently[_Out9] | None = None,
-    *__args: Coroutine[Any, Any, _Output] | _Concurrently[_Output],
+    __arg1: Coroutine[Any, Any, _Out1] | Call[_Out1] | _Concurrently[_Out1] | None = None,
+    __arg2: Coroutine[Any, Any, _Out2] | Call[_Out2] | _Concurrently[_Out2] | None = None,
+    __arg3: Coroutine[Any, Any, _Out3] | Call[_Out3] | _Concurrently[_Out3] | None = None,
+    __arg4: Coroutine[Any, Any, _Out4] | Call[_Out4] | _Concurrently[_Out4] | None = None,
+    __arg5: Coroutine[Any, Any, _Out5] | Call[_Out5] | _Concurrently[_Out5] | None = None,
+    __arg6: Coroutine[Any, Any, _Out6] | Call[_Out6] | _Concurrently[_Out6] | None = None,
+    __arg7: Coroutine[Any, Any, _Out7] | Call[_Out7] | _Concurrently[_Out7] | None = None,
+    __arg8: Coroutine[Any, Any, _Out8] | Call[_Out8] | _Concurrently[_Out8] | None = None,
+    __arg9: Coroutine[Any, Any, _Out9] | Call[_Out9] | _Concurrently[_Out9] | None = None,
+    *__args: Coroutine[Any, Any, _Output] | Call[_Output] | _Concurrently[_Output],
 ) -> _Concurrently[
     tuple[_Output, ...]
     | tuple[_Out0, _Out1, _Out2, _Out3, _Out4, _Out5, _Out6, _Out7, _Out8, _Out9]

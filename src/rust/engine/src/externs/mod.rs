@@ -488,7 +488,11 @@ impl PyGeneratorResponseNativeCall {
     }
 }
 
-#[pyclass(name = "Call", module = "pants.engine.internals.native_engine")]
+#[pyclass(
+    generic,
+    name = "Call",
+    module = "pants.engine.internals.native_engine"
+)]
 pub struct PyGeneratorResponseCall(RwLock<Option<Call>>);
 
 impl PyGeneratorResponseCall {
@@ -686,7 +690,7 @@ impl PyGeneratorResponseCall {
 /// The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so
 /// each invocation constructs the already-awaitable `Call` directly.
 /// `__getattribute__` forwards `__doc__` and other introspection attrs to the wrapped function.
-#[pyclass(frozen, module = "pants.engine.internals.native_engine")]
+#[pyclass(frozen, generic, module = "pants.engine.internals.native_engine")]
 pub struct RuleCallTrampoline {
     rule_id: PyBackedStr,
     #[pyo3(get)]

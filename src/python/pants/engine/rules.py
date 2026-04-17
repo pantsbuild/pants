@@ -24,7 +24,7 @@ from typing import (
 from typing_extensions import ParamSpec
 
 from pants.engine.engine_aware import SideEffecting
-from pants.engine.internals.native_engine import RuleCallTrampoline
+from pants.engine.internals.native_engine import Call, RuleCallTrampoline
 from pants.engine.internals.rule_visitor import collect_awaitables
 from pants.engine.internals.selectors import AwaitableConstraints
 from pants.engine.internals.selectors import concurrently as concurrently  # noqa: F401
@@ -54,7 +54,7 @@ P = ParamSpec("P")
 R = TypeVar("R")
 SyncRuleT = Callable[P, R]
 AsyncRuleT = Callable[P, Coroutine[Any, Any, R]]
-RuleDecorator = Callable[[SyncRuleT | AsyncRuleT], AsyncRuleT]
+RuleDecorator = Callable[[SyncRuleT | AsyncRuleT], Callable[P, Call[R]]]
 
 
 def _make_rule(
@@ -119,7 +119,7 @@ def _make_rule(
             polymorphic=polymorphic,
         )
         return cast(
-            Callable[P, R],
+            Callable[P, Call[R]],
             RuleCallTrampoline(canonical_name, return_type, original_func, task_rule),
         )
 
@@ -253,7 +253,7 @@ class _RuleDecoratorKwargs(RuleDecoratorKwargs):
 
 def rule_decorator(
     func: SyncRuleT | AsyncRuleT, **kwargs: Unpack[_RuleDecoratorKwargs]
-) -> AsyncRuleT:
+) -> Callable[P, Call[R]]:
     if not inspect.isfunction(func):
         raise ValueError("The @rule decorator expects to be placed on a function.")
 
@@ -388,7 +388,7 @@ def validate_requirements(
             )
 
 
-def inner_rule(*args, **kwargs) -> AsyncRuleT | RuleDecorator:
+def inner_rule(*args, **kwargs) -> Callable[P, Call[R]] | RuleDecorator:
     if len(args) == 1 and inspect.isfunction(args[0]):
         return rule_decorator(*args, **kwargs)
     else:
