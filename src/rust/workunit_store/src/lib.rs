@@ -28,6 +28,21 @@ use tokio::task_local;
 
 mod metrics;
 
+pub(crate) fn format_workunit_duration(duration: Duration) -> String {
+    let total_secs = duration.as_secs_f64();
+    if total_secs >= 60.0 {
+        let mins = (total_secs / 60.0).floor() as u64;
+        let secs = total_secs % 60.0;
+        if secs < 0.05 {
+            format!("{mins}m")
+        } else {
+            format!("{mins}m {secs:.1}s")
+        }
+    } else {
+        format!("{total_secs:.1}s")
+    }
+}
+
 ///
 /// A unique id for a single run or `--loop` iteration of Pants within a single Scheduler.
 ///
@@ -260,6 +275,18 @@ impl Workunit {
             self.name
         };
 
+        let duration_suffix: Option<String> = match &self.state {
+            WorkunitState::Completed { time_span } => Some(format!(
+                " ({})",
+                format_workunit_duration(Duration::from(time_span.duration))
+            )),
+            WorkunitState::Started { start_time, .. } if canceled => Some(format!(
+                " ({})",
+                format_workunit_duration(start_time.elapsed().unwrap_or_default())
+            )),
+            _ => None,
+        };
+
         /* This length calculation doesn't treat multi-byte unicode charcters identically
          * to single-byte ones for the purpose of figuring out where to truncate the string. But that's
          * ok, since we just want to truncate the log string if it's roughly "too long", we don't care
@@ -281,7 +308,11 @@ impl Workunit {
             "".to_string()
         };
 
-        log!(self.level, "{state} {effective_identifier}{message}");
+        log!(
+            self.level,
+            "{state} {effective_identifier}{}{message}",
+            duration_suffix.as_deref().unwrap_or(""),
+        );
     }
 }
 
