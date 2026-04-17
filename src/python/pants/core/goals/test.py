@@ -30,6 +30,7 @@ from pants.core.goals.package import (
     environment_aware_package,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+from pants.core.target_types import GenericTarget
 from pants.core.util_rules.distdir import DistDir
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.partitions import (
@@ -47,7 +48,7 @@ from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVars, EnvironmentVarsRequest
 from pants.engine.fs import EMPTY_FILE_DIGEST, FileDigest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.graph import find_valid_field_sets, resolve_targets
+from pants.engine.internals.graph import find_valid_field_sets, resolve_targets, transitive_targets
 from pants.engine.internals.session import RunId
 from pants.engine.internals.specs_rules import find_valid_field_sets_for_target_roots
 from pants.engine.intrinsics import merge_digests, run_interactive_process_in_environment
@@ -59,16 +60,21 @@ from pants.engine.process import (
 )
 from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
 from pants.engine.target import (
+    Dependencies,
+    DepsTraversalBehavior,
     FieldSet,
     FieldSetsPerTargetRequest,
     IntField,
     NoApplicableTargetsBehavior,
+    ShouldTraverseDepsPredicate,
     SourcesField,
     SpecialCasedDependencies,
     StringField,
     StringSequenceField,
+    Target,
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
+    TransitiveTargetsRequest,
     ValidNumbers,
     parse_shard_spec,
 )
@@ -1240,6 +1246,21 @@ class RuntimePackageDependenciesField(SpecialCasedDependencies):
     )
 
 
+class TraverseGenericTargetDepsOnly(ShouldTraverseDepsPredicate):
+    """Traverses deps of `target()` (GenericTarget) entries, stops at all other target types.
+
+    Used to unwrap a `target()` alias that groups packageable targets, so that
+    `runtime_package_dependencies` can reference the alias instead of each target individually.
+    """
+
+    def __call__(
+        self, target: Target, field: Dependencies | SpecialCasedDependencies
+    ) -> DepsTraversalBehavior:
+        if isinstance(target, GenericTarget) and isinstance(field, Dependencies):
+            return DepsTraversalBehavior.INCLUDE
+        return DepsTraversalBehavior.EXCLUDE
+
+
 class BuiltPackageDependencies(Collection[BuiltPackage]):
     pass
 
@@ -1257,8 +1278,22 @@ async def build_runtime_package_dependencies(
     if not unparsed_addresses:
         return BuiltPackageDependencies()
     tgts = await resolve_targets(**implicitly(unparsed_addresses))
+
+    # Unwrap GenericTarget ("target()") entries by traversing their deps transitively,
+    # stopping at non-GenericTarget targets. This lets callers group packageable targets
+    # under a single `target()` alias and reference that alias in
+    # runtime_package_dependencies, rather than listing each packageable target individually.
+    transitive = await transitive_targets(
+        TransitiveTargetsRequest(
+            [tgt.address for tgt in tgts],
+            should_traverse_deps_predicate=TraverseGenericTargetDepsOnly(),
+        ),
+        **implicitly(),
+    )
+    non_generic = [tgt for tgt in transitive.closure if not isinstance(tgt, GenericTarget)]
+
     field_sets_per_tgt = await find_valid_field_sets(
-        FieldSetsPerTargetRequest(PackageFieldSet, tgts), **implicitly()
+        FieldSetsPerTargetRequest(PackageFieldSet, non_generic), **implicitly()
     )
     packages = await concurrently(
         environment_aware_package(EnvironmentAwarePackageRequest(field_set))
