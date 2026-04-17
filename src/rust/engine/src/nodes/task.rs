@@ -121,6 +121,43 @@ impl Task {
         .boxed()
     }
 
+    // Dispatches a single `AllItem` to its corresponding driver, recursing into nested
+    // `concurrently(..)` groups and returning their joined results as a tuple `Value`.
+    fn gen_all_item(
+        context: &Context,
+        params: Params,
+        entry: Intern<rule_graph::Entry<Rule>>,
+        item: externs::AllItem,
+    ) -> BoxFuture<'_, NodeResult<Value>> {
+        async move {
+            match item {
+                externs::AllItem::Generator(generator) => {
+                    Self::gen_generator(context, params, entry, generator).await
+                }
+                externs::AllItem::Call(call) => Self::gen_call(context, params, entry, call).await,
+                externs::AllItem::Concurrent(items) => {
+                    let values = Self::gen_all(context, params, entry, items).await?;
+                    Python::attach(|py| externs::store_tuple(py, values))
+                        .map_err(|err| Python::attach(|py| Failure::from_py_err_with_gil(py, err)))
+                }
+            }
+        }
+        .boxed()
+    }
+
+    // Concurrently drives every item in an `All`/`concurrently(..)`.
+    async fn gen_all(
+        context: &Context,
+        params: Params,
+        entry: Intern<rule_graph::Entry<Rule>>,
+        items: Vec<externs::AllItem>,
+    ) -> NodeResult<Vec<Value>> {
+        let futures = items
+            .into_iter()
+            .map(|item| Self::gen_all_item(context, params.clone(), entry, item));
+        future::try_join_all(futures).await
+    }
+
     ///
     /// Given a python generator Value, loop to request the generator's dependencies until
     /// it completes with a result Value or fails with an error.
@@ -166,18 +203,7 @@ impl Task {
                 }
                 GeneratorResponse::All(items) => {
                     let _blocking_token = workunit.blocking();
-                    let get_futures = items
-                        .into_iter()
-                        .map(|item| match item {
-                            externs::AllItem::Generator(generator) => {
-                                Self::gen_generator(context, params.clone(), entry, generator)
-                            }
-                            externs::AllItem::Call(call) => {
-                                Self::gen_call(context, params.clone(), entry, call).boxed()
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    match future::try_join_all(get_futures).await {
+                    match Self::gen_all(context, params.clone(), entry, items).await {
                         Ok(values) => {
                             let values_tuple_result =
                                 Python::attach(|py| externs::store_tuple(py, values));

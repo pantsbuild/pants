@@ -357,32 +357,10 @@ pub(crate) fn generator_send(
     } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>() {
         Ok(GeneratorResponse::NativeCall(call.take(py)?))
     } else if let Ok(get_multi) = response.cast::<PySequence>() {
-        // Was an `All` or `concurrently`. Each item is one of:
-        //   * a generator (async helper) — drive via generator_send;
-        //   * a `Call` — dispatch directly via `gen_call`;
-        //   * a `_Concurrently` — nested `concurrently(...)`. Treat its awaiter as a
-        //     generator so the outer engine loop recurses into the inner tuple.
         let items = get_multi
             .try_iter()?
-            .map(|item| {
-                let item = item?;
-                if item.is_instance(&generator_type.as_py_type(py))? {
-                    Ok(AllItem::Generator(Value::new(item.unbind())))
-                } else if let Ok(call) = item.extract::<PyRef<PyGeneratorResponseCall>>() {
-                    call.take(py)
-                        .map(AllItem::Call)
-                        .map_err(PyValueError::new_err)
-                } else if let Ok(concurrently) = item.extract::<PyRef<PyConcurrently>>() {
-                    let awaiter = Py::new(py, concurrently.awaiter(py))?;
-                    Ok(AllItem::Generator(Value::new(awaiter.into_any())))
-                } else {
-                    Err(PyValueError::new_err(format!(
-                        "Expected an `All` or `concurrently` to receive calls to rules, \
-            but got: {response}"
-                    )))
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|item| AllItem::parse(py, generator_type, item?))
+            .collect::<PyResult<Vec<_>>>()?;
         Ok(GeneratorResponse::All(items))
     } else {
         Err(PyValueError::new_err(format!(
@@ -836,4 +814,31 @@ pub enum AllItem {
     Generator(Value),
     /// A direct `Call` returned by a call-by-name `@rule` invocation; execute it as-is.
     Call(Call),
+    /// A nested `concurrently(..)`: recursively join its items and wrap the results in a tuple.
+    Concurrent(Vec<AllItem>),
+}
+
+impl AllItem {
+    /// Parse one item from an `All`/`concurrently(..)` tuple. Nested `_Concurrently` is
+    /// resolved recursively.
+    fn parse(py: Python<'_>, generator_type: &TypeId, item: Bound<'_, PyAny>) -> PyResult<Self> {
+        if item.is_instance(&generator_type.as_py_type(py))? {
+            Ok(Self::Generator(Value::new(item.unbind())))
+        } else if let Ok(call) = item.extract::<PyRef<PyGeneratorResponseCall>>() {
+            call.take(py).map(Self::Call).map_err(PyValueError::new_err)
+        } else if let Ok(concurrently) = item.extract::<PyRef<PyConcurrently>>() {
+            let items = concurrently
+                .calls
+                .bind(py)
+                .iter()
+                .map(|item| Self::parse(py, generator_type, item))
+                .collect::<PyResult<Vec<_>>>()?;
+            Ok(Self::Concurrent(items))
+        } else {
+            Err(PyValueError::new_err(format!(
+                "Expected an `All` or `concurrently` item to be a rule call, coroutine, or \
+                 nested `concurrently(...)`, but got: {item}"
+            )))
+        }
+    }
 }
