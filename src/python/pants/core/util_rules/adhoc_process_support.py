@@ -617,6 +617,8 @@ async def check_outputs(
             "which requires all output globs to actually match an output.",
             snapshot,
         )
+        # Should return otherwise it silently falls through and warns twice
+        return
 
     # Otherwise it is `GlobExpansionConjunction.any_match` which means only at least one glob must match.
     total_count = len(filtered_output_files) + len(filtered_output_directories)
