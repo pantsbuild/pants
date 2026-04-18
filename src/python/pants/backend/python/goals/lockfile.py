@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 import itertools
+import os
 import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import LockfileResolver, PythonSetup
+from pants.backend.python.subsystems.uv import download_uv_binary
 from pants.backend.python.target_types import (
     PythonRequirementFindLinksField,
     PythonRequirementResolveField,
@@ -63,10 +65,11 @@ from pants.engine.intrinsics import (
     merge_digests,
     path_globs_to_digest,
 )
-from pants.engine.process import ProcessCacheScope, execute_process_or_raise
+from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.errors import OptionsError
 from pants.option.subsystem import _construct_subsystem
 from pants.util.docutil import bin_name
 from pants.util.logging import LogLevel
@@ -111,6 +114,82 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
     return _PipArgsAndConstraintsSetup(resolve_config, tuple(args), input_digest)
 
 
+def _strip_named_repo(value: str) -> str:
+    """Strip PEX-style ``name=URL`` prefix from index URLs.
+
+    ``[python-repos].indexes`` entries may use the ``name=https://...`` form
+    which PEX understands but uv does not.  This helper extracts just the URL.
+    """
+    if "=" not in value:
+        return value
+    maybe_name, maybe_url = value.split("=", 1)
+    if "://" not in maybe_name and ("://" in maybe_url or maybe_url.startswith("file:")):
+        return maybe_url
+    return value
+
+
+def _build_uv_compile_argv(
+    *,
+    uv_exe: str,
+    requirements_in_path: str,
+    output_path: str,
+    is_universal: bool,
+    python_version: str | None,
+    resolve_config: ResolvePexConfig,
+    find_links: FrozenOrderedSet[str],
+    extra_uv_args: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Build the argv for ``uv pip compile``."""
+    args: list[str] = [
+        uv_exe,
+        "pip",
+        "compile",
+        requirements_in_path,
+        "--output-file",
+        output_path,
+        "--no-header",
+        "--no-annotate",
+    ]
+
+    if is_universal:
+        args.append("--universal")
+
+    # Always pass --python-version so uv knows the target Python.
+    # This avoids needing a real interpreter binary in the sandbox.
+    if python_version:
+        args.extend(["--python-version", python_version])
+
+    # Index URLs
+    index_urls = [_strip_named_repo(i) for i in resolve_config.indexes]
+    if index_urls:
+        args.extend(["--default-index", index_urls[0]])
+        for extra_index in index_urls[1:]:
+            args.extend(["--extra-index-url", extra_index])
+    else:
+        args.append("--no-index")
+
+    # Find links
+    for link in (*resolve_config.find_links, *find_links):
+        args.extend(["--find-links", _strip_named_repo(link)])
+
+    # Constraints
+    if resolve_config.constraints_file:
+        args.extend(["--constraint", resolve_config.constraints_file.path])
+
+    # Binary restrictions
+    if resolve_config.no_binary:
+        for pkg in resolve_config.no_binary:
+            args.extend(["--no-binary", pkg])
+    if resolve_config.only_binary:
+        for pkg in resolve_config.only_binary:
+            args.extend(["--only-binary", pkg])
+
+    # User passthrough args
+    args.extend(extra_uv_args)
+
+    return tuple(args)
+
+
 @rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
 async def generate_lockfile(
     req: GeneratePythonLockfile,
@@ -125,6 +204,16 @@ async def generate_lockfile(
 
     pip_args_setup = await _setup_pip_args_and_constraints_file(req.resolve_name)
     header_delimiter = "//"
+
+    # Early validation for uv resolver — must happen before resolving complete_platforms
+    # addresses, since those will fail to resolve as file targets before we can give
+    # a clear error message.
+    use_uv = python_setup.lockfile_resolver == LockfileResolver.uv
+    if use_uv and req.complete_platforms:
+        raise OptionsError(
+            f'[python].lockfile_resolver = "uv" does not support complete_platforms '
+            f"(set on resolve {req.resolve_name!r}). Use the default pex resolver instead."
+        )
 
     python = await find_interpreter(req.interpreter_constraints, **implicitly())
 
@@ -178,6 +267,114 @@ async def generate_lockfile(
     else:
         existing_lockfile_digest = EMPTY_DIGEST
 
+    # ----- uv pre-resolve (opt-in) -----
+    uv_compiled_digest: Digest = EMPTY_DIGEST
+    uv_compiled_requirements_path = "__uv_compiled_requirements.txt"
+
+    if use_uv:
+        # Validate unsupported options (complete_platforms already checked above)
+        if pip_args_setup.resolve_config.overrides:
+            raise OptionsError(
+                f'[python].lockfile_resolver = "uv" does not yet support per-resolve overrides '
+                f"(set on resolve {req.resolve_name!r}). Use the default pex resolver instead."
+            )
+        if pip_args_setup.resolve_config.sources:
+            raise OptionsError(
+                f'[python].lockfile_resolver = "uv" does not yet support per-resolve sources '
+                f"(set on resolve {req.resolve_name!r}). Use the default pex resolver instead."
+            )
+        if pip_args_setup.resolve_config.excludes:
+            raise OptionsError(
+                f'[python].lockfile_resolver = "uv" does not yet support per-resolve excludes '
+                f"(set on resolve {req.resolve_name!r}). Use the default pex resolver instead."
+            )
+
+        is_universal = req.lock_style == "universal"
+
+        if is_universal:
+            # For universal locks, pass --python-version with the minimum compatible version.
+            target_python_version = req.interpreter_constraints.minimum_python_version(
+                python_setup.interpreter_versions_universe
+            )
+        else:
+            # For strict/sources, validate that interpreter constraints select a single major.minor.
+            versions = req.interpreter_constraints.partition_into_major_minor_versions(
+                python_setup.interpreter_versions_universe
+            )
+            if len(versions) != 1:
+                raise OptionsError(
+                    f'[python].lockfile_resolver = "uv" with lock_style={req.lock_style!r} '
+                    f"requires interpreter constraints that select exactly one Python major.minor "
+                    f"version, but resolve {req.resolve_name!r} matched: {versions}. "
+                    f'Use lock_style="universal" or narrow the interpreter constraints.'
+                )
+            target_python_version = versions[0]
+
+        # Download uv binary (uses the DownloadedUv rule which includes user args)
+        downloaded_uv = await download_uv_binary(**implicitly())
+
+        # Write requirements to a temp input file
+        requirements_in_path = "__uv_requirements.in"
+        uv_input_digest = await create_digest(
+            CreateDigest(
+                [
+                    FileContent(
+                        requirements_in_path,
+                        ("\n".join(sorted(req.requirements)) + "\n").encode("utf-8"),
+                    )
+                ]
+            )
+        )
+
+        uv_argv = _build_uv_compile_argv(
+            uv_exe=downloaded_uv.exe,
+            requirements_in_path=requirements_in_path,
+            output_path=uv_compiled_requirements_path,
+            is_universal=is_universal,
+            python_version=target_python_version,
+            resolve_config=pip_args_setup.resolve_config,
+            find_links=req.find_links,
+            extra_uv_args=downloaded_uv.args_for_lockfile_resolve,
+        )
+
+        uv_process_input = await merge_digests(
+            MergeDigests([downloaded_uv.digest, uv_input_digest, pip_args_setup.digest])
+        )
+
+        # Set up environment so uv can find the Python interpreter if needed.
+        # UV_PYTHON_DOWNLOADS=never prevents uv from trying to download interpreters.
+        # PATH includes the interpreter's directory so uv can find it.
+        python_dir = os.path.dirname(python.path)
+        uv_env = {
+            "PATH": python_dir,
+            "UV_PYTHON_DOWNLOADS": "never",
+        }
+
+        uv_result = await execute_process_or_raise(
+            **implicitly(
+                Process(
+                    argv=uv_argv,
+                    description=f"uv pip compile for {req.resolve_name}",
+                    input_digest=uv_process_input,
+                    output_files=(uv_compiled_requirements_path,),
+                    env=uv_env,
+                    cache_scope=ProcessCacheScope.PER_SESSION,
+                )
+            )
+        )
+        uv_compiled_digest = uv_result.output_digest
+
+    # ----- PEX lock create -----
+    # When using uv, pass --no-transitive and point at the pre-compiled requirements
+    # instead of passing the raw requirement strings.
+    if use_uv:
+        requirement_args: tuple[str, ...] = (
+            "--no-transitive",
+            f"--requirement={uv_compiled_requirements_path}",
+        )
+    else:
+        requirement_args = tuple(req.requirements)
+
     output_flag = "--lock" if generate_lockfiles_subsystem.sync else "--output"
     result = await execute_process_or_raise(
         **implicitly(
@@ -213,11 +410,11 @@ async def generate_lockfile(
                         f"--override={override}"
                         for override in pip_args_setup.resolve_config.overrides
                     ),
-                    *req.requirements,
+                    *requirement_args,
                 ),
                 additional_input_digest=await merge_digests(
                     MergeDigests(
-                        [existing_lockfile_digest, pip_args_setup.digest]
+                        [existing_lockfile_digest, pip_args_setup.digest, uv_compiled_digest]
                         + ([complete_platforms.digest] if complete_platforms else [])
                     )
                 ),

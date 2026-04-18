@@ -48,6 +48,12 @@ class PexBuilder(enum.Enum):
     uv = "uv"
 
 
+@enum.unique
+class LockfileResolver(enum.Enum):
+    pex = "pex"
+    uv = "uv"
+
+
 RESOLVE_OPTION_KEY__DEFAULT = "__default__"
 
 _T = TypeVar("_T")
@@ -331,6 +337,28 @@ class PythonSetup(Subsystem):
 
             Only applies to non-internal, non-cross-platform PEX builds. Other builds
             silently fall back to pip.
+            """
+        ),
+        advanced=True,
+    )
+    lockfile_resolver = EnumOption(
+        default=LockfileResolver.pex,
+        help=softwrap(
+            """
+            Which resolver to use for the dependency-solving step of
+            `generate-lockfiles`.
+
+            - `pex` (default): PEX's built-in pip resolver.
+            - `uv` (experimental): Pre-resolve with `uv pip compile`, then
+              run `pex lock create --no-transitive`. Supports all lock styles
+              including `universal`. 3-4x faster on cold cache.
+
+            Limitations when using `uv`:
+            - Does not support `complete_platforms`.
+            - Per-resolve `overrides`, `sources`, and `excludes` are not yet
+              wired through the uv step.
+            - For non-universal lock styles, interpreter constraints must
+              select a single Python major.minor version.
             """
         ),
         advanced=True,
