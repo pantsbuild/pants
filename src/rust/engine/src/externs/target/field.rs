@@ -1,141 +1,67 @@
-// Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
+// Copyright 2026 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fmt::Write;
-use std::hash::{Hash, Hasher};
+use std::sync::OnceLock;
 
-use fnv::FnvHasher;
+use fnv::FnvHashMap;
 
+use parking_lot::Mutex;
 use pyo3::basic::CompareOp;
 use pyo3::exceptions::PyValueError;
 use pyo3::intern;
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::pyclass_init::PyClassInitializer;
 use pyo3::types::PyType;
 
+use crate::TypeId;
 use crate::externs::address::Address;
 use crate::python::PyComparedBool;
 
-use std::sync::OnceLock;
+use super::util::{NoFieldValue, combine_hashes, raise_invalid_field_type, validate_choices};
 
-static INVALID_FIELD_TYPE_EXCEPTION: OnceLock<Py<PyAny>> = OnceLock::new();
-static INVALID_FIELD_CHOICE_EXCEPTION: OnceLock<Py<PyAny>> = OnceLock::new();
+static FIELD_TYPE_INFO_CACHE: OnceLock<Mutex<FnvHashMap<TypeId, FieldTypeInfo>>> = OnceLock::new();
 
-pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<Field>()?;
-    m.add_class::<ScalarField>()?;
-    m.add_class::<BoolField>()?;
-    m.add_class::<TriBoolField>()?;
-    m.add_class::<StringField>()?;
-    m.add_class::<SequenceField>()?;
-    m.add_class::<StringSequenceField>()?;
-    m.add_class::<AsyncFieldMixin>()?;
-    m.add_class::<NoFieldValue>()?;
-
-    m.add("NO_VALUE", NoFieldValue)?;
-
-    Ok(())
+struct FieldTypeInfo {
+    none_is_valid_value: bool,
+    deprecated: bool,
+    required: bool,
+    /// Populated lazily the first time the default is needed.
+    default: Option<Py<PyAny>>,
 }
 
-fn combine_hashes(hashes: &[isize]) -> isize {
-    let mut hasher = FnvHasher::default();
-    for h in hashes {
-        h.hash(&mut hasher);
+impl FieldTypeInfo {
+    fn resolve(cls: &Bound<'_, PyType>, py: Python) -> PyResult<Self> {
+        let removal_version: Option<PyBackedStr> =
+            cls.getattr(intern!(py, "removal_version"))?.extract()?;
+        Ok(Self {
+            none_is_valid_value: cls.getattr(intern!(py, "none_is_valid_value"))?.extract()?,
+            deprecated: removal_version.is_some(),
+            required: cls.getattr(intern!(py, "required"))?.extract()?,
+            default: None,
+        })
     }
-    hasher.finish() as isize
 }
 
-fn get_cached_exception<'py>(
-    py: Python<'py>,
-    cache: &OnceLock<Py<PyAny>>,
-    name: &str,
-) -> PyResult<Bound<'py, PyAny>> {
-    if let Some(exc) = cache.get() {
-        return Ok(exc.bind(py).clone());
-    }
-    let exc = py.import("pants.engine.target")?.getattr(name)?;
-    let _ = cache.set(exc.clone().unbind());
-    Ok(exc)
-}
-
-fn raise_invalid_field_type(
+fn with_field_type_info<R>(
+    cls: &Bound<'_, PyType>,
     py: Python,
-    address: &Bound<PyAny>,
-    alias: &str,
-    raw_value: Option<&Bound<PyAny>>,
-    expected_type_desc: &str,
-) -> PyErr {
-    match get_cached_exception(
-        py,
-        &INVALID_FIELD_TYPE_EXCEPTION,
-        "InvalidFieldTypeException",
-    ) {
-        Ok(exc_cls) => {
-            let kwargs = pyo3::types::PyDict::new(py);
-            let _ = kwargs.set_item("expected_type", expected_type_desc);
-            match exc_cls.call((address, alias, raw_value), Some(&kwargs)) {
-                Ok(exc) => PyErr::from_value(exc),
-                Err(e) => e,
-            }
-        }
-        Err(e) => e,
-    }
-}
-
-fn validate_choices(
-    py: Python,
-    address: &Bound<PyAny>,
-    alias: &str,
-    values: &Bound<PyAny>,
-    valid_choices: &Bound<PyAny>,
-) -> PyResult<()> {
-    let choices_set = pyo3::types::PySet::empty(py)?;
-    if valid_choices.is_instance_of::<pyo3::types::PyTuple>() {
-        for item in valid_choices.try_iter()? {
-            choices_set.add(item?)?;
-        }
-    } else {
-        for member in valid_choices.try_iter()? {
-            let member = member?;
-            choices_set.add(member.getattr(intern!(py, "value"))?)?;
-        }
-    }
-    for choice in values.try_iter()? {
-        let choice = choice?;
-        if !choices_set.contains(&choice)? {
-            let exc_cls = get_cached_exception(
-                py,
-                &INVALID_FIELD_CHOICE_EXCEPTION,
-                "InvalidFieldChoiceException",
-            )?;
-            let kwargs = pyo3::types::PyDict::new(py);
-            kwargs.set_item("valid_choices", &choices_set)?;
-            return Err(PyErr::from_value(
-                exc_cls.call((address, alias, &choice), Some(&kwargs))?,
-            ));
-        }
-    }
-    Ok(())
-}
-
-#[pyclass(name = "_NoValue", from_py_object)]
-#[derive(Clone)]
-struct NoFieldValue;
-
-#[pymethods]
-impl NoFieldValue {
-    fn __bool__(&self) -> bool {
-        false
-    }
-
-    fn __repr__(&self) -> &'static str {
-        "<NO_VALUE>"
-    }
+    f: impl FnOnce(&mut FieldTypeInfo) -> R,
+) -> PyResult<R> {
+    let type_id = TypeId::new(cls);
+    let cache = FIELD_TYPE_INFO_CACHE.get_or_init(|| Mutex::new(FnvHashMap::default()));
+    let mut locked = cache.lock();
+    let info = match locked.entry(type_id) {
+        std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+        std::collections::hash_map::Entry::Vacant(e) => e.insert(FieldTypeInfo::resolve(cls, py)?),
+    };
+    Ok(f(info))
 }
 
 #[pyclass(subclass, frozen, module = "pants.engine.internals.native_engine")]
 pub struct Field {
-    value: Py<PyAny>,
+    pub(crate) value: Py<PyAny>,
 }
 
 #[pymethods]
@@ -154,13 +80,9 @@ impl Field {
         //  to None below.
         Self::check_deprecated(cls, raw_value, &address, py)?;
 
+        let none_is_valid = with_field_type_info(cls, py, |info| info.none_is_valid_value)?;
         let raw_value = match raw_value {
-            Some(value)
-                if value.extract::<NoFieldValue>().is_ok()
-                    && !Self::cls_none_is_valid_value(cls)? =>
-            {
-                None
-            }
+            Some(value) if value.extract::<NoFieldValue>().is_ok() && !none_is_valid => None,
             rv => rv,
         };
 
@@ -214,28 +136,42 @@ impl Field {
         address: PyRef<Address>,
         py: Python<'py>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let default = || -> PyResult<Bound<'_, PyAny>> {
-            if Self::cls_required(cls)? {
-                // TODO: Should be `RequiredFieldMissingException`.
-                Err(PyValueError::new_err(format!(
-                    "The `{}` field in target {} must be defined.",
-                    Self::cls_alias(cls)?,
-                    *address,
-                )))
-            } else {
-                Self::cls_default(cls)
-            }
-        };
-
-        let none_is_valid_value = Self::cls_none_is_valid_value(cls)?;
-        match raw_value {
-            Some(value) if none_is_valid_value && value.extract::<NoFieldValue>().is_ok() => {
-                default()
-            }
-            None if none_is_valid_value => Ok(py.None().into_bound(py)),
-            None => default(),
-            Some(value) => Ok(value.clone()),
+        enum Branch<'a, 'py> {
+            Default,
+            NoneValue,
+            Value(&'a Bound<'py, PyAny>),
         }
+
+        with_field_type_info(cls, py, |info| -> PyResult<Bound<'py, PyAny>> {
+            let branch = match raw_value {
+                Some(value)
+                    if info.none_is_valid_value && value.extract::<NoFieldValue>().is_ok() =>
+                {
+                    Branch::Default
+                }
+                None if info.none_is_valid_value => Branch::NoneValue,
+                None => Branch::Default,
+                Some(value) => Branch::Value(value),
+            };
+
+            match branch {
+                Branch::NoneValue => Ok(py.None().into_bound(py)),
+                Branch::Value(value) => Ok(value.clone()),
+                Branch::Default => {
+                    if info.required {
+                        return Err(PyValueError::new_err(format!(
+                            "The `{}` field in target {} must be defined.",
+                            Self::cls_alias(cls)?,
+                            *address,
+                        )));
+                    }
+                    if info.default.is_none() {
+                        info.default = Some(cls.getattr(intern!(py, "default"))?.unbind());
+                    }
+                    Ok(info.default.as_ref().unwrap().bind(py).clone())
+                }
+            }
+        })?
     }
 
     #[getter]
@@ -293,7 +229,7 @@ impl Field {
 }
 
 impl Field {
-    fn init(
+    pub fn init(
         cls: &Bound<'_, PyType>,
         raw_value: Option<&Bound<'_, PyAny>>,
         address: Bound<'_, Address>,
@@ -304,28 +240,37 @@ impl Field {
         )?))
     }
 
-    fn cls_none_is_valid_value(cls: &Bound<'_, PyAny>) -> PyResult<bool> {
+    pub fn compute_value_from_bound<'py>(
+        cls: &Bound<'py, PyType>,
+        raw_value: Option<&Bound<'py, PyAny>>,
+        address: Bound<'py, Address>,
+        py: Python<'py>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        Self::compute_value(cls, raw_value, address.extract()?, py)
+    }
+
+    pub fn cls_none_is_valid_value(cls: &Bound<'_, PyAny>) -> PyResult<bool> {
         cls.getattr("none_is_valid_value")?.extract::<bool>()
     }
 
-    fn cls_default<'py>(cls: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    pub fn cls_default<'py>(cls: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
         cls.getattr("default")
     }
 
-    fn cls_required(cls: &Bound<'_, PyAny>) -> PyResult<bool> {
+    pub fn cls_required(cls: &Bound<'_, PyAny>) -> PyResult<bool> {
         cls.getattr("required")?.extract()
     }
 
-    fn cls_alias(cls: &Bound<'_, PyAny>) -> PyResult<String> {
+    pub fn cls_alias(cls: &Bound<'_, PyAny>) -> PyResult<PyBackedStr> {
         // TODO: All of these methods should use interned attr names.
         cls.getattr("alias")?.extract()
     }
 
-    fn cls_removal_version(cls: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    pub fn cls_removal_version(cls: &Bound<'_, PyAny>) -> PyResult<Option<PyBackedStr>> {
         cls.getattr("removal_version")?.extract()
     }
 
-    fn cls_removal_hint(cls: &Bound<'_, PyAny>) -> PyResult<Option<String>> {
+    pub fn cls_removal_hint(cls: &Bound<'_, PyAny>) -> PyResult<Option<PyBackedStr>> {
         cls.getattr("removal_hint")?.extract()
     }
 
@@ -335,6 +280,10 @@ impl Field {
         address: &Bound<'_, Address>,
         py: Python,
     ) -> PyResult<()> {
+        let is_deprecated = with_field_type_info(cls, py, |info| info.deprecated)?;
+        if !is_deprecated {
+            return Ok(());
+        }
         if address.borrow().is_generated_target() {
             return Ok(());
         }
@@ -401,8 +350,8 @@ impl ScalarField {
         if !value_or_default.is_none() {
             let expected_type = cls.getattr(intern!(py, "expected_type"))?;
             if !value_or_default.is_instance(&expected_type)? {
-                let alias: String = Field::cls_alias(cls)?;
-                let expected_type_desc: String = cls
+                let alias = Field::cls_alias(cls)?;
+                let expected_type_desc: PyBackedStr = cls
                     .getattr(intern!(py, "expected_type_description"))?
                     .extract()?;
                 return Err(raise_invalid_field_type(
@@ -595,7 +544,7 @@ impl SequenceField {
         let expected_element_type = cls.getattr(intern!(py, "expected_element_type"))?;
         if value_or_default.is_instance(&expected_element_type)? {
             let alias = Field::cls_alias(cls)?;
-            let desc: String = cls
+            let desc: PyBackedStr = cls
                 .getattr(intern!(py, "expected_type_description"))?
                 .extract()?;
             return Err(raise_invalid_field_type(
@@ -610,7 +559,7 @@ impl SequenceField {
             Ok(iter) => iter,
             Err(_) => {
                 let alias = Field::cls_alias(cls)?;
-                let desc: String = cls
+                let desc: PyBackedStr = cls
                     .getattr(intern!(py, "expected_type_description"))?
                     .extract()?;
                 return Err(raise_invalid_field_type(
@@ -627,7 +576,7 @@ impl SequenceField {
             let item = item?;
             if !item.is_instance(&expected_element_type)? {
                 let alias = Field::cls_alias(cls)?;
-                let desc: String = cls
+                let desc: PyBackedStr = cls
                     .getattr(intern!(py, "expected_type_description"))?
                     .extract()?;
                 return Err(raise_invalid_field_type(
@@ -710,7 +659,22 @@ impl StringSequenceField {
 
 #[pyclass(subclass, frozen, extends = Field, module = "pants.engine.internals.native_engine")]
 pub struct AsyncFieldMixin {
-    address: Py<Address>,
+    pub(crate) address: Py<Address>,
+}
+
+impl AsyncFieldMixin {
+    pub fn init(
+        cls: &Bound<'_, PyType>,
+        raw_value: Option<&Bound<'_, PyAny>>,
+        address: Bound<'_, Address>,
+        py: Python,
+    ) -> PyResult<PyClassInitializer<AsyncFieldMixin>> {
+        Ok(
+            Field::init(cls, raw_value, address.clone(), py)?.add_subclass(Self {
+                address: address.unbind(),
+            }),
+        )
+    }
 }
 
 #[pymethods]
@@ -739,7 +703,7 @@ impl AsyncFieldMixin {
     fn __repr__(self_: &Bound<Self>) -> PyResult<String> {
         let py = self_.py();
         let cls = self_.get_type();
-        let alias: String = Field::cls_alias(&cls)?;
+        let alias = Field::cls_alias(&cls)?;
         let value = self_.getattr(intern!(py, "value"))?;
         let address = self_.get().address.bind(py);
         let mut result = String::new();

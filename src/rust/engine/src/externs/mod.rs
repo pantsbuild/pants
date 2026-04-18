@@ -31,6 +31,7 @@ pub mod dep_inference;
 pub mod engine_aware;
 mod frozendict;
 pub mod fs;
+pub mod hunk;
 mod interface;
 #[cfg(test)]
 mod interface_tests;

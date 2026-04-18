@@ -68,6 +68,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::register(py, m)?;
     externs::address::register(py, m)?;
     externs::fs::register(m)?;
+    externs::hunk::register(m)?;
     externs::nailgun::register(py, m)?;
     externs::options::register(m)?;
     externs::pants_ng::register(m)?;
@@ -202,7 +203,6 @@ impl PyTypes {
         directory: &Bound<'_, PyType>,
         digest_contents: &Bound<'_, PyType>,
         digest_entries: &Bound<'_, PyType>,
-        path_globs: &Bound<'_, PyType>,
         create_digest: &Bound<'_, PyType>,
         digest_subset: &Bound<'_, PyType>,
         native_download_file: &Bound<'_, PyType>,
@@ -237,7 +237,7 @@ impl PyTypes {
             directory: TypeId::new(directory),
             digest_contents: TypeId::new(digest_contents),
             digest_entries: TypeId::new(digest_entries),
-            path_globs: TypeId::new(path_globs),
+            path_globs: TypeId::new(&py.get_type::<externs::fs::PyPathGlobs>()),
             merge_digests: TypeId::new(&py.get_type::<externs::fs::PyMergeDigests>()),
             add_prefix: TypeId::new(&py.get_type::<externs::fs::PyAddPrefix>()),
             remove_prefix: TypeId::new(&py.get_type::<externs::fs::PyRemovePrefix>()),

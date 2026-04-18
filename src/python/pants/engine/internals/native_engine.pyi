@@ -6,20 +6,32 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, KeysView, Mapping, Sequence
 from datetime import datetime
 from enum import Enum
 from io import RawIOBase
 from pathlib import Path
-from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Protocol,
+    Self,
+    TextIO,
+    TypeVar,
+    final,
+    overload,
+)
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import (
     CreateDigest,
     DigestContents,
     DigestEntries,
     DigestSubset,
+    GlobExpansionConjunction,
     NativeDownloadFile,
-    PathGlobs,
     PathMetadataRequest,
     PathMetadataResult,
     Paths,
@@ -38,6 +50,9 @@ from pants.engine.process import (
     InteractiveProcessResult,
     Process,
 )
+
+if TYPE_CHECKING:
+    from pants.engine.internals.target_adaptor import SourceBlocks
 
 # TODO: black and flake8 disagree about the content of this file:
 #   see https://github.com/psf/black/issues/1548
@@ -367,6 +382,303 @@ class _NoValue:
 # Marker for unspecified field values that should use the default value if applicable.
 NO_VALUE: _NoValue
 
+class TextBlock:
+    """Block of lines in a file.
+
+    Lines are 1 indexed, `start` is inclusive.
+
+    TextBlock is used as a part of unified diff hunk, thus it can be empty,
+    i.e. count can be equal to 0. In the special case when the file is empty
+    start = 0 and count = 0.
+    """
+
+    start: int
+    count: int
+    end: int
+    def __init__(self, start: int, count: int) -> None: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+
+class Hunk:
+    """Hunk of difference in unified format.
+
+    https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+
+    In the special case when file is created left = None.
+    In the special case when file is deleted right = None.
+    """
+
+    left: TextBlock | None
+    right: TextBlock | None
+    def __init__(self, left: TextBlock | None, right: TextBlock | None) -> None: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+
+class SourceBlock:
+    """Block of lines in a file.
+
+    Lines are 1 indexed, `start` is inclusive, `end` is exclusive.
+
+    SourceBlock is used to describe a set of source lines that are owned by a Target,
+    thus it can't be empty, i.e. `start` must be less than `end`.
+    """
+
+    start: int
+    end: int
+    def __init__(self, start: int, end: int) -> None: ...
+    def __len__(self) -> int: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+    def is_touched_by(self, o: TextBlock) -> bool: ...
+    @classmethod
+    def from_text_block(cls, text_block: TextBlock) -> SourceBlock: ...
+
+class TargetAdaptor:
+    """A light-weight object to store target information before being converted into the Target
+    API."""
+
+    type_alias: str
+    name: str | None
+    kwargs: FrozenDict
+    description_of_origin: str
+    origin_sources_blocks: FrozenDict
+    name_explicitly_set: bool
+    def __init__(
+        self,
+        type_alias: str,
+        name: str | None,
+        __description_of_origin__: str,
+        __origin_sources_blocks__: FrozenDict | None = None,
+        **kwargs: Any,
+    ) -> None: ...
+    def with_new_kwargs(self, **kwargs: Any) -> TargetAdaptor: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __hash__(self) -> int: ...
+
+class PluginFieldDescriptor:
+    """Descriptor that creates a unique @union type per subclass.
+
+    This is the Rust equivalent of @distinct_union_type_per_subclass.
+    """
+
+    def __get__(self, obj: Any | None, objtype: type | None = None) -> type: ...
+
+_F = TypeVar("_F", bound=Field)
+
+class Target:
+    """A Target represents an addressable set of metadata.
+
+    Set the `help` class property with a description, which will be used in `./pants help`. For the
+    best rendering, use soft wrapping (e.g. implicit string concatenation) within paragraphs, but
+    hard wrapping (`\n`) to separate distinct paragraphs and/or lists.
+    """
+
+    # Subclasses must define these
+    alias: ClassVar[str]
+    core_fields: ClassVar[tuple[type[Field], ...]]
+    help: ClassVar[str | Callable[[], str]]
+
+    removal_version: ClassVar[str | None] = None
+    removal_hint: ClassVar[str | None] = None
+
+    deprecated_alias: ClassVar[str | None] = None
+    deprecated_alias_removal_version: ClassVar[str | None] = None
+
+    # These get calculated in the constructor
+    address: Address
+    field_values: FrozenDict[type[Field], Field]
+    residence_dir: str
+    name_explicitly_set: bool
+    description_of_origin: str
+    origin_sources_blocks: FrozenDict[str, SourceBlocks]
+    field_types: KeysView[type[Field]]
+
+    PluginField: ClassVar[PluginFieldDescriptor]
+
+    @final
+    def __init__(
+        self,
+        unhydrated_values: Mapping[str, Any],
+        address: Address,
+        # NB: `union_membership` is only optional to facilitate tests. In production, we should
+        # always provide this parameter. This should be safe to do because production code should
+        # rarely directly instantiate Targets and should instead use the engine to request them.
+        union_membership: UnionMembership | None = None,
+        *,
+        name_explicitly_set: bool = True,
+        residence_dir: str | None = None,
+        ignore_unrecognized_fields: bool = False,
+        description_of_origin: str | None = None,
+        origin_sources_blocks: FrozenDict[str, SourceBlocks] | None = None,
+    ) -> None:
+        """Create a target.
+
+        :param unhydrated_values: A mapping of field aliases to their raw values. Any left off
+            fields will either use their default or error if required=True.
+        :param address: How to uniquely identify this target.
+        :param union_membership: Used to determine plugin fields. This must be set in production!
+        :param residence_dir: Where this target "lives". If unspecified, will be the `spec_path`
+            of the `address`, i.e. where the target was either explicitly defined or where its
+            target generator was explicitly defined. Target generators can, however, set this to
+            the directory where the generated target provides metadata for. For example, a
+            file-based target like `python_source` should set this to the parent directory of
+            its file. A file-less target like `go_third_party_package` should keep the default of
+            `address.spec_path`. This field impacts how command line specs work, so that globs
+            like `dir:` know whether to match the target or not.
+        :param ignore_unrecognized_fields: Don't error if fields are not recognized. This is only
+            intended for when Pants is bootstrapping itself.
+        :param description_of_origin: Where this target was declared, such as a path to BUILD file
+            and line number.
+        """
+        ...
+
+    def __repr__(self) -> str: ...
+    def __str__(self) -> str: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __lt__(self, other: object) -> bool: ...
+    def __gt__(self, other: object) -> bool: ...
+    @final
+    def __getitem__(self, field: type[_F]) -> _F:
+        """Get the requested `Field` instance belonging to this target.
+
+        If the `Field` is not registered on this `Target` type, this method will raise a
+        `KeyError`. To avoid this, you should first call `tgt.has_field()` or `tgt.has_fields()`
+        to ensure that the field is registered, or, alternatively, use `Target.get()`.
+
+        See the docstring for `Target.get()` for how this method handles subclasses of the
+        requested Field and for tips on how to use the returned value.
+        """
+        ...
+
+    @final
+    def get(self, field: type[_F], *, default_raw_value: Any | None = None) -> _F:
+        """Get the requested `Field` instance belonging to this target.
+
+        This will return an instance of the requested field type, e.g. an instance of
+        `InterpreterConstraints`, `SourcesField`, `EntryPoint`, etc. Usually, you will want to
+        grab the `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For async fields like
+        `SourcesField`, you may need to hydrate the value.).
+
+        This works with subclasses of `Field`. For example, if you subclass `Tags`
+        to define a custom subclass `CustomTags`, both `tgt.get(Tags)` and
+        `tgt.get(CustomTags)` will return the same `CustomTags` instance.
+
+        If the `Field` is not registered on this `Target` type, this will return an instance of
+        the requested Field by using `default_raw_value` to create the instance. Alternatively,
+        first call `tgt.has_field()` or `tgt.has_fields()` to ensure that the field is registered,
+        or, alternatively, use indexing (e.g. `tgt[Compatibility]`) to raise a KeyError when the
+        field is not registered.
+        """
+        ...
+
+    @final
+    def _maybe_get(self, field: type[_F]) -> _F | None: ...
+    @final
+    def has_field(self, field: type[Field]) -> bool:
+        """Check that this target has registered the requested field.
+
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
+        custom subclass `CustomTags`, both `tgt.has_field(Tags)` and
+        `python_tgt.has_field(CustomTags)` will return True.
+        """
+        ...
+
+    @final
+    def has_fields(self, fields: Iterable[type[Field]]) -> bool:
+        """Check that this target has registered all of the requested fields.
+
+        This works with subclasses of `Field`. For example, if you subclass `Tags` to define a
+        custom subclass `CustomTags`, both `tgt.has_fields([Tags])` and
+        `python_tgt.has_fields([CustomTags])` will return True.
+        """
+        ...
+
+    @final
+    @classmethod
+    def _has_fields(
+        cls, fields: Iterable[type[Field]], registered_fields: Iterable[type[Field]]
+    ) -> bool: ...
+    @final
+    @classmethod
+    def _find_registered_field_subclass(
+        cls, requested_field: type[_F], registered_fields: Iterable[type[Field]]
+    ) -> type[_F] | None:
+        """Check if the Target has registered a subclass of the requested Field.
+
+        This is necessary to allow targets to override the functionality of common fields. For
+        example, you could subclass `Tags` to define `CustomTags` with a different default. At the
+        same time, we still want to be able to call `tgt.get(Tags)`, in addition to
+        `tgt.get(CustomTags)`.
+        """
+        ...
+
+    @final
+    @classmethod
+    def class_field_types(cls, union_membership: UnionMembership | None) -> Any:
+        """Return all registered Fields belonging to this target type.
+
+        You can also use the instance property `tgt.field_types` to avoid having to pass the
+        parameter UnionMembership.
+        """
+        ...
+
+    @final
+    @classmethod
+    def class_has_field(cls, field: type[Field], union_membership: UnionMembership) -> bool:
+        """Behaves like `Target.has_field()`, but works as a classmethod rather than an instance
+        method."""
+        ...
+
+    @final
+    @classmethod
+    def class_has_fields(
+        cls, fields: Iterable[type[Field]], union_membership: UnionMembership
+    ) -> bool:
+        """Behaves like `Target.has_fields()`, but works as a classmethod rather than an instance
+        method."""
+        ...
+
+    @final
+    @classmethod
+    def class_get_field(cls, field: type[_F], union_membership: UnionMembership) -> type[_F]:
+        """Get the requested Field type registered with this target type.
+
+        This will error if the field is not registered, so you should call Target.class_has_field()
+        first.
+        """
+        ...
+
+    @classmethod
+    def _find_plugin_fields(cls, union_membership: UnionMembership) -> tuple[type[Field], ...]: ...
+    @classmethod
+    def register_plugin_field(cls, field: type[Field]) -> UnionRule:
+        """Register a new field on the target type.
+
+        In the `rules()` register.py entry-point, include
+        `MyTarget.register_plugin_field(NewField)`. This will register `NewField` as a first-class
+        citizen. Plugins can use this new field like any other.
+        """
+        ...
+
+    @final
+    @classmethod
+    def _get_field_aliases_to_field_types(
+        cls, field_types: Iterable[type[Field]]
+    ) -> dict[str, type[Field]]: ...
+    def validate(self) -> None:
+        """Validate the target, such as checking for mutually exclusive fields.
+
+        N.B.: The validation should only be of properties intrinsic to the associated files in any
+        context. If the validation only makes sense for certain goals acting on targets; those
+        validations should be done in the associated rules.
+        """
+        ...
+
 class Field:
     """A Field.
 
@@ -571,6 +883,148 @@ class AsyncFieldMixin(Field):
     def __ne__(self, other: Any) -> bool: ...
     def __repr__(self) -> str: ...
 
+class SourcesField(AsyncFieldMixin):
+    """A field for the sources that a target owns.
+
+    When defining a new sources field, you should subclass `MultipleSourcesField` or
+    `SingleSourceField`, which set up the field's `alias` and data type / parsing. However, you
+    should use `tgt.get(SourcesField)` when you need to operate on all sources types, such as
+    with `HydrateSourcesRequest`, so that both subclasses work.
+
+    Subclasses may set the following class properties:
+
+    - `expected_file_extensions` -- A tuple of strings containing the expected file extensions for
+        source files. The default is no expected file extensions.
+    - `expected_num_files` -- An integer or range stating the expected total number of source
+        files. The default is no limit on the number of source files.
+    - `uses_source_roots` -- Whether the concept of "source root" pertains to the source files
+        referenced by this field.
+    - `default` -- A default value for this field.
+    - `default_glob_match_error_behavior` -- Advanced option, should very rarely be used. Override
+        glob match error behavior when using the default value. If setting this to
+        `GlobMatchErrorBehavior.ignore`, make sure you have other validation in place in case the
+        default glob doesn't match any files, if required, to alert the user appropriately.
+    """
+
+    expected_file_extensions: ClassVar[tuple[str, ...] | None]
+    expected_num_files: ClassVar[int | range | None]
+    uses_source_roots: ClassVar[bool]
+    default: ClassVar[Any]
+    default_glob_match_error_behavior: ClassVar[Any | None]
+    @property
+    def globs(self) -> tuple[str, ...]:
+        """The raw globs, relative to the BUILD file."""
+        ...
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        """Perform any additional validation on the resulting source files, e.g. ensuring that
+        certain banned files are not used.
+
+        To enforce that the resulting files end in certain extensions, such as `.py` or `.java`, set
+        the class property `expected_file_extensions`.
+
+        To enforce that there are only a certain number of resulting files, such as binary targets
+        checking for only 0-1 sources, set the class property `expected_num_files`.
+        """
+        ...
+    @staticmethod
+    def prefix_glob_with_dirpath(dirpath: str, glob: str) -> str: ...
+    def _prefix_glob_with_address(self, glob: str) -> str: ...
+    def path_globs(self, unmatched_build_file_globs: Any) -> PathGlobs: ...
+    @classmethod
+    def can_generate(cls, output_type: type[SourcesField], union_membership: Any) -> bool:
+        """Can this field be used to generate the output_type?
+
+        Generally, this method does not need to be used. Most call sites can simply use the below,
+        and the engine will generate the sources if possible or will return an instance of
+        HydratedSources with an empty snapshot if not possible:
+
+            await hydrate_sources(
+                HydrateSourcesRequest(
+                    sources_field,
+                    for_sources_types=[FortranSources],
+                    enable_codegen=True,
+                ),
+                **implicitly(),
+            )
+
+        This method is useful when you need to filter targets before hydrating them, such as how
+        you may filter targets via `tgt.has_field(MyField)`.
+        """
+        ...
+    @property
+    def filespec(self) -> Filespec:
+        """The original globs, returned in the Filespec.
+
+        The globs will be relativized to the build root.
+        """
+        ...
+    @property
+    def filespec_matcher(self) -> FilespecMatcher: ...
+
+class MultipleSourcesField(SourcesField):
+    """The `sources: list[str]` field.
+
+    See the docstring for `SourcesField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(MultipleSourcesField)`.
+    """
+
+    alias: ClassVar[str]
+    ban_subdirectories: ClassVar[bool]
+    @property
+    def globs(self) -> tuple[str, ...]: ...
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[str] | None, address: Any
+    ) -> tuple[str, ...] | None: ...
+
+class OptionalSingleSourceField(SourcesField):
+    """The `source: str` field.
+
+    See the docstring for `SourcesField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(OptionalSingleSourceField)`.
+
+    Use `SingleSourceField` if the source must exist.
+    """
+
+    alias: ClassVar[str]
+    @property
+    def globs(self) -> tuple[str, ...]: ...
+    @property
+    def file_path(self) -> str | None:
+        """The path to the file, relative to the build root.
+
+        This works without hydration because we validate that `*` globs and `!` ignores are not
+        used. However, consider still hydrating so that you verify the source file actually exists.
+
+        The return type is optional because it's possible to have 0-1 files.
+        """
+        ...
+    @classmethod
+    def compute_value(cls, raw_value: str | None, address: Any) -> str | None: ...
+
+class SingleSourceField(OptionalSingleSourceField):
+    """The `source: str` field.
+
+    Unlike `OptionalSingleSourceField`, the `.value` must be defined, whether by setting the
+    `default` or making the field `required`.
+
+    See the docstring for `SourcesField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(SingleSourceField)`.
+    """
+
+    value: str
+    @property
+    def file_path(self) -> str: ...
+
 # ------------------------------------------------------------------------------
 # FS
 # ------------------------------------------------------------------------------
@@ -667,6 +1121,54 @@ class FilespecMatcher:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
     def matches(self, paths: Sequence[str]) -> list[str]: ...
+
+class Filespec:
+    """The original globs for a SourcesField, with includes and excludes.
+
+    For example: Filespec(includes=['helloworld/*.py'], excludes=['helloworld/ignore.py']).
+
+    The globs are in zglobs format.
+    """
+
+    @property
+    def includes(self) -> tuple[str, ...]: ...
+    @property
+    def excludes(self) -> tuple[str, ...]: ...
+    def __getitem__(self, key: str) -> tuple[str, ...]: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+class PathGlobs:
+    def __init__(
+        self,
+        globs: Iterable[str],
+        glob_match_error_behavior: GlobMatchErrorBehavior = ...,
+        conjunction: GlobExpansionConjunction = ...,
+        description_of_origin: str | None = None,
+    ) -> None:
+        """A request to find files given a set of globs.
+        The syntax supported is roughly Git's glob syntax. Use `*` for globs, `**` for recursive
+        globs, and `!` for ignores.
+        :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
+            with `!`, e.g. `!ignore.py`.
+        :param glob_match_error_behavior: whether to warn or error upon match failures
+        :param conjunction: whether all `globs` must match or only at least one must match
+        :param description_of_origin: a human-friendly description of where this PathGlobs request
+            is coming from, used to improve the error message for unmatched globs. For example,
+            this might be the text string "the option `--isort-config`".
+        """
+    @property
+    def globs(self) -> tuple[str, ...]: ...
+    @property
+    def glob_match_error_behavior(self) -> GlobMatchErrorBehavior: ...
+    @property
+    def conjunction(self) -> GlobExpansionConjunction: ...
+    @property
+    def description_of_origin(self) -> str | None: ...
+    def __eq__(self, other: PathGlobs | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
 
 EMPTY_DIGEST: Digest
 EMPTY_FILE_DIGEST: FileDigest
