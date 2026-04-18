@@ -569,6 +569,25 @@ class Target:
         context. If the validation only makes sense for certain goals acting on targets; those
         validations should be done in the associated rules.
         """
+        sources_field_types = tuple(
+            ft for ft in self.field_types if issubclass(ft, SourcesField)
+        )
+        if len(sources_field_types) > 1:
+            field_desc = ", ".join(
+                f"`{ft.alias}` ({ft.__name__})"
+                for ft in sorted(sources_field_types, key=lambda f: f.alias)
+            )
+            raise InvalidFieldException(
+                softwrap(
+                    f"""
+                    The {self.alias} target at {self.address} has multiple fields that subclass
+                    `SourcesField`, which is not supported: APIs such as `tgt.get(SourcesField)`
+                    require at most one. Found: {field_desc}.
+
+                    Remove or consolidate the extra sources field(s).
+                    """
+                )
+            )
 
 
 def _validate_origin_sources_blocks(origin_sources_blocks: FrozenDict[str, SourceBlocks]) -> None:

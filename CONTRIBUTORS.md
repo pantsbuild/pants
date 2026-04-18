@@ -425,3 +425,4 @@ Created as part of the release process.
 + yjabri
 + Éric Jacob
 + Ólafur Páll Geirsson
++ Shubham Kumar Barnwal
