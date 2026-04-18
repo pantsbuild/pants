@@ -3,19 +3,21 @@
     sidebar_position: 0
 ---
 
-The flow for making changes to Pants.
+Making changes to Pants.
 
 ---
 
-We welcome contributions of all types: from fixing typos to bug fixes to new features. For further questions about any of the below, please refer to the [community overview](/community/members).
+We welcome contributions of all types: from fixing typos to bug fixes to new features.
 
-:::tip Help wanted: identifying bad error messages
-We strive—but sometimes fail—to make every error message easy to understand and to give insight into what went wrong and how to fix it.
+## First, discuss your plan
 
-If you ever encounter a confusing or mediocre error message, we would love your help to identify the error message. Please open a [GitHub issue](https://github.com/pantsbuild/pants/issues) with the original Pants command, the error message, and what you found confusing or think could be improved.
+Before investing in a code change, please discuss your plan with us first. This allows us to give you initial feedback that will save you and us time and effort.
 
-(If you'd be interested in then changing the code, we'd be happy to point you in the right direction!)
-:::
+To share your plan, please open a [GitHub issue](https://github.com/pantsbuild/pants/issues), and then message us on the `#development` channel on [Slack](/community/getting-help#slack).
+
+If you're new to the Pants developer community, please take a moment to introduce yourself and tell us about your Pants usage. Describe the change you'd like to make and why you want to make it, and link to the GitHub issue.
+
+If we do not respond within 2-3 days, please gently remind us on Slack.
 
 ## LLM Assistance Notice
 
@@ -25,17 +27,19 @@ None of this is meant to discourage LLM use -- it is not frowned upon! -- but it
 
 An example disclosure:
 
-    This PR was written primarily by Claude Code.
-Or:
-
-    ChatGPT looked for prior art and came up with the approach but I wrote the code manually.
-Or:
-
-    I used an LLM to generate all of the test cases first, and then I wrote the code.
+    `This PR was written primarily by Claude Code.`
 
 Or:
 
-    <Inline comments calling out specific parts of the PR>
+   `ChatGPT looked for prior art and came up with the approach but I wrote the code manually.`
+
+Or:
+
+    `I used an LLM to generate all of the test cases first, and then I wrote the code.`
+
+Or:
+
+    &lt;Inline comments calling out specific parts of the PR&gt;
 
 Minor exceptions to this policy include basic auto-complete functionality or the various Machine Learning techniques that are no longer called "AI". Spellcheck is not an AI.
 
@@ -66,14 +70,6 @@ We rely on several Python features that you will want to acquaint yourself with:
 - [Comprehensions](https://www.geeksforgeeks.org/comprehensions-in-python/)
 
 Pants's engine is written in Rust. See [Developing Rust](./development/developing-rust.mdx) for a guide on making changes to the internals of Pants's engine.
-
-## First, share your plan
-
-Before investing your time into a code change, it helps to share your interest. This will allow us to give you initial feedback that will save you time, such as pointing you to related code.
-
-To share your plan, please either open a [GitHub issue](https://github.com/pantsbuild/pants/issues) or message us on [Slack](/community/getting-help#slack) (you can start with the #general channel). Briefly describe the change you'd like to make, including a motivation for the change.
-
-If we do not respond within 24 business hours, please gently ping us by commenting "ping" on your GitHub issue or messaging on Slack asking if someone could please take a look.
 
 :::note Tip: Can you split out any "prework"?
 If your change is big, such as adding a new feature, it can help to split it up into multiple pull requests. This makes it easier for us to review and to get passing CI.
@@ -116,6 +112,15 @@ You do not need to fully finish your change before asking for feedback. We'd be 
 
 If doing this, please open your pull request as a "Draft" and prefix your PR title with "WIP". Then, comment on the PR asking for feedback and/or post a link to the PR in [Slack](/community/members).
 :::
+
+:::tip Help wanted: identifying bad error messages
+We strive—but sometimes fail—to make every error message easy to understand and to give insight into what went wrong and how to fix it.
+
+If you ever encounter a confusing or mediocre error message, we would love your help to identify the error message. Please open a [GitHub issue](https://github.com/pantsbuild/pants/issues) with the original Pants command, the error message, and what you found confusing or think could be improved.
+
+(If you'd be interested in then changing the code, we'd be happy to point you in the right direction!)
+:::
+
 
 ## Opening a pull request
 

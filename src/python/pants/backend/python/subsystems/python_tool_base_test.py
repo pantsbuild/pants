@@ -9,6 +9,7 @@ from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMeta
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     Lockfile,
+    LockfileFormat,
     PexRequirements,
     Resolve,
 )
@@ -52,7 +53,9 @@ def test_get_lockfile_metadata() -> None:
         no_binary=set(),
     )
     lockfile = Lockfile("dummy_url", "dummy_description_of_origin", "dummy_resolve")
-    loaded_lockfile = LoadedLockfile(EMPTY_DIGEST, "", metadata, 0, True, None, lockfile)
+    loaded_lockfile = LoadedLockfile(
+        EMPTY_DIGEST, "", metadata, 0, LockfileFormat.Pex, None, lockfile
+    )
     assert (
         run_rule_with_mocks(
             get_lockfile_metadata,

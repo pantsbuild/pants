@@ -1,4 +1,4 @@
-name: Dev Release PR
+name: Create Dev Release PR
 on:
   workflow_dispatch:
     inputs:
@@ -11,16 +11,26 @@ defaults:
     shell: bash
 
 jobs:
-  create-dev-pr:
-    name: Create a dev release pull request
+  org-check:
+    name: Check GitHub Organization
+    if: ${{ github.repository_owner == 'pantsbuild' }}
     runs-on: ubuntu-latest
+    steps:
+      - name: Noop
+        run: "true"
 
+  github-pr:
+    name: Create a dev release pull request
+    needs: org-check
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Required for contributors file
 
       - name: Determine release version
         id: validate-version
@@ -83,20 +93,20 @@ jobs:
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
 
           # Create and checkout a new release branch
-          branch_name="automation/release/$RELEASE_VERSION"
-          git checkout -b "$branch_name"
+          BRANCH_NAME="automation/release/$RELEASE_VERSION"
+          git checkout -b "$BRANCH_NAME"
 
           # Commit and push to the release branch
-          title="Prepare $RELEASE_VERSION"
+          TITLE="Prepare $RELEASE_VERSION"
           git add src/python/pants/VERSION CONTRIBUTORS.md
-          git commit -m "$title"
-          git push -u origin "$branch_name"
+          git commit -m "$TITLE"
+          git push -u origin "$BRANCH_NAME"
 
           # Create PR from the release branch to main
           gh pr create \
-            --title "$title" \
+            --title "$TITLE" \
             --body "" \
             --base main \
-            --head "$branch_name" \
+            --head "$BRANCH_NAME" \
             --label "automation:release-prep,category:internal" \
             --assignee "${{ github.actor }}"

@@ -118,7 +118,7 @@ fn validate_choices(
     Ok(())
 }
 
-#[pyclass(name = "_NoValue")]
+#[pyclass(name = "_NoValue", from_py_object)]
 #[derive(Clone)]
 struct NoFieldValue;
 
