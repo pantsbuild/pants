@@ -27,6 +27,7 @@ from pants.backend.docker.target_types import (
     DockerBuildOptionFieldMultiValueMixin,
     DockerBuildOptionFieldValueMixin,
     DockerBuildOptionFlagFieldMixin,
+    DockerImageBuildExtraOptionsField,
     DockerImageBuildImageOutputField,
     DockerImageContextRootField,
     DockerImageRegistriesField,
@@ -323,6 +324,20 @@ class DockerInfoV1ImageTag:
     name: str
 
 
+def _extra_options_flag_names(extra_options: tuple[str, ...]) -> frozenset[str]:
+    """Return the set of flag names (e.g. ``--pull``) present in *extra_options*.
+
+    Handles both ``--flag=value`` and ``--flag value`` styles so that any structured field whose
+    ``docker_build_option`` class variable matches one of these names will be suppressed in favour
+    of the caller-supplied value, avoiding duplicate or conflicting flags on the command line.
+    """
+    names: set[str] = set()
+    for opt in extra_options:
+        if opt.startswith("-"):
+            names.add(opt.split("=")[0])
+    return frozenset(names)
+
+
 def get_build_options(
     context: DockerBuildContext,
     field_set: DockerPackageFieldSet,
@@ -331,7 +346,23 @@ def get_build_options(
     global_build_no_cache_option: bool | None,
     use_buildx_option: bool,
     target: Target,
+    global_extra_options: tuple[str, ...] = (),
 ) -> Iterator[str]:
+    target_extra = tuple(target[DockerImageBuildExtraOptionsField].value or ())
+    target_flag_names = _extra_options_flag_names(target_extra)
+
+    # Per-target wins: drop any global entry whose flag is already covered by the per-target list.
+    filtered_global = tuple(
+        opt
+        for opt in global_extra_options
+        if opt.startswith("-") and opt.split("=")[0] not in target_flag_names
+    )
+
+    extra_options: tuple[str, ...] = (*filtered_global, *target_extra)
+
+    # Compute the set of flag names that are provided by global and target extra options.
+    overridden_flags = _extra_options_flag_names(extra_options)
+
     # Build options from target fields inheriting from DockerBuildOptionFieldMixin
     for field_type in target.field_types:
         if issubclass(field_type, DockerBuildKitOptionField):
@@ -356,6 +387,12 @@ def get_build_options(
                 DockerBuildOptionFlagFieldMixin,
             ),
         ):
+            flag = getattr(
+                field_type, "docker_build_option", None
+            )  # get the flag name if it exists such as --pull or --network, etc.
+            if flag and flag in overridden_flags:
+                continue  # skip this field since its flag is already covered by extra_options
+
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
             )
@@ -386,11 +423,13 @@ def get_build_options(
                 )
             )
 
-    if target_stage:
-        yield from ("--target", target_stage)
+    if target_stage and "--target" not in overridden_flags:
+        extra_options = extra_options + ("--target", target_stage)
 
-    if global_build_no_cache_option:
-        yield "--no-cache"
+    if global_build_no_cache_option and "--no-cache" not in overridden_flags:
+        extra_options = extra_options + ("--no-cache",)
+
+    yield from extra_options
 
 
 @dataclass(frozen=True)
@@ -510,6 +549,7 @@ async def get_docker_image_build_process(
                 global_build_no_cache_option=options.build_no_cache,
                 use_buildx_option=options.use_buildx,
                 target=wrapped_target.target,
+                global_extra_options=options.build_extra_options,
             )
         ),
     )

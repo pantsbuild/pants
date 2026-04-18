@@ -596,6 +596,30 @@ class DockerImageRunExtraArgsField(StringSequenceField):
     )
 
 
+class DockerImageBuildExtraOptionsField(StringSequenceField):
+    alias = "extra_build_options"
+    default = ()
+    help = help_text(
+        lambda: f"""
+        Additional options to pass directly to the `docker build` (or `podman build`) command.
+
+        These are appended after all other computed flags. If any option specified here uses a
+        flag that is already covered by a dedicated field (e.g. `--pull`, `--network`,
+        `--platform`), the dedicated field's contribution is suppressed in favour of
+        the value given here, to avoid duplicate or conflicting flags on the command line.
+
+        Example:
+
+            docker_image(
+                extra_build_options=["--pull=always", "--compress"],
+            )
+
+        Use `[{DockerOptions.options_scope}].build_extra_options` to set default options for all
+        images. Per-target option overrides a conflicting global one.
+        """
+    )
+
+
 class DockerImageTarget(Target):
     alias = "docker_image"
     core_fields = (
@@ -622,6 +646,7 @@ class DockerImageTarget(Target):
         DockerImageBuildImageCacheFromField,
         DockerImageBuildImageOutputField,
         DockerImageRunExtraArgsField,
+        DockerImageBuildExtraOptionsField,
         OutputPathField,
         RestartableField,
     )
