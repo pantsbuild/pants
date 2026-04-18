@@ -13,13 +13,14 @@ from io import RawIOBase
 from pathlib import Path
 from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
 
+from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.fs import (
     CreateDigest,
     DigestContents,
     DigestEntries,
     DigestSubset,
+    GlobExpansionConjunction,
     NativeDownloadFile,
-    PathGlobs,
     PathMetadataRequest,
     PathMetadataResult,
     Paths,
@@ -571,6 +572,148 @@ class AsyncFieldMixin(Field):
     def __ne__(self, other: Any) -> bool: ...
     def __repr__(self) -> str: ...
 
+class SourcesField(AsyncFieldMixin):
+    """A field for the sources that a target owns.
+
+    When defining a new sources field, you should subclass `MultipleSourcesField` or
+    `SingleSourceField`, which set up the field's `alias` and data type / parsing. However, you
+    should use `tgt.get(SourcesField)` when you need to operate on all sources types, such as
+    with `HydrateSourcesRequest`, so that both subclasses work.
+
+    Subclasses may set the following class properties:
+
+    - `expected_file_extensions` -- A tuple of strings containing the expected file extensions for
+        source files. The default is no expected file extensions.
+    - `expected_num_files` -- An integer or range stating the expected total number of source
+        files. The default is no limit on the number of source files.
+    - `uses_source_roots` -- Whether the concept of "source root" pertains to the source files
+        referenced by this field.
+    - `default` -- A default value for this field.
+    - `default_glob_match_error_behavior` -- Advanced option, should very rarely be used. Override
+        glob match error behavior when using the default value. If setting this to
+        `GlobMatchErrorBehavior.ignore`, make sure you have other validation in place in case the
+        default glob doesn't match any files, if required, to alert the user appropriately.
+    """
+
+    expected_file_extensions: ClassVar[tuple[str, ...] | None]
+    expected_num_files: ClassVar[int | range | None]
+    uses_source_roots: ClassVar[bool]
+    default: ClassVar[Any]
+    default_glob_match_error_behavior: ClassVar[Any | None]
+    @property
+    def globs(self) -> tuple[str, ...]:
+        """The raw globs, relative to the BUILD file."""
+        ...
+    def validate_resolved_files(self, files: Sequence[str]) -> None:
+        """Perform any additional validation on the resulting source files, e.g. ensuring that
+        certain banned files are not used.
+
+        To enforce that the resulting files end in certain extensions, such as `.py` or `.java`, set
+        the class property `expected_file_extensions`.
+
+        To enforce that there are only a certain number of resulting files, such as binary targets
+        checking for only 0-1 sources, set the class property `expected_num_files`.
+        """
+        ...
+    @staticmethod
+    def prefix_glob_with_dirpath(dirpath: str, glob: str) -> str: ...
+    def _prefix_glob_with_address(self, glob: str) -> str: ...
+    def path_globs(self, unmatched_build_file_globs: Any) -> PathGlobs: ...
+    @classmethod
+    def can_generate(cls, output_type: type[SourcesField], union_membership: Any) -> bool:
+        """Can this field be used to generate the output_type?
+
+        Generally, this method does not need to be used. Most call sites can simply use the below,
+        and the engine will generate the sources if possible or will return an instance of
+        HydratedSources with an empty snapshot if not possible:
+
+            await hydrate_sources(
+                HydrateSourcesRequest(
+                    sources_field,
+                    for_sources_types=[FortranSources],
+                    enable_codegen=True,
+                ),
+                **implicitly(),
+            )
+
+        This method is useful when you need to filter targets before hydrating them, such as how
+        you may filter targets via `tgt.has_field(MyField)`.
+        """
+        ...
+    @property
+    def filespec(self) -> Filespec:
+        """The original globs, returned in the Filespec.
+
+        The globs will be relativized to the build root.
+        """
+        ...
+    @property
+    def filespec_matcher(self) -> FilespecMatcher: ...
+
+class MultipleSourcesField(SourcesField):
+    """The `sources: list[str]` field.
+
+    See the docstring for `SourcesField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(MultipleSourcesField)`.
+    """
+
+    alias: ClassVar[str]
+    ban_subdirectories: ClassVar[bool]
+    @property
+    def globs(self) -> tuple[str, ...]: ...
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[str] | None, address: Any
+    ) -> tuple[str, ...] | None: ...
+
+class OptionalSingleSourceField(SourcesField):
+    """The `source: str` field.
+
+    See the docstring for `SourcesField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(OptionalSingleSourceField)`.
+
+    Use `SingleSourceField` if the source must exist.
+    """
+
+    alias: ClassVar[str]
+    @property
+    def globs(self) -> tuple[str, ...]: ...
+    @property
+    def file_path(self) -> str | None:
+        """The path to the file, relative to the build root.
+
+        This works without hydration because we validate that `*` globs and `!` ignores are not
+        used. However, consider still hydrating so that you verify the source file actually exists.
+
+        The return type is optional because it's possible to have 0-1 files.
+        """
+        ...
+    @classmethod
+    def compute_value(cls, raw_value: str | None, address: Any) -> str | None: ...
+
+class SingleSourceField(OptionalSingleSourceField):
+    """The `source: str` field.
+
+    Unlike `OptionalSingleSourceField`, the `.value` must be defined, whether by setting the
+    `default` or making the field `required`.
+
+    See the docstring for `SourcesField` for some class properties you can set, such as
+    `expected_file_extensions`.
+
+    When you need to get the sources for all targets, use `tgt.get(SourcesField)` rather than
+    `tgt.get(SingleSourceField)`.
+    """
+
+    value: str
+    @property
+    def file_path(self) -> str: ...
+
 # ------------------------------------------------------------------------------
 # FS
 # ------------------------------------------------------------------------------
@@ -667,6 +810,54 @@ class FilespecMatcher:
     def __hash__(self) -> int: ...
     def __repr__(self) -> str: ...
     def matches(self, paths: Sequence[str]) -> list[str]: ...
+
+class Filespec:
+    """The original globs for a SourcesField, with includes and excludes.
+
+    For example: Filespec(includes=['helloworld/*.py'], excludes=['helloworld/ignore.py']).
+
+    The globs are in zglobs format.
+    """
+
+    @property
+    def includes(self) -> tuple[str, ...]: ...
+    @property
+    def excludes(self) -> tuple[str, ...]: ...
+    def __getitem__(self, key: str) -> tuple[str, ...]: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
+class PathGlobs:
+    def __init__(
+        self,
+        globs: Iterable[str],
+        glob_match_error_behavior: GlobMatchErrorBehavior = ...,
+        conjunction: GlobExpansionConjunction = ...,
+        description_of_origin: str | None = None,
+    ) -> None:
+        """A request to find files given a set of globs.
+        The syntax supported is roughly Git's glob syntax. Use `*` for globs, `**` for recursive
+        globs, and `!` for ignores.
+        :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
+            with `!`, e.g. `!ignore.py`.
+        :param glob_match_error_behavior: whether to warn or error upon match failures
+        :param conjunction: whether all `globs` must match or only at least one must match
+        :param description_of_origin: a human-friendly description of where this PathGlobs request
+            is coming from, used to improve the error message for unmatched globs. For example,
+            this might be the text string "the option `--isort-config`".
+        """
+    @property
+    def globs(self) -> tuple[str, ...]: ...
+    @property
+    def glob_match_error_behavior(self) -> GlobMatchErrorBehavior: ...
+    @property
+    def conjunction(self) -> GlobExpansionConjunction: ...
+    @property
+    def description_of_origin(self) -> str | None: ...
+    def __eq__(self, other: PathGlobs | Any) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
 
 EMPTY_DIGEST: Digest
 EMPTY_FILE_DIGEST: FileDigest

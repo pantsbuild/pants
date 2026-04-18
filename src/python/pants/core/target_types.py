@@ -873,7 +873,7 @@ class LockfileSourceField(OptionalSingleSourceField):
     required = True
     value: str
 
-    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:
         return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
@@ -903,7 +903,7 @@ class LockfilesGeneratorSourcesField(MultipleSourcesField):
 
     help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
 
-    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:
         return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 

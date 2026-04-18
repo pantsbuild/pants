@@ -1,6 +1,7 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fmt::Display;
@@ -323,7 +324,7 @@ pub struct FilespecMatcher {
 }
 
 impl FilespecMatcher {
-    pub fn new(includes: Vec<String>, excludes: Vec<String>) -> Result<Self, String> {
+    pub fn new(includes: &[String], excludes: Cow<'_, [String]>) -> Result<Self, String> {
         let includes = includes
             .iter()
             .map(|glob| {
@@ -334,7 +335,7 @@ impl FilespecMatcher {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
-        let excludes = GitignoreStyleExcludes::create(excludes)?;
+        let excludes = GitignoreStyleExcludes::create(excludes.into_owned())?;
         Ok(Self { includes, excludes })
     }
 
