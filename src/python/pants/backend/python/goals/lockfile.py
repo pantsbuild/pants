@@ -42,7 +42,6 @@ from pants.core.goals.generate_lockfiles import (
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
-    WrappedGenerateLockfile,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
@@ -87,11 +86,6 @@ class GeneratePythonLockfile(GenerateLockfile):
     def requirements_hex_digest(self) -> str:
         """Produces a hex digest of the requirements input for this lockfile."""
         return calculate_invalidation_digest(self.requirements)
-
-
-@rule
-async def wrap_python_lockfile_request(request: GeneratePythonLockfile) -> WrappedGenerateLockfile:
-    return WrappedGenerateLockfile(request)
 
 
 @dataclass(frozen=True)
