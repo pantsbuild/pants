@@ -276,6 +276,7 @@ def run_test_rule(
         shard="",
         batch_size=1,
         show_rerun_command=show_rerun_command,
+        show_all_batch_targets=False,
     )
     debug_adapter_subsystem = create_subsystem(
         DebugAdapterSubsystem,
@@ -341,8 +342,8 @@ def run_test_rule(
             ],
             mock_calls={
                 "pants.core.goals.test.partition_tests": mock_partitioner,
-                "pants.core.environments.rules.resolve_single_environment_name": lambda _a: EnvironmentName(
-                    None
+                "pants.core.environments.rules.resolve_single_environment_name": lambda _a: (
+                    EnvironmentName(None)
                 ),
                 "pants.core.goals.test.test_batch_to_debug_request": mock_debug_request,
                 "pants.core.goals.test.test_batch_to_debug_adapter_request": mock_debug_request,
@@ -350,8 +351,9 @@ def run_test_rule(
                 "pants.core.goals.test.create_coverage_report": mock_coverage_report_generation,
                 "pants.engine.internals.specs_rules.find_valid_field_sets_for_target_roots": mock_find_valid_field_sets,
                 "pants.engine.intrinsics.merge_digests": lambda _: EMPTY_DIGEST,
-                "pants.engine.intrinsics._interactive_process": lambda _p,
-                _e: InteractiveProcessResult(0),
+                "pants.engine.intrinsics._interactive_process": lambda _p, _e: (
+                    InteractiveProcessResult(0)
+                ),
             },
             union_membership=union_membership,
             # We don't want temporary warnings to interfere with our expected output.

@@ -739,6 +739,23 @@ class TestSubsystem(GoalSubsystem):
             """
         ),
     )
+    show_all_batch_targets = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            When tests are batched via `batch_compatibility_tag`, show all target addresses in
+            the batch in test result summaries, workunit descriptions, and warning messages.
+
+            By default, batched test descriptions are truncated to show only the first target
+            address (e.g. "path/to:tests and 3 other files"). When this option is enabled, all
+            target addresses in the batch are listed (e.g.
+            "path/to:tests, path/to:tests2, path/to:tests3, path/to:tests4").
+
+            This is useful for CI environments where you need to know exactly which targets
+            are grouped together in each test invocation.
+            """
+        ),
+    )
 
     def report_dir(self, distdir: DistDir) -> PurePath:
         return PurePath(self._report_dir.format(distdir=distdir.relpath))
@@ -1024,7 +1041,9 @@ async def run_tests(
             test_result_info[result.addresses[0].spec] = {
                 "source": result.result_metadata.source(run_id).value
             }
-        console.print_stderr(_format_test_summary(result, run_id, console))
+        console.print_stderr(
+            _format_test_summary(result, run_id, console, test_subsystem.show_all_batch_targets)
+        )
 
         if result.extra_output and result.extra_output.files:
             path_prefix = str(distdir.relpath / "test" / result.path_safe_description)
@@ -1121,7 +1140,12 @@ _SOURCE_MAP = {
 }
 
 
-def _format_test_summary(result: TestResult, run_id: RunId, console: Console) -> str:
+def _format_test_summary(
+    result: TestResult,
+    run_id: RunId,
+    console: Console,
+    show_all_batch_targets: bool = False,
+) -> str:
     """Format the test summary printed to the console."""
     assert result.result_metadata is not None, (
         "Skipped test results should not be outputted in the test summary"
@@ -1164,7 +1188,12 @@ def _format_test_summary(result: TestResult, run_id: RunId, console: Console) ->
         elapsed_secs = total_elapsed_ms / 1000
         elapsed_print = f"in {elapsed_secs:.2f}s"
 
-    return f"{sigil} {result.description} {status}{attempt_msg} {elapsed_print}{source_desc}."
+    if show_all_batch_targets and len(result.addresses) > 1:
+        description = ", ".join(addr.spec for addr in result.addresses)
+    else:
+        description = result.description
+
+    return f"{sigil} {description} {status}{attempt_msg} {elapsed_print}{source_desc}."
 
 
 def _format_test_rerun_command(results: Iterable[TestResult]) -> None | str:
