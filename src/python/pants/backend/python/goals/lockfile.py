@@ -123,10 +123,7 @@ def _strip_named_repo(value: str) -> str:
     if "=" not in value:
         return value
     maybe_name, maybe_url = value.split("=", 1)
-    if (
-        "://" not in maybe_name
-        and ("://" in maybe_url or maybe_url.startswith("file:"))
-    ):
+    if "://" not in maybe_name and ("://" in maybe_url or maybe_url.startswith("file:")):
         return maybe_url
     return value
 
@@ -214,7 +211,7 @@ async def generate_lockfile(
     use_uv = python_setup.lockfile_resolver == LockfileResolver.uv
     if use_uv and req.complete_platforms:
         raise OptionsError(
-            f"[python].lockfile_resolver = \"uv\" does not support complete_platforms "
+            f'[python].lockfile_resolver = "uv" does not support complete_platforms '
             f"(set on resolve {req.resolve_name!r}). Use the default pex resolver instead."
         )
 
@@ -278,17 +275,17 @@ async def generate_lockfile(
         # Validate unsupported options (complete_platforms already checked above)
         if pip_args_setup.resolve_config.overrides:
             raise OptionsError(
-                f"[python].lockfile_resolver = \"uv\" does not yet support per-resolve overrides "
+                f'[python].lockfile_resolver = "uv" does not yet support per-resolve overrides '
                 f"(set on resolve {req.resolve_name!r}). Use the default pex resolver instead."
             )
         if pip_args_setup.resolve_config.sources:
             raise OptionsError(
-                f"[python].lockfile_resolver = \"uv\" does not yet support per-resolve sources "
+                f'[python].lockfile_resolver = "uv" does not yet support per-resolve sources '
                 f"(set on resolve {req.resolve_name!r}). Use the default pex resolver instead."
             )
         if pip_args_setup.resolve_config.excludes:
             raise OptionsError(
-                f"[python].lockfile_resolver = \"uv\" does not yet support per-resolve excludes "
+                f'[python].lockfile_resolver = "uv" does not yet support per-resolve excludes '
                 f"(set on resolve {req.resolve_name!r}). Use the default pex resolver instead."
             )
 
@@ -306,10 +303,10 @@ async def generate_lockfile(
             )
             if len(versions) != 1:
                 raise OptionsError(
-                    f"[python].lockfile_resolver = \"uv\" with lock_style={req.lock_style!r} "
+                    f'[python].lockfile_resolver = "uv" with lock_style={req.lock_style!r} '
                     f"requires interpreter constraints that select exactly one Python major.minor "
                     f"version, but resolve {req.resolve_name!r} matched: {versions}. "
-                    f"Use lock_style=\"universal\" or narrow the interpreter constraints."
+                    f'Use lock_style="universal" or narrow the interpreter constraints.'
                 )
             target_python_version = versions[0]
 
@@ -319,12 +316,14 @@ async def generate_lockfile(
         # Write requirements to a temp input file
         requirements_in_path = "__uv_requirements.in"
         uv_input_digest = await create_digest(
-            CreateDigest([
-                FileContent(
-                    requirements_in_path,
-                    ("\n".join(sorted(req.requirements)) + "\n").encode("utf-8"),
-                )
-            ])
+            CreateDigest(
+                [
+                    FileContent(
+                        requirements_in_path,
+                        ("\n".join(sorted(req.requirements)) + "\n").encode("utf-8"),
+                    )
+                ]
+            )
         )
 
         uv_argv = _build_uv_compile_argv(
