@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Generator, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
 from enum import Enum
 from io import RawIOBase
@@ -1155,12 +1155,14 @@ def hash_prefix_zero_bits(item: str) -> int: ...
 # ------------------------------------------------------------------------------
 
 _Output = TypeVar("_Output")
+_Output_co = TypeVar("_Output_co", covariant=True)
 _Input = TypeVar("_Input")
 
-class PyGeneratorResponseCall:
+class Call(Generic[_Output_co]):
     rule_id: str
     output_type: type
-    inputs: Sequence[Any]
+    args: tuple[Any, ...]
+    implicit_args: dict[Any, type]
 
     @overload
     def __init__(
@@ -1192,6 +1194,40 @@ class PyGeneratorResponseCall:
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
+    def __await__(self) -> Generator[Any, None, _Output_co]: ...
+    def __repr__(self) -> str: ...
+
+class _Concurrently(Generic[_Output_co]):
+    def __init__(
+        self, calls: tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]
+    ) -> None: ...
+    def __await__(self) -> Generator[_Concurrently[_Output_co], None, _Output_co]: ...
+    @property
+    def calls(
+        self,
+    ) -> tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]: ...
+
+class RuleCallTrampoline(Generic[_Output]):
+    """The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so
+    each invocation constructs the already-awaitable `Call` directly.
+    `__getattribute__` forwards `__doc__` and other introspection attrs to the wrapped function.
+    """
+
+    rule_id: str
+    output_type: type[_Output]
+    rule: Any
+    __wrapped__: Callable[..., Any]
+
+    def __init__(
+        self,
+        rule_id: str,
+        output_type: type[_Output],
+        wrapped: Callable[..., Any],
+        rule: Any,
+    ) -> None: ...
+    def __call__(
+        self, *args: Any, __implicitly: Sequence[Any] = (), **kwargs: Any
+    ) -> Call[_Output]: ...
 
 # ------------------------------------------------------------------------------
 # (uncategorized)

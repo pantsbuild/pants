@@ -16,6 +16,7 @@ from typing import Any, get_type_hints
 import typing_extensions
 
 from pants.base.exceptions import RuleTypeError
+from pants.engine.internals.native_engine import RuleCallTrampoline
 from pants.engine.internals.selectors import (
     AwaitableConstraints,
     concurrently,
@@ -177,6 +178,11 @@ def _lookup_return_type(func: Callable, check: bool = False) -> Any:
 
 class _AwaitableCollector(ast.NodeVisitor):
     def __init__(self, func: Callable):
+        # `func` may be a RuleCallTrampoline (the return value of an `@rule`-decorated
+        # function). `inspect.getsource` and friends only know about real Python functions,
+        # so follow `__wrapped__` to reach the underlying implementation.
+        if isinstance(func, RuleCallTrampoline):
+            func = func.__wrapped__
         self.func = func
         source = inspect.getsource(func) or "<string>"
         beginning_indent = _get_starting_indent(source)
@@ -314,9 +320,9 @@ class _AwaitableCollector(ast.NodeVisitor):
     def visit_Call(self, call_node: ast.Call) -> None:
         func = self._lookup(call_node.func)
         if func is not None:
-            if (inspect.isfunction(func) or isinstance(func, RuleDescriptor)) and (
-                rule_id := getattr(func, "rule_id", None)
-            ) is not None:
+            if (
+                inspect.isfunction(func) or isinstance(func, (RuleDescriptor, RuleCallTrampoline))
+            ) and (rule_id := getattr(func, "rule_id", None)) is not None:
                 # Is a direct `@rule` call.
                 self.awaitables.append(self._get_byname_awaitable(rule_id, func, call_node))
             elif inspect.iscoroutinefunction(func):

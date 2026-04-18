@@ -10,8 +10,9 @@ use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use pyo3::FromPyObject;
 use pyo3::exceptions::{PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
 use pyo3::sync::{MutexExt, RwLockExt};
-use pyo3::types::{PyBool, PyBytes, PyDict, PySequence, PyString, PyTuple, PyType};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyString, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use smallvec::{SmallVec, smallvec};
 use std::collections::BTreeMap;
@@ -50,6 +51,8 @@ pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFailure>()?;
     m.add_class::<PyGeneratorResponseNativeCall>()?;
     m.add_class::<PyGeneratorResponseCall>()?;
+    m.add_class::<PyConcurrently>()?;
+    m.add_class::<RuleCallTrampoline>()?;
 
     m.add("EngineError", py.get_type::<EngineError>())?;
     m.add("IntrinsicError", py.get_type::<IntrinsicError>())?;
@@ -285,13 +288,12 @@ pub(crate) enum GeneratorInput {
 /// - coroutines may await:
 ///   - `Call`
 ///   - other coroutines,
-///   - sequences of those types.
+///   - a `_Concurrently` batch of the above.
 /// - we will `send` back a single value or tupled values to the coroutine, or `throw` an exception.
 /// - a coroutine will eventually return a single return value.
 ///
 pub(crate) fn generator_send(
     py: Python<'_>,
-    generator_type: &TypeId,
     generator: &Value,
     input: GeneratorInput,
 ) -> Result<GeneratorResponse, Failure> {
@@ -353,25 +355,8 @@ pub(crate) fn generator_send(
         Ok(GeneratorResponse::Call(call.take(py)?))
     } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>() {
         Ok(GeneratorResponse::NativeCall(call.take(py)?))
-    } else if let Ok(get_multi) = response.cast::<PySequence>() {
-        // Was an `All` or `concurrently`.
-        let generators = get_multi
-            .try_iter()?
-            .map(|generator| {
-                let generator = generator?;
-                // TODO: Find a better way to check whether something is a coroutine... this seems
-                // unnecessarily awkward.
-                if generator.is_instance(&generator_type.as_py_type(py))? {
-                    Ok(Value::new(generator.unbind()))
-                } else {
-                    Err(PyValueError::new_err(format!(
-                        "Expected an `All` or `concurrently` to receive calls to rules, \
-            but got: {response}"
-                    )))
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(GeneratorResponse::All(generators))
+    } else if let Ok(concurrently) = response.extract::<PyRef<PyConcurrently>>() {
+        Ok(GeneratorResponse::All(concurrently.take_items(py)?))
     } else {
         Err(PyValueError::new_err(format!(
             "Async @rule error. Expected a rule call, but got: {response}"
@@ -476,7 +461,11 @@ impl PyGeneratorResponseNativeCall {
     }
 }
 
-#[pyclass(subclass)]
+#[pyclass(
+    generic,
+    name = "Call",
+    module = "pants.engine.internals.native_engine"
+)]
 pub struct PyGeneratorResponseCall(RwLock<Option<Call>>);
 
 impl PyGeneratorResponseCall {
@@ -491,15 +480,10 @@ impl PyGeneratorResponseCall {
             ))
         }
     }
-}
 
-#[pymethods]
-impl PyGeneratorResponseCall {
-    #[new]
-    #[pyo3(signature = (rule_id, output_type, args, input_arg0=None))]
-    fn __new__(
-        py: Python,
-        rule_id: String,
+    pub(crate) fn construct(
+        py: Python<'_>,
+        rule_id: &str,
         output_type: &Bound<'_, PyType>,
         args: &Bound<'_, PyTuple>,
         input_arg0: Option<Bound<'_, PyAny>>,
@@ -521,13 +505,28 @@ impl PyGeneratorResponseCall {
         let (input_types, inputs) = interpret_implicit_args(py, input_arg0)?;
 
         Ok(Self(RwLock::new(Some(Call {
-            rule_id: RuleId::from_string(rule_id),
+            rule_id: RuleId::new(rule_id),
             output_type,
             args,
             args_arity,
             input_types,
             inputs,
         }))))
+    }
+}
+
+#[pymethods]
+impl PyGeneratorResponseCall {
+    #[new]
+    #[pyo3(signature = (rule_id, output_type, args, input_arg0=None))]
+    fn __new__(
+        py: Python,
+        rule_id: PyBackedStr,
+        output_type: &Bound<'_, PyType>,
+        args: &Bound<'_, PyTuple>,
+        input_arg0: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        Self::construct(py, &rule_id, output_type, args, input_arg0)
     }
 
     #[getter]
@@ -544,16 +543,137 @@ impl PyGeneratorResponseCall {
     }
 
     #[getter]
-    fn inputs(&self, py: Python<'_>) -> PyResult<Vec<Py<PyAny>>> {
+    fn args<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         let inner = self.borrow_inner(py)?;
-        let args: Vec<Py<PyAny>> = inner.args.as_ref().map_or_else(
-            || Ok(Vec::default()),
-            |args| args.to_py_object().extract(py),
-        )?;
-        Ok(args
-            .into_iter()
-            .chain(inner.inputs.iter().map(Key::to_py_object))
-            .collect())
+        match &inner.args {
+            Some(args) => Ok(args.to_py_object().extract(py)?),
+            None => Ok(PyTuple::empty(py)),
+        }
+    }
+
+    /// NB: keyed on the value, mirroring the `{value: declared_type}` shape of `implicitly(...)`
+    /// at the call site so test mocks can read declared types back off the dict.
+    #[getter]
+    fn implicit_args<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let inner = self.borrow_inner(py)?;
+        let d = PyDict::new(py);
+        for (typ, val) in inner.input_types.iter().zip(inner.inputs.iter()) {
+            d.set_item(val.to_py_object(), typ.as_py_type(py))?;
+        }
+        Ok(d)
+    }
+
+    fn __await__(slf: Py<Self>) -> YieldOnce {
+        YieldOnce::new(slf)
+    }
+
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        let inner = self.borrow_inner(py)?;
+        let output_type_name = inner.output_type.as_py_type(py).name()?.to_string();
+        Ok(format!(
+            "Call({}(...) -> {output_type_name})",
+            inner.rule_id
+        ))
+    }
+}
+
+/// A generator-protocol iterator that yields one value to the engine on the first `send`,
+/// then raises `StopIteration(result)` when the engine sends the result back. Used to
+/// implement `Call.__await__` and `_Concurrently.__await__`.
+#[pyclass(frozen, module = "pants.engine.internals.native_engine")]
+pub struct YieldOnce(Mutex<Option<Py<PyAny>>>);
+
+impl YieldOnce {
+    fn new<T>(value: Py<T>) -> Self {
+        Self(Mutex::new(Some(value.into_any())))
+    }
+}
+
+#[pymethods]
+impl YieldOnce {
+    fn __iter__(slf: Py<Self>) -> Py<Self> {
+        slf
+    }
+
+    fn __next__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.send(py, None)
+    }
+
+    #[pyo3(signature = (value=None))]
+    fn send(&self, py: Python<'_>, value: Option<Py<PyAny>>) -> PyResult<Py<PyAny>> {
+        let mut state = self.0.lock_py_attached(py);
+        if state.is_some() && matches!(&value, Some(v) if !v.is_none(py)) {
+            return Err(PyTypeError::new_err(
+                "can't send non-None value to a just-started generator",
+            ));
+        }
+        state
+            .take()
+            .ok_or_else(|| PyStopIteration::new_err((value.unwrap_or_else(|| py.None()),)))
+    }
+
+    fn throw(&self, exc: Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        Err(PyErr::from_value(exc))
+    }
+
+    fn close(&self, py: Python<'_>) {
+        *self.0.lock_py_attached(py) = None;
+    }
+}
+
+/// Yielded by `concurrently(...)` to hand a batch of awaitables (each either a `Call`, a
+/// coroutine from an async helper, or a nested `concurrently(..)`) to the engine for
+/// parallel execution.
+#[pyclass(
+    frozen,
+    generic,
+    name = "_Concurrently",
+    module = "pants.engine.internals.native_engine"
+)]
+pub struct PyConcurrently {
+    items: Mutex<Option<Vec<AllItem>>>,
+}
+
+impl PyConcurrently {
+    pub(crate) fn take_items(&self, py: Python<'_>) -> PyResult<Vec<AllItem>> {
+        self.items
+            .lock_py_attached(py)
+            .take()
+            .ok_or_else(|| PyValueError::new_err("A `concurrently(...)` may only be awaited once."))
+    }
+}
+
+#[pymethods]
+impl PyConcurrently {
+    #[new]
+    fn __new__(py: Python<'_>, calls: Bound<'_, PyTuple>) -> PyResult<Self> {
+        let items = calls
+            .iter()
+            .map(|item| AllItem::parse(py, item))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            items: Mutex::new(Some(items)),
+        })
+    }
+
+    fn __await__(slf: Py<Self>) -> YieldOnce {
+        YieldOnce::new(slf)
+    }
+
+    /// Rebuilds the original awaitables as fresh Python objects so test harnesses (e.g.
+    /// `run_rule_with_mocks`) can iterate and introspect without consuming the engine-side
+    /// items. Not used on the hot path.
+    #[getter]
+    fn calls<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        let guard = self.items.lock_py_attached(py);
+        let items = guard.as_ref().ok_or_else(|| {
+            PyValueError::new_err("A `concurrently(...)` has already been awaited.")
+        })?;
+        let py_items = items
+            .iter()
+            .map(|item| item.to_python(py))
+            .collect::<PyResult<Vec<_>>>()?;
+        PyTuple::new(py, py_items)
     }
 }
 
@@ -566,11 +686,105 @@ impl PyGeneratorResponseCall {
     }
 }
 
+/// The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so
+/// each invocation constructs the already-awaitable `Call` directly.
+/// `__getattribute__` forwards `__doc__` and other introspection attrs to the wrapped function.
+#[pyclass(frozen, generic, module = "pants.engine.internals.native_engine")]
+pub struct RuleCallTrampoline {
+    rule_id: PyBackedStr,
+    #[pyo3(get)]
+    output_type: Py<PyType>,
+    #[pyo3(get, name = "__wrapped__")]
+    wrapped: Py<PyAny>,
+    #[pyo3(get)]
+    rule: Py<PyAny>,
+}
+
+#[pymethods]
+impl RuleCallTrampoline {
+    #[new]
+    fn __new__(
+        rule_id: PyBackedStr,
+        output_type: Py<PyType>,
+        wrapped: Py<PyAny>,
+        rule: Py<PyAny>,
+    ) -> Self {
+        Self {
+            rule_id,
+            output_type,
+            wrapped,
+            rule,
+        }
+    }
+
+    #[getter]
+    fn rule_id(&self) -> &PyBackedStr {
+        &self.rule_id
+    }
+
+    #[pyo3(signature = (*args, __implicitly=None, **_kwargs))]
+    fn __call__(
+        &self,
+        py: Python<'_>,
+        args: &Bound<'_, PyTuple>,
+        __implicitly: Option<&Bound<'_, PyTuple>>,
+        _kwargs: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<Py<PyGeneratorResponseCall>> {
+        let input_arg0 = match __implicitly {
+            Some(t) if !t.is_empty() => Some(t.get_item(0)?),
+            _ => None,
+        };
+        let call = PyGeneratorResponseCall::construct(
+            py,
+            &self.rule_id,
+            self.output_type.bind(py),
+            args,
+            input_arg0,
+        )?;
+        Py::new(py, call)
+    }
+
+    /// Forward unknown attribute lookups (`__name__`, `__qualname__`, `__module__`,
+    /// `__line_number__`, custom attrs, ...) to the wrapped function so introspection that
+    /// would've relied on `functools.wraps` still works without a per-instance `__dict__`.
+    fn __getattr__<'py>(&self, py: Python<'py>, name: &str) -> PyResult<Bound<'py, PyAny>> {
+        self.wrapped.bind(py).getattr(name)
+    }
+
+    /// `__doc__` lives in the type object's `tp_doc` slot, which shadows `#[getter]` and
+    /// `__getattr__`. Intercepting at `tp_getattro` via `__getattribute__` is the only hook
+    /// that fires before the slot is read. See PyO3/pyo3#2187.
+    fn __getattribute__<'py>(
+        slf: PyRef<'py, Self>,
+        name: Bound<'py, PyString>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let py = slf.py();
+        if name.to_cow()? == "__doc__" {
+            return slf.wrapped.bind(py).getattr(intern!(py, "__doc__"));
+        }
+        unsafe {
+            Bound::from_owned_ptr_or_err(
+                py,
+                pyo3::ffi::PyObject_GenericGetAttr(slf.as_ptr(), name.as_ptr()),
+            )
+        }
+    }
+
+    fn __repr__(&self, py: Python) -> PyResult<String> {
+        let name: String = self
+            .wrapped
+            .bind(py)
+            .getattr(intern!(py, "__name__"))?
+            .extract()?;
+        Ok(format!("<RuleCallTrampoline for {name}>"))
+    }
+}
+
 pub struct NativeCall {
     pub call: BoxFuture<'static, Result<Value, Failure>>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Call {
     pub rule_id: RuleId,
     pub output_type: TypeId,
@@ -609,10 +823,65 @@ pub enum GeneratorResponse {
     NativeCall(NativeCall),
     /// The generator is awaiting a call to a known rule.
     Call(Call),
-    /// The generator is awaiting calls to a series of generators, all of which will
-    /// produce `Call`s.
+    /// The generator is awaiting completion of a series of awaitables.
     ///
-    /// The generators used in this position will either be call-by-name `@rule` stubs (which will
-    /// immediately produce a `Call`, and then return its value), or async "rule helpers".
-    All(Vec<Value>),
+    /// Each entry is either a rule `Call` (from a direct `RuleCallTrampoline` invocation, no
+    /// coroutine wrapper) or a generator from an async rule helper.
+    All(Vec<AllItem>),
 }
+
+#[derive(Clone)]
+pub enum AllItem {
+    /// A generator produced by an `async def` rule helper; drive it via generator_send.
+    Generator(Value),
+    /// A direct `Call` returned by a call-by-name `@rule` invocation; execute it as-is.
+    Call(Call),
+    /// A nested `concurrently(..)`: recursively join its items and wrap the results in a tuple.
+    Concurrent(Vec<AllItem>),
+}
+
+impl AllItem {
+    fn parse(py: Python<'_>, item: Bound<'_, PyAny>) -> PyResult<Self> {
+        if let Ok(call) = item.extract::<PyRef<PyGeneratorResponseCall>>() {
+            call.take(py).map(Self::Call).map_err(PyValueError::new_err)
+        } else if let Ok(concurrently) = item.extract::<PyRef<PyConcurrently>>() {
+            Ok(Self::Concurrent(concurrently.take_items(py)?))
+        } else if item.is_instance(&COROUTINE_TYPE.as_py_type(py))? {
+            Ok(Self::Generator(Value::new(item.unbind())))
+        } else {
+            Err(PyValueError::new_err(format!(
+                "Expected a `concurrently(..)` argument to be a rule call, coroutine, or \
+                 nested `concurrently(..)`, but got: {item}"
+            )))
+        }
+    }
+
+    fn to_python<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        match self {
+            Self::Generator(value) => Ok(value.bind(py).clone()),
+            Self::Call(call) => {
+                let py_call = PyGeneratorResponseCall(RwLock::new(Some(call.clone())));
+                Ok(Py::new(py, py_call)?.into_bound(py).into_any())
+            }
+            Self::Concurrent(items) => {
+                let py_concurrently = PyConcurrently {
+                    items: Mutex::new(Some(items.clone())),
+                };
+                Ok(Py::new(py, py_concurrently)?.into_bound(py).into_any())
+            }
+        }
+    }
+}
+
+static COROUTINE_TYPE: LazyLock<TypeId> = LazyLock::new(|| {
+    Python::attach(|py| {
+        let coroutine_type = py
+            .import("types")
+            .expect("Failed to import `types`")
+            .getattr("CoroutineType")
+            .expect("`types.CoroutineType` is missing")
+            .cast_into::<PyType>()
+            .expect("`types.CoroutineType` is not a type");
+        TypeId::new(&coroutine_type)
+    })
+});
