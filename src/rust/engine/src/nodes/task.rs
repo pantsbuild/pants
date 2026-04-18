@@ -171,9 +171,7 @@ impl Task {
     ) -> NodeResult<(Value, TypeId)> {
         let mut input = GeneratorInput::Initial;
         loop {
-            let response = Python::attach(|py| {
-                externs::generator_send(py, &context.core.types.coroutine, &generator, input)
-            })?;
+            let response = Python::attach(|py| externs::generator_send(py, &generator, input))?;
             match response {
                 GeneratorResponse::NativeCall(call) => {
                     let _blocking_token = workunit.blocking();

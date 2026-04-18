@@ -1198,15 +1198,14 @@ class Call(Generic[_Output_co]):
     def __repr__(self) -> str: ...
 
 class _Concurrently(Generic[_Output_co]):
-    calls: tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]
     def __init__(
         self, calls: tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]
     ) -> None: ...
-    def __await__(
+    def __await__(self) -> Generator[_Concurrently[_Output_co], None, _Output_co]: ...
+    @property
+    def calls(
         self,
-    ) -> Generator[
-        tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...], None, _Output_co
-    ]: ...
+    ) -> tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]: ...
 
 class RuleCallTrampoline(Generic[_Output]):
     """The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so

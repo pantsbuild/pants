@@ -35,7 +35,11 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
 from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine, options_parsing
-from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
+from pants.engine.internals.native_engine import (
+    ProcessExecutionEnvironment,
+    PyExecutor,
+    _Concurrently,
+)
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Call, Params
 from pants.engine.internals.session import SessionValues
@@ -710,7 +714,7 @@ def run_rule_with_mocks(
 
     unconsumed_mock_calls = set(mock_calls.keys())
 
-    def get(res: Call):
+    def get(res: Any):
         if not isinstance(res, Call):
             raise AssertionError(f"Bad arg type: {res}")
         mock_call = mock_calls.get(res.rule_id)
@@ -740,6 +744,8 @@ def run_rule_with_mocks(
             res = rule_coroutine.send(rule_input)
             if isinstance(res, Call):
                 rule_input = get(res)
+            elif isinstance(res, _Concurrently):
+                rule_input = [get(g) for g in res.calls]
             elif type(res) in (tuple, list):
                 rule_input = [get(g) for g in res]
             else:

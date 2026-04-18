@@ -12,7 +12,7 @@ use pyo3::exceptions::{PyException, PyStopIteration, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::pybacked::PyBackedStr;
 use pyo3::sync::{MutexExt, RwLockExt};
-use pyo3::types::{PyBool, PyBytes, PyDict, PySequence, PyString, PyTuple, PyType};
+use pyo3::types::{PyBool, PyBytes, PyDict, PyString, PyTuple, PyType};
 use pyo3::{create_exception, import_exception, intern};
 use smallvec::{SmallVec, smallvec};
 use std::collections::BTreeMap;
@@ -288,13 +288,12 @@ pub(crate) enum GeneratorInput {
 /// - coroutines may await:
 ///   - `Call`
 ///   - other coroutines,
-///   - sequences of those types.
+///   - a `_Concurrently` batch of the above.
 /// - we will `send` back a single value or tupled values to the coroutine, or `throw` an exception.
 /// - a coroutine will eventually return a single return value.
 ///
 pub(crate) fn generator_send(
     py: Python<'_>,
-    generator_type: &TypeId,
     generator: &Value,
     input: GeneratorInput,
 ) -> Result<GeneratorResponse, Failure> {
@@ -356,12 +355,8 @@ pub(crate) fn generator_send(
         Ok(GeneratorResponse::Call(call.take(py)?))
     } else if let Ok(call) = response.extract::<PyRef<PyGeneratorResponseNativeCall>>() {
         Ok(GeneratorResponse::NativeCall(call.take(py)?))
-    } else if let Ok(get_multi) = response.cast::<PySequence>() {
-        let items = get_multi
-            .try_iter()?
-            .map(|item| AllItem::parse(py, generator_type, item?))
-            .collect::<PyResult<Vec<_>>>()?;
-        Ok(GeneratorResponse::All(items))
+    } else if let Ok(concurrently) = response.extract::<PyRef<PyConcurrently>>() {
+        Ok(GeneratorResponse::All(concurrently.take_items(py)?))
     } else {
         Err(PyValueError::new_err(format!(
             "Async @rule error. Expected a rule call, but got: {response}"
@@ -626,8 +621,9 @@ impl YieldOnce {
     }
 }
 
-/// Yielded by `concurrently(...)` to hand a tuple of awaitables (each either a `Call` or a
-/// coroutine from an async helper) to the engine for parallel execution.
+/// Yielded by `concurrently(...)` to hand a batch of awaitables (each either a `Call`, a
+/// coroutine from an async helper, or a nested `concurrently(..)`) to the engine for
+/// parallel execution.
 #[pyclass(
     frozen,
     generic,
@@ -635,24 +631,49 @@ impl YieldOnce {
     module = "pants.engine.internals.native_engine"
 )]
 pub struct PyConcurrently {
-    calls: Py<PyTuple>,
+    items: Mutex<Option<Vec<AllItem>>>,
 }
 
 impl PyConcurrently {
-    pub(crate) fn awaiter(&self, py: Python<'_>) -> YieldOnce {
-        YieldOnce::new(self.calls.clone_ref(py))
+    pub(crate) fn take_items(&self, py: Python<'_>) -> PyResult<Vec<AllItem>> {
+        self.items
+            .lock_py_attached(py)
+            .take()
+            .ok_or_else(|| PyValueError::new_err("A `concurrently(...)` may only be awaited once."))
     }
 }
 
 #[pymethods]
 impl PyConcurrently {
     #[new]
-    fn __new__(calls: Py<PyTuple>) -> Self {
-        Self { calls }
+    fn __new__(py: Python<'_>, calls: Bound<'_, PyTuple>) -> PyResult<Self> {
+        let items = calls
+            .iter()
+            .map(|item| AllItem::parse(py, item))
+            .collect::<PyResult<Vec<_>>>()?;
+        Ok(Self {
+            items: Mutex::new(Some(items)),
+        })
     }
 
-    fn __await__(&self, py: Python<'_>) -> YieldOnce {
-        self.awaiter(py)
+    fn __await__(slf: Py<Self>) -> YieldOnce {
+        YieldOnce::new(slf)
+    }
+
+    /// Rebuilds the original awaitables as fresh Python objects so test harnesses (e.g.
+    /// `run_rule_with_mocks`) can iterate and introspect without consuming the engine-side
+    /// items. Not used on the hot path.
+    #[getter]
+    fn calls<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        let guard = self.items.lock_py_attached(py);
+        let items = guard.as_ref().ok_or_else(|| {
+            PyValueError::new_err("A `concurrently(...)` has already been awaited.")
+        })?;
+        let py_items = items
+            .iter()
+            .map(|item| item.to_python(py))
+            .collect::<PyResult<Vec<_>>>()?;
+        PyTuple::new(py, py_items)
     }
 }
 
@@ -763,7 +784,7 @@ pub struct NativeCall {
     pub call: BoxFuture<'static, Result<Value, Failure>>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Call {
     pub rule_id: RuleId,
     pub output_type: TypeId,
@@ -809,6 +830,7 @@ pub enum GeneratorResponse {
     All(Vec<AllItem>),
 }
 
+#[derive(Clone)]
 pub enum AllItem {
     /// A generator produced by an `async def` rule helper; drive it via generator_send.
     Generator(Value),
@@ -819,26 +841,47 @@ pub enum AllItem {
 }
 
 impl AllItem {
-    /// Parse one item from an `All`/`concurrently(..)` tuple. Nested `_Concurrently` is
-    /// resolved recursively.
-    fn parse(py: Python<'_>, generator_type: &TypeId, item: Bound<'_, PyAny>) -> PyResult<Self> {
-        if item.is_instance(&generator_type.as_py_type(py))? {
-            Ok(Self::Generator(Value::new(item.unbind())))
-        } else if let Ok(call) = item.extract::<PyRef<PyGeneratorResponseCall>>() {
+    fn parse(py: Python<'_>, item: Bound<'_, PyAny>) -> PyResult<Self> {
+        if let Ok(call) = item.extract::<PyRef<PyGeneratorResponseCall>>() {
             call.take(py).map(Self::Call).map_err(PyValueError::new_err)
         } else if let Ok(concurrently) = item.extract::<PyRef<PyConcurrently>>() {
-            let items = concurrently
-                .calls
-                .bind(py)
-                .iter()
-                .map(|item| Self::parse(py, generator_type, item))
-                .collect::<PyResult<Vec<_>>>()?;
-            Ok(Self::Concurrent(items))
+            Ok(Self::Concurrent(concurrently.take_items(py)?))
+        } else if item.is_instance(&COROUTINE_TYPE.as_py_type(py))? {
+            Ok(Self::Generator(Value::new(item.unbind())))
         } else {
             Err(PyValueError::new_err(format!(
-                "Expected an `All` or `concurrently` item to be a rule call, coroutine, or \
-                 nested `concurrently(...)`, but got: {item}"
+                "Expected a `concurrently(..)` argument to be a rule call, coroutine, or \
+                 nested `concurrently(..)`, but got: {item}"
             )))
         }
     }
+
+    fn to_python<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        match self {
+            Self::Generator(value) => Ok(value.bind(py).clone()),
+            Self::Call(call) => {
+                let py_call = PyGeneratorResponseCall(RwLock::new(Some(call.clone())));
+                Ok(Py::new(py, py_call)?.into_bound(py).into_any())
+            }
+            Self::Concurrent(items) => {
+                let py_concurrently = PyConcurrently {
+                    items: Mutex::new(Some(items.clone())),
+                };
+                Ok(Py::new(py, py_concurrently)?.into_bound(py).into_any())
+            }
+        }
+    }
 }
+
+static COROUTINE_TYPE: LazyLock<TypeId> = LazyLock::new(|| {
+    Python::attach(|py| {
+        let coroutine_type = py
+            .import("types")
+            .expect("Failed to import `types`")
+            .getattr("CoroutineType")
+            .expect("`types.CoroutineType` is missing")
+            .cast_into::<PyType>()
+            .expect("`types.CoroutineType` is not a type");
+        TypeId::new(&coroutine_type)
+    })
+});
