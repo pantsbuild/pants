@@ -25,6 +25,7 @@ from pants.backend.docker.goals.package_image import (
     GetImageRefsRequest,
     ImageRefRegistry,
     ImageRefTag,
+    _docker_build_captured_output_path,
     build_docker_image,
     get_docker_image_build_process,
     get_image_refs,
@@ -59,13 +60,17 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
+from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_FILE_DIGEST,
     EMPTY_SNAPSHOT,
+    AddPrefix,
     CreateDigest,
     Digest,
+    DigestContents,
+    DigestSubset,
     FileContent,
     Snapshot,
 )
@@ -1007,6 +1012,251 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
     assert metadata["registries"][0]["tags"][0]["tag"] == "1.2.3"
 
 
+def test_build_docker_image_packages_local_output_digest(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  image_tags=["1.2.3"],
+                  output_files=["bin/app"],
+                  output_directories=["share"],
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+    under_test_fs = DockerPackageFieldSet.create(tgt)
+    build_process = assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        options=dict(use_buildx=True),
+    )
+    exported_digest = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                [
+                    FileContent("bin/app", b"app"),
+                    FileContent("share/data.txt", b"data"),
+                ]
+            )
+        ],
+    )
+
+    def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set == under_test_fs
+        return build_process
+
+    def mock_execute_process(process: Process) -> FallibleProcessResult:
+        assert process == build_process.process
+        return FallibleProcessResult(
+            exit_code=0,
+            stdout=b"exported local output\n",
+            stderr=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=exported_digest,
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                    keep_sandboxes="never",
+                ),
+                "ran_locally",
+                0,
+            ),
+        )
+
+    def mock_add_prefix(request: AddPrefix) -> Digest:
+        return rule_runner.request(Digest, [request])
+
+    def mock_digest_subset_to_digest(request: DigestSubset) -> Digest:
+        return rule_runner.request(Digest, [request])
+
+    def mock_digest_to_snapshot(digest: Digest) -> Snapshot:
+        return rule_runner.request(Snapshot, [digest])
+
+    result = run_rule_with_mocks(
+        build_docker_image,
+        rule_args=[
+            under_test_fs,
+            _setup_docker_options(rule_runner, dict(use_buildx=True)),
+            rule_runner.request(GlobalOptions, []),
+            DockerBinary("/dummy/docker"),
+            KeepSandboxes.never,
+        ],
+        mock_calls={
+            "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+            "pants.engine.intrinsics.execute_process": mock_execute_process,
+            "pants.engine.intrinsics.digest_subset_to_digest": mock_digest_subset_to_digest,
+            "pants.engine.intrinsics.add_prefix": mock_add_prefix,
+            "pants.engine.intrinsics.digest_to_snapshot": mock_digest_to_snapshot,
+        },
+        show_warnings=False,
+    )
+
+    assert [artifact.relpath for artifact in result.artifacts] == [
+        "docker/test/bin/app",
+        "docker/test/share/data.txt",
+    ]
+    assert rule_runner.request(DigestContents, [result.digest]) == DigestContents(
+        [
+            FileContent("docker/test/bin/app", b"app"),
+            FileContent("docker/test/share/data.txt", b"data"),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ["output_path", "expected"],
+    [
+        (None, "docker/test"),
+        ('output_path="custom/path",', "custom/path"),
+        ('output_path="",', "."),
+    ],
+)
+def test_docker_output_capture_output_path(
+    rule_runner: RuleRunner, output_path: str | None, expected: str
+) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  output_files=["bin/app"],
+                  {output_path or ""}
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+
+    assert _docker_build_captured_output_path(DockerPackageFieldSet.create(tgt)) == expected
+
+
+@pytest.mark.parametrize(
+    ["outputs_match_mode", "expect_error"],
+    [
+        (None, False),
+        ('outputs_match_mode="all",', True),
+        ('outputs_match_mode="allow_empty",', False),
+    ],
+)
+def test_docker_output_capture_checks_outputs_match_mode(
+    rule_runner: RuleRunner,
+    caplog,
+    outputs_match_mode: str | None,
+    expect_error: bool,
+) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  output_files=["coredns"],
+                  {outputs_match_mode or ""}
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+    under_test_fs = DockerPackageFieldSet.create(tgt)
+    build_process = assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        options=dict(use_buildx=True),
+    )
+
+    def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set == under_test_fs
+        return build_process
+
+    def mock_execute_process(process: Process) -> FallibleProcessResult:
+        assert process == build_process.process
+        return FallibleProcessResult(
+            exit_code=0,
+            stdout=b"exported local output\n",
+            stderr=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                    keep_sandboxes="never",
+                ),
+                "ran_locally",
+                0,
+            ),
+        )
+
+    def mock_add_prefix(request: AddPrefix) -> Digest:
+        return rule_runner.request(Digest, [request])
+
+    def mock_digest_to_snapshot(digest: Digest) -> Snapshot:
+        assert digest == EMPTY_DIGEST
+        return EMPTY_SNAPSHOT
+
+    mock_calls: dict[str, Callable[..., Any]] | None = {
+        "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+        "pants.engine.intrinsics.execute_process": mock_execute_process,
+        "pants.engine.intrinsics.digest_subset_to_digest": lambda _: EMPTY_DIGEST,
+        "pants.engine.intrinsics.add_prefix": mock_add_prefix,
+        "pants.engine.intrinsics.digest_to_snapshot": mock_digest_to_snapshot,
+        "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
+    }
+    rule_args = [
+        under_test_fs,
+        _setup_docker_options(rule_runner, dict(use_buildx=True)),
+        rule_runner.request(GlobalOptions, []),
+        DockerBinary("/dummy/docker"),
+        KeepSandboxes.never,
+    ]
+
+    if expect_error:
+        with pytest.raises(ValueError, match="requires all output globs to actually match"):
+            run_rule_with_mocks(
+                build_docker_image,
+                rule_args=rule_args,
+                mock_calls=mock_calls,
+                show_warnings=False,
+            )
+    else:
+        result = run_rule_with_mocks(
+            build_docker_image,
+            rule_args=rule_args,
+            mock_calls=mock_calls,
+            show_warnings=False,
+        )
+        assert result == BuiltPackage(EMPTY_DIGEST, ())
+
+    if outputs_match_mode is None:
+        assert "requires all output globs to actually match" in caplog.text
+        assert "coredns (from `output_files` field)" in caplog.text
+    else:
+        assert "requires all output globs to actually match" not in caplog.text
+
+
 def test_docker_build_pull(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", pull=True)'})
 
@@ -1513,6 +1763,95 @@ def test_docker_output_option(
         build_process_assertions=check_build_process,
         options=dict(use_buildx=True, push_on_package=DockerPushOnPackageBehavior.ALLOW),
     )
+
+
+@pytest.mark.parametrize(
+    ["capture_fields", "expected_output_files", "expected_output_directories"],
+    [
+        (
+            'output_files=["bin/app"],',
+            ("bin/app",),
+            (),
+        ),
+        (
+            'output_directories=["dist"],',
+            (),
+            ("dist",),
+        ),
+        (
+            'output_files=["bin/app"], output_directories=["share"],',
+            ("bin/app",),
+            ("share",),
+        ),
+    ],
+)
+def test_docker_output_capture_fields_override_default_output(
+    rule_runner: RuleRunner,
+    capture_fields: str,
+    expected_output_files: tuple[str, ...],
+    expected_output_directories: tuple[str, ...],
+) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  {capture_fields}
+                )
+                """
+            ),
+        }
+    )
+
+    def check_build_process(result: DockerImageBuildProcess) -> None:
+        assert result.process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            "--output=type=local,dest=.",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+        assert result.process.output_files == expected_output_files
+        assert result.process.output_directories == expected_output_directories
+
+    assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        build_process_assertions=check_build_process,
+        options=dict(use_buildx=True),
+    )
+
+
+def test_docker_output_capture_fields_error_with_explicit_output(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  output={"type": "registry"},
+                  output_files=["bin/app"],
+                )
+                """
+            ),
+        }
+    )
+
+    with pytest.raises(
+        InvalidFieldException,
+        match=(r"The `docker_image` docker/test:img1 sets both `output` and output capture fields"),
+    ):
+        assert_build_process(
+            rule_runner,
+            Address("docker/test", target_name="img1"),
+            options=dict(use_buildx=True),
+        )
 
 
 @pytest.mark.parametrize(
@@ -2960,7 +3299,12 @@ def test_docker_info_serialize() -> None:
 
 @pytest.mark.parametrize(
     ("output", "expected"),
-    [({"type": "image", "push": "true"}, True), ({"type": "registry"}, True), (None, False)],
+    [
+        ({"type": "image", "push": "true"}, True),
+        ({"type": "registry"}, True),
+        ({"type": "local", "dest": "."}, False),
+        (None, False),
+    ],
 )
 def test_field_set_pushes_on_package(output: dict | None, expected: bool) -> None:
     rule_runner = RuleRunner(target_types=[DockerImageTarget])
