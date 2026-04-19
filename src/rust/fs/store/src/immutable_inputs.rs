@@ -141,7 +141,7 @@ impl ImmutableInputs {
 
         Ok(immutable_inputs
             .keys()
-            .zip(dsts.into_iter())
+            .zip(dsts)
             .map(|(src, dst)| WorkdirSymlink {
                 src: src.clone(),
                 dst,

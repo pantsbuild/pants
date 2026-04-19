@@ -162,7 +162,7 @@ fn gen_impl_hash_file(name: &'static str, source_dir: &Path, impl_dir: &Path, ou
     for entry in WalkDir::new(impl_dir)
         .sort_by_file_name()
         .into_iter()
-        .chain(WalkDir::new(source_dir).sort_by_file_name().into_iter())
+        .chain(WalkDir::new(source_dir).sort_by_file_name())
         .flatten()
     {
         if entry.file_type().is_file() && entry.path().file_name().unwrap() != "tests.rs" {

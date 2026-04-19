@@ -251,7 +251,7 @@ impl Task {
                             .args
                             .iter()
                             .skip(self.args_arity.into())
-                            .zip(deps.into_iter())
+                            .zip(deps)
                         {
                             kwargs.set_item(name, &value)?;
                         }
