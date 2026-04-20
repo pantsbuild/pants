@@ -3319,20 +3319,36 @@ def test_field_set_pushes_on_package(output: dict | None, expected: bool) -> Non
     assert field_set.pushes_on_package() is expected
 
 
-def test_global_build_extra_options(rule_runner: RuleRunner) -> None:
-    """Global build_extra_options from [docker] should be passed to the docker build command."""
-    rule_runner.set_options(
-        [],
-        env={
-            "PANTS_DOCKER_BUILD_EXTRA_OPTIONS": '["--compress"]',
-        },
-    )
+@pytest.mark.parametrize(
+    ("global_options", "target_options", "expected"),
+    [
+        (["--compress"], None, ["--compress"]),
+        (["--compress"], ["--pull=always"], ["--compress", "--pull=always"]),
+        # The `--no-cache` option is set in a different place in the code and hence requires separate tests.
+        (["--no-cache"], None, ["--no-cache"]),
+        (None, ["--no-cache"], ["--no-cache"]),
+    ],
+)
+def test_global_build_extra_options_merge(
+    rule_runner: RuleRunner,
+    global_options: list | None,
+    target_options: list | None,
+    expected: list,
+) -> None:
+    if global_options:
+        rule_runner.set_options(
+            [],
+            env={
+                "PANTS_DOCKER_BUILD_EXTRA_OPTIONS": f"{global_options}",
+            },
+        )
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
-                """\
+                f"""\
                 docker_image(
                   name="img1",
+                  extra_build_options={target_options},
                 )
                 """
             ),
@@ -3340,7 +3356,8 @@ def test_global_build_extra_options(rule_runner: RuleRunner) -> None:
     )
 
     def check_build_process(result: DockerImageBuildProcess):
-        assert "--compress" in result.process.argv
+        for expected_option in expected:
+            assert expected_option in result.process.argv
 
     assert_build_process(
         rule_runner,
@@ -3349,41 +3366,13 @@ def test_global_build_extra_options(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_extra_build_options_global_and_target_merged(rule_runner: RuleRunner) -> None:
-    """Global options and per-target options should be merged correctly."""
+def test_extra_build_options_overrides_pull_field_and_global_field(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [],
         env={
-            "PANTS_DOCKER_BUILD_EXTRA_OPTIONS": '["--compress"]',
+            "PANTS_DOCKER_BUILD_EXTRA_OPTIONS": '["--pull=missing"]',
         },
     )
-    rule_runner.write_files(
-        {
-            "docker/test/BUILD": dedent(
-                """\
-                docker_image(
-                  name="img1",
-                  extra_build_options=["--pull=always"],
-                )
-                """
-            ),
-        }
-    )
-
-    def check_build_process(result: DockerImageBuildProcess):
-        argv = result.process.argv
-        assert "--compress" in argv
-        assert "--pull=always" in argv
-
-    assert_build_process(
-        rule_runner,
-        Address("docker/test", target_name="img1"),
-        build_process_assertions=check_build_process,
-    )
-
-
-def test_extra_build_options_overrides_pull_field(rule_runner: RuleRunner) -> None:
-    """When extra_build_options contains --pull, the docker_image target pull argument is suppressed."""
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
@@ -3400,107 +3389,9 @@ def test_extra_build_options_overrides_pull_field(rule_runner: RuleRunner) -> No
 
     def check_build_process(result: DockerImageBuildProcess):
         argv = result.process.argv
-        # Only the extra_build_options value should appear; the structured field's
-        # --pull=True must NOT be present to avoid duplicate flags.
         assert "--pull=always" in argv
         assert "--pull=True" not in argv
-
-    assert_build_process(
-        rule_runner,
-        Address("docker/test", target_name="img1"),
-        build_process_assertions=check_build_process,
-    )
-
-
-def test_global_extra_options_overridden_by_target_extra_options(
-    rule_runner: RuleRunner,
-) -> None:
-    """When both global and target extra options specify the same flag, the target wins
-    and the global does not appear."""
-    rule_runner.set_options(
-        [],
-        env={
-            "PANTS_DOCKER_BUILD_EXTRA_OPTIONS": '["--pull=missing"]',
-        },
-    )
-    rule_runner.write_files(
-        {
-            "docker/test/BUILD": dedent(
-                """\
-                docker_image(
-                  name="img1",
-                  extra_build_options=["--pull=always"],
-                )
-                """
-            ),
-        }
-    )
-
-    def check_build_process(result: DockerImageBuildProcess):
-        argv = result.process.argv
-        # Both global and target specify --pull; the per-target value wins and the global
-        # entry is dropped at the flag-level dedup stage.
-        assert "--pull=always" in argv
-        assert "--pull=missing" not in argv  # global dropped because target specifies --pull
-
-    assert_build_process(
-        rule_runner,
-        Address("docker/test", target_name="img1"),
-        build_process_assertions=check_build_process,
-    )
-
-
-def test_global_build_no_cache_options_exits(
-    rule_runner: RuleRunner,
-) -> None:
-    rule_runner.set_options(
-        [],
-        env={
-            "PANTS_DOCKER_BUILD_EXTRA_OPTIONS": '["--no-cache"]',
-        },
-    )
-    rule_runner.write_files(
-        {
-            "docker/test/BUILD": dedent(
-                """\
-                docker_image(
-                  name="img1",
-                )
-                """
-            ),
-        }
-    )
-
-    def check_build_process(result: DockerImageBuildProcess):
-        argv = result.process.argv
-        assert "--no-cache" in argv
-
-    assert_build_process(
-        rule_runner,
-        Address("docker/test", target_name="img1"),
-        build_process_assertions=check_build_process,
-    )
-
-
-def test_global_build_no_cache_options_overridden_by_target_extra_options(
-    rule_runner: RuleRunner,
-) -> None:
-    rule_runner.write_files(
-        {
-            "docker/test/BUILD": dedent(
-                """\
-                docker_image(
-                  name="img1",
-                  extra_build_options=["--no-cache"],
-                )
-                """
-            ),
-        }
-    )
-
-    def check_build_process(result: DockerImageBuildProcess):
-        argv = result.process.argv
-        assert "--no-cache" in argv
+        assert "--pull=missing" not in argv
 
     assert_build_process(
         rule_runner,

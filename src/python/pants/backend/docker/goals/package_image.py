@@ -348,17 +348,23 @@ class DockerInfoV1ImageTag:
 
 
 def _extra_options_flag_names(extra_options: tuple[str, ...]) -> frozenset[str]:
-    """Return the set of flag names (e.g. ``--pull``) present in *extra_options*.
-
-    Handles both ``--flag=value`` and ``--flag value`` styles so that any structured field whose
-    ``docker_build_option`` class variable matches one of these names will be suppressed in favour
-    of the caller-supplied value, avoiding duplicate or conflicting flags on the command line.
-    """
+    """Returns a set of flag names (e.g. --pull, -network, etc)"""
     names: set[str] = set()
     for opt in extra_options:
         if opt.startswith("-"):
             names.add(opt.split("=")[0])
     return frozenset(names)
+
+
+def _filter_global_extra_options(
+    global_extra_options: tuple[str, ...], target_flag_names: frozenset[str]
+) -> tuple[str, ...]:
+    """Remove any global extra options that are included in the per-target options."""
+    return tuple(
+        opt
+        for opt in global_extra_options
+        if opt.startswith("-") and opt.split("=")[0] not in target_flag_names
+    )
 
 
 def get_build_options(
@@ -376,11 +382,7 @@ def get_build_options(
     target_flag_names = _extra_options_flag_names(target_extra)
 
     # Per-target wins: drop any global entry whose flag is already covered by the per-target list.
-    filtered_global = tuple(
-        opt
-        for opt in global_extra_options
-        if opt.startswith("-") and opt.split("=")[0] not in target_flag_names
-    )
+    filtered_global = _filter_global_extra_options(global_extra_options, target_flag_names)
 
     extra_options: tuple[str, ...] = (*filtered_global, *target_extra)
 
@@ -415,7 +417,7 @@ def get_build_options(
                 field_type, "docker_build_option", None
             )  # get the flag name if it exists such as --pull or --network, etc.
             if flag and flag in overridden_flags:
-                continue  # skip this field since its flag is already covered by extra_options
+                continue
 
             source = InterpolationContext.TextSource(
                 address=target.address, target_alias=target.alias, field_alias=field_type.alias
