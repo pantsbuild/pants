@@ -4,13 +4,12 @@
 # From the Pants repo root, run: `python3 build-support/bin/generate-pbs-urls.py`
 #
 
-from dataclasses import dataclass
 import itertools
 import json
-from pathlib import Path
 import re
-import sys
 import subprocess
+import sys
+from pathlib import Path
 from typing import Final, TypedDict
 
 VERSIONS_PATH: Final[Path] = Path(
@@ -18,17 +17,19 @@ VERSIONS_PATH: Final[Path] = Path(
 )
 
 VALID_PBS_PATTERNS: Final[set[str]] = {
-    f"{machine}-{osname}-install_only_stripped" for machine, osname in itertools.product(
-        ["aarch64", "x86_64"], 
-        ["apple-darwin", "unknown-linux-gnu"]
+    f"{machine}-{osname}-install_only_stripped"
+    for machine, osname in itertools.product(
+        ["aarch64", "x86_64"], ["apple-darwin", "unknown-linux-gnu"]
     )
 }
 
 # Grab version, release tag, ignore alpha/beta releases
 ASSET_MATCHER: Final[re.Pattern] = re.compile(r"^([a-zA-Z0-9]+)-([0-9.]+)\+([0-9.]+)-")
 
+
 class GithubTaggedRelease(TypedDict):
     tagName: str
+
 
 class GithubReleaseAsset(TypedDict):
     digest: str
@@ -36,60 +37,73 @@ class GithubReleaseAsset(TypedDict):
     size: int
     url: str
 
+
 class LocalReleaseInfo(TypedDict):
     pythons: dict[str, dict[str, dict[str, FileInfo]]]
     scraped_releases: list[str]
+
 
 class FileInfo(TypedDict):
     sha256: str
     size: int
     url: str
 
-@dataclass(frozen=True)
-class Foo:
-    python_version: str
-    release_tag: str
-    platform: str
-    file_info: FileInfo
 
 def list_all_remote_releases() -> set[str]:
     """Uses `gh` to call out to GitHub to grab all PBS releases"""
-    result = subprocess.run([
-            "gh", "release", "list", 
-            "--repo", "astral-sh/python-build-standalone", 
-            "--json", "tagName",
-            "--exclude-drafts", "--exclude-pre-releases"
+    result = subprocess.run(
+        [
+            "gh",
+            "release",
+            "list",
+            "--repo",
+            "astral-sh/python-build-standalone",
+            "--json",
+            "tagName",
+            "--exclude-drafts",
+            "--exclude-pre-releases",
         ],
         capture_output=True,
         text=True,
-        check=True
+        check=True,
     )
     releases: list[GithubTaggedRelease] = json.loads(result.stdout)
     return {r["tagName"] for r in releases}
+
 
 def list_filtered_release_assets(release_tag: str) -> list[GithubReleaseAsset]:
     """
     Uses `gh` to get all assets for this release.
     The results are then filtered for Pants-relevant releases (determined by VALID_PATTERNS).
     """
-    result = subprocess.run([
-            "gh", "release", "view", release_tag, 
-            "--repo", "astral-sh/python-build-standalone", 
-            "--json", "assets", 
-            "--jq", "[.assets[] | {digest, name, size, url}]"
+    result = subprocess.run(
+        [
+            "gh",
+            "release",
+            "view",
+            release_tag,
+            "--repo",
+            "astral-sh/python-build-standalone",
+            "--json",
+            "assets",
+            "--jq",
+            "[.assets[] | {digest, name, size, url}]",
         ],
         capture_output=True,
         text=True,
-        check=False
+        check=False,
     )
-    
+
     assets: list[GithubReleaseAsset] = json.loads(result.stdout)
     return [asset for asset in assets if any(p in asset["name"] for p in VALID_PBS_PATTERNS)]
 
+
 def main():
     if not VERSIONS_PATH.exists():
-        raise FileNotFoundError("This helper script must be run from the root of the Pants repository.")
-    
+        raise FileNotFoundError(
+            "This helper script must be run from the root of the Pants repository."
+        )
+
     print("Starting to scrape GitHub PBS releases")
     versions_info: LocalReleaseInfo = json.loads(VERSIONS_PATH.read_text())
     all_local_release_tags = set(versions_info["scraped_releases"])
@@ -116,21 +130,27 @@ def main():
                 print(f"    Parsing: {asset_name}")
 
             python_version, pbs_release_tag = matches.groups()[1:3]
-            assert tag == pbs_release_tag, f"Fetched release info ({tag}) does not match parsed release info ({pbs_release_tag})"
+            assert tag == pbs_release_tag, (
+                f"Fetched release info ({tag}) does not match parsed release info ({pbs_release_tag})"
+            )
 
-            name_parts = asset_name.replace("darwin", "macos").replace("aarch64", "arm64").split("-")
+            name_parts = (
+                asset_name.replace("darwin", "macos").replace("aarch64", "arm64").split("-")
+            )
             platform = f"{name_parts[4]}_{name_parts[2]}"
 
-            versions_info["pythons"].setdefault(python_version, {}).setdefault(tag, {})[platform] = {
+            versions_info["pythons"].setdefault(python_version, {}).setdefault(tag, {})[
+                platform
+            ] = {
                 "sha256": asset["digest"].removeprefix("sha256:"),
                 "size": asset["size"],
                 "url": asset["url"],
             }
-        
+
     versions_info["scraped_releases"] = sorted(all_local_release_tags)
     print(f"Writing release information to {VERSIONS_PATH}")
     VERSIONS_PATH.write_text(json.dumps(versions_info, sort_keys=True, indent=2))
-    
+
 
 if __name__ == "__main__":
     main()
