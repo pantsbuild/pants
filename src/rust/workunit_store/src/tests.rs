@@ -6,7 +6,10 @@ use std::time::Duration;
 
 use internment::Intern;
 
-use crate::{Level, ParentIds, SpanId, WorkunitMetadata, WorkunitState, WorkunitStore};
+use crate::{
+    Level, ParentIds, SpanId, WorkunitMetadata, WorkunitState, WorkunitStore,
+    format_workunit_duration,
+};
 
 #[test]
 fn heavy_hitters_basic() {
@@ -223,4 +226,83 @@ fn wu_level(span_id: u64, parent_id: Option<u64>, level: Level) -> AnonymousWork
     let mut metadata = WorkunitMetadata::default();
     metadata.desc = Some(format!("{span_id}"));
     (level, SpanId(span_id), parent_id.map(SpanId), metadata)
+}
+
+#[test]
+fn format_duration_sub_second() {
+    assert_eq!(format_workunit_duration(Duration::from_millis(123)), "0.1s");
+}
+
+#[test]
+fn format_duration_seconds() {
+    assert_eq!(
+        format_workunit_duration(Duration::from_secs_f64(12.345)),
+        "12.3s"
+    );
+}
+
+#[test]
+fn format_duration_just_under_minute() {
+    assert_eq!(
+        format_workunit_duration(Duration::from_secs_f64(59.5)),
+        "59.5s"
+    );
+}
+
+#[test]
+fn format_duration_exactly_one_minute() {
+    assert_eq!(format_workunit_duration(Duration::from_secs(60)), "1m");
+}
+
+#[test]
+fn format_duration_exact_multiple_minutes() {
+    assert_eq!(format_workunit_duration(Duration::from_secs(120)), "2m");
+}
+
+#[test]
+fn format_duration_negligible_seconds_omitted() {
+    // 60.04s is below the 0.05 threshold, so seconds are omitted
+    assert_eq!(
+        format_workunit_duration(Duration::from_secs_f64(60.04)),
+        "1m"
+    );
+}
+
+#[test]
+fn format_duration_just_above_seconds_threshold() {
+    // 60.1s is above the 0.05 threshold, so seconds are shown
+    assert_eq!(
+        format_workunit_duration(Duration::from_secs_f64(60.1)),
+        "1m 0.1s"
+    );
+}
+
+#[test]
+fn format_duration_minutes_and_seconds() {
+    assert_eq!(
+        format_workunit_duration(Duration::from_secs_f64(90.5)),
+        "1m 30.5s"
+    );
+}
+
+#[test]
+fn format_duration_multiple_minutes() {
+    assert_eq!(
+        format_workunit_duration(Duration::from_secs_f64(185.7)),
+        "3m 5.7s"
+    );
+}
+
+#[test]
+fn format_duration_zero() {
+    assert_eq!(format_workunit_duration(Duration::from_secs(0)), "0.0s");
+}
+
+#[test]
+fn format_duration_over_one_hour() {
+    // 1 hour 30 minutes 45.5 seconds = 5445.5 seconds
+    assert_eq!(
+        format_workunit_duration(Duration::from_secs_f64(5445.5)),
+        "90m 45.5s"
+    );
 }

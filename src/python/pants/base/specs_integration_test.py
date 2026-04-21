@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import re
 from textwrap import dedent
 
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
@@ -54,6 +55,11 @@ SOURCES = {
 }
 
 
+def _assert_succeeded(test_result: str, target: str) -> None:
+    pattern = re.escape(target) + r" \([^)]+\) - succeeded\."
+    assert re.search(pattern, test_result), f"Expected '{target}' succeeded in output"
+
+
 def run(args: list[str]) -> PantsResult:
     result = run_pants(
         [
@@ -80,8 +86,8 @@ def test_address_literal() -> None:
         assert run(["list", *list_specs]).stdout.splitlines() == list_specs
 
         test_result = run(["test", f"{tmpdir}/py:tests"]).stderr
-        assert f"{tmpdir}/py/utils/strutil_test.py:../tests - succeeded." in test_result
-        assert f"{tmpdir}/py/base/common_test.py:../tests - succeeded." in test_result
+        _assert_succeeded(test_result, f"{tmpdir}/py/utils/strutil_test.py:../tests")
+        _assert_succeeded(test_result, f"{tmpdir}/py/base/common_test.py:../tests")
         assert f"{tmpdir}/py:tests" not in test_result
 
 
@@ -109,14 +115,14 @@ def test_sibling_addresses() -> None:
         # Even though no `python_test` targets are explicitly defined in `util/`, a generated
         # target is resident there.
         test_result = run(["test", f"{tmpdir}/py/utils:"]).stderr
-        assert f"{tmpdir}/py/utils/strutil_test.py:../tests - succeeded." in test_result
+        _assert_succeeded(test_result, f"{tmpdir}/py/utils/strutil_test.py:../tests")
         assert f"{tmpdir}/py/base/common_test.py:../tests" not in test_result
         assert f"{tmpdir}/py:tests" not in test_result
 
         # Even though no `_test.py` files live in this dir, we match the `python_tests` target
         # and replace it with its generated targets.
         test_result = run(["test", f"{tmpdir}/py:"]).stderr
-        assert f"{tmpdir}/py/utils/strutil_test.py:../tests - succeeded." in test_result
+        _assert_succeeded(test_result, f"{tmpdir}/py/utils/strutil_test.py:../tests")
         assert f"{tmpdir}/py/base/common_test.py:../tests" in test_result
         assert f"{tmpdir}/py:tests" not in test_result
 
@@ -137,7 +143,7 @@ def test_descendent_addresses() -> None:
         ]
 
         test_result = run(["test", f"{tmpdir}/py::"]).stderr
-        assert f"{tmpdir}/py/utils/strutil_test.py:../tests - succeeded." in test_result
+        _assert_succeeded(test_result, f"{tmpdir}/py/utils/strutil_test.py:../tests")
         assert f"{tmpdir}/py/base/common_test.py:../tests" in test_result
         assert f"{tmpdir}/py:tests" not in test_result
 

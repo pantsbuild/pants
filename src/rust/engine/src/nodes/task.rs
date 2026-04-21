@@ -246,12 +246,8 @@ impl Task {
                             .extract::<Bound<'_, PyTuple>>()
                             .map_err(PyErr::from)?;
                         let kwargs = PyDict::new(py);
-                        for ((name, _), value) in self
-                            .task
-                            .args
-                            .iter()
-                            .skip(self.args_arity.into())
-                            .zip(deps.into_iter())
+                        for ((name, _), value) in
+                            self.task.args.iter().skip(self.args_arity.into()).zip(deps)
                         {
                             kwargs.set_item(name, &value)?;
                         }
