@@ -38,15 +38,15 @@ class GithubReleaseAsset(TypedDict):
     url: str
 
 
-class LocalReleaseInfo(TypedDict):
-    pythons: dict[str, dict[str, dict[str, FileInfo]]]
-    scraped_releases: list[str]
-
-
 class FileInfo(TypedDict):
     sha256: str
     size: int
     url: str
+
+
+class LocalReleaseInfo(TypedDict):
+    pythons: dict[str, dict[str, dict[str, FileInfo]]]
+    scraped_releases: list[str]
 
 
 def list_all_remote_releases() -> set[str]:
