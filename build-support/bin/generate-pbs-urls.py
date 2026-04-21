@@ -91,7 +91,7 @@ def list_filtered_release_assets(release_tag: str) -> list[GithubReleaseAsset]:
         ],
         capture_output=True,
         text=True,
-        check=False,
+        check=True,
     )
 
     assets: list[GithubReleaseAsset] = json.loads(result.stdout)
