@@ -203,8 +203,19 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
 
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
-def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
-    named_caches_dir = rule_runner.request(GlobalOptions, []).named_caches_dir
+def test_pex_working_directory(tmp_path: Path, pex_type: type[Pex | VenvPex]) -> None:
+    named_caches_dir = tmp_path / "named_caches"
+
+    rule_runner = RuleRunner(
+        rules=[
+            *pex_test_utils.rules(),
+            *pex_rules(),
+            QueryRule(Pex, (PexRequest,)),
+            QueryRule(VenvPex, (PexRequest,)),
+        ],
+        bootstrap_args=[f"--named-caches-dir={named_caches_dir}"],
+    )
+
     sources = rule_runner.request(
         Digest,
         [
