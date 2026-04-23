@@ -155,6 +155,8 @@ def _setup_docker_options(rule_runner: RuleRunner, options: dict | None) -> Dock
         opts.setdefault("env_vars", [])
         opts.setdefault("suggest_renames", True)
         opts.setdefault("push_on_package", DockerPushOnPackageBehavior.WARN)
+        opts.setdefault("args_for_docker_build", [])
+
         return create_subsystem(DockerOptions, **opts)
     else:
         return rule_runner.request(DockerOptions, [])
@@ -1218,6 +1220,54 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
                 "FROM_ENV": "env value",
                 "__UPSTREAM_IMAGE_IDS": "",
             }
+        )
+
+    assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        build_process_assertions=check_build_process,
+    )
+
+
+def test_docker_extra_args_for_docker_build(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  extra_args_for_docker_build=[
+                    "--shm-size",
+                    "256m",
+                  ]
+                )
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--docker-args-for-docker-build=--progress plain",
+            "--docker-args-for-docker-build=--label my_label",
+        ],
+    )
+
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
+            "/dummy/docker",
+            "build",
+            "--pull=False",
+            "--progress",
+            "plain",
+            "--label",
+            "my_label",
+            "--shm-size",
+            "256m",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
         )
 
     assert_build_process(
