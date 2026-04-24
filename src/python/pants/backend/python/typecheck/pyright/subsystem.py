@@ -21,6 +21,11 @@ class Pyright(NodeJSToolBase):
     )
 
     default_version = "pyright@1.1.396"
+    default_lockfile_resources = {
+        "npm": ("pants.backend.python.typecheck.pyright", "pyright.package-lock.json"),
+        "yarn": ("pants.backend.python.typecheck.pyright", "pyright.yarn.lock"),
+        "pnpm": ("pants.backend.python.typecheck.pyright", "pyright.pnpm-lock.yaml"),
+    }
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--version")

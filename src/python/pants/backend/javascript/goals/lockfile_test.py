@@ -10,8 +10,11 @@ import yaml
 
 from pants.backend.javascript.goals import lockfile
 from pants.backend.javascript.goals.lockfile import (
+    GenerateNodeJSToolLockfile,
     GeneratePackageLockJsonFile,
+    KnownNodeJSToolResolveNamesRequest,
     KnownPackageJsonUserResolveNamesRequest,
+    RequestedNodeJSToolResolveNames,
     RequestedPackageJsonUserResolveNames,
 )
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects
@@ -20,16 +23,20 @@ from pants.backend.javascript.package_json import (
     PackageJsonForGlobs,
     PackageJsonTarget,
 )
+from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfileResult,
     KnownUserResolveNames,
     UserGenerateLockfiles,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.target_types import FileTarget
 from pants.engine.fs import DigestContents, PathGlobs
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
+from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 
 
@@ -315,3 +322,84 @@ def test_generates_lockfile_for_yarn_package_json_workspace(rule_runner: RuleRun
         """
         ).strip()
     )
+
+
+# ---------------------------------------------------------------------------
+# NodeJS tool lockfile generation (NodeJSToolBase with default_lockfile_resources).
+# ---------------------------------------------------------------------------
+
+
+class _CowsayLockedTool(NodeJSToolBase):
+    options_scope = "cowsay-locked"
+    name = "CowsayLocked"
+    default_version = "cowsay@1.6.0"
+    help = "Cowsay with a default lockfile."
+    default_lockfile_resources = {
+        "npm": ("pants.backend.javascript.subsystems", "cowsay.package-lock.json"),
+    }
+
+
+@pytest.fixture
+def nodejs_tool_lockfile_rule_runner() -> RuleRunner:
+    return RuleRunner(
+        rules=[
+            *lockfile.rules(),
+            *_CowsayLockedTool.rules(),
+            UnionRule(ExportableTool, _CowsayLockedTool),
+            QueryRule(KnownUserResolveNames, (KnownNodeJSToolResolveNamesRequest,)),
+            QueryRule(UserGenerateLockfiles, (RequestedNodeJSToolResolveNames,)),
+            QueryRule(GenerateLockfileResult, (GenerateNodeJSToolLockfile,)),
+        ],
+        target_types=[PackageJsonTarget, FileTarget],
+    )
+
+
+def test_generate_nodejs_tool_lockfile_end_to_end(
+    nodejs_tool_lockfile_rule_runner: RuleRunner,
+) -> None:
+    """Covers the three lockfile rules for a NodeJSToolBase with default_lockfile_resources:
+
+    - `determine_nodejs_tool_resolves` discovers the tool's resolve name.
+    - `setup_nodejs_tool_lockfile_requests` targets the tool's source directory as
+      `lockfile_dest`.
+    - `generate_nodejs_tool_lockfile` produces a digest with the file relocated to
+      `lockfile_dest` (not at the digest root).
+    """
+    nodejs_tool_lockfile_rule_runner.set_options(
+        [
+            "--nodejs-package-managers={'npm': '11.6.2'}",
+            "--nodejs-package-manager=npm",
+        ],
+        env_inherit={"PATH"},
+    )
+    lockfile_dest = (
+        "src/python/pants/backend/javascript/subsystems/cowsay.package-lock.json"
+    )
+
+    resolves = nodejs_tool_lockfile_rule_runner.request(
+        KnownUserResolveNames, (KnownNodeJSToolResolveNamesRequest(),)
+    )
+    assert "cowsay-locked" in resolves.names
+
+    [request] = nodejs_tool_lockfile_rule_runner.request(
+        UserGenerateLockfiles,
+        (RequestedNodeJSToolResolveNames(("cowsay-locked",)),),
+    )
+    assert isinstance(request, GenerateNodeJSToolLockfile)
+    assert request.resolve_name == "cowsay-locked"
+    assert request.lockfile_dest == lockfile_dest
+
+    result = nodejs_tool_lockfile_rule_runner.request(
+        GenerateLockfileResult,
+        (
+            GenerateNodeJSToolLockfile(
+                resolve_name="cowsay-locked",
+                lockfile_dest=lockfile_dest,
+                diff=False,
+                package="cowsay@1.6.0",
+                package_manager=PackageManager.from_string("npm@11.6.2"),
+            ),
+        ),
+    )
+    [file_content] = nodejs_tool_lockfile_rule_runner.request(DigestContents, [result.digest])
+    assert file_content.path == lockfile_dest

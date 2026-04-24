@@ -12,3 +12,8 @@ class Redocly(NodeJSToolBase):
     help = "Redocly CLI toolbox with rich validation and bundling features (https://github.com/Redocly/redocly-cli)."
 
     default_version = "@redocly/cli@1.10.5"
+    default_lockfile_resources = {
+        "npm": ("pants.backend.openapi.subsystems", "redocly.package-lock.json"),
+        "yarn": ("pants.backend.openapi.subsystems", "redocly.yarn.lock"),
+        "pnpm": ("pants.backend.openapi.subsystems", "redocly.pnpm-lock.yaml"),
+    }

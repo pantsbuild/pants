@@ -18,6 +18,7 @@ from pants.core.util_rules.partitions import PartitionerType
 from pants.engine.fs import MergeDigests
 from pants.engine.intrinsics import merge_digests
 from pants.engine.process import execute_process_or_raise
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
@@ -76,4 +77,5 @@ def rules() -> Iterable[Rule | UnionRule]:
         *collect_rules(),
         *nodejs_tool.rules(),
         *PrettierFmtRequest.rules(),
+        UnionRule(ExportableTool, Prettier),
     )

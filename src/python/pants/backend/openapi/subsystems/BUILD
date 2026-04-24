@@ -3,4 +3,4 @@
 
 python_sources(dependencies=[":lockfiles"])
 
-resources(name="lockfiles", sources=["*.lockfile.txt"])
+resources(name="lockfiles", sources=["*.lockfile.txt", "*.package-lock.json", "*.yarn.lock", "*.pnpm-lock.yaml"])

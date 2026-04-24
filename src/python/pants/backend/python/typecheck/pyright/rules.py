@@ -59,6 +59,7 @@ from pants.engine.intrinsics import (
     merge_digests,
 )
 from pants.engine.process import ProcessCacheScope, execute_process_or_raise
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest, FieldSet, Target
 from pants.engine.unions import UnionRule
@@ -381,4 +382,5 @@ def rules() -> Iterable[Rule | UnionRule]:
         *pex_from_targets.rules(),
         *nodejs_tool.rules(),
         UnionRule(CheckRequest, PyrightRequest),
+        UnionRule(ExportableTool, Pyright),
     )

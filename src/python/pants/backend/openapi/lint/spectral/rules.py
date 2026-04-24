@@ -18,8 +18,10 @@ from pants.core.util_rules.source_files import SourceFilesRequest, determine_sou
 from pants.engine.fs import CreateDigest, FileContent, MergeDigests
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargetsRequest
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -111,4 +113,5 @@ def rules():
         *collect_rules(),
         *nodejs_tool.rules(),
         *SpectralRequest.rules(),
+        UnionRule(ExportableTool, SpectralSubsystem),
     ]

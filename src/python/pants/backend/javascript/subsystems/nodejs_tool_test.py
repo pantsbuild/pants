@@ -11,7 +11,12 @@ import pytest
 
 from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.subsystems import nodejs_tool
-from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase, NodeJSToolRequest
+from pants.backend.javascript.subsystems.nodejs_tool import (
+    NodeJSToolBase,
+    NodeJSToolRequest,
+    _parse_package_name_and_version,
+)
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -24,6 +29,17 @@ class CowsayTool(NodeJSToolBase):
     # Intentionally older version.
     default_version = "cowsay@1.4.0"
     help = "The Cowsay utility for printing cowsay messages"
+    lockfile_required = False
+
+
+class CowsayToolWithLockfile(NodeJSToolBase):
+    options_scope = "cowsay-locked"
+    name = "CowsayLocked"
+    default_version = "cowsay@1.6.0"
+    help = "Cowsay with bundled lockfile"
+    default_lockfile_resources = {
+        "npm": ("pants.backend.javascript.subsystems", "cowsay.package-lock.json"),
+    }
 
 
 class TypescriptTool(NodeJSToolBase):
@@ -31,6 +47,7 @@ class TypescriptTool(NodeJSToolBase):
     name = "TypeScript"
     default_version = "typescript@5.9.3"
     help = "The TypeScript compiler"
+    lockfile_required = False
 
 
 @pytest.fixture
@@ -39,8 +56,10 @@ def rule_runner() -> RuleRunner:
         rules=[
             *nodejs_tool.rules(),
             *CowsayTool.rules(),
+            *CowsayToolWithLockfile.rules(),
             *TypescriptTool.rules(),
             QueryRule(CowsayTool, []),
+            QueryRule(CowsayToolWithLockfile, []),
             QueryRule(TypescriptTool, []),
             QueryRule(ProcessResult, [NodeJSToolRequest]),
             QueryRule(Process, [NodeJSToolRequest]),
@@ -267,6 +286,7 @@ def test_scoped_npm_package_binary_name():
         name = "TestTool"
         default_version = ""
         help = "Test tool"
+        lockfile_required = False
 
         def __init__(self, version, binary_name_override=None):
             self.version = version
@@ -309,6 +329,7 @@ def test_invalid_npm_package_specification():
         name = "TestTool"
         default_version = ""
         help = "Test tool"
+        lockfile_required = False
 
         def __init__(self, version):
             self.version = version
@@ -317,3 +338,76 @@ def test_invalid_npm_package_specification():
     tool_invalid = TestTool("")
     with pytest.raises(ValueError, match="Invalid npm package specification: "):
         _ = tool_invalid.binary_name
+
+
+def test_parse_package_name_and_version():
+    assert _parse_package_name_and_version("prettier@3.6.2") == ("prettier", "3.6.2")
+    assert _parse_package_name_and_version("@redocly/cli@1.10.5") == ("@redocly/cli", "1.10.5")
+    assert _parse_package_name_and_version("@stoplight/spectral-cli@6.5.1") == (
+        "@stoplight/spectral-cli",
+        "6.5.1",
+    )
+    assert _parse_package_name_and_version("pyright@1.1.396") == ("pyright", "1.1.396")
+
+
+def test_lockfile_required_enforcement():
+    class ToolWithoutLockfile(NodeJSToolBase):
+        options_scope = "no_lockfile_tool"
+        name = "NoLockfileTool"
+        default_version = "some-tool@1.0.0"
+        help = "A tool without lockfile resources"
+
+    with pytest.raises(ValueError, match="default_lockfile_resources"):
+        # The __init__ check fires before Subsystem machinery, so it can be driven directly.
+        ToolWithoutLockfile.__init__(ToolWithoutLockfile)
+
+
+def test_lockfile_required_false_allows_no_resources():
+    class ToolOptedOut(NodeJSToolBase):
+        options_scope = "opted_out_tool"
+        name = "OptedOutTool"
+        default_version = "some-tool@1.0.0"
+        help = "A tool that opts out of lockfile enforcement"
+        lockfile_required = False
+
+    assert ToolOptedOut.lockfile_required is False
+    assert ToolOptedOut.default_lockfile_resources is None
+
+
+def test_default_lockfile_option_when_resources_set():
+    class ToolWithResources(NodeJSToolBase):
+        options_scope = "tool_with_resources"
+        name = "ToolWithResources"
+        default_version = "some-tool@1.0.0"
+        help = "A tool with lockfile resources"
+        default_lockfile_resources = {
+            "npm": ("some.package", "tool.package-lock.json"),
+            "yarn": ("some.package", "tool.yarn.lock"),
+            "pnpm": ("some.package", "tool.pnpm-lock.yaml"),
+        }
+
+    assert ToolWithResources.lockfile.kwargs["default"] == DEFAULT_TOOL_LOCKFILE
+
+
+def test_default_lockfile_option_when_no_resources():
+    assert CowsayTool.lockfile.kwargs["default"] is None
+
+
+def test_bundled_lockfile_execution(rule_runner: RuleRunner):
+    rule_runner.set_options(
+        [
+            "--nodejs-package-manager=npm",
+        ],
+        env_inherit={"PATH"},
+    )
+    tool = rule_runner.request(CowsayToolWithLockfile, [])
+    result = rule_runner.request(
+        ProcessResult,
+        [tool.request(("--version",), EMPTY_DIGEST, "Cowsay version", LogLevel.DEBUG)],
+    )
+    assert result.stdout == b"1.6.0\n"
+
+
+def test_parse_package_name_and_version_error():
+    with pytest.raises(ValueError, match="Invalid npm package specification"):
+        _parse_package_name_and_version("prettier")

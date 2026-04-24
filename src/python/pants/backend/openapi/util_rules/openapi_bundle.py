@@ -32,6 +32,7 @@ from pants.engine.target import (
     Target,
     TransitiveTargetsRequest,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.logging import LogLevel
@@ -129,4 +130,5 @@ def rules():
         *collect_rules(),
         *nodejs_tool.rules(),
         UnionRule(GenerateSourcesRequest, GenerateOpenApiBundleRequest),
+        UnionRule(ExportableTool, Redocly),
     )

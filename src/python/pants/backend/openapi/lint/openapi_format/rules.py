@@ -13,8 +13,10 @@ from pants.backend.openapi.lint.openapi_format.subsystem import (
 )
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
@@ -57,4 +59,5 @@ def rules():
         *collect_rules(),
         *nodejs_tool.rules(),
         *OpenApiFormatRequest.rules(),
+        UnionRule(ExportableTool, OpenApiFormatSubsystem),
     ]
