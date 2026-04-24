@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
 import shutil
@@ -60,7 +59,13 @@ from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
-from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase, _parse_package_name_and_version
+from pants.backend.javascript.package_manager import PackageManager
+from pants.backend.javascript.subsystems.nodejs_tool import (
+    NodeJSToolBase,
+    _lockfile_dest_for_resource,
+    _parse_package_name_and_version,
+    _tool_package_json_bytes,
+)
 from pants.backend.openapi.lint.openapi_format.subsystem import OpenApiFormatSubsystem
 from pants.backend.openapi.lint.spectral.subsystem import SpectralSubsystem
 from pants.backend.openapi.subsystems.redocly import Redocly
@@ -111,11 +116,7 @@ class JvmTool(Tool[JvmToolBase]): ...
 
 
 @dataclass
-class NodeJSTool(Tool[NodeJSToolBase]):
-    @property
-    def lockfile_name(self) -> str:
-        # Not used directly — NodeJS tools generate per-package-manager lockfiles.
-        return f"{self.name}.package-lock.json"
+class NodeJSTool(Tool[NodeJSToolBase]): ...
 
 
 all_python_tools = tuple(
@@ -335,6 +336,9 @@ def generate_nodejs_tool_lockfiles(
 ) -> None:
     cleanup_tmp = keep_sandboxes == KeepSandboxes.never
 
+    package_managers = [PackageManager.npm(None), PackageManager.yarn(None), PackageManager.pnpm(None)]
+    pants_repo_root = get_buildroot()
+
     for tool in tools:
         pkg_name, pkg_version = _parse_package_name_and_version(tool.cls.default_version)
 
@@ -343,66 +347,37 @@ def generate_nodejs_tool_lockfiles(
             logger.warning(f"Skipping {tool.name}: no default_lockfile_resources configured.")
             continue
 
-        pants_repo_root = get_buildroot()
+        for pm in package_managers:
+            if pm.name not in lockfile_resources:
+                continue
 
-        with temporary_dir(cleanup=cleanup_tmp) as tmp_dir:
-            if not cleanup_tmp:
-                logger.info(f"Preserving temp dir for {tool.name}: {tmp_dir}")
+            resource_pkg, resource_filename = lockfile_resources[pm.name]
+            dest = os.path.join(pants_repo_root, _lockfile_dest_for_resource(resource_pkg, resource_filename))
+            cmd = [pm.name, *pm.generate_lockfile_args, "--ignore-scripts"]
 
-            package_json = {
-                "name": f"pants-tool-{tool.name}",
-                "private": True,
-                "dependencies": {pkg_name: pkg_version},
-            }
-            package_json_path = os.path.join(tmp_dir, "package.json")
-            with open(package_json_path, "w") as f:
-                json.dump(package_json, f, indent=2)
+            if dry_run:
+                logger.info(f"Would run: {' '.join(cmd)} -> {dest}")
+                continue
 
-            pm_commands: dict[str, tuple[list[str], str]] = {
-                "npm": (["npm", "install", "--package-lock-only", "--ignore-scripts"], "package-lock.json"),
-                "yarn": (["yarn", "install", "--ignore-scripts"], "yarn.lock"),
-                "pnpm": (["pnpm", "install", "--lockfile-only", "--ignore-scripts"], "pnpm-lock.yaml"),
-            }
+            with temporary_dir(cleanup=cleanup_tmp) as tmp_dir:
+                if not cleanup_tmp:
+                    logger.info(f"Preserving temp dir for {tool.name}/{pm.name}: {tmp_dir}")
 
-            for pm_name, (cmd, lockfile_name) in pm_commands.items():
-                if pm_name not in lockfile_resources:
-                    continue
+                with open(os.path.join(tmp_dir, "package.json"), "wb") as f:
+                    f.write(_tool_package_json_bytes(tool.name, pkg_name, pkg_version))
 
-                resource_pkg, resource_filename = lockfile_resources[pm_name]
-                dest = os.path.join(
-                    pants_repo_root,
-                    "src",
-                    "python",
-                    resource_pkg.replace(".", os.path.sep),
-                    resource_filename,
-                )
-
-                if dry_run:
-                    logger.info(f"Would run: {' '.join(cmd)} in {tmp_dir} -> {dest}")
-                    continue
-
-                logger.info(f"Generating {pm_name} lockfile for {tool.name}...")
-                # Clean up previous artifacts from other package managers
-                for _, other_lockfile in pm_commands.values():
-                    path = os.path.join(tmp_dir, other_lockfile)
-                    if os.path.isfile(path):
-                        os.remove(path)
-                node_modules = os.path.join(tmp_dir, "node_modules")
-                if os.path.isdir(node_modules):
-                    shutil.rmtree(node_modules)
-
+                logger.info(f"Generating {pm.name} lockfile for {tool.name}...")
                 try:
                     subprocess.run(cmd, cwd=tmp_dir, check=True, capture_output=True)
                 except subprocess.CalledProcessError as e:
                     logger.error(
-                        f"Failed to generate {pm_name} lockfile for {tool.name}:\n"
+                        f"Failed to generate {pm.name} lockfile for {tool.name}:\n"
                         f"  stdout: {e.stdout.decode()}\n"
                         f"  stderr: {e.stderr.decode()}"
                     )
                     raise
-                src = os.path.join(tmp_dir, lockfile_name)
-                shutil.copy(src, dest)
-                logger.debug(f"Copied {src} -> {dest}")
+                shutil.copy(os.path.join(tmp_dir, pm.lockfile_name), dest)
+                logger.debug(f"Copied {pm.lockfile_name} -> {dest}")
 
 
 def generate(

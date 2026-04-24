@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import importlib.resources
 import json
-import re
+import os.path
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import ClassVar
@@ -53,8 +53,6 @@ class NodeJSToolBase(Subsystem, ExportableTool):
     # Subclasses must set.
     default_version: ClassVar[str]
 
-    # Mapping of package manager name to (python_package, filename) for bundled lockfiles.
-    # e.g. {"npm": ("pants.backend.javascript.lint.prettier", "prettier.package-lock.json"), ...}
     default_lockfile_resources: ClassVar[dict[str, tuple[str, str]] | None] = None
 
     # Set to False for tools that always use a resolve (e.g. TypeScript).
@@ -88,16 +86,17 @@ class NodeJSToolBase(Subsystem, ExportableTool):
 
     @property
     def binary_name(self) -> str:
-        """The binary name to run for this tool."""
         if self._binary_name:
             return self._binary_name
 
-        # For scoped packages (@scope/package), use the scope name (often matches the binary)
-        # For regular packages, use the full package name
-        match = re.match(r"^(?:@([^/]+)/[^@]+|([^@]+))", self.version)
-        if not match:
+        package_name, _ = _split_package_spec(self.version)
+        if not package_name:
             raise ValueError(f"Invalid npm package specification: {self.version}")
-        return match.group(1) or match.group(2)
+        if package_name.startswith("@"):
+            # Scoped packages (`@scope/name`) conventionally expose a binary named after the scope,
+            # e.g. `@redocly/cli` → `redocly`.
+            return package_name[1:].split("/", 1)[0]
+        return package_name
 
     install_from_resolve = StrOption(
         advanced=True,
@@ -114,17 +113,15 @@ class NodeJSToolBase(Subsystem, ExportableTool):
         ),
     )
 
-    def __init__(self, *args, **kwargs):
-        if self.lockfile_required and not self.default_lockfile_resources:
-            raise ValueError(
-                softwrap(
-                    f"""
-                    The class property `default_lockfile_resources` must be set for
-                    `{self.options_scope}`, or set `lockfile_required = False` to opt out.
-                    """
-                )
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # If a tool subsystem didn't set `default_lockfile_resources` explicitly, derive it by
+        # convention from the subsystem's own module and `options_scope`. Tools that don't ship
+        # bundled lockfiles opt out with `lockfile_required = False` (e.g. TypeScript).
+        if cls.lockfile_required and cls.default_lockfile_resources is None:
+            cls.default_lockfile_resources = bundled_lockfiles(
+                cls.__module__.rsplit(".", 1)[0], cls.options_scope
             )
-        super().__init__(*args, **kwargs)
 
     def request(
         self,
@@ -181,20 +178,71 @@ class NodeJSToolRequest:
     extra_env: Mapping[str, str] = field(default_factory=FrozenDict)
 
 
+def _split_package_spec(package: str) -> tuple[str, str | None]:
+    """Split `name[@version]` or `@scope/name[@version]` into (name, version_or_None).
+
+    Scoped packages (leading `@`) have their version separator at the second `@`, not the first.
+    """
+    # Skip the leading `@` for scoped packages so we find the version separator (the second `@`).
+    search_start = 1 if package.startswith("@") else 0
+    at_idx = package.find("@", search_start)
+    if at_idx == -1:
+        return package, None
+    return package[:at_idx], package[at_idx + 1 :]
+
+
 def _parse_package_name_and_version(package: str) -> tuple[str, str]:
-    try:
-        if package.startswith("@"):
-            # Scoped packages (@scope/name@version): skip the leading @ and find the separator.
-            at_idx = package.index("@", 1)
-            return package[:at_idx], package[at_idx + 1 :]
-        else:
-            at_idx = package.index("@")
-            return package[:at_idx], package[at_idx + 1 :]
-    except ValueError:
+    name, version = _split_package_spec(package)
+    if not name or version is None:
         raise ValueError(
             f"Invalid npm package specification '{package}': expected format 'package@version' "
             f"or '@scope/package@version'."
         )
+    return name, version
+
+
+def _tool_package_json_bytes(resolve_name: str, package_name: str, package_version: str) -> bytes:
+    return json.dumps(
+        {
+            "name": f"pants-tool-{resolve_name}",
+            "private": True,
+            "dependencies": {package_name: package_version},
+        },
+        indent=2,
+    ).encode()
+
+
+def _lockfile_dest_for_resource(resource_pkg: str, filename: str) -> str:
+    """In-repo path for a bundled lockfile resource, relative to the buildroot."""
+    return os.path.join("src", "python", resource_pkg.replace(".", os.path.sep), filename)
+
+
+def bundled_lockfiles(package: str, prefix: str) -> dict[str, tuple[str, str]]:
+    """Build a `NodeJSToolBase.default_lockfile_resources` dict for a tool that ships lockfiles for
+    npm/yarn/pnpm at `{prefix}.{pm.lockfile_name}` within `package`.
+
+    Example:
+        default_lockfile_resources = bundled_lockfiles(__package__, "prettier")
+    """
+    pms = (PackageManager.npm(None), PackageManager.yarn(None), PackageManager.pnpm(None))
+    return {pm.name: (package, f"{prefix}.{pm.lockfile_name}") for pm in pms}
+
+
+def _active_package_manager(nodejs: NodeJS, for_tool: str) -> PackageManager:
+    default_package_manager = nodejs.default_package_manager
+    if (
+        nodejs.package_managers.get(nodejs.package_manager) is None
+        or default_package_manager is None
+    ):
+        raise ValueError(
+            softwrap(
+                f"""
+                Version for {nodejs.package_manager} has to be configured
+                in [{nodejs.options_scope}].package_managers to run the tool '{for_tool}'.
+                """
+            )
+        )
+    return PackageManager.from_string(default_package_manager)
 
 
 @dataclass(frozen=True)
@@ -245,19 +293,15 @@ class _NodeJSBundledToolInstalled:
 async def install_nodejs_tool_from_bundled_lockfile(
     request: _NodeJSBundledToolInstallRequest,
 ) -> _NodeJSBundledToolInstalled:
-    package_json = json.dumps(
-        {
-            "name": f"pants-tool-{request.options_scope}",
-            "private": True,
-            "dependencies": {request.package_name: request.package_version},
-        },
-        indent=2,
-    ).encode()
-
     project_digest = await create_digest(
         CreateDigest(
             [
-                FileContent("package.json", package_json),
+                FileContent(
+                    "package.json",
+                    _tool_package_json_bytes(
+                        request.options_scope, request.package_name, request.package_version
+                    ),
+                ),
                 FileContent(request.lockfile_name, request.lockfile_bytes),
             ]
         ),
@@ -289,19 +333,7 @@ async def install_nodejs_tool_from_bundled_lockfile(
 async def _run_tool_with_bundled_lockfile(
     request: NodeJSToolRequest, nodejs: NodeJS
 ) -> Process:
-    pkg_manager_version = nodejs.package_managers.get(nodejs.package_manager)
-    pkg_manager_and_version = nodejs.default_package_manager
-    if pkg_manager_version is None or pkg_manager_and_version is None:
-        raise ValueError(
-            softwrap(
-                f"""
-                Version for {nodejs.package_manager} has to be configured
-                in [{nodejs.options_scope}].package_managers when running
-                the tool '{request.binary_name}' with a bundled lockfile.
-                """
-            )
-        )
-    pkg_manager = PackageManager.from_string(pkg_manager_and_version)
+    pkg_manager = _active_package_manager(nodejs, request.binary_name)
 
     if request.lockfile == DEFAULT_TOOL_LOCKFILE:
         if not request.default_lockfile_resources:
@@ -369,21 +401,9 @@ async def _run_tool_with_bundled_lockfile(
 
 
 async def _run_tool_without_resolve(request: NodeJSToolRequest, nodejs: NodeJS) -> Process:
-    pkg_manager_version = nodejs.package_managers.get(nodejs.package_manager)
-    pkg_manager_and_version = nodejs.default_package_manager
-    if pkg_manager_version is None or pkg_manager_and_version is None:
-        # Occurs when a user configures a custom package manager but without a resolve.
-        # Corepack requires a package.json to make a decision on a "good known release".
-        raise ValueError(
-            softwrap(
-                f"""
-                Version for {nodejs.package_manager} has to be configured
-                in [{nodejs.options_scope}].package_managers when running
-                the tool '{request.binary_name}' without setting [{request.options_scope}].install_from_resolve.
-                """
-            )
-        )
-    pkg_manager = PackageManager.from_string(pkg_manager_and_version)
+    # Corepack requires a configured version in [nodejs].package_managers to pick a
+    # "good known release"; there's no project package.json here to derive it from.
+    pkg_manager = _active_package_manager(nodejs, request.binary_name)
 
     return await setup_node_tool_process(
         NodeJSToolProcess(
@@ -456,3 +476,8 @@ async def prepare_tool_process(request: NodeJSToolRequest, nodejs: NodeJS) -> Pr
 
 def rules() -> Iterable[Rule | UnionRule]:
     return [*collect_rules(), *nodejs_project_environment.rules(), *install_node_package.rules()]
+
+
+def rules_for_tool(tool_cls: type[NodeJSToolBase]) -> Iterable[Rule | UnionRule]:
+    """All rules needed to register a NodeJSToolBase subsystem in its backend's `rules()`."""
+    return [*rules(), UnionRule(ExportableTool, tool_cls)]

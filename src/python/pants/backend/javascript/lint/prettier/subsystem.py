@@ -23,11 +23,6 @@ class Prettier(NodeJSToolBase):
     )
 
     default_version = "prettier@3.6.2"
-    default_lockfile_resources = {
-        "npm": ("pants.backend.javascript.lint.prettier", "prettier.package-lock.json"),
-        "yarn": ("pants.backend.javascript.lint.prettier", "prettier.yarn.lock"),
-        "pnpm": ("pants.backend.javascript.lint.prettier", "prettier.pnpm-lock.yaml"),
-    }
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--version")

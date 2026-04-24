@@ -28,11 +28,6 @@ class OpenApiFormatSubsystem(NodeJSToolBase):
     help = "Format an OpenAPI document by ordering, formatting and filtering fields (https://github.com/thim81/openapi-format)."
 
     default_version = "openapi-format@1.13.1"
-    default_lockfile_resources = {
-        "npm": ("pants.backend.openapi.lint.openapi_format", "openapi-format.package-lock.json"),
-        "yarn": ("pants.backend.openapi.lint.openapi_format", "openapi-format.yarn.lock"),
-        "pnpm": ("pants.backend.openapi.lint.openapi_format", "openapi-format.pnpm-lock.yaml"),
-    }
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--no-sort")

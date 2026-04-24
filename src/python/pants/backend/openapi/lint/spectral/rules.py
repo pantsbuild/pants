@@ -18,7 +18,6 @@ from pants.core.util_rules.source_files import SourceFilesRequest, determine_sou
 from pants.engine.fs import CreateDigest, FileContent, MergeDigests
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
-from pants.core.goals.resolves import ExportableTool
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargetsRequest
 from pants.engine.unions import UnionRule
@@ -111,7 +110,6 @@ async def run_spectral(
 def rules():
     return [
         *collect_rules(),
-        *nodejs_tool.rules(),
+        *nodejs_tool.rules_for_tool(SpectralSubsystem),
         *SpectralRequest.rules(),
-        UnionRule(ExportableTool, SpectralSubsystem),
     ]

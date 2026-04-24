@@ -13,7 +13,6 @@ from pants.backend.openapi.lint.openapi_format.subsystem import (
 )
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import PartitionerType
-from pants.core.goals.resolves import ExportableTool
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
@@ -57,7 +56,6 @@ async def run_openapi_format(
 def rules():
     return [
         *collect_rules(),
-        *nodejs_tool.rules(),
+        *nodejs_tool.rules_for_tool(OpenApiFormatSubsystem),
         *OpenApiFormatRequest.rules(),
-        UnionRule(ExportableTool, OpenApiFormatSubsystem),
     ]

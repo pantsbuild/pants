@@ -7,6 +7,10 @@ python_sources(
     },
 )
 
+# Bundled lockfiles shipped for the `prettier` NodeJSToolBase subsystem (one per package manager).
+# To regenerate after a version bump (or initial creation):
+#   ./pants run build-support/bin/generate_builtin_lockfiles.py -- prettier
+# Or for all NodeJS tools at once: `... -- --all-nodejs`.
 resources(
     name="lockfiles",
     sources=["*.package-lock.json", "*.yarn.lock", "*.pnpm-lock.yaml"],

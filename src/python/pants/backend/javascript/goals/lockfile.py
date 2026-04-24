@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import json
 import os.path
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -23,7 +22,9 @@ from pants.backend.javascript.subsystems.nodejs import (
 )
 from pants.backend.javascript.subsystems.nodejs_tool import (
     NodeJSToolBase,
+    _lockfile_dest_for_resource,
     _parse_package_name_and_version,
+    _tool_package_json_bytes,
 )
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
@@ -138,9 +139,6 @@ async def generate_lockfile_from_package_jsons(
     return GenerateLockfileResult(output_digest, request.resolve_name, request.lockfile_dest)
 
 
-# --- NodeJS tool lockfile generation ---
-
-
 @dataclass(frozen=True)
 class GenerateNodeJSToolLockfile(GenerateLockfile):
     package: str
@@ -209,10 +207,8 @@ async def setup_nodejs_tool_lockfile_requests(
             continue
         lockfile_resources = tool_cls.default_lockfile_resources
         if lockfile_resources and pkg_manager.name in lockfile_resources:
-            _pkg, filename = lockfile_resources[pkg_manager.name]
-            lockfile_pkg = _pkg.replace(".", os.path.sep)
-            # This path assumes the Pants repo layout (src/python/...) for in-repo lockfile generation.
-            lockfile_dest = os.path.join("src", "python", lockfile_pkg, filename)
+            resource_pkg, filename = lockfile_resources[pkg_manager.name]
+            lockfile_dest = _lockfile_dest_for_resource(resource_pkg, filename)
         else:
             lockfile_dest = f"{name}.{pkg_manager.lockfile_name}"
 
@@ -234,17 +230,17 @@ async def generate_nodejs_tool_lockfile(
 ) -> GenerateLockfileResult:
     package_name, package_version = _parse_package_name_and_version(request.package)
 
-    package_json = json.dumps(
-        {
-            "name": f"pants-tool-{request.resolve_name}",
-            "private": True,
-            "dependencies": {package_name: package_version},
-        },
-        indent=2,
-    ).encode()
-
     input_digest = await create_digest(
-        CreateDigest([FileContent("package.json", package_json)]),
+        CreateDigest(
+            [
+                FileContent(
+                    "package.json",
+                    _tool_package_json_bytes(
+                        request.resolve_name, package_name, package_version
+                    ),
+                )
+            ]
+        ),
         **implicitly(),
     )
 

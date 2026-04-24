@@ -324,11 +324,6 @@ def test_generates_lockfile_for_yarn_package_json_workspace(rule_runner: RuleRun
     )
 
 
-# ---------------------------------------------------------------------------
-# NodeJS tool lockfile generation (NodeJSToolBase with default_lockfile_resources).
-# ---------------------------------------------------------------------------
-
-
 class _CowsayLockedTool(NodeJSToolBase):
     options_scope = "cowsay-locked"
     name = "CowsayLocked"
@@ -357,14 +352,6 @@ def nodejs_tool_lockfile_rule_runner() -> RuleRunner:
 def test_generate_nodejs_tool_lockfile_end_to_end(
     nodejs_tool_lockfile_rule_runner: RuleRunner,
 ) -> None:
-    """Covers the three lockfile rules for a NodeJSToolBase with default_lockfile_resources:
-
-    - `determine_nodejs_tool_resolves` discovers the tool's resolve name.
-    - `setup_nodejs_tool_lockfile_requests` targets the tool's source directory as
-      `lockfile_dest`.
-    - `generate_nodejs_tool_lockfile` produces a digest with the file relocated to
-      `lockfile_dest` (not at the digest root).
-    """
     nodejs_tool_lockfile_rule_runner.set_options(
         [
             "--nodejs-package-managers={'npm': '11.6.2'}",

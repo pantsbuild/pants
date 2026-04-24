@@ -350,16 +350,20 @@ def test_parse_package_name_and_version():
     assert _parse_package_name_and_version("pyright@1.1.396") == ("pyright", "1.1.396")
 
 
-def test_lockfile_required_enforcement():
-    class ToolWithoutLockfile(NodeJSToolBase):
-        options_scope = "no_lockfile_tool"
-        name = "NoLockfileTool"
+def test_default_lockfile_resources_auto_derived():
+    class _AutoDerivedTool(NodeJSToolBase):
+        options_scope = "auto-derived-tool"
+        name = "AutoDerivedTool"
         default_version = "some-tool@1.0.0"
-        help = "A tool without lockfile resources"
+        help = "A tool that relies on the derived-by-convention default_lockfile_resources"
 
-    with pytest.raises(ValueError, match="default_lockfile_resources"):
-        # The __init__ check fires before Subsystem machinery, so it can be driven directly.
-        ToolWithoutLockfile.__init__(ToolWithoutLockfile)
+    # `__init_subclass__` should populate `default_lockfile_resources` from the subclass's module
+    # and `options_scope`.
+    assert _AutoDerivedTool.default_lockfile_resources == {
+        "npm": ("pants.backend.javascript.subsystems", "auto-derived-tool.package-lock.json"),
+        "yarn": ("pants.backend.javascript.subsystems", "auto-derived-tool.yarn.lock"),
+        "pnpm": ("pants.backend.javascript.subsystems", "auto-derived-tool.pnpm-lock.yaml"),
+    }
 
 
 def test_lockfile_required_false_allows_no_resources():
