@@ -29,6 +29,8 @@ from pants.backend.javascript.subsystems.nodejs import (
     NodeJSToolProcess,
     setup_node_tool_process,
 )
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
+from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import CreateDigest, FileContent, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.intrinsics import (
@@ -40,8 +42,6 @@ from pants.engine.intrinsics import (
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
-from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
-from pants.core.goals.resolves import ExportableTool
 from pants.option.option_types import StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
@@ -330,9 +330,7 @@ async def install_nodejs_tool_from_bundled_lockfile(
     return _NodeJSBundledToolInstalled(digest=install_result.output_digest)
 
 
-async def _run_tool_with_bundled_lockfile(
-    request: NodeJSToolRequest, nodejs: NodeJS
-) -> Process:
+async def _run_tool_with_bundled_lockfile(request: NodeJSToolRequest, nodejs: NodeJS) -> Process:
     pkg_manager = _active_package_manager(nodejs, request.binary_name)
 
     if request.lockfile == DEFAULT_TOOL_LOCKFILE:
@@ -345,7 +343,7 @@ async def _run_tool_with_bundled_lockfile(
                 softwrap(
                     f"""
                     No bundled lockfile for package manager '{pkg_manager.name}' in tool
-                    '{request.options_scope}'. Available: {', '.join(request.default_lockfile_resources.keys())}.
+                    '{request.options_scope}'. Available: {", ".join(request.default_lockfile_resources.keys())}.
                     """
                 )
             )
@@ -363,6 +361,7 @@ async def _run_tool_with_bundled_lockfile(
 
     package_name, package_version = _parse_package_name_and_version(request.package)
 
+    assert pkg_manager.version is not None
     installed = await install_nodejs_tool_from_bundled_lockfile(
         _NodeJSBundledToolInstallRequest(
             pkg_manager_name=pkg_manager.name,
@@ -377,9 +376,7 @@ async def _run_tool_with_bundled_lockfile(
         )
     )
 
-    execution_input = await merge_digests(
-        MergeDigests([request.input_digest, installed.digest])
-    )
+    execution_input = await merge_digests(MergeDigests([request.input_digest, installed.digest]))
 
     # Invoke the binary from node_modules/.bin directly rather than via `npx`/`pnpm run` so the
     # immutable lockfile install isn't repeated.

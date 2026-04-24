@@ -359,9 +359,7 @@ def test_generate_nodejs_tool_lockfile_end_to_end(
         ],
         env_inherit={"PATH"},
     )
-    lockfile_dest = (
-        "src/python/pants/backend/javascript/subsystems/cowsay.package-lock.json"
-    )
+    lockfile_dest = "src/python/pants/backend/javascript/subsystems/cowsay.package-lock.json"
 
     resolves = nodejs_tool_lockfile_rule_runner.request(
         KnownUserResolveNames, (KnownNodeJSToolResolveNamesRequest(),)

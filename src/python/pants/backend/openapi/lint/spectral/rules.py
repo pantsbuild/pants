@@ -20,7 +20,6 @@ from pants.engine.internals.graph import transitive_targets as transitive_target
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet, Target, TransitiveTargetsRequest
-from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 

@@ -29,8 +29,20 @@ from pants.backend.helm.subsystems.k8s_parser import HelmKubeParserSubsystem
 from pants.backend.helm.subsystems.post_renderer import HelmPostRendererSubsystem
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
+from pants.backend.javascript.lint.prettier.subsystem import Prettier
+from pants.backend.javascript.package_manager import PackageManager
+from pants.backend.javascript.subsystems.nodejs import NodeJS
+from pants.backend.javascript.subsystems.nodejs_tool import (
+    NodeJSToolBase,
+    _lockfile_dest_for_resource,
+    _parse_package_name_and_version,
+    _tool_package_json_bytes,
+)
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.nfpm.native_libs.elfdeps.subsystem import Elfdeps
+from pants.backend.openapi.lint.openapi_format.subsystem import OpenApiFormatSubsystem
+from pants.backend.openapi.lint.spectral.subsystem import SpectralSubsystem
+from pants.backend.openapi.subsystems.redocly import Redocly
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingComma
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
@@ -53,23 +65,12 @@ from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.typecheck.pyright.subsystem import Pyright
 from pants.backend.python.typecheck.pytype.subsystem import Pytype
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff
-from pants.backend.javascript.lint.prettier.subsystem import Prettier
-from pants.backend.javascript.package_manager import PackageManager
-from pants.backend.javascript.subsystems.nodejs_tool import (
-    NodeJSToolBase,
-    _lockfile_dest_for_resource,
-    _parse_package_name_and_version,
-    _tool_package_json_bytes,
-)
-from pants.backend.openapi.lint.openapi_format.subsystem import OpenApiFormatSubsystem
-from pants.backend.openapi.lint.spectral.subsystem import SpectralSubsystem
-from pants.backend.openapi.subsystems.redocly import Redocly
-from pants.backend.python.typecheck.pyright.subsystem import Pyright
 from pants.backend.terraform.dependency_inference import TerraformHcl2Parser
 from pants.backend.tools.semgrep.subsystem import SemgrepSubsystem
 from pants.backend.tools.yamllint.subsystem import Yamllint
@@ -336,7 +337,13 @@ def generate_nodejs_tool_lockfiles(
 ) -> None:
     cleanup_tmp = keep_sandboxes == KeepSandboxes.never
 
-    package_managers = [PackageManager.npm(None), PackageManager.yarn(None), PackageManager.pnpm(None)]
+    assert NodeJS.package_managers is not None
+    pm_versions: dict[str, str] = NodeJS.package_managers.kwargs["default"]
+    package_managers = [
+        PackageManager.npm(pm_versions["npm"]),
+        PackageManager.yarn(pm_versions["yarn"]),
+        PackageManager.pnpm(pm_versions["pnpm"]),
+    ]
     pants_repo_root = get_buildroot()
 
     for tool in tools:
@@ -352,8 +359,16 @@ def generate_nodejs_tool_lockfiles(
                 continue
 
             resource_pkg, resource_filename = lockfile_resources[pm.name]
-            dest = os.path.join(pants_repo_root, _lockfile_dest_for_resource(resource_pkg, resource_filename))
-            cmd = [pm.name, *pm.generate_lockfile_args, "--ignore-scripts"]
+            dest = os.path.join(
+                pants_repo_root, _lockfile_dest_for_resource(resource_pkg, resource_filename)
+            )
+            cmd = [
+                "npx",
+                "--yes",
+                f"{pm.name}@{pm.version}",
+                *pm.generate_lockfile_args,
+                "--ignore-scripts",
+            ]
 
             if dry_run:
                 logger.info(f"Would run: {' '.join(cmd)} -> {dest}")

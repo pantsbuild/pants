@@ -235,9 +235,7 @@ async def generate_nodejs_tool_lockfile(
             [
                 FileContent(
                     "package.json",
-                    _tool_package_json_bytes(
-                        request.resolve_name, package_name, package_version
-                    ),
+                    _tool_package_json_bytes(request.resolve_name, package_name, package_version),
                 )
             ]
         ),
