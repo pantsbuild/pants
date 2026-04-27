@@ -1397,21 +1397,26 @@ pub async fn make_execute_request(
             });
     }
 
-    let mut output_paths = req
-        .output_files
-        .iter()
-        .map(|p| {
-            p.to_str()
-                .map(str::to_owned)
-                .ok_or_else(|| format!("Non-UTF8 output file path: {p:?}"))
-        })
-        .chain(req.output_directories.iter().map(|p| {
-            p.to_str()
-                .map(str::to_owned)
-                .ok_or_else(|| format!("Non-UTF8 output directory path: {p:?}"))
-        }))
-        .collect::<Result<Vec<String>, String>>()?;
-    output_paths.sort();
+    let output_paths = {
+        let mut output_paths = req
+            .output_files
+            .iter()
+            .map(|p| {
+                p.to_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("Non-UTF8 output file path: {p:?}"))
+            })
+            .chain(req.output_directories.iter().map(|p| {
+                p.to_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("Non-UTF8 output directory path: {p:?}"))
+            }))
+            .collect::<Result<HashSet<String>, String>>()?
+            .into_iter()
+            .collect::<Vec<String>>();
+        output_paths.sort();
+        output_paths
+    };
     command.output_paths = output_paths;
 
     if let Some(working_directory) = &req.working_directory {
