@@ -52,6 +52,11 @@ def pnpm_project_test(request) -> TestProjectAndPackageManager:
     return cast(TestProjectAndPackageManager, request.param)
 
 
+@pytest.fixture(params=[("pnpm_member_dep", "pnpm")])
+def pnpm_member_dep_test(request) -> TestProjectAndPackageManager:
+    return cast(TestProjectAndPackageManager, request.param)
+
+
 def _create_rule_runner(package_manager: str) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
@@ -99,6 +104,14 @@ def pnpm_rule_runner(
     pnpm_project_test: TestProjectAndPackageManager,
 ) -> RuleRunnerWithProjectAndPackageManager:
     test_project, package_manager = pnpm_project_test
+    return _create_rule_runner(package_manager), test_project, package_manager
+
+
+@pytest.fixture
+def pnpm_member_dep_rule_runner(
+    pnpm_member_dep_test: TestProjectAndPackageManager,
+) -> RuleRunnerWithProjectAndPackageManager:
+    test_project, package_manager = pnpm_member_dep_test
     return _create_rule_runner(package_manager), test_project, package_manager
 
 
@@ -618,3 +631,34 @@ def test_check_javascript_disabled_via_tsconfig(
     assert len(results.results) == 1
     assert results.results[0].exit_code == 0
     assert "error.js" not in results.results[0].stdout
+
+
+def test_typescript_check_resolves_member_only_deps(
+    pnpm_member_dep_rule_runner: RuleRunnerWithProjectAndPackageManager,
+) -> None:
+    """Regression test: @types/node is declared only on the member, not the root.
+
+    Pre-fix, tsc ran from the workspace root and couldn't see member/node_modules,
+    so it failed with TS2304 (Cannot find name 'process').
+    """
+    rule_runner, test_project, _ = pnpm_member_dep_rule_runner
+    test_files = _load_project_test_files(test_project)
+    rule_runner.write_files(test_files)
+
+    target = rule_runner.get_target(
+        Address(
+            f"{test_project}/member/src",
+            target_name="ts_sources",
+            relative_file_path="node_types.ts",
+        )
+    )
+    field_set = TypeScriptCheckFieldSet.create(target)
+    request = TypeScriptCheckRequest([field_set])
+    results = rule_runner.request(CheckResults, [request])
+
+    assert len(results.results) == 1
+    result = results.results[0]
+    assert result.exit_code == 0, (
+        f"TypeScript check failed — member node_modules likely missing from sandbox:\n"
+        f"{result.stdout}\n{result.stderr}"
+    )
