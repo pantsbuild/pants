@@ -31,7 +31,7 @@ jobs:
       - run: npm install ./build-support/cherry_pick
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           script: |
@@ -116,7 +116,7 @@ jobs:
         uses: actions/checkout@v6
       - run: npm install ./build-support/cherry_pick
       - name: Run Script
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           script: |
