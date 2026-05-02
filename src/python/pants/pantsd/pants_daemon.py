@@ -58,6 +58,9 @@ _PRESERVED_ENV_VARS = [
     "http_proxy",  # for historical reasons, in some environments, *_proxy variables must be lowercase
     "https_proxy",
     "no_proxy",
+    # Used by indicatif.
+    "TERM",
+    "NO_COLOR",
 ]
 
 
