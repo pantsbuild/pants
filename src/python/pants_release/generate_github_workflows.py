@@ -1804,42 +1804,6 @@ def public_repos() -> PublicReposOutput:
     return PublicReposOutput(jobs=jobs, inputs=inputs, run_name=run_name)
 
 
-def clear_self_hosted_persistent_caches_jobs() -> Jobs:
-    jobs = {}
-
-    for platform in sorted(SELF_HOSTED, key=lambda p: p.value):
-        helper = Helper(platform)
-
-        clear_steps = [
-            {
-                "name": f"Deleting {directory}",
-                # squash all errors: this is a best effort thing, so, for instance, it's fine if
-                # there's directories hanging around that this workflow doesn't have permission to
-                # delete
-                "run": f"du -sh {directory} || true; rm -rf {directory} || true",
-            }
-            for directory in [
-                # not all of these will necessarily exist (e.g. ~/Library/Caches is macOS-specific),
-                # but the script is resilient to this
-                "~/Library/Caches",
-                "~/.cache",
-                "~/.nce",
-                "~/.rustup",
-                "~/.pex",
-            ]
-        ]
-        jobs[helper.job_name("clean")] = {
-            "runs-on": helper.runs_on(),
-            "steps": [
-                {"name": "df before", "run": "df -h"},
-                *clear_steps,
-                {"name": "df after", "run": "df -h"},
-            ],
-        }
-
-    return jobs
-
-
 # ----------------------------------------------------------------------
 # Telemetry
 # ----------------------------------------------------------------------
@@ -2049,23 +2013,11 @@ def generate() -> dict[Path, str]:
         },
     )
 
-    clear_self_hosted_persistent_caches = clear_self_hosted_persistent_caches_jobs()
-    clear_self_hosted_persistent_caches_yaml = render_workflow(
-        {
-            "name": "Clear persistent caches on long-lived self-hosted runners",
-            "on": {"workflow_dispatch": {}},
-            "jobs": clear_self_hosted_persistent_caches,
-        }
-    )
-
     return {
         Path(".github/workflows/cache_comparison.yaml"): cache_comparison_yaml,
         Path(".github/workflows/test.yaml"): test_yaml,
         Path(".github/workflows/release.yaml"): release_yaml,
         Path(".github/workflows/public_repos.yaml"): public_repos_yaml,
-        Path(
-            ".github/workflows/clear_self_hosted_persistent_caches.yaml"
-        ): clear_self_hosted_persistent_caches_yaml,
     }
 
 

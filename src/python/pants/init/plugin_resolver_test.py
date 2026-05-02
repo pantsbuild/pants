@@ -183,6 +183,7 @@ def plugin_resolution(
     requirements: Iterable[str] = (),
     sdist: bool = True,
     existing_distributions: Sequence[MockDistribution] = (),
+    available_distributions: Sequence[Plugin] = (),
     inherit_existing_constraints: bool = False,
     use_pypi: bool = False,
 ):
@@ -246,6 +247,11 @@ def plugin_resolution(
                 _create_artifact(plugin.name, version, plugin.install_requires)
             env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
 
+            for distribution in available_distributions:
+                _create_artifact(
+                    distribution.name, distribution.version, distribution.install_requires
+                )
+
             for requirement in tuple(requirements):
                 r = Requirement(requirement)
                 assert len(r.specifier) == 1, (
@@ -273,6 +279,7 @@ def plugin_resolution(
         site_packages_path = Path(root_dir, "site-packages")
         for dist in existing_distributions:
             dist.create(site_packages_path)
+            _create_artifact(dist.name, str(dist.version), [])
         if existing_distributions:
             sys.path.insert(0, str(site_packages_path))
 
@@ -340,23 +347,25 @@ def test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
 
 
 def test_range_deps(rule_runner: RuleRunner) -> None:
-    # Test that when a plugin has a range dependency, specifying a working set constrains
-    # to a particular version that is compatible with the active Pants lock/PYTHONPATH.
+    # Test that when a plugin has a range dependency, the active sys.path constrains the
+    # resolve to the already-loaded version rather than the highest available version.
     with plugin_resolution(
         rule_runner,
-        plugins=[Plugin("jane", "3.4.5", ["requests>=2.25.1,<3"])],
-        existing_distributions=[MockDistribution(name="requests", version=Version("2.32.5"))],
+        plugins=[Plugin("jane", "3.4.5", ["testdep>=1,<3"])],
+        existing_distributions=[MockDistribution(name="testdep", version=Version("2.0.0"))],
+        available_distributions=[Plugin("testdep", "2.1.0")],
         inherit_existing_constraints=True,
-        # Because we're resolving real distributions, we enable access to pypi.
-        use_pypi=True,
     ) as (
-        _,
+        plugin_paths,
         _,
         _,
         _,
     ):
-        dist = importlib.metadata.distribution("requests")
-        assert "2.32.5" == dist.version
+        dists = {
+            canonicalize_name(dist.name): dist.version
+            for dist in importlib.metadata.distributions(path=plugin_paths)
+        }
+        assert dists[canonicalize_name("testdep")] == "2.0.0"
 
 
 @skip_unless_python38_and_python39_present
