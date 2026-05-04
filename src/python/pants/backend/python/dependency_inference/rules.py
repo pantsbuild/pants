@@ -74,8 +74,8 @@ from pants.engine.unions import UnionRule
 from pants.source.source_root import (
     SourceRootRequest,
     SourceRootsRequest,
+    get_optional_source_roots,
     get_source_root,
-    get_source_roots,
 )
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
@@ -504,11 +504,14 @@ async def infer_python_dependencies_via_source(
         deleted_files: DeletedFiles = await get_deleted_files(**implicitly())
         deleted_python_files = tuple(f for f in deleted_files.paths if f.endswith((".py", ".pyi")))
         if deleted_python_files:
-            source_roots_result = await get_source_roots(
+            source_roots_result = await get_optional_source_roots(
                 SourceRootsRequest.for_files(deleted_python_files)
             )
+            # We drop files not under a source root, since they can't be used for import anyway.
             stripped_deleted_python_files = tuple(
-                f.relative_to(root.path) for f, root in source_roots_result.path_to_root.items()
+                f.relative_to(opt_root.source_root.path)
+                for f, opt_root in source_roots_result.path_to_optional_root.items()
+                if opt_root.source_root
             )
             deleted_modules = tuple(
                 module_from_stripped_path(f) for f in stripped_deleted_python_files
