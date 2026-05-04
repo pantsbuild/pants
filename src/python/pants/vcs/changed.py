@@ -122,14 +122,20 @@ class ChangedOptions:
     def changed_files(self, git_worktree: GitWorktree) -> set[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:
-            return git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
+            return {
+                cf.path
+                for cf in git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
+            }
 
         changes_since = self.since or git_worktree.current_rev_identifier
-        return git_worktree.changed_files(
-            from_commit=changes_since,
-            include_untracked=True,
-            relative_to=get_buildroot(),
-        )
+        return {
+            cf.path
+            for cf in git_worktree.changed_files(
+                from_commit=changes_since,
+                include_untracked=True,
+                relative_to=get_buildroot(),
+            )
+        }
 
     def diff_hunks(
         self, git_worktree: GitWorktree, paths: Iterable[str]

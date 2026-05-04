@@ -20,6 +20,7 @@ from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException,
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
+from pants.vcs.change import ChangedFile, ChangeType
 from pants.vcs.hunk import Hunk, TextBlock
 
 logger = logging.getLogger(__name__)
@@ -83,28 +84,33 @@ class GitWorktree(EngineAwareReturnType):
         from_commit: str | None = None,
         include_untracked: bool = False,
         relative_to: PurePath | str | None = None,
-    ) -> set[str]:
+    ) -> set[ChangedFile]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         rel_suffix = ["--", str(relative_to)]
+
+        files: dict[str, ChangeType] = {}
+
         uncommitted_changes = self._git_binary._invoke_unsandboxed(
             self._create_git_cmdline(
-                ["diff", "--name-only", "HEAD"] + rel_suffix,
+                ["diff", "--name-status", "--no-renames", "HEAD"] + rel_suffix,
             )
         )
+        files.update(self._parse_name_status(uncommitted_changes))
 
-        files = set(uncommitted_changes.decode().splitlines())
         if from_commit:
             # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
             # the changes that have occurred on the current branch.
             committed_cmd = [
                 "diff",
-                "--name-only",
+                "--name-status",
+                "--no-renames",
                 from_commit + "...HEAD",
             ] + rel_suffix
             committed_changes = self._git_binary._invoke_unsandboxed(
                 self._create_git_cmdline(committed_cmd)
             )
-            files.update(committed_changes.decode().splitlines())
+            files.update(self._parse_name_status(committed_changes))
+
         if include_untracked:
             untracked_cmd = [
                 "ls-files",
@@ -115,9 +121,36 @@ class GitWorktree(EngineAwareReturnType):
             untracked = self._git_binary._invoke_unsandboxed(
                 self._create_git_cmdline(untracked_cmd)
             )
-            files.update(untracked.decode().splitlines())
+            files.update(
+                {path: ChangeType.ADDED for path in untracked.decode().splitlines() if path}
+            )
+
         # git will report changed files relative to the worktree: re-relativize to relative_to
-        return {self._fix_git_relative_path(f, relative_to) for f in files}
+        return {
+            ChangedFile(
+                path=self._fix_git_relative_path(path, relative_to),
+                change_type=change_type,
+            )
+            for path, change_type in files.items()
+        }
+
+    @staticmethod
+    def _parse_name_status(output: bytes) -> dict[str, ChangeType]:
+        """Parse `git diff --name-status` output into a dict of path -> ChangeType."""
+        result = {}
+        for line in output.decode().splitlines():
+            if not line:
+                continue
+            status, _, path = line.partition("\t")
+            letter = status[0].upper() if status else "M"
+            try:
+                change_type = ChangeType(letter)
+            except ValueError:
+                # Git may report various other esoteric statuses.
+                # We treat anything that isn't A, D or M as if it were M.
+                change_type = ChangeType.MODIFIED
+            result[path] = change_type
+        return result
 
     def changed_files_lines(
         self,
@@ -175,15 +208,19 @@ class GitWorktree(EngineAwareReturnType):
         """Run unsandboxed git diff command and parse the diff."""
         return self._diff_parser.parse_unified_diff(self._git("diff", *args))
 
-    def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
+    def changes_in(
+        self, diffspec: str, relative_to: PurePath | str | None = None
+    ) -> set[ChangedFile]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
-        cmd = ["diff-tree", "--no-commit-id", "--name-only", "-r", diffspec]
-        files = (
-            self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd))
-            .decode()
-            .splitlines()
-        )
-        return {self._fix_git_relative_path(f.strip(), relative_to) for f in files}
+        cmd = ["diff-tree", "--no-commit-id", "--name-status", "--no-renames", "-r", diffspec]
+        output = self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd))
+        return {
+            ChangedFile(
+                path=self._fix_git_relative_path(path, relative_to),
+                change_type=change_type,
+            )
+            for path, change_type in self._parse_name_status(output).items()
+        }
 
     def _create_git_cmdline(self, args: Iterable[str]) -> list[str]:
         return [f"--git-dir={self._gitdir}", f"--work-tree={self.worktree}", *args]
