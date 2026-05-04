@@ -198,6 +198,8 @@ class DeletedFiles:
 @rule
 async def get_deleted_files(changed: Changed) -> DeletedFiles:
     changed_options = ChangedOptions.from_options(changed.options)
+    if not changed_options.provided:
+        return DeletedFiles(tuple())
     maybe_git_worktree = await get_git_worktree(GitWorktreeRequest(), **implicitly())
     if maybe_git_worktree.git_worktree:
         deleted_files = tuple(
