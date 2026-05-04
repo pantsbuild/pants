@@ -32,18 +32,15 @@ from pants.backend.python.target_types import (
     PythonResolveField,
     PythonSourceField,
 )
-from pants.core.target_types import DeletedSources, DeletedTarget
 from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
-from pants.engine.internals.build_files import DELETED_ADDRESS
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import AllTargets, Target
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
-from pants.vcs.changed import DeletedFiles, get_deleted_files
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +83,6 @@ def module_from_stripped_path(path: PurePath) -> str:
 class AllPythonTargets:
     first_party: tuple[Target, ...]
     third_party: tuple[Target, ...]
-    # Set this if using `--changed-since` and there are deleted files.
-    # Downstream code can use this to
-    deleted: DeletedTarget | None
 
 
 @rule(desc="Find all Python targets in project", level=LogLevel.DEBUG)
@@ -101,12 +95,7 @@ async def find_all_python_targets(all_targets: AllTargets) -> AllPythonTargets:
         if tgt.has_field(PythonRequirementsField):
             third_party.append(tgt)
 
-    deleted_files: DeletedFiles = await get_deleted_files(**implicitly())
-    deleted_tgt = None
-    if deleted_files:
-        deleted_tgt = DeletedTarget({DeletedSources.alias: deleted_files.paths}, DELETED_ADDRESS)
-
-    return AllPythonTargets(tuple(sorted(first_party)), tuple(sorted(third_party)), deleted_tgt)
+    return AllPythonTargets(tuple(sorted(first_party)), tuple(sorted(third_party)))
 
 
 # -----------------------------------------------------------------------------------------------
