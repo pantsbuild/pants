@@ -122,7 +122,7 @@ class GitWorktree(EngineAwareReturnType):
                 self._create_git_cmdline(untracked_cmd)
             )
             files.update(
-                {path: ChangeType.Added for path in untracked.decode().splitlines() if path}
+                {path: ChangeType.ADDED for path in untracked.decode().splitlines() if path}
             )
 
         # git will report changed files relative to the worktree: re-relativize to relative_to
@@ -148,7 +148,7 @@ class GitWorktree(EngineAwareReturnType):
             except ValueError:
                 # Git may report various other esoteric statuses.
                 # We treat anything that isn't A, D or M as if it were M.
-                change_type = ChangeType.Modified
+                change_type = ChangeType.MODIFIED
             result[path] = change_type
         return result
 

@@ -8,9 +8,9 @@ from enum import Enum
 
 
 class ChangeType(Enum):
-    Added = "A"
-    Deleted = "D"
-    Modified = "M"
+    ADDED = "A"
+    DELETED = "D"
+    MODIFIED = "M"
 
 
 @dataclass(frozen=True)
