@@ -359,7 +359,7 @@ class LoaderTest(unittest.TestCase):
             with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
                 backends = [backend_module]
                 build_configuration = load_backends_and_plugins(
-                    plugins, backends, bc_builder=self.bc_builder
+                    plugins, backends, pants_ng=False, bc_builder=self.bc_builder
                 )
             # The backend should load first, then the plugins, therefore the alias registered in
             # the plugin will override the alias registered by the backend
