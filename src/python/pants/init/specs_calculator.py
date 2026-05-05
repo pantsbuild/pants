@@ -11,6 +11,7 @@ from pants.core.environments.rules import determine_bootstrap_environment
 from pants.core.util_rules.system_binaries import GitBinary
 from pants.engine.addresses import AddressInput
 from pants.engine.environment import EnvironmentName
+from pants.engine.internals.build_files import DELETED_ADDRESS
 from pants.engine.internals.graph import FilesWithSourceBlocks
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
@@ -111,14 +112,16 @@ def calculate_specs(
     address_literal_specs = []
     for address in cast(ChangedAddresses, changed_addresses):
         address_input = AddressInput.parse(address.spec, description_of_origin="`--changed-since`")
-        address_literal_specs.append(
-            AddressLiteralSpec(
-                path_component=address_input.path_component,
-                target_component=address_input.target_component,
-                generated_component=address_input.generated_component,
-                parameters=FrozenDict(address_input.parameters),
+        # The pseudo-target has done its job, but we don't want to actually see it downstream.
+        if address != DELETED_ADDRESS:
+            address_literal_specs.append(
+                AddressLiteralSpec(
+                    path_component=address_input.path_component,
+                    target_component=address_input.target_component,
+                    generated_component=address_input.generated_component,
+                    parameters=FrozenDict(address_input.parameters),
+                )
             )
-        )
 
     return Specs(
         includes=RawSpecs(
