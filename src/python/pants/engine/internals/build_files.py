@@ -36,7 +36,12 @@ from pants.engine.internals.dep_rules import (
     DependencyRuleApplication,
     MaybeBuildFileDependencyRulesImplementation,
 )
-from pants.engine.internals.mapper import AddressFamily, AddressMap, DuplicateNameError
+from pants.engine.internals.mapper import (
+    DELETED_SPEC_PATH,
+    AddressFamily,
+    AddressMap,
+    DuplicateNameError,
+)
 from pants.engine.internals.parser import (
     BuildFilePreludeSymbols,
     BuildFileSymbolsInfo,
@@ -65,6 +70,24 @@ from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+# Singleton for use as a reference to the DeletedTarget pseudo-target.
+# A backend can inject a dependency on DELETED_ADDRESS if it is capable of detecting
+# (via naming conventions) that a file depends on some other, deleted file.
+# The generic change detection mechanism will use that dependency to include the
+# files in the transitive closure of dependents of changed files.
+# This is somewhat limited - the backend doesn't get the content of the deleted file,
+# and so cannot use it in the regular inference pipeline.
+#
+# This is not the most elegant solution, but the legacy design of dep inference and of
+# change detection does not admit a simple one.
+#
+# A more global solution, that doesn't rely on backend specifics, would be to capture the
+# state of the repo before and after the changes and apply dep inference to both.
+# However that is a very substantial change from the status quo, so for now this
+# incremental improvement will suffice.
+DELETED_ADDRESS = Address(DELETED_SPEC_PATH)
 
 
 class BuildFileSyntaxError(SyntaxError):
@@ -168,6 +191,8 @@ async def get_all_build_file_symbols_info(
 
 @rule
 async def maybe_resolve_address(address_input: AddressInput) -> MaybeAddress:
+    if address_input.path_component == DELETED_ADDRESS.spec_path:
+        return MaybeAddress(DELETED_ADDRESS)
     # Determine the type of the path_component of the input.
     if address_input.path_component:
         paths = await path_globs_to_paths(PathGlobs(globs=(address_input.path_component,)))
@@ -225,6 +250,11 @@ class OptionalAddressFamily:
         if self.address_family is not None:
             return self.address_family
         raise ResolveError(f"Directory '{self.path}' does not contain any BUILD files.")
+
+
+_DELETED_OPTIONAL_ADDRESS_FAMILY = OptionalAddressFamily(
+    DELETED_ADDRESS.spec_path, AddressFamily.create(DELETED_ADDRESS.spec_path, [])
+)
 
 
 @rule
@@ -293,6 +323,9 @@ async def parse_address_family(
 
     The AddressFamily may be empty, but it will not be None.
     """
+    if directory.path == _DELETED_OPTIONAL_ADDRESS_FAMILY.path:
+        return _DELETED_OPTIONAL_ADDRESS_FAMILY
+
     digest_contents, all_synthetic_address_maps = await concurrently(
         get_digest_contents(
             **implicitly(
