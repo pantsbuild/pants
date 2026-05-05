@@ -525,8 +525,6 @@ class ResolveConfig:
     def validate_for_uv(self, resolve_name: str) -> None:
         """Raise if any pex-specific resolve options are set that have no uv equivalent."""
         pex_specific: list[str] = []
-        if self.manylinux:
-            pex_specific.append("`[python].resolves_to_constraints_file`")
         if self.constraints_file:
             pex_specific.append("`[python].resolves_to_constraints_file`")
         if self.complete_platforms:
