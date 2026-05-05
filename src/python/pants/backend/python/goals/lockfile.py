@@ -44,7 +44,6 @@ from pants.core.goals.generate_lockfiles import (
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
-    WrappedGenerateLockfile,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.lockfile_metadata import calculate_invalidation_digest
