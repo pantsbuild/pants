@@ -6,12 +6,14 @@ from __future__ import annotations
 import itertools
 import json
 import logging
+import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from packaging.version import Version, parse
 
+from pants.backend.python.util_rules.lockfile_metadata import LockfileFormat
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfileRequest,
     Lockfile,
@@ -68,44 +70,87 @@ def _pex_lockfile_requirements(
     return LockfilePackages(requirements)
 
 
-async def _parse_lockfile(lockfile: Lockfile) -> FrozenDict[str, Any] | None:
+def _uv_lockfile_requirements(
+    lockfile_data: Mapping[str, Any] | None, path: str | None = None
+) -> LockfilePackages:
+    if not lockfile_data:
+        return LockfilePackages({})
+
+    requirements = {}
+    for pkg in lockfile_data.get("package", []):
+        try:
+            name = pkg["name"]
+            version = pkg.get("version")
+            # Skip the synthetic virtual package, it's not interesting in diffs.
+            if version is not None and not name.startswith("pants-lockfile-for-"):
+                requirements[PackageName(name)] = PythonRequirementVersion.parse(version)
+        except Exception as e:
+            if path:
+                logger.warning(f"{path}: Failed to parse package entry in lockfile: {e}")
+
+    return LockfilePackages(requirements)
+
+
+def _parse_lockfile_packages(
+    content: bytes, lockfile_format: LockfileFormat, path: str | None = None
+) -> LockfilePackages:
+    """Parse the packages from lockfile content according to its format."""
     try:
-        loaded = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
-        fc = await get_digest_contents(loaded.lockfile_digest)
-        parsed = await _parse_lockfile_content(next(iter(fc)).content, lockfile.url)
-        return parsed
-    except EngineError:
-        # May fail in case the file doesn't exist, which is expected when parsing the "old" lockfile
-        # the first time a new lockfile is generated.
-        return None
+        match lockfile_format:
+            case LockfileFormat.PEX:
+                # strip_comments_from_pex_json_lockfile is idempotent, so safe to call on
+                # already-stripped content (e.g. when content was loaded via load_lockfile).
+                stripped = strip_comments_from_pex_json_lockfile(content)
+                data = FrozenDict.deep_freeze(json.loads(stripped))
+                return _pex_lockfile_requirements(data, path)
+            case LockfileFormat.UV:
+                data = FrozenDict.deep_freeze(tomllib.loads(content.decode()))
+                return _uv_lockfile_requirements(data, path)
+            case LockfileFormat.CONSTRAINTS_DEPRECATED:
+                # These can't meaningfully be diffed.
+                return LockfilePackages({})
+            case _:
+                raise ValueError(f"Unrecognized lockfile format: {lockfile_format}")
+    except Exception as e:
+        if path:
+            logger.debug(f"{path}: Failed to parse lockfile contents: {e}")
+        return LockfilePackages({})
 
 
-async def _parse_lockfile_content(content: bytes, url: str) -> FrozenDict[str, Any] | None:
-    try:
-        parsed_lockfile = json.loads(content)
-        return FrozenDict.deep_freeze(parsed_lockfile)
-    except json.JSONDecodeError as e:
-        logger.debug(f"{url}: Failed to parse lockfile contents: {e}")
-        return None
-
-
-async def _generate_python_lockfile_diff(
-    digest: Digest, resolve_name: str, path: str
+async def _generate_lockfile_diff(
+    digest: Digest, resolve_name: str, path: str, new_format: LockfileFormat
 ) -> LockfileDiff:
+    """Generate a diff between the newly generated lockfile and the existing one on disk.
+
+    Handles all combinations of old vs. new and pex vs. uv lockfile formats.
+    """
     new_digest_contents = await get_digest_contents(digest)
     new_content = next(c for c in new_digest_contents if c.path == path).content
-    new_content = strip_comments_from_pex_json_lockfile(new_content)
-    new = await _parse_lockfile_content(new_content, path)
-    old = await _parse_lockfile(
-        Lockfile(
-            url=path,
-            url_description_of_origin="existing lockfile",
-            resolve_name=resolve_name,
+    new_packages = _parse_lockfile_packages(new_content, new_format, path)
+
+    old_packages = LockfilePackages({})
+    try:
+        loaded = await load_lockfile(
+            LoadedLockfileRequest(
+                Lockfile(
+                    url=path,
+                    url_description_of_origin="existing lockfile",
+                    resolve_name=resolve_name,
+                )
+            ),
+            **implicitly(),
         )
-    )
+        old_content_entries = await get_digest_contents(loaded.lockfile_digest)
+        old_content = next(iter(old_content_entries)).content
+        old_packages = _parse_lockfile_packages(old_content, loaded.lockfile_format, path)
+    except EngineError:
+        # May fail if the file doesn't exist, which is expected the first time a new lockfile
+        # is generated.
+        pass
+
     return LockfileDiff.create(
         path=path,
         resolve_name=resolve_name,
-        old=_pex_lockfile_requirements(old),
-        new=_pex_lockfile_requirements(new, path),
+        old=old_packages,
+        new=new_packages,
     )

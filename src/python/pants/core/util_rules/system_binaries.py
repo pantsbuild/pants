@@ -306,6 +306,10 @@ class BashBinary(BinaryPath):
     DEFAULT_SEARCH_PATH = SearchPath(("/usr/bin", "/bin", "/usr/local/bin"))
 
 
+class RealpathBinary(BinaryPath):
+    pass
+
+
 # Note that updating this will impact the `archive` target defined in `core/target_types.py`.
 class ArchiveFormat(Enum):
     TAR = "tar"
@@ -816,6 +820,18 @@ async def create_binary_shims(
     cache_name = f"_binary_shims_{digest.fingerprint}"
 
     return BinaryShims(digest, cache_name)
+
+
+@rule(desc="Finding the `realpath` binary", level=LogLevel.DEBUG)
+async def find_realpath(
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
+) -> RealpathBinary:
+    request = BinaryPathRequest(
+        binary_name="realpath", search_path=system_binaries.system_binary_paths
+    )
+    paths = await find_binary(request, **implicitly())
+    first_path = paths.first_path_or_raise(request, rationale="realpath file")
+    return RealpathBinary(first_path.path, first_path.fingerprint)
 
 
 @rule(desc="Finding the `awk` binary", level=LogLevel.DEBUG)

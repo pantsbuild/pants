@@ -3,16 +3,22 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+from typing import ClassVar
 
 from pants.core.util_rules.external_tool import (
     TemplatedExternalTool,
     download_external_tool,
 )
 from pants.engine.fs import Digest
+from pants.engine.internals.native_engine import FrozenDict
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
-from pants.option.option_types import ArgsListOption
+from pants.option.option_types import StrListOption
+from pants.option.subsystem import Subsystem
+from pants.util.memo import memoized_property
+from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import softwrap
 
 
@@ -42,28 +48,60 @@ class Uv(TemplatedExternalTool):
         platform = self.default_url_platform_mapping[plat.value]
         return f"./uv-{platform}/uv"
 
-    args_for_uv_pip_install = ArgsListOption(
-        tool_name="uv",
-        example="--index-strategy unsafe-first-match",
-        extra_help=softwrap(
-            """
-            Additional arguments to pass to `uv pip install` invocations.
+    class EnvironmentAware(Subsystem.EnvironmentAware):
+        env_vars_used_by_options = ("PATH",)
 
-            Used when `[python].pex_builder = "uv"` to pass extra flags to the
-            `uv pip install` step (e.g. `--index-url`, `--extra-index-url`).
-            These are NOT passed to the `uv venv` step.
-            """
-        ),
-    )
+        _executable_search_paths = StrListOption(
+            default=["<PATH>"],
+            help=softwrap(
+                """
+                The PATH value that will be used by the uv subprocess and any subprocesses it
+                spawns.
+
+                The special string `"<PATH>"` will expand to the contents of the PATH env var.
+                """
+            ),
+            advanced=True,
+            metavar="<binary-paths>",
+        )
+
+        @memoized_property
+        def path(self) -> tuple[str, ...]:
+            def iter_path_entries():
+                for entry in self._executable_search_paths:
+                    if entry == "<PATH>":
+                        path = self._options_env.get("PATH")
+                        if path:
+                            yield from path.split(os.pathsep)
+                    else:
+                        yield entry
+
+            return tuple(OrderedSet(iter_path_entries()))
 
 
 @dataclass(frozen=True)
 class DownloadedUv:
-    """The downloaded uv binary with user-configured args."""
-
     digest: Digest
     exe: str
-    args_for_uv_pip_install: tuple[str, ...]
+
+    # The relpath to the named_cache inside the sandbox.
+    cache_dir: ClassVar[str] = ".cache/uv_cache/"
+
+    # Initial command line args for all invocations of this uv.
+    # Callers will want to add further args for specific invocations.
+    def args(self) -> tuple[str, ...]:
+        return (
+            self.exe,
+            # --no-config suppresses user and host config discovery.
+            "--no-config",
+            # --config-file forces use of our generated uv.toml instead.
+            "--config-file=uv.toml",
+            f"--cache-dir={self.cache_dir}",
+        )
+
+    @classmethod
+    def append_only_caches(cls) -> FrozenDict[str, str]:
+        return FrozenDict({"uv_cache": cls.cache_dir})
 
 
 @rule
@@ -72,7 +110,6 @@ async def download_uv_binary(uv: Uv, platform: Platform) -> DownloadedUv:
     return DownloadedUv(
         digest=downloaded.digest,
         exe=downloaded.exe,
-        args_for_uv_pip_install=tuple(uv.args_for_uv_pip_install),
     )
 
 

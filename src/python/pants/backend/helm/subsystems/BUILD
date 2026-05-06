@@ -16,7 +16,7 @@ python_sources(
     skip_mypy=True,
 )
 
-resources(name="post_renderer", sources=["post_renderer.lock", "post_renderer_main.py"])
+resources(name="post_renderer", sources=["post_renderer.lock*", "post_renderer_main.py"])
 
 # Kubernetes manifest parser
 
@@ -26,4 +26,4 @@ python_sources(
     skip_mypy=True,
 )
 
-resources(name="k8s_parser", sources=["k8s_parser.lock", "k8s_parser_main.py"])
+resources(name="k8s_parser", sources=["k8s_parser.lock*", "k8s_parser_main.py"])

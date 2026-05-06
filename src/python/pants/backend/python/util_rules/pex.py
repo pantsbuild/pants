@@ -20,8 +20,7 @@ import packaging.version
 from packaging.requirements import Requirement
 
 from pants.backend.python.subsystems import uv as uv_subsystem
-from pants.backend.python.subsystems.setup import PexBuilder, PythonSetup
-from pants.backend.python.subsystems.uv import download_uv_binary
+from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import (
     Executable,
     MainSpecification,
@@ -32,6 +31,9 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules import pex_cli, pex_requirements
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.lockfile_metadata import (
+    LockfileFormat,
+)
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX, maybe_log_pex_stderr
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
@@ -44,10 +46,9 @@ from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     LoadedLockfileRequest,
     Lockfile,
-    LockfileFormat,
     Resolve,
-    ResolvePexConfigRequest,
-    determine_resolve_pex_config,
+    ResolveConfigRequest,
+    determine_resolve_config,
     get_lockfile_for_resolve,
     load_lockfile,
     validate_metadata,
@@ -55,9 +56,18 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements as PexRequirements,  # Explicit re-export.
 )
+from pants.backend.python.util_rules.uv import (
+    VenvFromUvLockfileRequest,
+    VenvRepository,
+    create_venv_repository_from_uv_lockfile,
+)
+from pants.backend.python.util_rules.uv import (
+    rules as uv_rules,
+)
 from pants.build_graph.address import Address
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.target_types import FileSourceField, ResourceSourceField
+from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
 from pants.core.util_rules.system_binaries import BashBinary
@@ -70,7 +80,6 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
-    Directory,
     FileContent,
     MergeDigests,
     RemovePrefix,
@@ -92,9 +101,7 @@ from pants.engine.intrinsics import (
 from pants.engine.process import (
     Process,
     ProcessCacheScope,
-    ProcessExecutionFailure,
     ProcessResult,
-    execute_process_or_raise,
     fallible_to_exec_result_or_raise,
 )
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -498,213 +505,14 @@ async def _determine_pex_python_and_platforms(request: PexRequest) -> _BuildPexP
         )
 
 
-_UV_VENV_DIR = "__uv_venv"
-
-
-@dataclass(frozen=True)
-class _UvVenvRequest:
-    """Request to build a pre-populated venv using uv for PEX --venv-repository."""
-
-    req_strings: tuple[str, ...]
-    requirements: PexRequirements | EntireLockfile
-    python_path: str
-    description: str
-
-
-@dataclass(frozen=True)
-class _UvVenvResult:
-    """Result of building a uv venv."""
-
-    venv_digest: Digest | None
-
-
-def _check_uv_preconditions(
-    request: PexRequest,
-    req_strings: tuple[str, ...],
-    pex_python_setup: _BuildPexPythonSetup,
-) -> str | None:
-    """Check whether the uv builder can be used for this PEX request.
-
-    Returns None if all preconditions are met, or a warning message describing
-    why uv cannot be used.
-    """
-    label = request.description or request.output_filename
-    if not req_strings:
-        return (
-            f"pex_builder=uv: no individual requirement strings for {label} "
-            "(e.g. using a whole-lockfile resolve or no third-party deps). "
-            "Falling back to the default PEX/pip builder."
-        )
-    if request.platforms or request.complete_platforms:
-        return (
-            f"pex_builder=uv: cross-platform build detected for {label}. "
-            "Falling back to the default PEX/pip builder."
-        )
-    if pex_python_setup.python is None:
-        return (
-            f"pex_builder=uv: no local Python interpreter available for {label}. "
-            "Falling back to the default PEX/pip builder."
-        )
-    return None
-
-
-@rule
-async def _build_uv_venv(
-    uv_request: _UvVenvRequest,
-    pex_env: PexEnvironment,
-) -> _UvVenvResult:
-    """Build a pre-populated venv using uv for use with PEX --venv-repository."""
-    downloaded_uv = await download_uv_binary(**implicitly())
-
-    logger.debug(
-        "pex_builder=uv: using uv builder for %s",
-        uv_request.description,
-    )
-
-    # Try to export a subset of the lockfile via `pex3 lock export-subset` so we
-    # can pass only the needed locked requirements with --no-deps (reproducible).
-    # This uses Pex's stable CLI rather than parsing the internal lockfile JSON
-    # directly.  Fall back to letting uv resolve transitively if no lockfile.
-    exported_reqs_digest: Digest | None = None
-    reqs_file = "pylock.toml"
-
-    if isinstance(uv_request.requirements, PexRequirements) and isinstance(
-        uv_request.requirements.from_superset, Resolve
-    ):
-        lockfile = await get_lockfile_for_resolve(
-            uv_request.requirements.from_superset, **implicitly()
-        )
-        loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
-        if loaded_lockfile.lockfile_format == LockfileFormat.Pex:
-            try:
-                export_result = await fallible_to_exec_result_or_raise(
-                    **implicitly(
-                        PexCliProcess(
-                            subcommand=("lock", "export-subset"),
-                            extra_args=(
-                                *uv_request.req_strings,
-                                "--lock",
-                                loaded_lockfile.lockfile_path,
-                                "--format",
-                                "pep-751",
-                                "-o",
-                                reqs_file,
-                            ),
-                            additional_input_digest=loaded_lockfile.lockfile_digest,
-                            description=f"Export lockfile subset for {uv_request.description}",
-                            output_files=(reqs_file,),
-                        )
-                    )
-                )
-                exported_reqs_digest = export_result.output_digest
-            except ProcessExecutionFailure as e:
-                logger.warning(
-                    "pex_builder=uv: failed to export lockfile subset for %s: %s. "
-                    "Falling back to transitive uv resolution.",
-                    uv_request.description,
-                    e,
-                )
-
-    use_exported_lockfile = exported_reqs_digest is not None
-
-    if use_exported_lockfile:
-        logger.debug(
-            "pex_builder=uv: using exported lockfile subset with --no-deps for %s",
-            uv_request.description,
-        )
-        assert exported_reqs_digest is not None
-        reqs_digest = exported_reqs_digest
-    else:
-        logger.debug(
-            "pex_builder=uv: no lockfile available, using transitive uv resolution for %s",
-            uv_request.description,
-        )
-        reqs_file = "__uv_requirements.txt"
-        reqs_content = "\n".join(uv_request.req_strings) + "\n"
-        reqs_digest = await create_digest(
-            CreateDigest([FileContent(reqs_file, reqs_content.encode())])
-        )
-
-    complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    uv_cache_dir = ".cache/uv_cache"
-    uv_env = {
-        **complete_pex_env.environment_dict(python_configured=True),
-        "UV_CACHE_DIR": uv_cache_dir,
-        "UV_NO_CONFIG": "1",
-    }
-    uv_caches = {
-        **complete_pex_env.append_only_caches,
-        "uv_cache": uv_cache_dir,
-    }
-    uv_tmpdir = "__uv_tmp"
-    tmpdir_digest = await create_digest(CreateDigest([Directory(uv_tmpdir)]))
-
-    python_path = uv_request.python_path
-
-    uv_input = await merge_digests(MergeDigests([downloaded_uv.digest, reqs_digest, tmpdir_digest]))
-
-    # Step 1: Create venv with uv.
-    venv_result = await execute_process_or_raise(
-        **implicitly(
-            Process(
-                argv=(
-                    downloaded_uv.exe,
-                    "venv",
-                    _UV_VENV_DIR,
-                    "--python",
-                    python_path,
-                ),
-                input_digest=uv_input,
-                output_directories=(_UV_VENV_DIR,),
-                env={**uv_env, "TMPDIR": uv_tmpdir},
-                append_only_caches=uv_caches,
-                description=f"Create uv venv for {uv_request.description}",
-                level=LogLevel.DEBUG,
-                cache_scope=ProcessCacheScope.SUCCESSFUL,
-            )
-        )
-    )
-
-    # Step 2: Install dependencies into the venv.
-    install_input = await merge_digests(MergeDigests([uv_input, venv_result.output_digest]))
-
-    install_argv: tuple[str, ...] = (
-        downloaded_uv.exe,
-        "pip",
-        "install",
-        "--python",
-        os.path.join(_UV_VENV_DIR, "bin", "python"),
-        "-r",
-        reqs_file,
-        *(("--no-deps",) if use_exported_lockfile else ()),
-        *downloaded_uv.args_for_uv_pip_install,
-    )
-
-    uv_install_result = await execute_process_or_raise(
-        **implicitly(
-            Process(
-                argv=install_argv,
-                input_digest=install_input,
-                output_directories=(_UV_VENV_DIR,),
-                env={**uv_env, "TMPDIR": uv_tmpdir},
-                append_only_caches=uv_caches,
-                description=f"uv pip install for {uv_request.description}",
-                level=LogLevel.DEBUG,
-                cache_scope=ProcessCacheScope.SUCCESSFUL,
-            )
-        )
-    )
-
-    return _UvVenvResult(
-        venv_digest=uv_install_result.output_digest,
-    )
-
-
 @dataclass
 class _BuildPexRequirementsSetup:
     digests: list[Digest]
     argv: list[str]
     concurrency_available: int
+    # Set when the requirements come from a uv lockfile; signals build_pex to
+    # use create_venv_repository_from_uv_lockfile instead of pex's resolver.
+    uv_lockfile: LoadedLockfile | None = None
 
 
 @dataclass(frozen=True)
@@ -795,8 +603,8 @@ async def _setup_pex_requirements(
         # However, if no resolve is specified, we will still load options that apply to every
         # resolve, like `[python-repos].indexes`.
         resolve_name = None
-    resolve_config = await determine_resolve_pex_config(
-        ResolvePexConfigRequest(resolve_name), **implicitly()
+    resolve_config = await determine_resolve_config(
+        ResolveConfigRequest(resolve_name), **implicitly()
     )
 
     pex_lock_resolver_args = list(resolve_config.pex_args())
@@ -806,9 +614,17 @@ async def _setup_pex_requirements(
         request.requirements
     )
     if loaded_lockfile:
+        if loaded_lockfile.lockfile_format == LockfileFormat.UV:
+            # The caller will need to set the argv. This is slightly awkward, and due to
+            # uv support being tacked on later. Fixing this will require a bit more of a
+            # refactor than we want to do right now.
+            return _BuildPexRequirementsSetup(
+                [], [], loaded_lockfile.requirement_estimate, uv_lockfile=loaded_lockfile
+            )
+
         argv = (
             ["--lock", loaded_lockfile.lockfile_path, *pex_lock_resolver_args]
-            if loaded_lockfile.lockfile_format == LockfileFormat.Pex
+            if loaded_lockfile.lockfile_format == LockfileFormat.PEX
             # We use pip to resolve a requirements.txt pseudo-lockfile, possibly with hashes.
             else [
                 "--requirement",
@@ -857,10 +673,13 @@ async def _setup_pex_requirements(
         )
         loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
 
-        # NB: This is also validated in the constructor.
-        assert loaded_lockfile.lockfile_format == LockfileFormat.Pex
         if not reqs_info.req_strings:
             return _BuildPexRequirementsSetup([], [], concurrency_available)
+
+        if loaded_lockfile.lockfile_format == LockfileFormat.UV:
+            return _BuildPexRequirementsSetup(
+                [], [], concurrency_available, uv_lockfile=loaded_lockfile
+            )
 
         if loaded_lockfile.metadata:
             validate_metadata(
@@ -967,43 +786,48 @@ async def build_pex(
         )
         req_strings = ()
 
-    # Experimental: build PEX via uv + --venv-repository.
-    # When opted in, we use uv to create a pre-populated venv and let PEX
-    # package from it instead of resolving with pip.
-    # See: https://github.com/pantsbuild/pants/issues/20679
-    uv_venv_digest: Digest | None = None
-
-    use_uv_builder = python_setup.pex_builder == PexBuilder.uv
-    # uv builder only applies to non-internal PEXes with requirements and a
-    # local interpreter (not cross-platform builds).
-    if use_uv_builder and not request.internal_only:
-        fallback_reason = _check_uv_preconditions(request, req_strings, pex_python_setup)
-        if fallback_reason:
-            logger.warning(fallback_reason)
-        else:
-            assert pex_python_setup.python is not None
-            uv_result = await _build_uv_venv(
-                _UvVenvRequest(
-                    req_strings=req_strings,
-                    requirements=request.requirements,
-                    python_path=pex_python_setup.python.path,
-                    description=request.description or request.output_filename,
-                ),
-                **implicitly(),
+    venv_repo: VenvRepository | None = None
+    if requirements_setup.uv_lockfile is not None:
+        if request.platforms or request.complete_platforms:
+            # TODO: Support this via multiple --venv-repository venvs.
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Cannot build a cross-platform PEX from a uv lockfile for
+                    {request.output_filename}.
+                    """
+                )
             )
-            uv_venv_digest = uv_result.venv_digest
 
-            # Replace requirements_setup: pass requirement strings + --venv-repository
-            # so PEX subsets from the uv-populated venv instead of resolving with pip.
-            requirements_setup = _BuildPexRequirementsSetup(
-                digests=[],
-                argv=[*req_strings, f"--venv-repository={_UV_VENV_DIR}"],
-                concurrency_available=requirements_setup.concurrency_available,
+        if pex_python_setup.python is None:
+            # Should never happen.
+            raise ValueError(
+                softwrap(
+                    f"""
+                    Cannot build a pex from a uv lockfile  for {request.output_filename} with no
+                    local python specified. Please report this error to the Pants team.
+                    """
+                )
             )
-    elif use_uv_builder and request.internal_only:
-        logger.debug(
-            "pex_builder=uv: skipping for internal-only PEX %s. Using the default PEX/pip builder.",
-            request.description or request.output_filename,
+
+        venv_repo = await create_venv_repository_from_uv_lockfile(
+            VenvFromUvLockfileRequest(
+                lockfile=requirements_setup.uv_lockfile,
+                python=pex_python_setup.python,
+            ),
+            **implicitly(),
+        )
+
+        # This is where we add the argv for the uv case (as explained above).
+        requirements_setup = dataclasses.replace(
+            requirements_setup,
+            argv=[
+                # In the EntireLockfile case req_strings will be empty, and pex will
+                # default to all the distributions in the venv-repository.
+                *req_strings,
+                "--no-transitive",
+                f"--venv-repository={venv_repo.relpath()}",
+            ],
         )
 
     output_chroot = os.path.dirname(request.output_filename)
@@ -1026,18 +850,23 @@ async def build_pex(
         *request.additional_args,
     ]
 
-    if uv_venv_digest is not None:
-        # When using --venv-repository, PEX does not allow any custom target
-        # flags (--python, --interpreter-constraint, --platform). The target is
-        # implicitly the venv interpreter.
-        pass
-    else:
+    if venv_repo is None:
         argv.extend(pex_python_setup.argv)
+        interpreter = None
+    else:
+        # When using --venv-repository the interpreter is fixed to the venv's Python;
+        # PEX does not accept --python / --interpreter-constraint in this case.
+        # TODO: This type name is misleading here: this isn't a PBS (or at least not one we
+        #  downloaded as such), but PythonBuildStandaloneBinary is just a wrapper for
+        #  a path to an interpreter, so we use it as such.  But we should probably rename the type.
+        interpreter = PythonBuildStandaloneBinary(
+            os.path.join(venv_repo.relpath(), "bin", "python")
+        )
 
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
         if isinstance(request.main, Executable):
-            # Unlike other MainSpecifiecation types (that can pass spec as-is to pex),
+            # Unlike other MainSpecification types (that can pass spec as-is to pex),
             # Executable must be an actual path relative to the sandbox.
             # request.main.spec is a python source file including its spec_path.
             # To make it relative to the sandbox, we strip the source root
@@ -1075,7 +904,6 @@ async def build_pex(
                 request.additional_inputs,
                 *requirements_setup.digests,
                 *(pex.digest for pex in request.pex_path),
-                *([uv_venv_digest] if uv_venv_digest else []),
             )
         )
     )
@@ -1085,10 +913,12 @@ async def build_pex(
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
             PexCliProcess(
+                interpreter=interpreter,
                 subcommand=(),
                 extra_args=argv,
                 additional_input_digest=merged_digest,
                 description=_build_pex_description(request, req_strings, python_setup.resolves),
+                append_only_caches=venv_repo.append_only_caches() if venv_repo else None,
                 output_files=None,
                 output_directories=[output_chroot],
                 concurrency_available=requirements_setup.concurrency_available,
@@ -1610,8 +1440,8 @@ async def setup_venv_pex_process(
         **pex_environment.in_sandbox(
             working_directory=request.working_directory
         ).append_only_caches,
-        **request.append_only_caches,
-        **(FrozenDict({}) if venv_pex.append_only_caches is None else venv_pex.append_only_caches),
+        **(request.append_only_caches or FrozenDict({})),
+        **(venv_pex.append_only_caches or FrozenDict({})),
     )
     return Process(
         argv=argv,
@@ -1718,6 +1548,7 @@ def rules():
         *collect_rules(),
         *pex_cli.rules(),
         *pex_requirements.rules(),
-        *uv_subsystem.rules(),  # Also in register.py; engine deduplicates.
+        *uv_subsystem.rules(),
+        *uv_rules(),
         *stripped_source_rules(),
     ]

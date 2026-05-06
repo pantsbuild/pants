@@ -8,7 +8,8 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python.util_rules import pex
-from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
+from pants.backend.python.util_rules.lockfile_diff import _generate_lockfile_diff
+from pants.backend.python.util_rules.lockfile_metadata import LockfileFormat
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, LockfileDiff
 from pants.engine.rules import rule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -16,7 +17,9 @@ from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunn
 
 @rule
 async def helper_fixture(result: GenerateLockfileResult) -> LockfileDiff:
-    return await _generate_python_lockfile_diff(result.digest, result.resolve_name, result.path)
+    return await _generate_lockfile_diff(
+        result.digest, result.resolve_name, result.path, LockfileFormat.PEX
+    )
 
 
 @pytest.fixture

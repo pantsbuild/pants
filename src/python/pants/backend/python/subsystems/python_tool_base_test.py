@@ -5,11 +5,13 @@ from __future__ import annotations
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase, get_lockfile_metadata
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
+from pants.backend.python.util_rules.lockfile_metadata import (
+    LockfileFormat,
+    PythonLockfileMetadataV3,
+)
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
     Lockfile,
-    LockfileFormat,
     PexRequirements,
     Resolve,
 )
@@ -54,7 +56,7 @@ def test_get_lockfile_metadata() -> None:
     )
     lockfile = Lockfile("dummy_url", "dummy_description_of_origin", "dummy_resolve")
     loaded_lockfile = LoadedLockfile(
-        EMPTY_DIGEST, "", metadata, 0, LockfileFormat.Pex, None, lockfile
+        EMPTY_DIGEST, "", metadata, 0, LockfileFormat.PEX, None, lockfile
     )
     assert (
         run_rule_with_mocks(

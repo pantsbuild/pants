@@ -5,4 +5,4 @@ python_sources()
 
 python_tests(name="tests", dependencies=[":lockfiles"])
 
-resources(name="lockfiles", sources=["*.test.lock"])
+resources(name="lockfiles", sources=["*.test.lock*"])
