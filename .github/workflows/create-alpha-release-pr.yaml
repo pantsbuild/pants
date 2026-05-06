@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: The release version to create (e.g. 2.42.4a0).
+        description: The alpha release version to create (MAJOR.MINOR.PATCHaN e.g. 2.42.4a0).
         required: true
 
 defaults:
@@ -46,8 +46,8 @@ jobs:
               echo "::error::The input 'version' must be smaller than 11 characters (i.e. allows '2.99.99a99')"
               exit 1
 
-          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(a[0-9]+)?$ ]]; then
-              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCH (1.2.3) with an optional 'a' specifier (8.9.10a99)"
+          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+a[0-9]+$ ]]; then
+              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCHaN (8.9.10a99)"
               exit 1
           fi
 
@@ -129,7 +129,7 @@ jobs:
 
           # Commit and push to the release branch
           TITLE="Prepare $RELEASE_VERSION"
-          git add src/python/pants/VERSION CONTRIBUTORS.md
+          git add src/python/pants/VERSION CONTRIBUTORS.md docs/notes/
           git commit -m "$TITLE"
           git push -u origin "$BRANCH_NAME"
 
