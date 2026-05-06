@@ -115,7 +115,7 @@ jobs:
           RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
         run: |
           if [[ -z $(git status --porcelain) ]]; then
-            echo "::error::No changes detected in VERSION or CONTRIBUTORS.md - skipping PR creation"
+            echo "::error::No changes detected - skipping PR creation"
             exit 1
           fi
 
