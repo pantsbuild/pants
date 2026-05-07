@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from textwrap import dedent
-from typing import cast
 
 import pytest
 
@@ -12,32 +11,24 @@ from pants.backend.docker.subsystems.dockerfile_parser import rules as parser_ru
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
 from pants.backend.docker.util_rules.dockerfile import rules as dockerfile_rules
-from pants.backend.python.target_types import PexBinary
-from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.pants_integration_test import run_pants
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
-@pytest.fixture(params=[pytest.param(True, id="rust"), pytest.param(False, id="legacy")])
-def use_rust_parser(request) -> bool:
-    return cast(bool, request.param)
-
-
 @pytest.fixture
-def rule_runner(use_rust_parser: bool) -> RuleRunner:
+def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *dockerfile_rules(),
             *parser_rules(),
-            *pex_rules(),
             QueryRule(DockerfileInfo, (DockerfileInfoRequest,)),
         ],
-        target_types=[DockerImageTarget, PexBinary],
+        target_types=[DockerImageTarget],
     )
     rule_runner.set_options(
-        [f"--dockerfile-parser-use-rust-parser={use_rust_parser}"],
+        args=[],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     return rule_runner
@@ -229,6 +220,7 @@ def test_baseimage_tags(rule_runner: RuleRunner) -> None:
     )
 
 
+# TODO: Ensure this passes before deleting it
 def test_generate_lockfile_without_python_backend() -> None:
     """Regression test for https://github.com/pantsbuild/pants/issues/14876."""
     run_pants(

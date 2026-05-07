@@ -24,7 +24,6 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 )
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
-from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.helm.subsystems.k8s_parser import HelmKubeParserSubsystem
 from pants.backend.helm.subsystems.post_renderer import HelmPostRendererSubsystem
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
@@ -115,7 +114,6 @@ all_python_tools = tuple(
             PythonTool(CoverageSubsystem, "pants.backend.python"),
             PythonTool(DebugPy, "pants.backend.python"),
             PythonTool(Docformatter, "pants.backend.python.lint.docformatter"),
-            PythonTool(DockerfileParser, "pants.backend.docker"),
             PythonTool(Elfdeps, "pants.backend.experimental.nfpm.native_libs"),
             PythonTool(Flake8, "pants.backend.python.lint.flake8"),
             PythonTool(HelmKubeParserSubsystem, "pants.backend.experimental.helm"),
