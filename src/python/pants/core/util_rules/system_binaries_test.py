@@ -94,6 +94,35 @@ def test_find_binary_file_path(rule_runner: RuleRunner, tmp_path: Path) -> None:
     assert binary_paths.first_path.path == str(binary_path_abs)
 
 
+def test_find_binary_symlink_to_file_on_path(rule_runner: RuleRunner, tmp_path: Path) -> None:
+    # Regression test for https://github.com/pantsbuild/pants/issues/21990:
+    # a symlink-to-file on PATH should be skipped gracefully, not crash with IntrinsicError.
+    target_file = tmp_path / "some_file"
+    target_file.touch()
+    symlink = tmp_path / "my_symlink"
+    symlink.symlink_to(target_file)
+
+    binary_paths = rule_runner.request(
+        BinaryPaths,
+        [BinaryPathRequest(binary_name=MyBin.binary_name, search_path=[str(symlink)])],
+    )
+    assert binary_paths.first_path is None
+
+
+def test_find_binary_file_component_on_path(rule_runner: RuleRunner, tmp_path: Path) -> None:
+    # Regression test for https://github.com/pantsbuild/pants/issues/21990:
+    # a path like `foo/bar` where `foo` is a file should be skipped gracefully, not crash.
+    file_component = tmp_path / "not_a_dir"
+    file_component.touch()
+    bogus_path = file_component / "subdir"
+
+    binary_paths = rule_runner.request(
+        BinaryPaths,
+        [BinaryPathRequest(binary_name=MyBin.binary_name, search_path=[str(bogus_path)])],
+    )
+    assert binary_paths.first_path is None
+
+
 def test_find_binary_respects_search_path_order(rule_runner: RuleRunner, tmp_path: Path) -> None:
     binary_path_abs1 = MyBin.create(tmp_path / "bin1")
     binary_path_abs2 = MyBin.create(tmp_path / "bin2")

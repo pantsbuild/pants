@@ -276,6 +276,8 @@ impl PosixFS {
                 }))
             }
             Err(err) if err.kind() == ErrorKind::NotFound => Ok(None),
+            // A path component is a file rather than a directory: treat as not found.
+            Err(err) if err.kind() == ErrorKind::NotADirectory => Ok(None),
             Err(err) => Err(err),
         }
     }

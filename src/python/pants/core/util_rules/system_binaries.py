@@ -625,13 +625,20 @@ async def _find_candidate_paths_via_path_metadata_lookups(
         if not metadata:
             continue
 
-        if metadata.kind in (PathMetadataKind.DIRECTORY, PathMetadataKind.SYMLINK):
+        if metadata.kind == PathMetadataKind.DIRECTORY or (
+            metadata.kind == PathMetadataKind.SYMLINK and os.path.isdir(metadata.path)
+        ):
             file_metadata_request = PathMetadataRequest(
                 path=os.path.join(metadata.path, request.binary_name),
                 namespace=PathNamespace.SYSTEM,
             )
             found_paths_and_requests.append(file_metadata_request)
             file_metadata_requests.append(file_metadata_request)
+
+        elif metadata.kind == PathMetadataKind.SYMLINK:
+            logger.debug(
+                f"Skipping PATH entry `{metadata.path}`: symlink does not resolve to a directory."
+            )
 
         elif metadata.kind == PathMetadataKind.FILE and request.check_file_entries:
             found_paths_and_requests.append(metadata.path)
