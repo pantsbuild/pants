@@ -150,6 +150,7 @@ interpreter_constraints = ["==3.14.*"]
 macos_big_sur_compatibility = true
 enable_resolves = true
 pip_version = "latest"
+resolver = "uv"
 separate_lockfile_metadata_file = true
 
 [python.resolves]
