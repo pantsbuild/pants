@@ -1,77 +1,31 @@
-{
-  "allow_builds": true,
-  "allow_prereleases": false,
-  "allow_wheels": true,
-  "build_isolation": true,
-  "constraints": [],
-  "elide_unused_requires_dist": false,
-  "excluded": [],
-  "locked_resolves": [
-    {
-      "locked_requirements": [
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "1093a5c541af079c13ac8c70ab8b24d1d35c8cacb676306cf11e57f699c02926",
-              "url": "https://files.pythonhosted.org/packages/81/72/cb3a101717d81ab1f97ee38a409be9740e7256bc25074e48fd634055261f/debugpy-1.6.7.post1-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "fe87ec0182ef624855d05e6ed7e0b7cb1359d2ffa2a925f8ec2d22e98b75d0ca",
-              "url": "https://files.pythonhosted.org/packages/0b/c8/b6978e56c917c2fe5096cd83d81bab8ac08ceb1f9a4b9373ad5b066a3265/debugpy-1.6.7.post1.zip"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "d16882030860081e7dd5aa619f30dec3c2f9a421e69861125f83cc372c94e57d",
-              "url": "https://files.pythonhosted.org/packages/33/a4/0dffe40fc4de1850e8e430f24fcd00570c3072086aea3c2e79bb18ba3e1a/debugpy-1.6.7.post1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "38651c3639a4e8bbf0ca7e52d799f6abd07d622a193c406be375da4d510d968d",
-              "url": "https://files.pythonhosted.org/packages/71/75/2eef476d812d568b520918e375c25283e824a186df7262618f52a2b17014/debugpy-1.6.7.post1-cp39-cp39-macosx_11_0_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "038c51268367c9c935905a90b1c2d2dbfe304037c27ba9d19fe7409f8cdc710c",
-              "url": "https://files.pythonhosted.org/packages/95/4f/d52e9691cf6a817a404046e6361ed15c453ad87da1c0500a16f53a7fdc72/debugpy-1.6.7.post1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "903bd61d5eb433b6c25b48eae5e23821d4c1a19e25c9610205f5aeaccae64e32",
-              "url": "https://files.pythonhosted.org/packages/a3/a9/5c8b8aed462d8bfa7f6cdea1ad3539825e1fd7b965bf5ed34f0abded14c1/debugpy-1.6.7.post1-cp310-cp310-macosx_11_0_x86_64.whl"
-            }
-          ],
-          "project_name": "debugpy",
-          "requires_dists": [],
-          "requires_python": ">=3.7",
-          "version": "1.6.7.post1"
-        }
-      ],
-      "marker": null,
-      "platform_tag": null
-    }
-  ],
-  "only_builds": [],
-  "only_wheels": [],
-  "overridden": [],
-  "path_mappings": {},
-  "pex_version": "2.69.1",
-  "pip_version": "25.3",
-  "prefer_older_binary": false,
-  "requirements": [
-    "debugpy<1.7,>=1.6.5"
-  ],
-  "requires_python": [
-    "CPython<3.15,>=3.9"
-  ],
-  "resolver_version": "pip-2020-resolver",
-  "style": "universal",
-  "target_systems": [
-    "linux",
-    "mac"
-  ],
-  "transitive": true,
-  "use_pep517": null,
-  "use_system_time": false
-}
+version = 1
+revision = 3
+requires-python = ">=3.9, <3.15"
+
+[[package]]
+name = "debugpy"
+version = "1.6.7.post1"
+source = { registry = "https://pypi.org/simple/" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/c8/b6978e56c917c2fe5096cd83d81bab8ac08ceb1f9a4b9373ad5b066a3265/debugpy-1.6.7.post1.zip", hash = "sha256:fe87ec0182ef624855d05e6ed7e0b7cb1359d2ffa2a925f8ec2d22e98b75d0ca", size = 4664667, upload-time = "2023-08-08T20:04:28.974Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/a9/5c8b8aed462d8bfa7f6cdea1ad3539825e1fd7b965bf5ed34f0abded14c1/debugpy-1.6.7.post1-cp310-cp310-macosx_11_0_x86_64.whl", hash = "sha256:903bd61d5eb433b6c25b48eae5e23821d4c1a19e25c9610205f5aeaccae64e32", size = 1714251, upload-time = "2023-08-08T20:04:32.215Z" },
+    { url = "https://files.pythonhosted.org/packages/33/a4/0dffe40fc4de1850e8e430f24fcd00570c3072086aea3c2e79bb18ba3e1a/debugpy-1.6.7.post1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d16882030860081e7dd5aa619f30dec3c2f9a421e69861125f83cc372c94e57d", size = 2998606, upload-time = "2023-08-08T20:04:35.233Z" },
+    { url = "https://files.pythonhosted.org/packages/77/ab/2b1efc35a52a68d00cf6d0a78e52f51765ce765d00563960636406dcbacb/debugpy-1.6.7.post1-cp310-cp310-win32.whl", hash = "sha256:eea8d8cfb9965ac41b99a61f8e755a8f50e9a20330938ad8271530210f54e09c", size = 4810089, upload-time = "2023-08-08T20:04:38.214Z" },
+    { url = "https://files.pythonhosted.org/packages/71/ab/947d54283646ace2dba280290e122c1abdb3a06409c0796c05102ead1f83/debugpy-1.6.7.post1-cp310-cp310-win_amd64.whl", hash = "sha256:85969d864c45f70c3996067cfa76a319bae749b04171f2cdeceebe4add316155", size = 4836788, upload-time = "2023-08-08T20:04:40.587Z" },
+    { url = "https://files.pythonhosted.org/packages/71/75/2eef476d812d568b520918e375c25283e824a186df7262618f52a2b17014/debugpy-1.6.7.post1-cp39-cp39-macosx_11_0_x86_64.whl", hash = "sha256:38651c3639a4e8bbf0ca7e52d799f6abd07d622a193c406be375da4d510d968d", size = 1723627, upload-time = "2023-08-08T20:05:05.526Z" },
+    { url = "https://files.pythonhosted.org/packages/95/4f/d52e9691cf6a817a404046e6361ed15c453ad87da1c0500a16f53a7fdc72/debugpy-1.6.7.post1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:038c51268367c9c935905a90b1c2d2dbfe304037c27ba9d19fe7409f8cdc710c", size = 3065207, upload-time = "2023-08-08T20:05:08.145Z" },
+    { url = "https://files.pythonhosted.org/packages/41/fd/307535048bb1f3db880b5afb7e395d45de99f781244d6b6565eca1f2f174/debugpy-1.6.7.post1-cp39-cp39-win32.whl", hash = "sha256:4b9eba71c290852f959d2cf8a03af28afd3ca639ad374d393d53d367f7f685b2", size = 4820197, upload-time = "2023-08-08T20:05:11.141Z" },
+    { url = "https://files.pythonhosted.org/packages/df/40/ac3d2c28923684e239b928719406e75edb19f7b17fe2deb09344f1346f1a/debugpy-1.6.7.post1-cp39-cp39-win_amd64.whl", hash = "sha256:973a97ed3b434eab0f792719a484566c35328196540676685c975651266fccf9", size = 4848524, upload-time = "2023-08-08T20:05:14.156Z" },
+    { url = "https://files.pythonhosted.org/packages/81/72/cb3a101717d81ab1f97ee38a409be9740e7256bc25074e48fd634055261f/debugpy-1.6.7.post1-py2.py3-none-any.whl", hash = "sha256:1093a5c541af079c13ac8c70ab8b24d1d35c8cacb676306cf11e57f699c02926", size = 4872783, upload-time = "2023-08-08T20:05:17.116Z" },
+]
+
+[[package]]
+name = "pants-lockfile-for-debugpy"
+version = "0.0.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "debugpy" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "debugpy", specifier = ">=1.6.5,<1.7" }]
