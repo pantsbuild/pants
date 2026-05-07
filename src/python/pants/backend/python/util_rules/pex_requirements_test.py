@@ -457,6 +457,7 @@ def _uv_config(
     indexes=None,
     find_links=None,
     extra_find_links=(),
+    sources=None,
     only_binary=None,
     no_binary=None,
     uploaded_prior_to=None,
@@ -466,11 +467,11 @@ def _uv_config(
         find_links=find_links or [],
         manylinux=None,
         constraints_file=None,
-        no_binary=FrozenOrderedSet(no_binary) if no_binary else FrozenOrderedSet(),
-        only_binary=FrozenOrderedSet(only_binary) if only_binary else FrozenOrderedSet(),
+        no_binary=FrozenOrderedSet(no_binary or []),
+        only_binary=FrozenOrderedSet(only_binary or []),
         excludes=FrozenOrderedSet(),
         overrides=FrozenOrderedSet(),
-        sources=FrozenOrderedSet(),
+        sources=FrozenOrderedSet(sources or []),
         path_mappings=[],
         lock_style="universal",
         complete_platforms=(),
@@ -490,14 +491,19 @@ def test_uv_config_indexes():
     assert parsed["index"][0]["default"] is True
 
     parsed = _uv_config(
-        indexes=["https://primary.example.com/simple", "https://secondary.example.com/simple"]
+        indexes=[
+            "https://primary.example.com/simple",
+            "fallback=https://secondary.example.com/simple",
+        ]
     )
     indexes = parsed["index"]
     assert len(indexes) == 2
     assert indexes[0]["url"] == "https://primary.example.com/simple"
-    assert indexes[0]["default"] is True
+    assert "name" not in indexes[0]
+    assert "default" not in indexes[0]
     assert indexes[1]["url"] == "https://secondary.example.com/simple"
-    assert indexes[1].get("name") == "extra-1"
+    assert indexes[1].get("name") == "fallback"
+    assert indexes[1]["default"] is True
 
 
 def test_uv_config_find_links():
@@ -512,6 +518,22 @@ def test_uv_config_find_links():
         "https://a.example.com/wheels",
         "https://b.example.com/wheels",
     ]
+
+
+def test_uv_config_sources():
+    parsed = _uv_config(sources=[])
+    assert "sources" not in parsed
+
+    parsed = _uv_config(sources=["myindex=requests>=2.0"])
+    assert parsed["sources"] == {"requests": {"index": "myindex"}}
+
+    parsed = _uv_config(sources=['myindex=requests>=2.0; python_version > "3.8"'])
+    assert parsed["sources"]["requests"]["index"] == "myindex"
+    assert "python_version" in parsed["sources"]["requests"]["marker"]
+
+    parsed = _uv_config(sources=["indexa=requests>=2.0", "indexb=boto3>=1.0"])
+    assert parsed["sources"]["requests"] == {"index": "indexa"}
+    assert parsed["sources"]["boto3"] == {"index": "indexb"}
 
 
 def test_uv_config_no_binary():

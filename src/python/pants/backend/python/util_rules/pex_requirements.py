@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from packaging.requirements import Requirement
+
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
 from pants.backend.python.target_types import PythonRequirementsField
@@ -488,37 +490,75 @@ class ResolveConfig:
         """
         config_lines: list[str] = []
 
-        if not self.indexes:
-            config_lines.append("no-index = true")
-
         all_find_links = (*self.find_links, *extra_find_links)
         if all_find_links:
-            entries = "\n".join(f'    "{fl}",' for fl in all_find_links)
-            config_lines.append(f"find-links = [\n{entries}\n]")
+            config_lines.append("find-links = [")
+            for fl in all_find_links:
+                config_lines.append(f'    "{fl}",')
+            config_lines.append("]")
+            config_lines.append("")
+
+        if self.sources:
+            config_lines.append("[sources]")
+            for source in self.sources:
+                index_name, _, scope = source.partition("=")
+                req = Requirement(scope)
+                # Markers may contain double-quotes, so we use single quotes in the TOML.
+                marker = f", marker = '{req.marker}'" if req.marker else ""
+                config_lines.append(f'{req.name} = {{ index = "{index_name}"{marker} }}')
+            config_lines.append("")
 
         if self.no_binary:
             if ":all:" in self.no_binary:
                 config_lines.append("no-binary = true")
             elif ":none:" not in self.no_binary:
-                entries = "\n".join(f'    "{pkg}",' for pkg in self.no_binary)
-                config_lines.append(f"no-binary-package = [\n{entries}\n]")
+                config_lines.append("no-binary-package = [")
+                for pkg in self.no_binary:
+                    config_lines.append(f'    "{pkg}",')
+                config_lines.append("]")
+            config_lines.append("")
 
         if self.only_binary:
             if ":all:" in self.only_binary:
                 config_lines.append("no-build = true")
             elif ":none:" not in self.only_binary:
-                entries = "\n".join(f'    "{pkg}",' for pkg in self.only_binary)
-                config_lines.append(f"no-build-package = [\n{entries}\n]")
+                config_lines.append("no-build-package = [")
+                for pkg in self.only_binary:
+                    config_lines.append(f'    "{pkg}",')
+                config_lines.append("]")
+            config_lines.append("")
 
         if self.uploaded_prior_to:
             config_lines.append(f'exclude-newer = "{self.uploaded_prior_to}"')
+            config_lines.append("")
 
-        for i, index_url in enumerate(self.indexes):
-            # The first index gets `default = true`, replacing uv's built-in PyPI default.
-            # Subsequent indexes are additional sources.
-            block = f'[[index]]\nurl = "{index_url}"\n'
-            block += "default = true\n" if i == 0 else f'name = "extra-{i}"\n'
-            config_lines.append(block)
+        indexes = []
+        for index in self.indexes:
+            part1, _, part2 = index.partition("=")
+            (name, url) = (part1, part2) if part2 else ("", part1)
+            index_data = {"url": url}
+            if name:
+                index_data["name"] = name
+            indexes.append(index_data)
+        if indexes:
+            # To turn off uv's fallback to PyPI we must set some other index to be the default.
+            # In uv the default index has the lowest priority, regardless of its position in the
+            # list of indexes, so we set the last index to be that default, to match user intent.
+            indexes[-1]["default"] = "true"
+            for index_data in indexes:
+                name = index_data.get("name", "")
+                url = index_data.get("url", "")
+                default = index_data.get("default", False)
+                config_lines.append("[[index]]")
+                if name:
+                    config_lines.append(f'name = "{name}"')
+                config_lines.append(f'url = "{url}"')
+                if default:
+                    config_lines.append("default = true")
+                config_lines.append("")
+        else:
+            config_lines.append("no-index = true")
+            config_lines.append("")
 
         return "\n".join(config_lines) + "\n" if config_lines else ""
 
@@ -533,8 +573,6 @@ class ResolveConfig:
             pex_specific.append("`[python].resolves_to_excludes`")
         if self.overrides:
             pex_specific.append("`[python].resolves_to_overrides`")
-        if self.sources:
-            pex_specific.append("`[python].resolves_to_sources`")
         if self.lock_style != "universal":
             pex_specific.append("`[python]._resolves_to_lock_style`")
         if self.path_mappings:
