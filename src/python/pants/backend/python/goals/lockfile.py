@@ -10,15 +10,16 @@ from dataclasses import dataclass
 from operator import itemgetter
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import PythonSetup, Resolver
+from pants.backend.python.subsystems.uv import DownloadedUv
 from pants.backend.python.target_types import (
     PythonRequirementFindLinksField,
     PythonRequirementResolveField,
     PythonRequirementsField,
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_diff import _generate_python_lockfile_diff
-from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
+from pants.backend.python.util_rules.lockfile_diff import _generate_lockfile_diff
+from pants.backend.python.util_rules.lockfile_metadata import LockfileFormat, PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     digest_complete_platform_addresses,
@@ -28,10 +29,11 @@ from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex
 from pants.backend.python.util_rules.pex_environment import PexSubsystem
 from pants.backend.python.util_rules.pex_requirements import (
     PexRequirements,
-    ResolvePexConfig,
-    ResolvePexConfigRequest,
-    determine_resolve_pex_config,
+    ResolveConfig,
+    ResolveConfigRequest,
+    determine_resolve_config,
 )
+from pants.backend.python.util_rules.uv import UvEnvironment, generate_pyproject_toml
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.core.goals.generate_lockfiles import (
     DEFAULT_TOOL_LOCKFILE,
@@ -63,7 +65,7 @@ from pants.engine.intrinsics import (
     merge_digests,
     path_globs_to_digest,
 )
-from pants.engine.process import ProcessCacheScope, execute_process_or_raise
+from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionMembership, UnionRule
@@ -75,7 +77,7 @@ from pants.util.pip_requirement import PipRequirement
 
 
 @dataclass(frozen=True)
-class GeneratePythonLockfile(GenerateLockfile):
+class GeneratePexLockfile(GenerateLockfile):
     requirements: FrozenOrderedSet[str]
     find_links: FrozenOrderedSet[str]
     interpreter_constraints: InterpreterConstraints
@@ -89,15 +91,27 @@ class GeneratePythonLockfile(GenerateLockfile):
 
 
 @dataclass(frozen=True)
+class GenerateUvLockfile(GenerateLockfile):
+    requirements: FrozenOrderedSet[str]
+    find_links: FrozenOrderedSet[str]
+    interpreter_constraints: InterpreterConstraints
+
+    @property
+    def requirements_hex_digest(self) -> str:
+        """Produces a hex digest of the requirements input for this lockfile."""
+        return calculate_invalidation_digest(self.requirements)
+
+
+@dataclass(frozen=True)
 class _PipArgsAndConstraintsSetup:
-    resolve_config: ResolvePexConfig
+    resolve_config: ResolveConfig
     args: tuple[str, ...]
     digest: Digest
 
 
 async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAndConstraintsSetup:
-    resolve_config = await determine_resolve_pex_config(
-        ResolvePexConfigRequest(resolve_name), **implicitly()
+    resolve_config = await determine_resolve_config(
+        ResolveConfigRequest(resolve_name), **implicitly()
     )
 
     args = list(resolve_config.pex_args())
@@ -111,9 +125,9 @@ async def _setup_pip_args_and_constraints_file(resolve_name: str) -> _PipArgsAnd
     return _PipArgsAndConstraintsSetup(resolve_config, tuple(args), input_digest)
 
 
-@rule(desc="Generate Python lockfile", level=LogLevel.DEBUG)
-async def generate_lockfile(
-    req: GeneratePythonLockfile,
+@rule(desc="Generate Pex lockfile", level=LogLevel.DEBUG)
+async def generate_pex_lockfile(
+    req: GeneratePexLockfile,
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     python_setup: PythonSetup,
     pex_subsystem: PexSubsystem,
@@ -222,13 +236,13 @@ async def generate_lockfile(
                     )
                 ),
                 output_files=(req.lockfile_dest,),
-                description=f"Generate lockfile for {req.resolve_name}",
+                description=f"Generate pex lockfile for {req.resolve_name}",
                 # Instead of caching lockfile generation with LMDB, we instead use the invalidation
                 # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
                 # necessary so that our invalidation is resilient to deleting LMDB or running on a
                 # new machine.
                 #
-                # We disable caching with LMDB so that when you generate a lockfile, you always get
+                # We disable persistent caching so that when you generate a lockfile, you always get
                 # the most up-to-date snapshot of the world. This is generally desirable and also
                 # necessary to avoid an awkward edge case where different developers generate
                 # different lockfiles even when generating at the same time. See
@@ -262,6 +276,8 @@ async def generate_lockfile(
         lock_style=req.lock_style,
         complete_platforms=req.complete_platforms,
         uploaded_prior_to=pip_args_setup.resolve_config.uploaded_prior_to,
+        lockfile_format=LockfileFormat.PEX,
+        resolve=req.resolve_name,
     )
     regenerate_command = (
         generate_lockfiles_subsystem.custom_command
@@ -298,8 +314,136 @@ async def generate_lockfile(
         )
 
     if req.diff:
-        diff = await _generate_python_lockfile_diff(
-            final_lockfile_digest, req.resolve_name, req.lockfile_dest
+        diff = await _generate_lockfile_diff(
+            final_lockfile_digest, req.resolve_name, req.lockfile_dest, LockfileFormat.PEX
+        )
+    else:
+        diff = None
+
+    return GenerateLockfileResult(final_lockfile_digest, req.resolve_name, req.lockfile_dest, diff)
+
+
+@rule(desc="Generate uv lockfile", level=LogLevel.DEBUG)
+async def generate_uv_lockfile(
+    req: GenerateUvLockfile,
+    generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
+    downloaded_uv: DownloadedUv,
+    uv_env: UvEnvironment,
+) -> GenerateLockfileResult:
+    if not req.interpreter_constraints:
+        raise ValueError(
+            f"Cannot generate uv lockfile for resolve {req.resolve_name} with no interpreter "
+            "constraints. Please set `interpreter_constraints` for this resolve."
+        )
+
+    resolve_config = await determine_resolve_config(
+        ResolveConfigRequest(req.resolve_name), **implicitly()
+    )
+    resolve_config.validate_for_uv(req.resolve_name)
+
+    pyproject_content = generate_pyproject_toml(
+        req.resolve_name, req.interpreter_constraints, req.requirements
+    )
+
+    if generate_lockfiles_subsystem.sync:
+        # `uv lock` does a minimal update by default if an existing lockfile is present.
+        # So we just need to make sure it is. There are no special flags to specify.
+        existing_lockfile_digest = await path_globs_to_digest(
+            PathGlobs(
+                globs=(req.lockfile_dest,),
+                # We ignore errors, since the lockfile may not exist.
+                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+                conjunction=GlobExpansionConjunction.any_match,
+            )
+        )
+    else:
+        existing_lockfile_digest = EMPTY_DIGEST
+
+    # uv always writes the lockfile to `uv.lock` in the project directory. We capture that
+    # and rename it to req.lockfile_dest in the final digest.
+    uv_lock_output = "uv.lock"
+    uv_config = resolve_config.uv_config(extra_find_links=req.find_links)
+
+    uv_config_digest = await create_digest(
+        CreateDigest(
+            [
+                FileContent("pyproject.toml", pyproject_content.encode()),
+                FileContent("uv.toml", uv_config.encode()),
+            ]
+        )
+    )
+
+    input_digest = await merge_digests(
+        MergeDigests([downloaded_uv.digest, uv_config_digest, existing_lockfile_digest])
+    )
+
+    result = await execute_process_or_raise(
+        **implicitly(
+            Process(
+                argv=(
+                    *downloaded_uv.args(),
+                    "lock",
+                ),
+                env=uv_env.env,
+                input_digest=input_digest,
+                output_files=(uv_lock_output,),
+                append_only_caches=downloaded_uv.append_only_caches(),
+                description=f"Generate uv lockfile for {req.resolve_name}",
+                # We disable persistent caching so that when you generate a lockfile, you always
+                # get the most up-to-date snapshot of the world.
+                cache_scope=ProcessCacheScope.PER_SESSION,
+            )
+        )
+    )
+
+    # Rename uv.lock to the configured lockfile destination.
+    uv_lock_contents = await get_digest_contents(result.output_digest)
+    uv_lock_digest = await create_digest(
+        CreateDigest([FileContent(req.lockfile_dest, next(iter(uv_lock_contents)).content)])
+    )
+
+    regenerate_command = (
+        generate_lockfiles_subsystem.custom_command
+        or f"{bin_name()} generate-lockfiles --resolve={req.resolve_name}"
+    )
+    descr = f"This lockfile was generated by Pants. To regenerate, run: {regenerate_command}"
+    metadata = PythonLockfileMetadata.new(
+        valid_for_interpreter_constraints=req.interpreter_constraints,
+        requirements={
+            PipRequirement.parse(
+                r,
+                description_of_origin=f"the lockfile {req.lockfile_dest} for the resolve {req.resolve_name}",
+            )
+            for r in req.requirements
+        },
+        manylinux=None,
+        requirement_constraints=set(),
+        only_binary=set(resolve_config.only_binary),
+        no_binary=set(resolve_config.no_binary),
+        excludes=set(),
+        overrides=set(),
+        sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
+        uploaded_prior_to=resolve_config.uploaded_prior_to,
+        lockfile_format=LockfileFormat.UV,
+        resolve=req.resolve_name,
+    )
+    metadata_digest = await create_digest(
+        CreateDigest(
+            [
+                FileContent(
+                    PythonLockfileMetadata.metadata_location_for_lockfile(req.lockfile_dest),
+                    metadata.to_json(with_description=descr).encode(),
+                ),
+            ]
+        )
+    )
+    final_lockfile_digest = await merge_digests(MergeDigests([metadata_digest, uv_lock_digest]))
+
+    if req.diff:
+        diff = await _generate_lockfile_diff(
+            final_lockfile_digest, req.resolve_name, req.lockfile_dest, LockfileFormat.UV
         )
     else:
         diff = None
@@ -347,7 +491,7 @@ async def setup_user_lockfile_requests(
     python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> UserGenerateLockfiles:
-    """Transform the names of resolves requested into the `GeneratePythonLockfile` request object.
+    """Transform the names of resolves requested into the appropriate lockfile request object.
 
     Shadowing is done here by only checking internal resolves if the resolve is not a user-created
     resolve.
@@ -366,29 +510,45 @@ async def setup_user_lockfile_requests(
 
     tools = ExportableTool.filter_for_subclasses(union_membership, PythonToolBase)
 
-    out = set()
+    out: set[GenerateLockfile] = set()
     for resolve in requested:
         if resolve in python_setup.resolves:
-            out.add(
-                GeneratePythonLockfile(
-                    requirements=PexRequirements.req_strings_from_requirement_fields(
-                        resolve_to_requirements_fields[resolve]
-                    ),
-                    find_links=FrozenOrderedSet(resolve_to_find_links[resolve]),
-                    interpreter_constraints=InterpreterConstraints(
-                        python_setup.resolves_to_interpreter_constraints.get(
-                            resolve, python_setup.interpreter_constraints
-                        )
-                    ),
-                    resolve_name=resolve,
-                    lockfile_dest=python_setup.resolves[resolve],
-                    diff=False,
-                    lock_style=python_setup.resolves_to_lock_style().get(resolve, "universal"),
-                    complete_platforms=tuple(
-                        python_setup.resolves_to_complete_platforms().get(resolve, [])
-                    ),
+            requirements = PexRequirements.req_strings_from_requirement_fields(
+                resolve_to_requirements_fields[resolve]
+            )
+            find_links = FrozenOrderedSet(resolve_to_find_links[resolve])
+            interpreter_constraints = InterpreterConstraints(
+                python_setup.resolves_to_interpreter_constraints.get(
+                    resolve, python_setup.interpreter_constraints
                 )
             )
+            lockfile_dest = python_setup.resolves[resolve]
+            if python_setup.resolver == Resolver.uv:
+                out.add(
+                    GenerateUvLockfile(
+                        requirements=requirements,
+                        find_links=find_links,
+                        interpreter_constraints=interpreter_constraints,
+                        resolve_name=resolve,
+                        lockfile_dest=lockfile_dest,
+                        diff=False,
+                    )
+                )
+            else:
+                out.add(
+                    GeneratePexLockfile(
+                        requirements=requirements,
+                        find_links=find_links,
+                        interpreter_constraints=interpreter_constraints,
+                        resolve_name=resolve,
+                        lockfile_dest=lockfile_dest,
+                        diff=False,
+                        lock_style=python_setup.resolves_to_lock_style().get(resolve, "universal"),
+                        complete_platforms=tuple(
+                            python_setup.resolves_to_complete_platforms().get(resolve, [])
+                        ),
+                    )
+                )
         else:
             tool_cls: type[PythonToolBase] = tools[resolve]
             tool = await _construct_subsystem(tool_cls)
@@ -400,18 +560,30 @@ async def setup_user_lockfile_requests(
             else:
                 ic = InterpreterConstraints(tool.default_interpreter_constraints)
 
-            out.add(
-                GeneratePythonLockfile(
-                    requirements=FrozenOrderedSet(sorted(tool.requirements)),
-                    find_links=FrozenOrderedSet(),
-                    interpreter_constraints=ic,
-                    resolve_name=resolve,
-                    lockfile_dest=DEFAULT_TOOL_LOCKFILE,
-                    diff=False,
-                    lock_style="universal",  # Tools always use universal style
-                    complete_platforms=(),  # Tools don't use complete platforms
+            if python_setup.resolver == Resolver.uv:
+                out.add(
+                    GenerateUvLockfile(
+                        requirements=FrozenOrderedSet(sorted(tool.requirements)),
+                        find_links=FrozenOrderedSet(),
+                        interpreter_constraints=ic,
+                        resolve_name=resolve,
+                        lockfile_dest=DEFAULT_TOOL_LOCKFILE,
+                        diff=False,
+                    )
                 )
-            )
+            else:
+                out.add(
+                    GeneratePexLockfile(
+                        requirements=FrozenOrderedSet(sorted(tool.requirements)),
+                        find_links=FrozenOrderedSet(),
+                        interpreter_constraints=ic,
+                        resolve_name=resolve,
+                        lockfile_dest=DEFAULT_TOOL_LOCKFILE,
+                        diff=False,
+                        lock_style="universal",  # Tools always use universal style
+                        complete_platforms=(),  # Tools don't use complete platforms
+                    )
+                )
 
     return UserGenerateLockfiles(out)
 
@@ -468,7 +640,8 @@ async def python_lockfile_synthetic_targets(
 def rules():
     return (
         *collect_rules(),
-        UnionRule(GenerateLockfile, GeneratePythonLockfile),
+        UnionRule(GenerateLockfile, GeneratePexLockfile),
+        UnionRule(GenerateLockfile, GenerateUvLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownPythonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPythonUserResolveNames),
         UnionRule(SyntheticTargetsRequest, PythonSyntheticLockfileTargetsRequest),

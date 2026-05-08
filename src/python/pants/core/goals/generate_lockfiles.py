@@ -49,7 +49,7 @@ class GenerateLockfile:
     """A union base for generating ecosystem-specific lockfiles.
 
     Each language ecosystem should set up a subclass of `GenerateLockfile`, like
-    `GeneratePythonLockfile` and `GenerateJVMLockfile`, and register a union rule.
+    `GeneratePexLockfile` and `GenerateJVMLockfile`, and register a union rule.
 
     Subclasses will usually want to add additional properties, such as what requirements to
     install and Python interpreter constraints.
@@ -81,7 +81,7 @@ class UserGenerateLockfiles(Collection[GenerateLockfile]):
     Each language ecosystem should set up a subclass of `RequestedUserResolveNames` (see its
     docstring), and implement a rule going from that subclass -> UserGenerateLockfiles. Each element
     in the returned `UserGenerateLockfiles` should be a subclass of `GenerateLockfile`, like
-    `GeneratePythonLockfile`.
+    `GeneratePexLockfile`.
     """
 
 

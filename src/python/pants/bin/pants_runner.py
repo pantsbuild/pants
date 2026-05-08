@@ -15,6 +15,7 @@ from pants.base.deprecated import warn_or_error
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
 from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.internals.native_engine import PyNgInvocation
 from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
 from pants.option.bootstrap_options import BootstrapOptions
@@ -74,9 +75,27 @@ class PantsRunner:
     def run(self, start_time: float) -> ExitCode:
         self.scrub_pythonpath()
 
-        options_bootstrapper = OptionsBootstrapper.create(
-            args=self.args, env=self.env, allow_pantsrc=True
-        )
+        # Create a transient OptionsBootstrapper with no args, to read the value of pants_ng from
+        # config and env. We can't parse args until we know if we're ng or og.
+        options_bootstrapper = OptionsBootstrapper.create(args=[], env=self.env, allow_pantsrc=True)
+        pants_ng = options_bootstrapper.bootstrap_options.for_global_scope().pants_ng
+
+        if pants_ng:
+            logger.info("PantsRunner running as pants_ng")
+            ng_invocation = PyNgInvocation.from_args(tuple(self.args[1:]))
+            # Allow the existing logic to read flags in global position (note, these can be
+            # prefixed with a scope so they are not necessarily just global options), so
+            # that the engine can configure itself.
+            global_flags = ng_invocation.global_flag_strings()
+            options_bootstrapper = OptionsBootstrapper.create(
+                args=[self.args[0], *global_flags], env=self.env, allow_pantsrc=True
+            )
+        else:
+            ng_invocation = None
+            options_bootstrapper = OptionsBootstrapper.create(
+                args=self.args, env=self.env, allow_pantsrc=True
+            )
+
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options
             global_bootstrap_options = bootstrap_options.for_global_scope()
@@ -155,6 +174,7 @@ class PantsRunner:
                 env=CompleteEnvironmentVars(self.env),
                 working_dir=os.getcwd(),
                 options_bootstrapper=options_bootstrapper,
+                ng_invocation=ng_invocation,
             )
             return runner.run(start_time)
 

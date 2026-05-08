@@ -12,7 +12,13 @@ from pants.backend.project_info.dependents import DependentsRequest, find_depend
 from pants.base.build_environment import get_buildroot
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection
-from pants.engine.internals.graph import OwnersRequest, find_owners, resolve_unexpanded_targets
+from pants.engine.internals.build_files import DELETED_ADDRESS
+from pants.engine.internals.graph import (
+    Owners,
+    OwnersRequest,
+    find_owners,
+    resolve_unexpanded_targets,
+)
 from pants.engine.internals.mapper import SpecsFilter
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import EnumOption, StrOption
@@ -22,7 +28,8 @@ from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import help_text
-from pants.vcs.git import GitWorktree
+from pants.vcs.change import ChangedFile, ChangeType
+from pants.vcs.git import GitWorktree, GitWorktreeRequest, get_git_worktree
 from pants.vcs.hunk import Hunk, TextBlocks
 
 
@@ -62,6 +69,7 @@ async def find_changed_owners(
         ),
         **implicitly(),
     )
+    owners = Owners(owners | {DELETED_ADDRESS})
 
     if no_dependents:
         return ChangedAddresses(owners)
@@ -119,8 +127,7 @@ class ChangedOptions:
     def provided(self) -> bool:
         return bool(self.since) or bool(self.diffspec)
 
-    def changed_files(self, git_worktree: GitWorktree) -> set[str]:
-        """Determines the files changed according to SCM/workspace and options."""
+    def _changed_files(self, git_worktree: GitWorktree) -> set[ChangedFile]:
         if self.diffspec:
             return git_worktree.changes_in(self.diffspec, relative_to=get_buildroot())
 
@@ -130,6 +137,18 @@ class ChangedOptions:
             include_untracked=True,
             relative_to=get_buildroot(),
         )
+
+    def changed_files(self, git_worktree: GitWorktree) -> set[str]:
+        """Determines the files changed according to SCM/workspace and options."""
+        return {cf.path for cf in self._changed_files(git_worktree)}
+
+    def deleted_files(self, git_worktree: GitWorktree) -> set[str]:
+        """Determines the files deleted according to SCM/workspace and options."""
+        return {
+            cf.path
+            for cf in self._changed_files(git_worktree)
+            if cf.change_type == ChangeType.DELETED
+        }
 
     def diff_hunks(
         self, git_worktree: GitWorktree, paths: Iterable[str]
@@ -169,6 +188,26 @@ class Changed(Subsystem):
         default=DependentsOption.NONE,
         help="Include direct or transitive dependents of changed targets.",
     )
+
+
+@dataclass(frozen=True)
+class DeletedFiles:
+    paths: tuple[str, ...]
+
+
+@rule
+async def get_deleted_files(changed: Changed) -> DeletedFiles:
+    changed_options = ChangedOptions.from_options(changed.options)
+    if not changed_options.provided:
+        return DeletedFiles(tuple())
+    maybe_git_worktree = await get_git_worktree(GitWorktreeRequest(), **implicitly())
+    if maybe_git_worktree.git_worktree:
+        deleted_files = tuple(
+            sorted(changed_options.deleted_files(maybe_git_worktree.git_worktree))
+        )
+    else:
+        deleted_files = tuple()
+    return DeletedFiles(deleted_files)
 
 
 def rules():

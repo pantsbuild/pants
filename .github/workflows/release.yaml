@@ -35,7 +35,7 @@ jobs:
         rm -rf /mnt/host-root/usr/local/.ghcup || true
         df -h
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -80,14 +80,14 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -105,7 +105,7 @@ jobs:
         echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
       with:
         subject-path: dist/src.python.pants/*
     - if: needs.release_info.outputs.is-release == 'true'
@@ -162,7 +162,7 @@ jobs:
         rm -rf /mnt/host-root/usr/local/.ghcup || true
         df -h
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
@@ -193,12 +193,12 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go 1.25.3
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
         cache: false
         go-version: 1.25.3
     - name: Install Go 1.24.9
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
         cache: false
         go-version: 1.24.9
@@ -217,14 +217,14 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-wheels-and-pex-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -242,7 +242,7 @@ jobs:
         echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
       with:
         subject-path: dist/src.python.pants/*
     - if: needs.release_info.outputs.is-release == 'true'
@@ -271,7 +271,7 @@ jobs:
             --data-binary "@$WHL";
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants.testutil wheel
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants_testutil*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -312,12 +312,12 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.9
@@ -334,7 +334,7 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
@@ -353,12 +353,12 @@ jobs:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Install Go 1.25.3
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
         cache: false
         go-version: 1.25.3
     - name: Install Go 1.24.9
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
         cache: false
         go-version: 1.24.9
@@ -379,14 +379,14 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-wheels-and-pex-macOS14-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the pantsbuild.pants wheel
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
       with:
         subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
     - if: needs.release_info.outputs.is-release == 'true'
@@ -404,7 +404,7 @@ jobs:
         echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
       name: Attest the Pants Pex artifact
-      uses: actions/attest-build-provenance@v3
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
       with:
         subject-path: dist/src.python.pants/*
     - if: needs.release_info.outputs.is-release == 'true'
@@ -444,13 +444,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout Pants at Release Tag
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: '0'
         fetch-tags: true
         ref: ${{ needs.release_info.outputs.build-ref }}
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -469,7 +469,7 @@ jobs:
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
@@ -487,7 +487,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: |-
@@ -502,13 +502,13 @@ jobs:
       run: |
         ./pants run src/python/pants_release/generate_release_announcement.py                         -- --output-dir=${{ runner.temp }}
     - name: Announce release to Slack
-      uses: slackapi/slack-github-action@v2.1.1
+      uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
       with:
         method: chat.postMessage
         payload-file-path: ${{ runner.temp }}/slack_announcement.json
         token: ${{ secrets.SLACK_BOT_TOKEN }}
     - name: Announce to pants-devel
-      uses: dawidd6/action-send-mail@v3.8.0
+      uses: dawidd6/action-send-mail@3c0bbc53efa3786dff33fedbb0d03c3eb7e92df1 # v3.8.0
       with:
         body: file://${{ runner.temp }}/email_announcement_body.md
         connection_url: ${{ secrets.EMAIL_CONNECTION_URL }}

@@ -4,10 +4,12 @@
 
 import importlib
 import locale
+import logging
 import os
 import sys
 import time
 import warnings
+from datetime import datetime
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.bin.pants_env_vars import (
@@ -18,6 +20,9 @@ from pants.bin.pants_env_vars import (
 from pants.bin.pants_runner import PantsRunner
 from pants.engine.internals import native_engine
 from pants.util.strutil import softwrap
+
+# pants: infer-dep(/src/python/pants/backend/**/register.py)
+# pants: infer-dep(/src/python/pants/core/**/*)
 
 
 class PantsLoader:
@@ -118,6 +123,20 @@ class PantsLoader:
 
     @classmethod
     def main(cls) -> None:
+        # Set up logging. This is just temporary, as the PantsRunner will re-initialize logging to
+        # be emitted via Rust, but until that happens we want basic logging to do something useful.
+        # We set it up to be visually compatible with the Rust logging.
+        class HundredthsFormatter(logging.Formatter):
+            def formatTime(self, record, datefmt=None):
+                dt = datetime.fromtimestamp(record.created)
+                formatted_time = dt.strftime(datefmt or "%H:%M:%S")
+                hundredths = str(dt.microsecond // 10000).zfill(2)
+                return f"{formatted_time}.{hundredths}"
+
+        handler = logging.StreamHandler()
+        handler.setFormatter(HundredthsFormatter(fmt="%(asctime)s [%(levelname)s] %(message)s"))
+        logging.basicConfig(level=logging.INFO, handlers=[handler])
+
         native_engine.initialize()
         cls.setup_warnings()
         cls.ensure_locale()

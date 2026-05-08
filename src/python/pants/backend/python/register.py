@@ -32,7 +32,8 @@ from pants.backend.python.macros.poetry_requirements import PoetryRequirementsTa
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.macros.python_requirements import PythonRequirementsTargetGenerator
 from pants.backend.python.macros.uv_requirements import UvRequirementsTargetGenerator
-from pants.backend.python.subsystems import debugpy, uv
+from pants.backend.python.subsystems import debugpy
+from pants.backend.python.subsystems import uv as uv_subsystem
 from pants.backend.python.target_types import (
     PexBinariesGeneratorTarget,
     PexBinary,
@@ -53,6 +54,9 @@ from pants.backend.python.util_rules import (
     pex_from_targets,
     python_sources,
 )
+from pants.backend.python.util_rules import (
+    uv as uv_util,
+)
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import TargetGeneratorSourcesHelperTarget
 from pants.core.util_rules.wrap_source import wrap_source_rule_and_target
@@ -70,7 +74,7 @@ def rules():
         # Subsystems
         *coverage_py.rules(),
         *debugpy.rules(),
-        *uv.rules(),
+        *uv_subsystem.rules(),
         # Util rules
         *ancestor_files.rules(),
         *dependency_inference_rules.rules(),
@@ -78,6 +82,7 @@ def rules():
         *pex.rules(),
         *pex_from_targets.rules(),
         *python_sources.rules(),
+        *uv_util.rules(),
         # Goals
         *package_pex_binary.rules(),
         *pytest_runner.rules(),

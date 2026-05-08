@@ -1781,6 +1781,19 @@ class BootstrapOptions:
         ),
     )
 
+    pants_ng = BoolOption(
+        default=False,
+        advanced=True,
+        help=softwrap(
+            """
+            Enable the Pants "next generation" mode.
+
+            Note that this is currently under development and is *not* yet useful to end users.
+            Do not set this unless you truly know what you're doing.
+            """
+        ),
+    )
+
     @classmethod
     def validate_instance(cls, opts: OptionValueContainer):
         """Validates an instance of global options for cases that are not prohibited via

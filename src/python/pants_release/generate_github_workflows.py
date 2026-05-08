@@ -16,42 +16,69 @@ from dataclasses import dataclass, field
 from enum import Enum, ReprEnum
 from pathlib import Path
 from textwrap import dedent  # noqa: PNT20
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import toml
 import yaml
 from pants_release.common import die
 
 
+class Pin(NamedTuple):
+    ref: str
+    tag: str | None = None
+
+
+# Actions are SHA-pinned for security (see https://docs.zizmor.sh/). The
+# optional tag is rendered as a trailing `# vX.Y.Z` comment on the generated
+# `uses:` for use by humans and tools like pinact/zizmor
+version_map: dict[str, Pin] = {
+    "action-send-mail": Pin(
+        "dawidd6/action-send-mail@3c0bbc53efa3786dff33fedbb0d03c3eb7e92df1", "v3.8.0"
+    ),
+    "actions-rust-lang": Pin(
+        "actions-rust-lang/setup-rust-toolchain@2b1f5e9b395427c92ee4e3331786ca3c37afe2d7", "v1.16.0"
+    ),
+    "attest-build-provenance": Pin(
+        "actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a", "v3.0.0"
+    ),
+    "cache": Pin("actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae", "v5.0.5"),
+    "checkout": Pin("actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd", "v6.0.2"),
+    "coverallsapp": Pin(
+        "coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e", "v2.3.7"
+    ),
+    "download-artifact": Pin(
+        "actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131", "v7.0.0"
+    ),
+    "free-disk-space": Pin("jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be"),
+    "github-action-required-labels": Pin(
+        "mheap/github-action-required-labels@422e4c352ef83db91089e6acfbf09d8725e08abc", "v4.0.0"
+    ),
+    "msys2": Pin("msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda"),
+    "rust-cache": Pin("Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4"),
+    "setup-go": Pin("actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c", "v6.4.0"),
+    "setup-java": Pin("actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654", "v5.2.0"),
+    "setup-node": Pin("actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e", "v6.4.0"),
+    # TODO: If arduino accept https://github.com/arduino/setup-protoc/pull/113 we
+    #  can reference the upstream SHA. Until then we use our fork.
+    "setup-protoc": Pin("benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85"),
+    "setup-python": Pin("actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405", "v6.2.0"),
+    "slack-github-action": Pin(
+        "slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a", "v2.1.1"
+    ),
+    "upload-artifact": Pin(
+        "actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f", "v6.0.0"
+    ),
+}
+
+
 def action(name: str) -> str:
-    version_map = {
-        "action-send-mail": "dawidd6/action-send-mail@v3.8.0",
-        "actions-rust-lang": "actions-rust-lang/setup-rust-toolchain@v1",
-        "attest-build-provenance": "actions/attest-build-provenance@v3",
-        "cache": "actions/cache@v5",
-        "checkout": "actions/checkout@v6",
-        "coverallsapp": "coverallsapp/github-action@v2",
-        "download-artifact": "actions/download-artifact@v7",
-        "free-disk-space": "jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be",
-        "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
-        "msys2": "msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda",
-        "rust-cache": "Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4",
-        "setup-go": "actions/setup-go@v6",
-        "setup-java": "actions/setup-java@v5",
-        "setup-node": "actions/setup-node@v6",
-        # TODO: If arduino accept https://github.com/arduino/setup-protoc/pull/113 we
-        #  can reference the upstream SHA. Until then we use our fork.
-        "setup-protoc": "benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85",
-        "setup-python": "actions/setup-python@v6",
-        "slack-github-action": "slackapi/slack-github-action@v2.1.1",
-        "upload-artifact": "actions/upload-artifact@v6",
-    }
     try:
-        return version_map[name]
+        return version_map[name].ref
     except KeyError as e:
+        known = {n: p.ref for n, p in version_map.items()}
         raise ValueError(
             f"Requested github action '{name}' does not have a version configured.\n"
-            f"Current known versions: {version_map}"
+            f"Current known versions: {known}"
         ) from e
 
 
@@ -1869,9 +1896,19 @@ PantsDumper.add_representer(str, _yaml_representer_pipes_if_multiline)
 
 
 def dump_yaml(data: object) -> str:
+    uses_comments = {pin.ref: pin.tag for pin in version_map.values() if pin.tag}
+
+    def annotate(line: str) -> str:
+        head, sep, ref = line.partition("uses: ")
+        if not sep:
+            return line
+        ref = ref.rstrip()
+        tag = uses_comments.get(ref)
+        return f"{head}uses: {ref} # {tag}" if tag else line
+
     result = yaml.dump(data, Dumper=PantsDumper)
     assert isinstance(result, str)
-    return result
+    return "\n".join(annotate(line) for line in result.split("\n"))
 
 
 def merge_ok(pr_jobs: list[str]) -> Jobs:
