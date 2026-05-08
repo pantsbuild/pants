@@ -388,7 +388,7 @@ def _overwrite_flag_warning_global_option(
     target: Target, option_name: str, extra_options: tuple[str, ...]
 ) -> None:
     for opt in extra_options:
-        if opt.startswith(f"{option_name}"):
+        if opt.split("=")[0] == option_name.split("=")[0]:
             extra_build_options = opt
             break
     logger.warning(
@@ -488,7 +488,7 @@ def get_build_options(
 
     if target_stage:
         if "--target" in overridden_flags:
-            _overwrite_flag_warning_global_option(target, "--target", extra_options)
+            _overwrite_flag_warning_global_option(target, f"--target={target_stage}", extra_options)
         else:
             extra_options = extra_options + ("--target", target_stage)
 
