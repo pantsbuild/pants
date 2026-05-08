@@ -3366,7 +3366,10 @@ def test_global_build_extra_options_merge(
     )
 
 
-def test_extra_build_options_overrides_pull_field_and_global_field(rule_runner: RuleRunner) -> None:
+def test_extra_build_options_overrides_pull_field_and_global_field(
+    rule_runner: RuleRunner,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     rule_runner.set_options(
         [],
         env={
@@ -3397,4 +3400,61 @@ def test_extra_build_options_overrides_pull_field_and_global_field(rule_runner: 
         rule_runner,
         Address("docker/test", target_name="img1"),
         build_process_assertions=check_build_process,
+    )
+
+    caplog.set_level(logging.WARNING)
+
+    warning_messages = [
+        record.message for record in caplog.records if record.levelno == logging.WARNING
+    ]
+    assert (
+        warning_messages[0]
+        == f"Global docker extra option `--pull=missing` is overridden by a per-target option and will be ignored."
+    )
+    assert (
+        warning_messages[1]
+        == f"The individual `--pull=True` field on the `docker_image` target in `docker/test:img1` is overridden by `extra_build_options` (`--pull=always`). Individual build option fields are deprecated in favor of using `extra_build_options`"
+    )
+
+
+def test_warning_on_deprecated_no_cache_field(
+    rule_runner: RuleRunner, caplog: pytest.LogCaptureFixture
+) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_NO_CACHE": "True",
+        },
+    )
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  extra_build_options=["--no-cache"],
+                )
+                """
+            ),
+        }
+    )
+
+    def check_build_process(result: DockerImageBuildProcess):
+        argv = result.process.argv
+        assert "--no-cache" in argv
+
+    assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        build_process_assertions=check_build_process,
+    )
+
+    caplog.set_level(logging.WARNING)
+
+    warning_messages = [
+        record.message for record in caplog.records if record.levelno == logging.WARNING
+    ]
+    assert (
+        warning_messages[0]
+        == f"The individual `--no-cache` field on the `docker_image` target in `docker/test:img1` is overridden by `extra_build_options` (`--no-cache`). Individual build option fields are deprecated in favor of using `extra_build_options`"
     )
