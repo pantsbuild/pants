@@ -122,8 +122,7 @@ class SingleThreadedProcessor(Processor):
         self._queue.put_nowait(
             (_MessageType.FINISH, _FinishDetails(timeout=timeout, context=context), context)
         )
-        if not self._finish_completed_event.wait(
-            timeout=timeout.total_seconds() * 1000.0 if timeout is not None else None
-        ):
+        timeout_seconds_opt = timeout.total_seconds() if timeout is not None else None
+        if not self._finish_completed_event.wait(timeout_seconds_opt):
             raise RuntimeError("Work unit processor failed to report completion.")
-        self._thread.join(timeout=timeout.total_seconds() if timeout is not None else None)
+        self._thread.join(timeout=timeout_seconds_opt)
