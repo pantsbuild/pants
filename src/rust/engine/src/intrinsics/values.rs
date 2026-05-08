@@ -2,10 +2,10 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use pyo3::types::{PyModule, PyModuleMethods};
-use pyo3::{pyfunction, wrap_pyfunction, Bound, PyResult, Python};
+use pyo3::{Bound, PyResult, Python, pyfunction, wrap_pyfunction};
 
 use crate::externs::PyGeneratorResponseNativeCall;
-use crate::nodes::{task_get_context, RunId, SessionValues};
+use crate::nodes::{RunId, SessionValues, task_get_context};
 
 pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(session_values, m)?)?;

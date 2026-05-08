@@ -20,7 +20,8 @@ from pants.engine.internals.native_engine import PyExecutor, PyNailgunServer
 from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import initialize_stdio, pants_log_path
 from pants.init.util import init_workdir
-from pants.option.global_options import GlobalOptions, LocalStoreOptions
+from pants.option.bootstrap_options import BootstrapOptions, LocalStoreOptions
+from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -36,6 +37,8 @@ from pants.version import VERSION
 _SHUTDOWN_TIMEOUT_SECS = 3
 
 _PRESERVED_ENV_VARS = [
+    # Provides location of sandboxer binary.
+    "PANTS_SANDBOXER_BINARY_PATH",
     # Controls backtrace behavior for rust code.
     "RUST_BACKTRACE",
     # The environment variables consumed by the `bollard` crate as of
@@ -48,6 +51,16 @@ _PRESERVED_ENV_VARS = [
     "HOME",
     "PATH",
     "USER",
+    # Environment variables needed to support downloading tools in a restricted internet environment
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "http_proxy",  # for historical reasons, in some environments, *_proxy variables must be lowercase
+    "https_proxy",
+    "no_proxy",
+    # Used by indicatif.
+    "TERM",
+    "NO_COLOR",
 ]
 
 
@@ -195,8 +208,10 @@ class PantsDaemon(PantsDaemonProcessManager):
         # Switch log output to the daemon's log stream, and empty `env` and `argv` to encourage all
         # further usage of those variables to happen via engine APIs and options.
         self._close_stdio(pants_log_path(PurePath(global_bootstrap_options.pants_workdir)))
-        with initialize_stdio(global_bootstrap_options), argv_as(tuple()), hermetic_environment_as(
-            *_PRESERVED_ENV_VARS
+        with (
+            initialize_stdio(global_bootstrap_options),
+            argv_as(tuple()),
+            hermetic_environment_as(*_PRESERVED_ENV_VARS),
         ):
             # Install signal and panic handling.
             ExceptionSink.install(
@@ -232,7 +247,11 @@ def launch_new_pantsd_instance():
     """An external entrypoint that spawns a new pantsd instance."""
 
     options_bootstrapper = OptionsBootstrapper.create(
-        env=os.environ, args=sys.argv, allow_pantsrc=True
+        args=sys.argv, env=os.environ, allow_pantsrc=True
     )
+
+    bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+    BootstrapOptions.maybe_enable_stack_trampoline(bootstrap_options)
+
     daemon = PantsDaemon.create(options_bootstrapper)
     daemon.run_sync()

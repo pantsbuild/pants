@@ -29,16 +29,13 @@ def test_determine_specified_tool_ids() -> None:
             only_option=["bad"],
             all_requests=[StyleReq],
         )
-    assert (
-        softwrap(
-            """
+    assert softwrap(
+        """
             Unrecognized name with the option `--fake-goal-only`: 'bad'
 
             All valid names: ['my-tool']
             """
-        )
-        in str(exc.value)
-    )
+    ) in str(exc.value)
 
 
 def test_write_reports() -> None:

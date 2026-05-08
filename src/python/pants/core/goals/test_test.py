@@ -4,11 +4,12 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Iterable
+from typing import Any
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
@@ -17,6 +18,7 @@ from pants.backend.python.goals import package_pex_binary
 from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
 from pants.backend.python.target_types_rules import rules as python_target_type_rules
 from pants.backend.python.util_rules import pex_from_targets
+from pants.core.environments.rules import ChosenLocalEnvironmentName
 from pants.core.goals.test import (
     BuildPackageDependenciesRequest,
     BuiltPackageDependencies,
@@ -27,7 +29,6 @@ from pants.core.goals.test import (
     RuntimePackageDependenciesField,
     ShowOutput,
     Test,
-    TestDebugAdapterRequest,
     TestDebugRequest,
     TestFieldSet,
     TestRequest,
@@ -40,25 +41,13 @@ from pants.core.goals.test import (
     run_tests,
 )
 from pants.core.subsystems.debug_adapter import DebugAdapterSubsystem
+from pants.core.target_types import GenericTarget
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.environments import (
-    ChosenLocalEnvironmentName,
-    SingleEnvironmentNameRequest,
-)
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.addresses import Address
 from pants.engine.console import Console
-from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    EMPTY_FILE_DIGEST,
-    Digest,
-    FileDigest,
-    MergeDigests,
-    Snapshot,
-    Workspace,
-)
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_FILE_DIGEST, FileDigest, Snapshot, Workspace
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.process import (
@@ -75,18 +64,12 @@ from pants.engine.target import (
     TargetRootsToFieldSets,
     TargetRootsToFieldSetsRequest,
 )
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import SkipOption
 from pants.option.subsystem import Subsystem
 from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.testutil.rule_runner import (
-    MockEffect,
-    MockGet,
-    QueryRule,
-    mock_console,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import QueryRule, mock_console, run_rule_with_mocks
 from pants.util.logging import LogLevel
 
 
@@ -109,6 +92,7 @@ def make_process_result_metadata(
             remote_execution=remote_execution,
             remote_execution_extra_platform_properties=[],
             execute_in_workspace=False,
+            keep_sandboxes="never",
         ),
         source,
         source_run_id,
@@ -192,7 +176,7 @@ class MockTestSubsystem(Subsystem):
 
 class MockTestRequest(TestRequest):
     field_set_type = MockTestFieldSet
-    tool_subsystem = MockTestSubsystem
+    tool_subsystem = MockTestSubsystem  # type: ignore[assignment]
 
     @staticmethod
     @abstractmethod
@@ -206,7 +190,7 @@ class MockTestRequest(TestRequest):
 
     @classmethod
     def test_result(cls, field_sets: Iterable[MockTestFieldSet]) -> TestResult:
-        addresses = [field_set.address for field_set in field_sets]
+        addresses = tuple(field_set.address for field_set in field_sets)
         return make_test_result(
             addresses,
             exit_code=cls.exit_code(addresses),
@@ -239,15 +223,18 @@ class ConditionallySucceedsRequest(MockTestRequest):
 
 
 def mock_partitioner(
-    request: MockTestRequest.PartitionRequest,
-    _: EnvironmentName,
+    __implicitly: tuple,
 ) -> Partitions[MockTestFieldSet, Any]:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == TestRequest.PartitionRequest
     return Partitions(Partition((field_set,), None) for field_set in request.field_sets)
 
 
-def mock_test_partition(request: MockTestRequest.Batch, _: EnvironmentName) -> TestResult:
-    request_type = {cls.Batch: cls for cls in MockTestRequest.__subclasses__()}[type(request)]
-    return request_type.test_result(request.elements)
+def mock_test_partition(__implicitly: tuple) -> TestResult:
+    request, typ = next(iter(__implicitly[0].items()))
+    assert typ == TestRequest.Batch
+    request_subtype = {cls.Batch: cls for cls in MockTestRequest.__subclasses__()}[type(request)]
+    return request_subtype.test_result(request.elements)
 
 
 @pytest.fixture
@@ -297,13 +284,13 @@ def run_test_rule(
         port="5678",
     )
     workspace = Workspace(rule_runner.scheduler, _enforce_effects=False)
-    union_membership = UnionMembership(
+    union_membership = UnionMembership.from_rules(
         {
-            TestFieldSet: [MockTestFieldSet],
-            TestRequest: [request_type],
-            TestRequest.PartitionRequest: [request_type.PartitionRequest],
-            TestRequest.Batch: [request_type.Batch],
-            CoverageDataCollection: [MockCoverageDataCollection],
+            UnionRule(TestFieldSet, MockTestFieldSet),
+            UnionRule(TestRequest, request_type),
+            UnionRule(TestRequest.PartitionRequest, request_type.PartitionRequest),
+            UnionRule(TestRequest.Batch, request_type.Batch),
+            UnionRule(CoverageDataCollection, MockCoverageDataCollection),
         }
     )
 
@@ -321,19 +308,15 @@ def run_test_rule(
         )
 
     def mock_debug_request(
-        _field_set: TestFieldSet, _environment_name: EnvironmentName
+        __implicitly: tuple,
     ) -> TestDebugRequest:
         return TestDebugRequest(InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST))
 
-    def mock_debug_adapter_request(_: TestFieldSet) -> TestDebugAdapterRequest:
-        return TestDebugAdapterRequest(
-            InteractiveProcess(["/bin/example"], input_digest=EMPTY_DIGEST)
-        )
-
     def mock_coverage_report_generation(
-        coverage_data_collection: MockCoverageDataCollection,
-        _: EnvironmentName,
+        __implicitly: tuple,
     ) -> CoverageReports:
+        coverage_data_collection, typ = next(iter(__implicitly[0].items()))
+        assert typ == CoverageDataCollection
         addresses = ", ".join(
             address.spec
             for coverage_data in coverage_data_collection
@@ -357,60 +340,23 @@ def run_test_rule(
                 run_id,
                 ChosenLocalEnvironmentName(EnvironmentName(None)),
             ],
-            mock_gets=[
-                MockGet(
-                    output_type=TargetRootsToFieldSets,
-                    input_types=(TargetRootsToFieldSetsRequest,),
-                    mock=mock_find_valid_field_sets,
+            mock_calls={
+                "pants.core.goals.test.partition_tests": mock_partitioner,
+                "pants.core.environments.rules.resolve_single_environment_name": lambda _a: EnvironmentName(
+                    None
                 ),
-                MockGet(
-                    output_type=Partitions,
-                    input_types=(TestRequest.PartitionRequest, EnvironmentName),
-                    mock=mock_partitioner,
-                ),
-                MockGet(
-                    output_type=EnvironmentName,
-                    input_types=(SingleEnvironmentNameRequest,),
-                    mock=lambda _a: EnvironmentName(None),
-                ),
-                MockGet(
-                    output_type=TestResult,
-                    input_types=(TestRequest.Batch, EnvironmentName),
-                    mock=mock_test_partition,
-                ),
-                MockGet(
-                    output_type=TestDebugRequest,
-                    input_types=(TestRequest.Batch, EnvironmentName),
-                    mock=mock_debug_request,
-                ),
-                MockGet(
-                    output_type=TestDebugAdapterRequest,
-                    input_types=(TestFieldSet,),
-                    mock=mock_debug_adapter_request,
-                ),
-                # Merge XML results.
-                MockGet(
-                    output_type=Digest,
-                    input_types=(MergeDigests,),
-                    mock=lambda _: EMPTY_DIGEST,
-                ),
-                MockGet(
-                    output_type=CoverageReports,
-                    input_types=(CoverageDataCollection, EnvironmentName),
-                    mock=mock_coverage_report_generation,
-                ),
-                MockGet(
-                    output_type=OpenFiles,
-                    input_types=(OpenFilesRequest,),
-                    mock=lambda _: OpenFiles(()),
-                ),
-                MockEffect(
-                    output_type=InteractiveProcessResult,
-                    input_types=(InteractiveProcess, EnvironmentName),
-                    mock=lambda _p, _e: InteractiveProcessResult(0),
-                ),
-            ],
+                "pants.core.goals.test.test_batch_to_debug_request": mock_debug_request,
+                "pants.core.goals.test.test_batch_to_debug_adapter_request": mock_debug_request,
+                "pants.core.goals.test.run_test_batch": mock_test_partition,
+                "pants.core.goals.test.create_coverage_report": mock_coverage_report_generation,
+                "pants.engine.internals.specs_rules.find_valid_field_sets_for_target_roots": mock_find_valid_field_sets,
+                "pants.engine.intrinsics.merge_digests": lambda _: EMPTY_DIGEST,
+                "pants.engine.intrinsics._interactive_process": lambda _p,
+                _e: InteractiveProcessResult(0),
+            },
             union_membership=union_membership,
+            # We don't want temporary warnings to interfere with our expected output.
+            show_warnings=False,
         )
         assert not stdio_reader.get_stdout()
         return result.exit_code, stdio_reader.get_stderr()
@@ -659,14 +605,18 @@ def test_coverage(rule_runner: PythonRuleRunner) -> None:
 
 
 def sort_results() -> None:
-    create_test_result = partial(
-        TestResult,
-        stdout="",
-        stdout_digest=EMPTY_FILE_DIGEST,
-        stderr="",
-        stderr_digest=EMPTY_FILE_DIGEST,
-        output_setting=ShowOutput.ALL,
-    )
+    def create_test_result(exit_code: int | None, addresses: Iterable[Address]) -> TestResult:
+        return TestResult(
+            exit_code=exit_code,
+            addresses=tuple(addresses),
+            stdout_bytes=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_bytes=b"",
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_setting=ShowOutput.ALL,
+            result_metadata=None,
+        )
+
     skip1 = create_test_result(
         exit_code=None,
         addresses=(Address("t1"),),
@@ -805,6 +755,44 @@ def test_runtime_package_dependencies() -> None:
     assert snapshot.files == ("src.py/main.pex",)
 
 
+def test_runtime_package_dependencies_via_generic_target() -> None:
+    """A `target()` listed in runtime_package_dependencies should be unwrapped so that its
+    packageable dependencies are built, rather than being silently ignored."""
+    rule_runner = PythonRuleRunner(
+        rules=[
+            build_runtime_package_dependencies,
+            *pex_from_targets.rules(),
+            *package_pex_binary.rules(),
+            *python_target_type_rules(),
+            QueryRule(BuiltPackageDependencies, [BuildPackageDependenciesRequest]),
+        ],
+        target_types=[PythonSourcesGeneratorTarget, PexBinary, GenericTarget],
+    )
+    rule_runner.set_options(args=[], env_inherit={"PATH", "PYENV_ROOT", "HOME"})
+
+    rule_runner.write_files(
+        {
+            "src/py/main_a.py": "",
+            "src/py/main_b.py": "",
+            "src/py/BUILD": dedent(
+                """\
+                pex_binary(name='bin_a', entry_point='main_a.py')
+                pex_binary(name='bin_b', entry_point='main_b.py')
+                target(
+                    name='all_bins',
+                    dependencies=[':bin_a', ':bin_b'],
+                )
+                """
+            ),
+        }
+    )
+    input_field = RuntimePackageDependenciesField(["src/py:all_bins"], Address("fake"))
+    result = rule_runner.request(
+        BuiltPackageDependencies, [BuildPackageDependenciesRequest(input_field)]
+    )
+    assert len(result) == 2
+
+
 def test_timeout_calculation() -> None:
     def assert_timeout_calculated(
         *,
@@ -835,8 +823,8 @@ def test_non_utf8_output() -> None:
     test_result = make_test_result(
         [],
         exit_code=1,  # "test error" so stdout/stderr are output in message
-        stdout_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
-        stderr_bytes=b"\x80\xBF",  # invalid UTF-8 as required by the test
+        stdout_bytes=b"\x80\xbf",  # invalid UTF-8 as required by the test
+        stderr_bytes=b"\x80\xbf",  # invalid UTF-8 as required by the test
         output_setting=ShowOutput.ALL,
     )
     assert test_result.message() == "failed (exit code 1).\n��\n��\n\n"

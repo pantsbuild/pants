@@ -7,29 +7,41 @@ import json
 import logging
 import os.path
 from collections import namedtuple
+from collections.abc import Callable
 from textwrap import dedent
-from typing import Callable, ContextManager, cast
+from typing import Any, ContextManager, cast
 
 import pytest
 
 from pants.backend.docker.goals.package_image import (
     DockerBuildTargetStageError,
+    DockerImageBuildProcess,
     DockerImageOptionValueError,
+    DockerImageRefs,
     DockerImageTagValueError,
     DockerInfoV1,
     DockerPackageFieldSet,
     DockerRepositoryNameError,
+    GetImageRefsRequest,
     ImageRefRegistry,
     ImageRefTag,
+    _docker_build_captured_output_path,
     build_docker_image,
+    get_docker_image_build_process,
+    get_image_refs,
     parse_image_id_from_docker_build_output,
     rules,
+)
+from pants.backend.docker.package_types import (
+    DockerPushOnPackageBehavior,
+    DockerPushOnPackageException,
 )
 from pants.backend.docker.registries import DockerRegistries, DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import (
     DockerImageTags,
+    DockerImageTagsField,
     DockerImageTagsRequest,
     DockerImageTarget,
 )
@@ -48,13 +60,17 @@ from pants.backend.docker.util_rules.docker_build_env import (
     DockerBuildEnvironmentRequest,
 )
 from pants.backend.docker.util_rules.docker_build_env import rules as build_env_rules
+from pants.core.goals.package import BuiltPackage
 from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_DIGEST,
     EMPTY_FILE_DIGEST,
     EMPTY_SNAPSHOT,
+    AddPrefix,
     CreateDigest,
     Digest,
+    DigestContents,
+    DigestSubset,
     FileContent,
     Snapshot,
 )
@@ -66,12 +82,12 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResultMetadata,
 )
-from pants.engine.target import InvalidFieldException, WrappedTarget, WrappedTargetRequest
+from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
-from pants.testutil.rule_runner import MockGet, QueryRule, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
@@ -96,23 +112,16 @@ class DockerImageTagsRequestPlugin(DockerImageTagsRequest):
     pass
 
 
-def assert_build(
+def _create_build_context_mock(
     rule_runner: RuleRunner,
     address: Address,
-    *extra_log_lines: str,
-    options: dict | None = None,
-    process_assertions: Callable[[Process], None] | None = None,
-    exit_code: int = 0,
-    copy_sources: tuple[str, ...] = (),
-    copy_build_args=(),
-    build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
-    version_tags: tuple[str, ...] = (),
-    plugin_tags: tuple[str, ...] = (),
-    expected_registries_metadata: None | list = None,
-) -> None:
+    build_context_snapshot: Snapshot,
+    copy_sources: tuple[str, ...],
+    copy_build_args,
+    version_tags: tuple[str, ...],
+):
+    """Create a mock function for create_docker_build_context."""
     tgt = rule_runner.get_target(address)
-    metadata_file_path: list[str] = []
-    metadata_file_contents: list[bytes] = []
 
     def build_context_mock(request: DockerBuildContextRequest) -> DockerBuildContext:
         return DockerBuildContext.create(
@@ -132,41 +141,13 @@ def assert_build(
             ),
         )
 
-    def run_process_mock(process: Process) -> FallibleProcessResult:
-        if process_assertions:
-            process_assertions(process)
+    return build_context_mock
 
-        return FallibleProcessResult(
-            exit_code=exit_code,
-            stdout=b"stdout",
-            stdout_digest=EMPTY_FILE_DIGEST,
-            stderr=b"stderr",
-            stderr_digest=EMPTY_FILE_DIGEST,
-            output_digest=EMPTY_DIGEST,
-            metadata=ProcessResultMetadata(
-                0,
-                ProcessExecutionEnvironment(
-                    environment_name=None,
-                    platform=Platform.create_for_localhost().value,
-                    docker_image=None,
-                    remote_execution=False,
-                    remote_execution_extra_platform_properties=[],
-                    execute_in_workspace=False,
-                ),
-                "ran_locally",
-                0,
-            ),
-        )
 
-    def mock_get_info_file(request: CreateDigest) -> Digest:
-        assert len(request) == 1
-        assert isinstance(request[0], FileContent)
-        metadata_file_path.append(request[0].path)
-        metadata_file_contents.append(request[0].content)
-        return EMPTY_DIGEST
-
+def _setup_docker_options(rule_runner: RuleRunner, options: dict | None) -> DockerOptions:
+    """Setup DockerOptions with sensible defaults."""
     if options:
-        opts = options or {}
+        opts = options.copy()
         opts.setdefault("registries", {})
         opts.setdefault("default_repository", "{name}")
         opts.setdefault("default_context_root", "")
@@ -177,76 +158,142 @@ def assert_build(
         opts.setdefault("build_no_cache", False)
         opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
-
-        docker_options = create_subsystem(
-            DockerOptions,
-            **opts,
-        )
+        opts.setdefault("suggest_renames", True)
+        opts.setdefault("push_on_package", DockerPushOnPackageBehavior.WARN)
+        return create_subsystem(DockerOptions, **opts)
     else:
-        docker_options = rule_runner.request(DockerOptions, [])
+        return rule_runner.request(DockerOptions, [])
 
-    global_options = rule_runner.request(GlobalOptions, [])
+
+def _create_union_membership() -> UnionMembership:
+    """Create union membership for Docker image tags plugin."""
+    return UnionMembership.from_rules(
+        [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
+    )
+
+
+def assert_build_process(
+    rule_runner: RuleRunner,
+    address: Address,
+    *,
+    options: dict | None = None,
+    build_process_assertions: Callable[[DockerImageBuildProcess], None] | None = None,
+    copy_sources: tuple[str, ...] = (),
+    copy_build_args=(),
+    build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
+    version_tags: tuple[str, ...] = (),
+    image_refs: DockerImageRefs | None = None,
+) -> DockerImageBuildProcess:
+    """Test helper for get_docker_image_build_process rule.
+
+    Tests Process construction without execution. Returns DockerImageBuildProcess for validation.
+    Tests can access result.process for Process-specific assertions.
+    """
+    tgt = rule_runner.get_target(address)
+
+    # Auto-generate image_refs if not provided (same logic as old assert_build)
+    if image_refs is None:
+        repository = address.target_name
+        image_tags = tgt.get(DockerImageTagsField).value
+        tags_to_use = ("latest",) if image_tags is None else image_tags
+        image_refs = DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=None,
+                    repository=repository,
+                    tags=tuple(
+                        ImageRefTag(
+                            template=tag,
+                            formatted=tag,
+                            full_name=f"{repository}:{tag}",
+                            uses_local_alias=False,
+                        )
+                        for tag in tags_to_use
+                    ),
+                )
+            ]
+        )
+
+    build_context_mock = _create_build_context_mock(
+        rule_runner, address, build_context_snapshot, copy_sources, copy_build_args, version_tags
+    )
+    docker_options = _setup_docker_options(rule_runner, options)
 
     result = run_rule_with_mocks(
-        build_docker_image,
+        get_docker_image_build_process,
         rule_args=[
             DockerPackageFieldSet.create(tgt),
             docker_options,
-            global_options,
             DockerBinary("/dummy/docker"),
-            KeepSandboxes.never,
-            UnionMembership.from_rules(
-                [UnionRule(DockerImageTagsRequest, DockerImageTagsRequestPlugin)]
-            ),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DockerBuildContext,
-                input_types=(DockerBuildContextRequest,),
-                mock=build_context_mock,
-            ),
-            MockGet(
-                output_type=WrappedTarget,
-                input_types=(WrappedTargetRequest,),
-                mock=lambda _: WrappedTarget(tgt),
-            ),
-            MockGet(
-                output_type=DockerImageTags,
-                input_types=(DockerImageTagsRequestPlugin,),
-                mock=lambda _: DockerImageTags(plugin_tags),
-            ),
-            MockGet(
-                output_type=FallibleProcessResult,
-                input_types=(Process,),
-                mock=run_process_mock,
-            ),
-            MockGet(
-                output_type=Digest,
-                input_types=(CreateDigest,),
-                mock=mock_get_info_file,
-            ),
-        ],
+        mock_calls={
+            "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
+            "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
+            "pants.backend.docker.goals.package_image.get_image_refs": lambda _: image_refs,
+        },
+        union_membership=_create_union_membership(),
+        show_warnings=False,
     )
 
-    assert result.digest == EMPTY_DIGEST
-    assert len(result.artifacts) == 1
-    assert len(metadata_file_path) == len(metadata_file_contents) == 1
-    assert result.artifacts[0].relpath == metadata_file_path[0]
+    # Run optional assertions
+    if build_process_assertions:
+        build_process_assertions(result)
 
-    metadata = json.loads(metadata_file_contents[0])
-    # basic checks that we can always do
-    assert metadata["version"] == 1
-    assert metadata["image_id"] == "<unknown>"
-    assert isinstance(metadata["registries"], list)
-    # detailed checks, if the test opts in
-    if expected_registries_metadata is not None:
-        assert metadata["registries"] == expected_registries_metadata
-
-    for log_line in extra_log_lines:
-        assert log_line in result.artifacts[0].extra_log_lines
+    return result
 
 
-def test_build_docker_image(rule_runner: RuleRunner) -> None:
+def assert_get_image_refs(
+    rule_runner: RuleRunner,
+    address: Address,
+    *,
+    options: dict | None = None,
+    expected_refs: DockerImageRefs | None = None,
+    version_tags: tuple[str, ...] = (),
+    plugin_tags: tuple[str, ...] = (),
+    copy_sources: tuple[str, ...] = (),
+    copy_build_args=(),
+    build_context_snapshot: Snapshot = EMPTY_SNAPSHOT,
+    build_upstream_images: bool = True,
+) -> DockerImageRefs:
+    """Test helper for get_image_refs rule.
+
+    Returns DockerImageRefs for validation. Optionally asserts against expected_refs.
+    """
+    tgt = rule_runner.get_target(address)
+
+    build_context_mock = _create_build_context_mock(
+        rule_runner, address, build_context_snapshot, copy_sources, copy_build_args, version_tags
+    )
+    docker_options = _setup_docker_options(rule_runner, options)
+    union_membership = _create_union_membership()
+
+    field_set = DockerPackageFieldSet.create(tgt)
+    result = run_rule_with_mocks(
+        get_image_refs,
+        rule_args=[
+            GetImageRefsRequest(
+                field_set=field_set,
+                build_upstream_images=build_upstream_images,
+            ),
+            docker_options,
+            union_membership,
+        ],
+        mock_calls={
+            "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
+            "pants.engine.internals.graph.resolve_target": lambda *_, **__: WrappedTarget(tgt),
+            "pants.backend.docker.target_types.get_docker_image_tags": lambda *_,
+            **__: DockerImageTags(plugin_tags),
+        },
+        union_membership=union_membership,
+    )
+
+    if expected_refs is not None:
+        assert result == expected_refs
+
+    return result
+
+
+def test_get_image_refs(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
@@ -290,93 +337,141 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
         }
     )
 
-    assert_build(
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="test1"),
-        "Built docker image: test/test1:1.2.3",
-        expected_registries_metadata=[
-            dict(
-                alias=None,
-                address=None,
-                repository="test/test1",
-                tags=[
-                    dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="test/test1:1.2.3",
-                    )
-                ],
-            )
-        ],
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=None,
+                    repository="test/test1",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="test/test1:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="test2"),
-        "Built docker image: test2:1.2.3",
-        expected_registries_metadata=[
-            dict(
-                alias=None,
-                address=None,
-                repository="test2",
-                tags=[
-                    dict(template="1.2.3", tag="1.2.3", uses_local_alias=False, name="test2:1.2.3")
-                ],
-            )
-        ],
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=None,
+                    repository="test2",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="test2:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="test3"),
-        "Built docker image: docker/test/test3:1.2.3",
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=None,
+                    repository="docker/test/test3",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="docker/test/test3:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="test4"),
-        "Built docker image: test/four/test-four:1.2.3",
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=None,
+                    repository="test/four/test-four",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="test/four/test-four:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="test5"),
-        (
-            "Built docker images: \n"
-            "  * test/test5:latest\n"
-            "  * test/test5:alpha-1.0\n"
-            "  * test/test5:alpha-1"
-        ),
         options=dict(default_repository="{directory}/{name}"),
-        expected_registries_metadata=[
-            dict(
-                alias=None,
-                address=None,
-                repository="test/test5",
-                tags=[
-                    dict(
-                        template="alpha-1",
-                        tag="alpha-1",
-                        uses_local_alias=False,
-                        name="test/test5:alpha-1",
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=None,
+                    repository="test/test5",
+                    tags=(
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            full_name="test/test5:latest",
+                            uses_local_alias=False,
+                        ),
+                        ImageRefTag(
+                            template="alpha-1.0",
+                            formatted="alpha-1.0",
+                            full_name="test/test5:alpha-1.0",
+                            uses_local_alias=False,
+                        ),
+                        ImageRefTag(
+                            template="alpha-1",
+                            formatted="alpha-1",
+                            full_name="test/test5:alpha-1",
+                            uses_local_alias=False,
+                        ),
                     ),
-                    dict(
-                        template="alpha-1.0",
-                        tag="alpha-1.0",
-                        uses_local_alias=False,
-                        name="test/test5:alpha-1.0",
-                    ),
-                    dict(
-                        template="latest",
-                        tag="latest",
-                        uses_local_alias=False,
-                        name="test/test5:latest",
-                    ),
-                ],
-            )
-        ],
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="test6"),
-        "Built docker image: xyz/docker/test/test6:1.2.3",
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=None,
+                    repository="xyz/docker/test/test6",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="xyz/docker/test/test6:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
 
     err1 = (
@@ -386,13 +481,13 @@ def test_build_docker_image(rule_runner: RuleRunner) -> None:
         r"pants, parent_directory, tags, target_repository\."
     )
     with pytest.raises(DockerRepositoryNameError, match=err1):
-        assert_build(
+        assert_get_image_refs(
             rule_runner,
             Address("docker/test", target_name="err1"),
         )
 
 
-def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
+def test_get_image_refs_with_registries(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
@@ -417,211 +512,267 @@ def test_build_image_with_registries(rule_runner: RuleRunner) -> None:
         "default_repository": "{name}",
         "registries": {
             "reg1": {"address": "myregistry1domain:port"},
-            "reg2": {"address": "myregistry2domain:port", "default": "true"},
+            "reg2": {"address": "myregistry2domain:port", "default": True},
             "extra": {"address": "extra", "extra_image_tags": ["latest"]},
         },
     }
 
-    assert_build(
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="addr1"),
-        "Built docker image: myregistry1domain:port/addr1:1.2.3",
         options=options,
-        expected_registries_metadata=[
-            dict(
-                alias="reg1",
-                address="myregistry1domain:port",
-                repository="addr1",
-                tags=[
-                    dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="myregistry1domain:port/addr1:1.2.3",
-                    )
-                ],
-            )
-        ],
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(address="myregistry1domain:port", alias="reg1"),
+                    repository="addr1",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="myregistry1domain:port/addr1:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="addr2"),
-        "Built docker image: myregistry2domain:port/addr2:1.2.3",
         options=options,
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(
+                        address="myregistry2domain:port", alias="reg2", default=True
+                    ),
+                    repository="addr2",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="myregistry2domain:port/addr2:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="addr3"),
-        "Built docker image: myregistry3domain:port/addr3:1.2.3",
         options=options,
-        expected_registries_metadata=[
-            dict(
-                alias=None,
-                address="myregistry3domain:port",
-                repository="addr3",
-                tags=[
-                    dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="myregistry3domain:port/addr3:1.2.3",
-                    )
-                ],
-            )
-        ],
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(address="myregistry3domain:port"),
+                    repository="addr3",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="myregistry3domain:port/addr3:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="alias1"),
-        "Built docker image: myregistry1domain:port/alias1:1.2.3",
         options=options,
-        expected_registries_metadata=[
-            dict(
-                alias="reg1",
-                address="myregistry1domain:port",
-                repository="alias1",
-                tags=[
-                    dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="myregistry1domain:port/alias1:1.2.3",
-                    )
-                ],
-            )
-        ],
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(alias="reg1", address="myregistry1domain:port"),
+                    repository="alias1",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="myregistry1domain:port/alias1:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="alias2"),
-        "Built docker image: myregistry2domain:port/alias2:1.2.3",
         options=options,
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(
+                        address="myregistry2domain:port", alias="reg2", default=True
+                    ),
+                    repository="alias2",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="myregistry2domain:port/alias2:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="alias3"),
-        "Built docker image: reg3/alias3:1.2.3",
         options=options,
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(address="reg3"),
+                    repository="alias3",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="reg3/alias3:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="unreg"),
-        "Built docker image: unreg:1.2.3",
         options=options,
-        expected_registries_metadata=[
-            dict(
-                alias=None,
-                address=None,
-                repository="unreg",
-                tags=[
-                    dict(template="1.2.3", tag="1.2.3", uses_local_alias=False, name="unreg:1.2.3")
-                ],
-            )
-        ],
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=None,
+                    repository="unreg",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="unreg:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="def"),
-        "Built docker image: myregistry2domain:port/def:1.2.3",
         options=options,
-        expected_registries_metadata=[
-            dict(
-                alias="reg2",
-                address="myregistry2domain:port",
-                repository="def",
-                tags=[
-                    dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="myregistry2domain:port/def:1.2.3",
-                    )
-                ],
-            )
-        ],
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(
+                        address="myregistry2domain:port", alias="reg2", default=True
+                    ),
+                    repository="def",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="myregistry2domain:port/def:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="multi"),
-        (
-            "Built docker images: \n"
-            "  * myregistry2domain:port/multi:1.2.3\n"
-            "  * myregistry1domain:port/multi:1.2.3"
-        ),
         options=options,
-        expected_registries_metadata=[
-            dict(
-                alias="reg1",
-                address="myregistry1domain:port",
-                repository="multi",
-                tags=[
-                    dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="myregistry1domain:port/multi:1.2.3",
-                    )
-                ],
-            ),
-            dict(
-                alias="reg2",
-                address="myregistry2domain:port",
-                repository="multi",
-                tags=[
-                    dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="myregistry2domain:port/multi:1.2.3",
-                    )
-                ],
-            ),
-        ],
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(
+                        address="myregistry2domain:port", alias="reg2", default=True
+                    ),
+                    repository="multi",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="myregistry2domain:port/multi:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(alias="reg1", address="myregistry1domain:port"),
+                    repository="multi",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="myregistry1domain:port/multi:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
-    assert_build(
+
+    assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="extra_tags"),
-        (
-            "Built docker images: \n"
-            "  * myregistry1domain:port/extra_tags:1.2.3\n"
-            "  * extra/extra_tags:1.2.3\n"
-            "  * extra/extra_tags:latest"
-        ),
         options=options,
-        expected_registries_metadata=[
-            dict(
-                alias="extra",
-                address="extra",
-                repository="extra_tags",
-                tags=[
-                    dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="extra/extra_tags:1.2.3",
+        expected_refs=DockerImageRefs(
+            [
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(address="myregistry1domain:port", alias="reg1"),
+                    repository="extra_tags",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="myregistry1domain:port/extra_tags:1.2.3",
+                            uses_local_alias=False,
+                        ),
                     ),
-                    dict(
-                        template="latest",
-                        tag="latest",
-                        uses_local_alias=False,
-                        name="extra/extra_tags:latest",
+                ),
+                ImageRefRegistry(
+                    registry=DockerRegistryOptions(
+                        alias="extra", address="extra", extra_image_tags=("latest",)
                     ),
-                ],
-            ),
-            dict(
-                alias="reg1",
-                address="myregistry1domain:port",
-                repository="extra_tags",
-                tags=[
-                    dict(
-                        template="1.2.3",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="myregistry1domain:port/extra_tags:1.2.3",
-                    )
-                ],
-            ),
-        ],
+                    repository="extra_tags",
+                    tags=(
+                        ImageRefTag(
+                            template="1.2.3",
+                            formatted="1.2.3",
+                            full_name="extra/extra_tags:1.2.3",
+                            uses_local_alias=False,
+                        ),
+                        ImageRefTag(
+                            template="latest",
+                            formatted="latest",
+                            full_name="extra/extra_tags:latest",
+                            uses_local_alias=False,
+                        ),
+                    ),
+                ),
+            ]
+        ),
     )
 
 
@@ -696,8 +847,8 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
         },
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -707,7 +858,7 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
             "docker/test/Dockerfile",
             ".",
         )
-        assert process.env == FrozenDict(
+        assert result.process.env == FrozenDict(
             {
                 "INHERIT": "from Pants env",
                 "VAR": "value",
@@ -715,18 +866,402 @@ def test_docker_build_process_environment(rule_runner: RuleRunner) -> None:
             }
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="env1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
+
+
+def test_build_docker_image(rule_runner: RuleRunner) -> None:
+    """Test build_docker_image rule orchestration and metadata creation."""
+    rule_runner.write_files(
+        {"docker/test/BUILD": 'docker_image(name="img1", image_tags=["1.2.3"])'}
+    )
+
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+    under_test_fs = DockerPackageFieldSet.create(tgt)
+    metadata_file_path: list[str] = []
+    metadata_file_contents: list[bytes] = []
+
+    # Create mock DockerImageBuildProcess
+    image_refs = DockerImageRefs(
+        [
+            ImageRefRegistry(
+                registry=None,
+                repository="img1",
+                tags=(
+                    ImageRefTag(
+                        template="1.2.3",
+                        formatted="1.2.3",
+                        full_name="img1:1.2.3",
+                        uses_local_alias=False,
+                    ),
+                ),
+            )
+        ]
+    )
+
+    process = Process(
+        argv=(
+            "/dummy/docker",
+            "build",
+            "--tag",
+            "img1:1.2.3",
+            "--pull=False",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        ),
+        description="docker build",
+        input_digest=EMPTY_DIGEST,
+    )
+
+    build_context = DockerBuildContext.create(
+        snapshot=EMPTY_SNAPSHOT,
+        upstream_image_ids=[],
+        dockerfile_info=DockerfileInfo(
+            tgt.address,
+            digest=EMPTY_DIGEST,
+            source="docker/test/Dockerfile",
+        ),
+        build_args=DockerBuildArgs(()),
+        build_env=DockerBuildEnvironment.create({}),
+    )
+
+    mock_build_process = DockerImageBuildProcess(
+        process=process,
+        context=build_context,
+        context_root=".",
+        image_refs=image_refs,
+        tags=("img1:1.2.3",),
+    )
+
+    # Mock get_docker_image_build_process to return our mock
+    def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set == under_test_fs
+        return mock_build_process
+
+    # Mock execute_process to return success with image ID
+    def mock_execute_process(_process: Process) -> FallibleProcessResult:
+        return FallibleProcessResult(
+            exit_code=0,
+            stdout=b"Successfully built abc123\n",
+            stderr=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                    keep_sandboxes="never",
+                ),
+                "ran_locally",
+                0,
+            ),
+        )
+
+    # Mock create_digest to capture metadata
+    def mock_create_digest(request: CreateDigest) -> Digest:
+        assert len(request) == 1
+        assert isinstance(request[0], FileContent)
+        metadata_file_path.append(request[0].path)
+        metadata_file_contents.append(request[0].content)
+        return EMPTY_DIGEST
+
+    docker_options = _setup_docker_options(rule_runner, None)
+    global_options = rule_runner.request(GlobalOptions, [])
+
+    # Execute the rule
+    result = run_rule_with_mocks(
+        build_docker_image,
+        rule_args=[
+            under_test_fs,
+            docker_options,
+            global_options,
+            DockerBinary("/dummy/docker"),
+            KeepSandboxes.never,
+        ],
+        mock_calls={
+            "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+            "pants.engine.intrinsics.execute_process": mock_execute_process,
+            "pants.engine.intrinsics.create_digest": mock_create_digest,
+        },
+        show_warnings=False,
+    )
+
+    # Validate BuiltPackage result
+    assert result.digest == EMPTY_DIGEST
+    assert len(result.artifacts) == 1
+    assert len(metadata_file_path) == 1
+    assert result.artifacts[0].relpath == metadata_file_path[0]
+
+    # Validate metadata file content
+    metadata = json.loads(metadata_file_contents[0])
+    assert metadata["version"] == 1
+    assert metadata["image_id"] == "abc123"
+    assert isinstance(metadata["registries"], list)
+    assert len(metadata["registries"]) == 1
+    assert metadata["registries"][0]["repository"] == "img1"
+    assert metadata["registries"][0]["tags"][0]["tag"] == "1.2.3"
+
+
+def test_build_docker_image_packages_local_output_digest(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  image_tags=["1.2.3"],
+                  output_files=["bin/app"],
+                  output_directories=["share"],
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+    under_test_fs = DockerPackageFieldSet.create(tgt)
+    build_process = assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        options=dict(use_buildx=True),
+    )
+    exported_digest = rule_runner.request(
+        Digest,
+        [
+            CreateDigest(
+                [
+                    FileContent("bin/app", b"app"),
+                    FileContent("share/data.txt", b"data"),
+                ]
+            )
+        ],
+    )
+
+    def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set == under_test_fs
+        return build_process
+
+    def mock_execute_process(process: Process) -> FallibleProcessResult:
+        assert process == build_process.process
+        return FallibleProcessResult(
+            exit_code=0,
+            stdout=b"exported local output\n",
+            stderr=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=exported_digest,
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                    keep_sandboxes="never",
+                ),
+                "ran_locally",
+                0,
+            ),
+        )
+
+    def mock_add_prefix(request: AddPrefix) -> Digest:
+        return rule_runner.request(Digest, [request])
+
+    def mock_digest_subset_to_digest(request: DigestSubset) -> Digest:
+        return rule_runner.request(Digest, [request])
+
+    def mock_digest_to_snapshot(digest: Digest) -> Snapshot:
+        return rule_runner.request(Snapshot, [digest])
+
+    result = run_rule_with_mocks(
+        build_docker_image,
+        rule_args=[
+            under_test_fs,
+            _setup_docker_options(rule_runner, dict(use_buildx=True)),
+            rule_runner.request(GlobalOptions, []),
+            DockerBinary("/dummy/docker"),
+            KeepSandboxes.never,
+        ],
+        mock_calls={
+            "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+            "pants.engine.intrinsics.execute_process": mock_execute_process,
+            "pants.engine.intrinsics.digest_subset_to_digest": mock_digest_subset_to_digest,
+            "pants.engine.intrinsics.add_prefix": mock_add_prefix,
+            "pants.engine.intrinsics.digest_to_snapshot": mock_digest_to_snapshot,
+        },
+        show_warnings=False,
+    )
+
+    assert [artifact.relpath for artifact in result.artifacts] == [
+        "docker/test/bin/app",
+        "docker/test/share/data.txt",
+    ]
+    assert rule_runner.request(DigestContents, [result.digest]) == DigestContents(
+        [
+            FileContent("docker/test/bin/app", b"app"),
+            FileContent("docker/test/share/data.txt", b"data"),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ["output_path", "expected"],
+    [
+        (None, "docker/test"),
+        ('output_path="custom/path",', "custom/path"),
+        ('output_path="",', "."),
+    ],
+)
+def test_docker_output_capture_output_path(
+    rule_runner: RuleRunner, output_path: str | None, expected: str
+) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  output_files=["bin/app"],
+                  {output_path or ""}
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+
+    assert _docker_build_captured_output_path(DockerPackageFieldSet.create(tgt)) == expected
+
+
+@pytest.mark.parametrize(
+    ["outputs_match_mode", "expect_error"],
+    [
+        (None, False),
+        ('outputs_match_mode="all",', True),
+        ('outputs_match_mode="allow_empty",', False),
+    ],
+)
+def test_docker_output_capture_checks_outputs_match_mode(
+    rule_runner: RuleRunner,
+    caplog,
+    outputs_match_mode: str | None,
+    expect_error: bool,
+) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  output_files=["coredns"],
+                  {outputs_match_mode or ""}
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+    under_test_fs = DockerPackageFieldSet.create(tgt)
+    build_process = assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        options=dict(use_buildx=True),
+    )
+
+    def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set == under_test_fs
+        return build_process
+
+    def mock_execute_process(process: Process) -> FallibleProcessResult:
+        assert process == build_process.process
+        return FallibleProcessResult(
+            exit_code=0,
+            stdout=b"exported local output\n",
+            stderr=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                    keep_sandboxes="never",
+                ),
+                "ran_locally",
+                0,
+            ),
+        )
+
+    def mock_add_prefix(request: AddPrefix) -> Digest:
+        return rule_runner.request(Digest, [request])
+
+    def mock_digest_to_snapshot(digest: Digest) -> Snapshot:
+        assert digest == EMPTY_DIGEST
+        return EMPTY_SNAPSHOT
+
+    mock_calls: dict[str, Callable[..., Any]] | None = {
+        "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+        "pants.engine.intrinsics.execute_process": mock_execute_process,
+        "pants.engine.intrinsics.digest_subset_to_digest": lambda _: EMPTY_DIGEST,
+        "pants.engine.intrinsics.add_prefix": mock_add_prefix,
+        "pants.engine.intrinsics.digest_to_snapshot": mock_digest_to_snapshot,
+        "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
+    }
+    rule_args = [
+        under_test_fs,
+        _setup_docker_options(rule_runner, dict(use_buildx=True)),
+        rule_runner.request(GlobalOptions, []),
+        DockerBinary("/dummy/docker"),
+        KeepSandboxes.never,
+    ]
+
+    if expect_error:
+        with pytest.raises(ValueError, match="requires all output globs to actually match"):
+            run_rule_with_mocks(
+                build_docker_image,
+                rule_args=rule_args,
+                mock_calls=mock_calls,
+                show_warnings=False,
+            )
+    else:
+        result = run_rule_with_mocks(
+            build_docker_image,
+            rule_args=rule_args,
+            mock_calls=mock_calls,
+            show_warnings=False,
+        )
+        assert result == BuiltPackage(EMPTY_DIGEST, ())
+
+    if outputs_match_mode is None:
+        assert "requires all output globs to actually match" in caplog.text
+        assert "coredns (from `output_files` field)" in caplog.text
+    else:
+        assert "requires all output globs to actually match" not in caplog.text
 
 
 def test_docker_build_pull(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"docker/test/BUILD": 'docker_image(name="args1", pull=True)'})
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=True",
@@ -737,10 +1272,10 @@ def test_docker_build_pull(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="args1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
@@ -756,8 +1291,8 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -769,8 +1304,8 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    def check_docker_proc_no_squash(process: Process):
-        assert process.argv == (
+    def check_build_process_no_squash(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -781,15 +1316,15 @@ def test_docker_build_squash(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="args1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="args2"),
-        process_assertions=check_docker_proc_no_squash,
+        build_process_assertions=check_build_process_no_squash,
     )
 
 
@@ -805,8 +1340,8 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         },
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -822,17 +1357,17 @@ def test_docker_build_args(rule_runner: RuleRunner) -> None:
         )
 
         # Check that we pull in name only args via env.
-        assert process.env == FrozenDict(
+        assert result.process.env == FrozenDict(
             {
                 "INHERIT": "from Pants env",
                 "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="args1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
@@ -847,26 +1382,17 @@ def test_docker_image_version_from_build_arg(rule_runner: RuleRunner) -> None:
         },
     )
 
-    assert_build(
+    refs = assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="ver1"),
-        "Built docker image: ver1:1.2.3",
-        expected_registries_metadata=[
-            dict(
-                alias=None,
-                address=None,
-                repository="ver1",
-                tags=[
-                    dict(
-                        template="{build_args.VERSION}",
-                        tag="1.2.3",
-                        uses_local_alias=False,
-                        name="ver1:1.2.3",
-                    )
-                ],
-            )
-        ],
     )
+    assert len(refs) == 1
+    assert refs[0].registry is None
+    assert refs[0].repository == "ver1"
+    assert len(refs[0].tags) == 1
+    assert refs[0].tags[0].template == "{build_args.VERSION}"
+    assert refs[0].tags[0].formatted == "1.2.3"
+    assert refs[0].tags[0].full_name == "ver1:1.2.3"
 
 
 def test_docker_repository_from_build_arg(rule_runner: RuleRunner) -> None:
@@ -880,11 +1406,13 @@ def test_docker_repository_from_build_arg(rule_runner: RuleRunner) -> None:
         },
     )
 
-    assert_build(
+    refs = assert_get_image_refs(
         rule_runner,
         Address("docker/test", target_name="image"),
-        "Built docker image: test/image:latest",
     )
+    assert refs[0].repository == "test/image"
+    assert refs[0].tags[0].formatted == "latest"
+    assert refs[0].tags[0].full_name == "test/image:latest"
 
 
 def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
@@ -915,8 +1443,8 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
         },
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -935,17 +1463,17 @@ def test_docker_extra_build_args_field(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-        assert process.env == FrozenDict(
+        assert result.process.env == FrozenDict(
             {
                 "FROM_ENV": "env value",
                 "__UPSTREAM_IMAGE_IDS": "",
             }
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
@@ -967,8 +1495,8 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -985,10 +1513,10 @@ def test_docker_build_secrets_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
@@ -1006,8 +1534,8 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -1020,10 +1548,10 @@ def test_docker_build_ssh_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
@@ -1046,8 +1574,8 @@ def test_docker_build_no_cache_option(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -1059,10 +1587,10 @@ def test_docker_build_no_cache_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
@@ -1086,8 +1614,8 @@ def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--add-host",
@@ -1104,10 +1632,10 @@ def test_docker_build_hosts_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
@@ -1125,8 +1653,8 @@ def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "buildx",
             "build",
@@ -1140,10 +1668,10 @@ def test_docker_cache_to_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
         options=dict(use_buildx=True),
     )
 
@@ -1162,8 +1690,8 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "buildx",
             "build",
@@ -1178,38 +1706,49 @@ def test_docker_cache_from_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
         options=dict(use_buildx=True),
     )
 
 
-def test_docker_output_option(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    ["output", "expected_output_arg"],
+    [
+        (None, "--output=type=docker"),
+        ({"type": "registry"}, "--output=type=registry"),
+        ({"type": "image", "push": "true"}, "--output=type=image,push=true"),
+    ],
+)
+def test_docker_output_option(
+    rule_runner: RuleRunner, output: dict | None, expected_output_arg: str
+) -> None:
     """Testing non-default output type 'image'.
 
     Default output type 'docker' tested implicitly in other scenarios
     """
+    output_str = f"output={repr(output)}," if output else ""
     rule_runner.write_files(
         {
             "docker/test/BUILD": dedent(
-                """\
+                f"""\
                 docker_image(
                   name="img1",
-                  output={"type": "image"}
+                  {output_str}
                 )
                 """
             ),
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess) -> None:
+        assert result.process.argv == (
             "/dummy/docker",
             "buildx",
             "build",
-            "--output=type=image",
+            expected_output_arg,
             "--pull=False",
             "--tag",
             "img1:latest",
@@ -1218,12 +1757,449 @@ def test_docker_output_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
+        options=dict(use_buildx=True, push_on_package=DockerPushOnPackageBehavior.ALLOW),
+    )
+
+
+@pytest.mark.parametrize(
+    ["capture_fields", "expected_output_files", "expected_output_directories"],
+    [
+        (
+            'output_files=["bin/app"],',
+            ("bin/app",),
+            (),
+        ),
+        (
+            'output_directories=["dist"],',
+            (),
+            ("dist",),
+        ),
+        (
+            'output_files=["bin/app"], output_directories=["share"],',
+            ("bin/app",),
+            ("share",),
+        ),
+    ],
+)
+def test_docker_output_capture_fields_override_default_output(
+    rule_runner: RuleRunner,
+    capture_fields: str,
+    expected_output_files: tuple[str, ...],
+    expected_output_directories: tuple[str, ...],
+) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  {capture_fields}
+                )
+                """
+            ),
+        }
+    )
+
+    def check_build_process(result: DockerImageBuildProcess) -> None:
+        assert result.process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            "--output=type=local,dest=.",
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+        assert result.process.output_files == expected_output_files
+        assert result.process.output_directories == expected_output_directories
+
+    assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        build_process_assertions=check_build_process,
         options=dict(use_buildx=True),
     )
+
+
+def test_docker_output_capture_fields_error_with_explicit_output(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  output={"type": "registry"},
+                  output_files=["bin/app"],
+                )
+                """
+            ),
+        }
+    )
+
+    with pytest.raises(
+        InvalidFieldException,
+        match=(r"The `docker_image` docker/test:img1 sets both `output` and output capture fields"),
+    ):
+        assert_build_process(
+            rule_runner,
+            Address("docker/test", target_name="img1"),
+            options=dict(use_buildx=True),
+        )
+
+
+@pytest.mark.parametrize(
+    ["output", "expect_error", "expected_output_arg"],
+    [
+        (None, False, "--output=type=docker"),
+        ({"type": "registry"}, True, None),
+        ({"type": "image", "push": "true"}, True, None),
+    ],
+)
+def test_docker_output_option_when_push_on_package_error(
+    rule_runner: RuleRunner,
+    output: dict | None,
+    expect_error: bool,
+    expected_output_arg: str | None,
+) -> None:
+    output_str = f"output={repr(output)}," if output else ""
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  {output_str}
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+    under_test_fs = DockerPackageFieldSet.create(tgt)
+
+    def check_build_process(result: DockerImageBuildProcess) -> None:
+        assert result.process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            expected_output_arg,
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    build_process = assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        build_process_assertions=check_build_process if expected_output_arg else None,
+        options=dict(use_buildx=True),
+    )
+
+    def mock_execute_process(process: Process) -> FallibleProcessResult:
+        assert process == build_process.process
+        return FallibleProcessResult(
+            exit_code=0,
+            stdout=b"Successfully built abc123",
+            stderr=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                    keep_sandboxes="never",
+                ),
+                "ran_locally",
+                0,
+            ),
+        )
+
+    def mock_create_digest(request: CreateDigest) -> Digest:
+        return EMPTY_DIGEST
+
+    def mock_get_build_process_success(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set == under_test_fs
+        return build_process
+
+    docker_options = _setup_docker_options(
+        rule_runner, dict(use_buildx=True, push_on_package=DockerPushOnPackageBehavior.ERROR)
+    )
+    global_options = rule_runner.request(GlobalOptions, [])
+
+    try:
+        run_rule_with_mocks(
+            build_docker_image,
+            rule_args=[
+                under_test_fs,
+                docker_options,
+                global_options,
+                DockerBinary("/dummy/docker"),
+                KeepSandboxes.never,
+            ],
+            mock_calls={
+                "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process_success,
+                "pants.engine.intrinsics.execute_process": mock_execute_process,
+                "pants.engine.intrinsics.create_digest": mock_create_digest,
+            },
+            show_warnings=False,
+        )
+    except DockerPushOnPackageException:
+        assert expect_error
+    else:
+        assert not expect_error
+
+
+@pytest.mark.parametrize(
+    ["output", "expected_output_arg", "expected_message"],
+    [
+        (None, "--output=type=docker", None),
+        (
+            {"type": "registry"},
+            "--output=type=registry",
+            "Docker image docker/test:img1 will push to a registry during packaging",
+        ),
+        (
+            {"type": "image", "push": "true"},
+            "--output=type=image,push=true",
+            "Docker image docker/test:img1 will push to a registry during packaging",
+        ),
+    ],
+)
+def test_docker_output_option_when_push_on_package_warn(
+    rule_runner: RuleRunner,
+    caplog: pytest.LogCaptureFixture,
+    output: dict | None,
+    expected_output_arg: str,
+    expected_message: str | None,
+) -> None:
+    output_str = f"output={repr(output)}," if output else ""
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  {output_str}
+                )
+                """
+            ),
+        }
+    )
+
+    # Step 1: Validate Process construction using assert_build_process
+    def check_build_process(result: DockerImageBuildProcess) -> None:
+        assert result.process.argv == (
+            "/dummy/docker",
+            "buildx",
+            "build",
+            expected_output_arg,
+            "--pull=False",
+            "--tag",
+            "img1:latest",
+            "--file",
+            "docker/test/Dockerfile",
+            ".",
+        )
+
+    build_process = assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        build_process_assertions=check_build_process,
+        options=dict(use_buildx=True),
+    )
+
+    # Step 2: Test build_docker_image with WARN behavior
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+    under_test_fs = DockerPackageFieldSet.create(tgt)
+
+    def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set == under_test_fs
+        return build_process
+
+    def mock_execute_process(_process: Process) -> FallibleProcessResult:
+        return FallibleProcessResult(
+            exit_code=0,
+            stdout=b"Successfully built abc123",
+            stderr=b"",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                    keep_sandboxes="never",
+                ),
+                "ran_locally",
+                0,
+            ),
+        )
+
+    def mock_create_digest(_request: CreateDigest) -> Digest:
+        return EMPTY_DIGEST
+
+    docker_options = _setup_docker_options(
+        rule_runner, dict(use_buildx=True, push_on_package=DockerPushOnPackageBehavior.WARN)
+    )
+    global_options = rule_runner.request(GlobalOptions, [])
+
+    caplog.set_level(logging.WARNING)
+
+    run_rule_with_mocks(
+        build_docker_image,
+        rule_args=[
+            under_test_fs,
+            docker_options,
+            global_options,
+            DockerBinary("/dummy/docker"),
+            KeepSandboxes.never,
+        ],
+        mock_calls={
+            "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+            "pants.engine.intrinsics.execute_process": mock_execute_process,
+            "pants.engine.intrinsics.create_digest": mock_create_digest,
+        },
+        show_warnings=False,
+    )
+
+    # Validate warning was logged
+    has_message = expected_message in [
+        record.message for record in caplog.records if record.levelno == logging.WARNING
+    ]
+    assert has_message is (expected_message is not None)
+
+
+@pytest.mark.parametrize(
+    ["output", "expected_output_arg"],
+    [
+        (None, "--output=type=docker"),
+        ({"type": "registry"}, None),
+        ({"type": "image", "push": "true"}, None),
+    ],
+)
+def test_docker_output_option_when_push_on_package_ignore(
+    rule_runner: RuleRunner, output: dict | None, expected_output_arg: str | None
+) -> None:
+    output_str = f"output={repr(output)}," if output else ""
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  {output_str}
+                )
+                """
+            ),
+        }
+    )
+    docker_options = _setup_docker_options(
+        rule_runner, dict(use_buildx=True, push_on_package=DockerPushOnPackageBehavior.IGNORE)
+    )
+    global_options = rule_runner.request(GlobalOptions, [])
+    tgt = rule_runner.get_target(Address("docker/test", target_name="img1"))
+    under_test_fs = DockerPackageFieldSet.create(tgt)
+
+    if expected_output_arg:
+        # Step 1: Validate Process construction using assert_build_process
+        def check_build_process(result: DockerImageBuildProcess) -> None:
+            assert result.process.argv == (
+                "/dummy/docker",
+                "buildx",
+                "build",
+                expected_output_arg,
+                "--pull=False",
+                "--tag",
+                "img1:latest",
+                "--file",
+                "docker/test/Dockerfile",
+                ".",
+            )
+
+        build_process = assert_build_process(
+            rule_runner,
+            Address("docker/test", target_name="img1"),
+            build_process_assertions=check_build_process,
+            options=dict(use_buildx=True),
+        )
+
+        def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+            assert field_set == under_test_fs
+            return build_process
+
+        def mock_execute_process(process: Process) -> FallibleProcessResult:
+            assert process == build_process.process
+            return FallibleProcessResult(
+                exit_code=0,
+                stdout=b"Successfully built abc123",
+                stderr=b"",
+                stdout_digest=EMPTY_FILE_DIGEST,
+                stderr_digest=EMPTY_FILE_DIGEST,
+                output_digest=EMPTY_DIGEST,
+                metadata=ProcessResultMetadata(
+                    0,
+                    ProcessExecutionEnvironment(
+                        environment_name=None,
+                        platform=Platform.create_for_localhost().value,
+                        docker_image=None,
+                        remote_execution=False,
+                        remote_execution_extra_platform_properties=[],
+                        execute_in_workspace=False,
+                        keep_sandboxes="never",
+                    ),
+                    "ran_locally",
+                    0,
+                ),
+            )
+
+        def mock_create_digest(_request: CreateDigest) -> Digest:
+            return EMPTY_DIGEST
+
+        mock_calls: dict[str, Callable[..., Any]] | None = {
+            "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+            "pants.engine.intrinsics.execute_process": mock_execute_process,
+            "pants.engine.intrinsics.create_digest": mock_create_digest,
+        }
+    else:
+        mock_calls = None
+
+    result = run_rule_with_mocks(
+        build_docker_image,
+        rule_args=[
+            under_test_fs,
+            docker_options,
+            global_options,
+            DockerBinary("/dummy/docker"),
+            KeepSandboxes.never,
+        ],
+        mock_calls=mock_calls,
+        show_warnings=False,
+    )
+
+    assert result.digest == EMPTY_DIGEST
+    assert len(result.artifacts) == (1 if expected_output_arg else 0)
 
 
 def test_docker_output_option_raises_when_no_buildkit(rule_runner: RuleRunner) -> None:
@@ -1244,7 +2220,7 @@ def test_docker_output_option_raises_when_no_buildkit(rule_runner: RuleRunner) -
         DockerImageOptionValueError,
         match=r"Buildx must be enabled via the Docker subsystem options in order to use this field.",
     ):
-        assert_build(
+        assert_build_process(
             rule_runner,
             Address("docker/test", target_name="img1"),
         )
@@ -1264,8 +2240,8 @@ def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--network=host",
@@ -1277,10 +2253,10 @@ def test_docker_build_network_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
@@ -1298,8 +2274,8 @@ def test_docker_build_platform_option(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--platform=linux/amd64,linux/arm64,linux/arm/v7",
@@ -1311,10 +2287,10 @@ def test_docker_build_platform_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
@@ -1339,8 +2315,8 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--label",
@@ -1359,13 +2335,14 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
     )
 
 
+@pytest.mark.parametrize("suggest_renames", [True, False])
 @pytest.mark.parametrize(
     "context_root, copy_sources, build_context_files, expect_logged, fail_log_contains",
     [
@@ -1415,22 +2392,16 @@ def test_docker_build_labels_option(rule_runner: RuleRunner) -> None:
                 "docker/test/config/.a",
                 "docker/test/config/.conf.d/b",
             ),
+            [(logging.WARNING, "Docker build failed for `docker_image` docker/test:test.")],
             [
-                (
-                    logging.WARNING,
-                    (
-                        "Docker build failed for `docker_image` docker/test:test. "
-                        "There are files in the Docker build context that were not referenced by "
-                        "any `COPY` instruction (this is not an error):\n"
-                        "\n"
-                        "  * ..unusal-name\n"
-                        "  * .a\n"
-                        "  * .conf.d/b\n"
-                        "  * .rc\n"
-                    ),
-                )
+                "There are files in the Docker build context that were not referenced by "
+                "any `COPY` instruction (this is not an error):\n"
+                "\n"
+                "  * ..unusal-name\n"
+                "  * .a\n"
+                "  * .conf.d/b\n"
+                "  * .rc\n"
             ],
-            [],
         ),
     ],
 )
@@ -1442,23 +2413,119 @@ def test_docker_build_fail_logs(
     build_context_files: tuple[str, ...],
     expect_logged: list[tuple[int, str]] | None,
     fail_log_contains: list[str],
+    suggest_renames: bool,
 ) -> None:
     caplog.set_level(logging.INFO)
     rule_runner.write_files({"docker/test/BUILD": f"docker_image(context_root={context_root!r})"})
     build_context_files = ("docker/test/Dockerfile", *build_context_files)
     build_context_snapshot = rule_runner.make_snapshot_of_empty_files(build_context_files)
-    with pytest.raises(ProcessExecutionFailure):
-        assert_build(
-            rule_runner,
-            Address("docker/test"),
+    suggest_renames_arg = (
+        "--docker-suggest-renames" if suggest_renames else "--no-docker-suggest-renames"
+    )
+    rule_runner.set_options([suggest_renames_arg])
+
+    # Step 1: Get the build process
+    tgt = rule_runner.get_target(Address("docker/test"))
+    address = Address("docker/test")
+
+    build_context_mock = _create_build_context_mock(
+        rule_runner, address, build_context_snapshot, copy_sources, (), ()
+    )
+    docker_options = _setup_docker_options(rule_runner, None)
+    global_options = rule_runner.request(GlobalOptions, [])
+
+    # Get image refs
+    repository = address.target_name
+    image_tags = tgt.get(DockerImageTagsField).value
+    tags_to_use = ("latest",) if image_tags is None else image_tags
+    image_refs = DockerImageRefs(
+        [
+            ImageRefRegistry(
+                registry=None,
+                repository=repository,
+                tags=tuple(
+                    ImageRefTag(
+                        template=tag,
+                        formatted=tag,
+                        full_name=f"{repository}:{tag}",
+                        uses_local_alias=False,
+                    )
+                    for tag in tags_to_use
+                ),
+            )
+        ]
+    )
+
+    # Step 2: Create the build process with the get_docker_image_build_process rule
+    under_test_fs = DockerPackageFieldSet.create(tgt)
+    build_process = run_rule_with_mocks(
+        get_docker_image_build_process,
+        rule_args=[
+            under_test_fs,
+            docker_options,
+            DockerBinary("/dummy/docker"),
+        ],
+        mock_calls={
+            "pants.backend.docker.util_rules.docker_build_context.create_docker_build_context": build_context_mock,
+            "pants.engine.internals.graph.resolve_target": lambda _: WrappedTarget(tgt),
+            "pants.backend.docker.goals.package_image.get_image_refs": lambda _: image_refs,
+        },
+        show_warnings=False,
+    )
+
+    # Step 3: Test that build_docker_image handles the failure properly
+    def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set == under_test_fs
+        return build_process
+
+    def mock_execute_process(_process: Process) -> FallibleProcessResult:
+        # Simulate Docker build failure
+        return FallibleProcessResult(
             exit_code=1,
-            copy_sources=copy_sources,
-            build_context_snapshot=build_context_snapshot,
+            stdout=b"stdout",
+            stderr=b"stderr",
+            stdout_digest=EMPTY_FILE_DIGEST,
+            stderr_digest=EMPTY_FILE_DIGEST,
+            output_digest=EMPTY_DIGEST,
+            metadata=ProcessResultMetadata(
+                0,
+                ProcessExecutionEnvironment(
+                    environment_name=None,
+                    platform=Platform.create_for_localhost().value,
+                    docker_image=None,
+                    remote_execution=False,
+                    remote_execution_extra_platform_properties=[],
+                    execute_in_workspace=False,
+                    keep_sandboxes="never",
+                ),
+                "ran_locally",
+                0,
+            ),
+        )
+
+    with pytest.raises(ProcessExecutionFailure):
+        run_rule_with_mocks(
+            build_docker_image,
+            rule_args=[
+                under_test_fs,
+                docker_options,
+                global_options,
+                DockerBinary("/dummy/docker"),
+                KeepSandboxes.never,
+            ],
+            mock_calls={
+                "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+                "pants.engine.intrinsics.execute_process": mock_execute_process,
+            },
+            show_warnings=False,
         )
 
     assert_logged(caplog, expect_logged)
     for msg in fail_log_contains:
-        assert msg in caplog.records[0].message
+        if suggest_renames:
+            assert msg in caplog.records[0].message
+        else:
+            assert msg not in caplog.records[0].message
 
 
 @pytest.mark.parametrize(
@@ -1484,8 +2551,8 @@ def test_build_target_stage(
         }
     )
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -1498,24 +2565,12 @@ def test_build_target_stage(
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("", target_name="image"),
         options=options,
-        process_assertions=check_docker_proc,
+        build_process_assertions=check_build_process,
         version_tags=("build latest", "dev latest", "prod latest"),
-        expected_registries_metadata=[
-            dict(
-                address=None,
-                alias=None,
-                repository="image",
-                tags=[
-                    dict(
-                        template="latest", tag="latest", uses_local_alias=False, name="image:latest"
-                    )
-                ],
-            )
-        ],
     )
 
 
@@ -1538,7 +2593,7 @@ def test_invalid_build_target_stage(rule_runner: RuleRunner) -> None:
         r"such stage in `Dockerfile`\. Available stages: build, dev, prod\."
     )
     with pytest.raises(DockerBuildTargetStageError, match=err):
-        assert_build(
+        assert_build_process(
             rule_runner,
             Address("", target_name="image"),
             version_tags=("build latest", "dev latest", "prod latest"),
@@ -1730,6 +2785,26 @@ def test_get_context_root(
                 #13 unpacking to my-host.com/repo:latest done
                 #13 DONE 0.1s
                 """
+            ),
+            "",
+        ),
+        # Buildkit with containerd-snapshotter 0.17.1 and disabled attestations
+        (
+            DockerBinary("/bin/docker", "1234", is_podman=False),
+            "sha256:6c3aff6414781126578b3e7b4a217682e89c616c0eac864d5b3ea7c87f1094d0",
+            dedent(
+                """\
+                    #24 exporting to image
+                    #24 exporting layers done
+                    #24 preparing layers for inline cache
+                    #24 preparing layers for inline cache 0.4s done
+                    #24 exporting manifest sha256:6c3aff6414781126578b3e7b4a217682e89c616c0eac864d5b3ea7c87f1094d0 0.0s done
+                    #24 exporting config sha256:af716170542d95134cb41b56e2dfea2c000b05b6fc4f440158ed9834ff96d1b4 0.0s done
+                    #24 naming to REDACTED:latest done
+                    #24 unpacking to REDACTED:latest 0.0s done
+                    #24 DONE 0.5s
+
+                    """
             ),
             "",
         ),
@@ -2067,8 +3142,14 @@ def test_docker_image_tags_from_plugin_hook(
 ) -> None:
     rule_runner.write_files({"docker/test/BUILD": BUILD})
 
-    def check_docker_proc(process: Process):
-        assert process.argv == (
+    refs = assert_get_image_refs(
+        rule_runner,
+        Address("docker/test", target_name="plugin"),
+        plugin_tags=plugin_tags,
+    )
+
+    def check_build_process(result: DockerImageBuildProcess):
+        assert result.process.argv == (
             "/dummy/docker",
             "build",
             "--pull=False",
@@ -2078,11 +3159,11 @@ def test_docker_image_tags_from_plugin_hook(
             ".",
         )
 
-    assert_build(
+    assert_build_process(
         rule_runner,
         Address("docker/test", target_name="plugin"),
-        process_assertions=check_docker_proc,
-        plugin_tags=plugin_tags,
+        build_process_assertions=check_build_process,
+        image_refs=refs,
     )
 
 
@@ -2091,7 +3172,7 @@ def test_docker_image_tags_defined(rule_runner: RuleRunner) -> None:
 
     err = "The `image_tags` field in target docker/test:no-tags must not be empty, unless"
     with pytest.raises(InvalidFieldException, match=err):
-        assert_build(
+        assert_build_process(
             rule_runner,
             Address("docker/test", target_name="no-tags"),
         )
@@ -2214,3 +3295,24 @@ def test_docker_info_serialize() -> None:
 
     result = DockerInfoV1.serialize(image_refs, image_id)
     assert json.loads(result) == expected
+
+
+@pytest.mark.parametrize(
+    ("output", "expected"),
+    [
+        ({"type": "image", "push": "true"}, True),
+        ({"type": "registry"}, True),
+        ({"type": "local", "dest": "."}, False),
+        (None, False),
+    ],
+)
+def test_field_set_pushes_on_package(output: dict | None, expected: bool) -> None:
+    rule_runner = RuleRunner(target_types=[DockerImageTarget])
+    output_str = f", output={output}" if output else ""
+    rule_runner.write_files(
+        {"BUILD": f"docker_image(name='image', source='Dockerfile'{output_str})"}
+    )
+    field_set = DockerPackageFieldSet.create(
+        rule_runner.get_target(Address("", target_name="image"))
+    )
+    assert field_set.pushes_on_package() is expected

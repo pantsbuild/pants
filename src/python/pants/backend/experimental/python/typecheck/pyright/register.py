@@ -8,7 +8,7 @@ See https://github.com/Microsoft/pyright for details.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.javascript.subsystems import nodejs
 from pants.backend.python.typecheck.pyright import rules as pyright_rules

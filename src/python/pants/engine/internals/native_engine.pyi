@@ -1,28 +1,17 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# pants: infer-dep(native_engine.so)
+# pants: infer-dep(native_engine.so.metadata)
+
 from __future__ import annotations
 
+from collections.abc import Callable, Coroutine, Generator, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
+from enum import Enum
 from io import RawIOBase
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    FrozenSet,
-    Generic,
-    Iterable,
-    Mapping,
-    Optional,
-    Protocol,
-    Sequence,
-    TextIO,
-    Tuple,
-    TypeVar,
-    overload,
-)
-
-from typing_extensions import Self
+from pathlib import Path
+from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
     CreateDigest,
@@ -37,9 +26,9 @@ from pants.engine.fs import (
 )
 from pants.engine.internals.docker import DockerResolveImageRequest, DockerResolveImageResult
 from pants.engine.internals.native_dep_inference import (
-    NativeParsedDockerfileInfo,
-    NativeParsedJavascriptDependencies,
-    NativeParsedPythonDependencies,
+    NativeDockerfileInfo,
+    NativeJavascriptFileDependencies,
+    NativePythonFileDependencies,
 )
 from pants.engine.internals.scheduler import Workunit, _PathGlobsAndRootCollection
 from pants.engine.internals.session import RunId, SessionValues
@@ -61,13 +50,45 @@ from pants.engine.process import (
 class PyFailure:
     def get_error(self) -> Exception | None: ...
 
+K = TypeVar("K")
+V = TypeVar("V")
+
+class FrozenDict(Mapping[K, V]):
+    """A wrapper around a normal `dict` that removes all methods to mutate the instance and that
+    implements __hash__.
+
+    This should be used instead of normal dicts when working with the engine because normal dicts
+    are not safe to use.
+    """
+
+    @overload
+    def __new__(cls, __items: Iterable[tuple[K, V]], **kwargs: V) -> Self: ...
+    @overload
+    def __new__(cls, __other: Mapping[K, V], **kwargs: V) -> Self: ...
+    @overload
+    def __new__(cls, **kwargs: V) -> Self: ...
+    @classmethod
+    def deep_freeze(cls, data: Mapping[K, V]) -> Self: ...
+    @staticmethod
+    def frozen(to_freeze: Mapping[K, V]) -> FrozenDict[K, V]: ...
+    def __getitem__(self, k: K) -> V: ...
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[K]: ...
+    def __reversed__(self) -> Iterator[K]: ...
+    def __eq__(self, other: Any) -> Any: ...
+    def __lt__(self, other: Any) -> bool: ...
+    def __or__(self, other: Any) -> FrozenDict[K, V]: ...
+    def __ror__(self, other: Any) -> FrozenDict[K, V]: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
+
 # ------------------------------------------------------------------------------
 # Address
 # ------------------------------------------------------------------------------
 
-BANNED_CHARS_IN_TARGET_NAME: FrozenSet
-BANNED_CHARS_IN_GENERATED_NAME: FrozenSet
-BANNED_CHARS_IN_PARAMETERS: FrozenSet
+BANNED_CHARS_IN_TARGET_NAME: frozenset
+BANNED_CHARS_IN_GENERATED_NAME: frozenset
+BANNED_CHARS_IN_PARAMETERS: frozenset
 
 def address_spec_parse(
     spec: str,
@@ -164,6 +185,7 @@ class AddressInput:
         directory, i.e. a target which leaves off `name`.
         """
         ...
+
     @property
     def spec(self) -> str: ...
     @property
@@ -179,6 +201,7 @@ class AddressInput:
     def file_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a file on disk."""
         ...
+
     def dir_to_address(self) -> Address:
         """Converts to an Address by assuming that the path_component is a directory on disk."""
         ...
@@ -214,6 +237,7 @@ class Address:
           them, this will always be relative.
         """
         ...
+
     @property
     def spec_path(self) -> str: ...
     @property
@@ -231,6 +255,7 @@ class Address:
     def is_parametrized_subset_of(self, other: Address) -> bool:
         """True if this Address is == to the given Address, but with a subset of its parameters."""
         ...
+
     @property
     def filename(self) -> str: ...
     @property
@@ -245,18 +270,21 @@ class Address:
         "relative" spec notation.
         """
         ...
+
     @property
     def path_safe_spec(self) -> str: ...
     def parametrize(self, parameters: Mapping[str, str], replace: bool = False) -> Address:
         """Creates a new Address with the given `parameters` merged or replaced over
         self.parameters."""
         ...
+
     def maybe_convert_to_target_generator(self) -> Address:
         """If this address is generated or parametrized, convert it to its generator target.
 
         Otherwise, return self unmodified.
         """
         ...
+
     def create_generated(self, generated_name: str) -> Address: ...
     def create_file(self, relative_file_path: str) -> Address: ...
     def debug_hint(self) -> str: ...
@@ -266,6 +294,51 @@ class Address:
     # the stub in order for mypy to accept them as comparable.
     def __lt__(self, other: Any) -> bool: ...
     def __gt__(self, other: Any) -> bool: ...
+
+# ------------------------------------------------------------------------------
+# Union
+# ------------------------------------------------------------------------------
+
+class UnionRule:
+    union_base: type
+    union_member: type
+
+    def __init__(self, union_base: type, union_member: type) -> None: ...
+
+_T = TypeVar("_T", bound=type)
+
+class UnionMembership:
+    @staticmethod
+    def from_rules(rules: Iterable[UnionRule]) -> UnionMembership: ...
+    @staticmethod
+    def empty() -> UnionMembership: ...
+    def __contains__(self, union_type: _T) -> bool: ...
+    def __getitem__(self, union_type: _T) -> Sequence[_T]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, this will raise an
+        IndexError.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
+
+    def get(self, union_type: _T) -> Sequence[_T]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, return an empty
+        Sequence.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
+
+    def items(self) -> Iterable[tuple[type, Sequence[type]]]: ...
+    def is_member(self, union_type: type, putative_member: type) -> bool: ...
+    def has_members(self, union_type: type) -> bool:
+        """Check whether the union has an implementation or not."""
 
 # ------------------------------------------------------------------------------
 # Scheduler
@@ -288,6 +361,7 @@ class _NoValue:
     def __bool__(self) -> bool:
         """NB: Always returns `False`."""
         ...
+
     def __repr__(self) -> str: ...
 
 # Marker for unspecified field values that should use the default value if applicable.
@@ -361,6 +435,8 @@ class Field:
 
     value: ImmutableValue | None
 
+    _raw_value_type: ClassVar[str]
+
     def __init__(self, raw_value: Any | None, address: Address) -> None: ...
     @classmethod
     def compute_value(cls, raw_value: Any | None, address: Address) -> ImmutableValue:
@@ -373,16 +449,134 @@ class Field:
         """
         ...
 
+_ST = TypeVar("_ST")
+
+class ScalarField(Field, Generic[_ST]):
+    expected_type: ClassVar[type[_ST]]
+    expected_type_description: ClassVar[str]
+    value: _ST | None
+    default: ClassVar[_ST | None] = None
+
+    @classmethod
+    def compute_value(cls, raw_value: Any | None, address: Address) -> _ST | None: ...
+
+class BoolField(ScalarField[bool]):
+    """A field whose value is a boolean.
+
+    Subclasses must either set `default: bool` or `required = True` so that the value is always
+    defined.
+    """
+
+    expected_type: ClassVar[type[bool]]
+    expected_type_description: ClassVar[str]
+    value: bool
+    default: ClassVar[bool]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool, address: Address) -> bool: ...  # type: ignore[override]
+
+class TriBoolField(ScalarField[bool]):
+    """A field whose value is a boolean or None, which is meant to represent a tri-state."""
+
+    expected_type: ClassVar[type[bool]]
+    expected_type_description: ClassVar[str]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool | None, address: Address) -> bool | None: ...
+
+class StringField(ScalarField[str]):
+    expected_type: ClassVar[type[str]]
+    expected_type_description: ClassVar[str]
+    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None]
+
+    @classmethod
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None: ...
+
+_ET = TypeVar("_ET")
+
+class SequenceField(Field, Generic[_ET]):
+    expected_element_type: ClassVar[type]
+    expected_type_description: ClassVar[str]
+    value: tuple[_ET, ...] | None
+    default: ClassVar[tuple[_ET, ...] | None] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[Any] | None, address: Address
+    ) -> tuple[_ET, ...] | None: ...
+
+class StringSequenceField(SequenceField[str]):
+    expected_element_type: ClassVar[type[str]]
+    expected_type_description: ClassVar[str]
+    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[str, ...] | None: ...
+
+# NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter
+# which order you use for inheriting the field template vs. the mixin.
+class AsyncFieldMixin(Field):
+    """A mixin to store the field's original `Address` for use during hydration by the engine.
+
+    Typically, you should also create a dataclass representing the hydrated value and another for
+    the request, then a rule to go from the request to the hydrated value. The request class should
+    store the async field as a property.
+
+    (Why use the request class as the rule input, rather than the field itself? It's a wrapper so
+    that subclasses of the async field work properly, given that the engine uses exact type IDs.
+    This is like WrappedTarget.)
+
+    For example:
+
+        class Sources(StringSequenceField, AsyncFieldMixin):
+            alias = "sources"
+
+            # Often, async fields will want to define entry points like this to allow subclasses to
+            # change behavior.
+            def validate_resolved_files(self, files: Sequence[str]) -> None:
+                pass
+
+
+        @dataclass(frozen=True)
+        class HydrateSourcesRequest:
+            field: Sources
+
+
+        @dataclass(frozen=True)
+        class HydratedSources:
+            snapshot: Snapshot
+
+
+        @rule
+        async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
+            digest = await path_globs_to_digest(PathGlobs(request.field.value))
+            result = await digest_to_snapshot(digest)
+            request.field.validate_resolved_files(result.files)
+            ...
+            return HydratedSources(result)
+
+    Then, call sites can `await` if they need to hydrate the field, even if they subclassed
+    the original async field to have custom behavior:
+
+        sources1 = hydrate_sources(HydrateSourcesRequest(my_tgt.get(Sources)))
+        sources2 = hydrate_sources(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
+    """
+
+    address: Address
+
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: Any) -> bool: ...
+    def __ne__(self, other: Any) -> bool: ...
+    def __repr__(self) -> str: ...
+
 # ------------------------------------------------------------------------------
 # FS
 # ------------------------------------------------------------------------------
 
 class Digest:
-    """A Digest is a lightweight reference to a set of files known about by the engine.
-
-    You can use `await Get(Snapshot, Digest)` to see the file names referred to, or use `await
-    Get(DigestContents, Digest)` to see the actual file content.
-    """
+    """A Digest is a lightweight reference to a set of files known about by the engine."""
 
     def __init__(self, fingerprint: str, serialized_bytes_length: int) -> None: ...
     @property
@@ -409,11 +603,8 @@ class Snapshot:
     """A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
     names/content.
 
-    You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
-
     The `files` and `dirs` properties are symlink oblivious. If you require knowing about symlinks,
-    you can use the `digest` property to request the `DigestEntries`:
-    `await Get(DigestEntries, Digest, snapshot.digest)`.
+    you can use the `digest` property to request the `DigestEntries`.
     """
 
     @classmethod
@@ -441,12 +632,8 @@ class Snapshot:
 class MergeDigests:
     """A request to merge several digests into one single digest.
 
-    This will fail if there are any conflicting changes, such as two digests having the same
-    file but with different content.
-
-    Example:
-
-        result = await Get(Digest, MergeDigests([digest1, digest2])
+    This will fail if there are any conflicting changes, such as two digests having the same file
+    but with different content.
     """
 
     def __init__(self, digests: Iterable[Digest]) -> None: ...
@@ -455,12 +642,7 @@ class MergeDigests:
     def __repr__(self) -> str: ...
 
 class AddPrefix:
-    """A request to add the specified prefix path to every file and directory in the digest.
-
-    Example:
-
-        result = await Get(Digest, AddPrefix(input_digest, "my_dir")
-    """
+    """A request to add the specified prefix path to every file and directory in the digest."""
 
     def __init__(self, digest: Digest, prefix: str) -> None: ...
     def __eq__(self, other: AddPrefix | Any) -> bool: ...
@@ -472,10 +654,6 @@ class RemovePrefix:
 
     This will fail if there are any files or directories in the original input digest without the
     specified prefix.
-
-    Example:
-
-        result = await Get(Digest, RemovePrefix(input_digest, "my_dir")
     """
 
     def __init__(self, digest: Digest, prefix: str) -> None: ...
@@ -575,13 +753,13 @@ async def interactive_process(
 async def docker_resolve_image(request: DockerResolveImageRequest) -> DockerResolveImageResult: ...
 async def parse_dockerfile_info(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedDockerfileInfo: ...
+) -> tuple[tuple[str, NativeDockerfileInfo]]: ...
 async def parse_python_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedPythonDependencies: ...
+) -> tuple[tuple[str, NativePythonFileDependencies]]: ...
 async def parse_javascript_deps(
     deps_request: NativeDependenciesRequest,
-) -> NativeParsedJavascriptDependencies: ...
+) -> tuple[tuple[str, NativeJavascriptFileDependencies]]: ...
 async def path_metadata_request(request: PathMetadataRequest) -> PathMetadataResult: ...
 
 # ------------------------------------------------------------------------------
@@ -610,6 +788,8 @@ class ProcessExecutionEnvironment:
         remote_execution: bool,
         remote_execution_extra_platform_properties: Sequence[tuple[str, str]],
         execute_in_workspace: bool,
+        # Must be a `KeepSandboxes` value
+        keep_sandboxes: str,
     ) -> None: ...
     def __eq__(self, other: ProcessExecutionEnvironment | Any) -> bool: ...
     def __hash__(self) -> int: ...
@@ -651,45 +831,120 @@ class PantsdClientException(Exception):
 # Options
 # ------------------------------------------------------------------------------
 
+class PyGoalInfo:
+    def __init__(
+        self, scope_name: str, is_builtin: bool, is_auxiliary: bool, aliases: tuple[str, ...]
+    ) -> None: ...
+
 class PyOptionId:
     def __init__(
         self, *components: str, scope: str | None = None, switch: str | None = None
     ) -> None: ...
 
+class PyNgInvocation:
+    @staticmethod
+    def empty() -> PyNgInvocation: ...
+    @staticmethod
+    def from_args(args: tuple[str, ...]) -> PyNgInvocation: ...
+    def global_flag_strings(self) -> tuple[str, ...]: ...
+    def specs(self) -> tuple[str, ...]: ...
+    def goals(self) -> tuple[str, ...]: ...
+    def passthru(self) -> tuple[str, ...]: ...
+
+class PyPantsCommand:
+    def builtin_or_auxiliary_goal(self) -> str | None: ...
+    def goals(self) -> list[str]: ...
+    def unknown_goals(self) -> list[str]: ...
+    def specs(self) -> list[str]: ...
+    def passthru(self) -> list[str]: ...
+
 class PyConfigSource:
     def __init__(self, path: str, content: bytes) -> None: ...
 
+# See src/rust/engine/src/externs/options.rs for the Rust-side versions of these types.
 T = TypeVar("T")
-# A pair of (option value, rank). See src/python/pants/option/ranked_value.py.
-OptionValue = Tuple[Optional[T], int]
-OptionListValue = Tuple[list[T], int]
-OptionDictValue = Tuple[dict[str, Any], int]
+
+# List of tuples of (value, rank, details string).
+OptionValueDerivation = list[tuple[T, int, str]]
+
+# A tuple (value, rank of value, optional derivation of value).
+OptionValue = tuple[T | None, int, OptionValueDerivation | None]
+
+def py_bin_name() -> str: ...
 
 class PyOptionParser:
     def __init__(
         self,
-        args: Optional[Sequence[str]],
+        buildroot: Path | None,
+        args: Sequence[str] | None,
         env: dict[str, str],
-        configs: Optional[Sequence[PyConfigSource]],
+        configs: Sequence[PyConfigSource] | None,
         allow_pantsrc: bool,
+        include_derivation: bool,
+        known_scopes_to_flags: dict[str, frozenset[str]] | None,
+        known_goals: Sequence[PyGoalInfo] | None,
     ) -> None: ...
-    def get_bool(self, option_id: PyOptionId, default: Optional[bool]) -> OptionValue[bool]: ...
-    def get_int(self, option_id: PyOptionId, default: Optional[int]) -> OptionValue[int]: ...
-    def get_float(self, option_id: PyOptionId, default: Optional[float]) -> OptionValue[float]: ...
-    def get_string(self, option_id: PyOptionId, default: Optional[str]) -> OptionValue[str]: ...
+    def get_bool(self, option_id: PyOptionId, default: bool | None) -> OptionValue[bool]: ...
+    def get_int(self, option_id: PyOptionId, default: int | None) -> OptionValue[int]: ...
+    def get_float(self, option_id: PyOptionId, default: float | None) -> OptionValue[float]: ...
+    def get_string(self, option_id: PyOptionId, default: str | None) -> OptionValue[str]: ...
     def get_bool_list(
-        self, option_id: PyOptionId, default: list[bool]
-    ) -> OptionListValue[bool]: ...
-    def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionListValue[int]: ...
+        self, option_id: PyOptionId, default: Iterable[bool]
+    ) -> OptionValue[list[bool]]: ...
+    def get_int_list(
+        self, option_id: PyOptionId, default: Iterable[int]
+    ) -> OptionValue[list[int]]: ...
     def get_float_list(
-        self, option_id: PyOptionId, default: list[float]
-    ) -> OptionListValue[float]: ...
+        self, option_id: PyOptionId, default: Iterable[float]
+    ) -> OptionValue[list[float]]: ...
     def get_string_list(
-        self, option_id: PyOptionId, default: list[str]
-    ) -> OptionListValue[str]: ...
-    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionDictValue: ...
-    def get_passthrough_args(self) -> Optional[list[str]]: ...
+        self, option_id: PyOptionId, default: Iterable[str]
+    ) -> OptionValue[list[str]]: ...
+    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionValue[dict]: ...
+    def get_command(self) -> PyPantsCommand: ...
     def get_unconsumed_flags(self) -> dict[str, list[str]]: ...
+    def validate_config(self, valid_keys: dict[str, set[str]]) -> list[str]: ...
+
+class PyNgOptionsReader:
+    # Useful in tests.
+    def __init__(
+        self,
+        buildroot: Path,
+        flags: dict[str, dict[str, tuple[str | None, ...]]],
+        env: dict[str, str],
+        configs: Sequence[PyConfigSource],
+    ) -> None: ...
+    def get_bool(self, option_id: PyOptionId, default: bool | None) -> OptionValue[bool]: ...
+    def get_int(self, option_id: PyOptionId, default: int | None) -> OptionValue[int]: ...
+    def get_float(self, option_id: PyOptionId, default: float | None) -> OptionValue[float]: ...
+    def get_string(self, option_id: PyOptionId, default: str | None) -> OptionValue[str]: ...
+    def get_bool_list(
+        self, option_id: PyOptionId, default: list[bool] | tuple[bool]
+    ) -> OptionValue[list[bool]]: ...
+    def get_int_list(
+        self, option_id: PyOptionId, default: list[int] | tuple[int]
+    ) -> OptionValue[list[int]]: ...
+    def get_float_list(
+        self, option_id: PyOptionId, default: list[float] | tuple[float]
+    ) -> OptionValue[list[float]]: ...
+    def get_string_list(
+        self, option_id: PyOptionId, default: list[str] | tuple[str]
+    ) -> OptionValue[list[str]]: ...
+    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionValue[dict]: ...
+
+class PyNgSourcePartition:
+    def paths(self) -> tuple[str, ...]: ...
+    def options_reader(self) -> PyNgOptionsReader: ...
+
+class PyNgOptions:
+    def __init__(
+        self,
+        pants_invocation: PyNgInvocation,
+        env: dict[str, str],
+        include_derivation: bool,
+    ) -> None: ...
+    def get_options_reader_for_dir(self, dir: str) -> PyNgOptionsReader: ...
+    def partition_sources(self, paths: tuple[str, ...]) -> tuple[PyNgSourcePartition, ...]: ...
 
 # ------------------------------------------------------------------------------
 # Testutil
@@ -706,6 +961,8 @@ class PyStubCAS:
     @property
     def address(self) -> str: ...
     def remove(self, digest: FileDigest | Digest) -> bool: ...
+    def contains(self, digest: FileDigest | Digest) -> bool: ...
+    def contains_action_result(self, digest: FileDigest | Digest) -> bool: ...
     def action_cache_len(self) -> int: ...
 
 # ------------------------------------------------------------------------------
@@ -725,16 +982,11 @@ class InferenceMetadata:
     def __repr__(self) -> str: ...
 
 class NativeDependenciesRequest:
-    """A request to parse the dependencies of a file.
+    """A request to parse the dependencies of a set of files.
 
-    * The `digest` is expected to contain exactly one source file.
     * Depending on the implementation, a `metadata` structure
       can be passed. It will be supplied to the native parser, and
       it will be incorporated into the cache key.
-
-
-    Example:
-        result = await Get(NativeParsedPythonDependencies, NativeDependenciesRequest(input_digest, None)
     """
 
     def __init__(self, digest: Digest, metadata: InferenceMetadata | None = None) -> None: ...
@@ -816,11 +1068,13 @@ def tasks_task_begin(
 ) -> None: ...
 def tasks_task_end(tasks: PyTasks) -> None: ...
 def tasks_add_call(
-    tasks: PyTasks, output: type, inputs: Sequence[type], rule_id: str, explicit_args_arity: int
-) -> None: ...
-def tasks_add_get(tasks: PyTasks, output: type, inputs: Sequence[type]) -> None: ...
-def tasks_add_get_union(
-    tasks: PyTasks, output_type: type, input_types: Sequence[type], in_scope_types: Sequence[type]
+    tasks: PyTasks,
+    output: type,
+    inputs: Sequence[type],
+    rule_id: str,
+    explicit_args_arity: int,
+    vtable_entries: Sequence[tuple[type, str]] | None,
+    in_scope_types: Sequence[type] | None,
 ) -> None: ...
 def tasks_add_query(tasks: PyTasks, output_type: type, input_types: Sequence[type]) -> None: ...
 def execution_add_root_select(
@@ -838,6 +1092,7 @@ def scheduler_create(
     tasks: PyTasks,
     types: PyTypes,
     build_root: str,
+    pants_workdir: str,
     local_execution_root_dir: str,
     named_caches_dir: str,
     ignore_patterns: Sequence[str],
@@ -884,9 +1139,6 @@ def validate_reachability(scheduler: PyScheduler) -> None: ...
 def rule_graph_consumed_types(
     scheduler: PyScheduler, param_types: Sequence[type], product_type: type
 ) -> list[type]: ...
-def rule_graph_rule_gets(
-    scheduler: PyScheduler,
-) -> dict[Callable, list[tuple[type, list[type], Callable]]]: ...
 def rule_graph_visualize(scheduler: PyScheduler, path: str) -> None: ...
 def rule_subgraph_visualize(
     scheduler: PyScheduler, param_types: Sequence[type], product_type: type, path: str
@@ -894,7 +1146,7 @@ def rule_subgraph_visualize(
 def garbage_collect_store(scheduler: PyScheduler, target_size_bytes: int) -> None: ...
 def lease_files_in_graph(scheduler: PyScheduler, session: PySession) -> None: ...
 def strongly_connected_components(
-    adjacency_lists: Sequence[Tuple[Any, Sequence[Any]]]
+    adjacency_lists: Sequence[tuple[Any, Sequence[Any]]],
 ) -> Sequence[Sequence[Any]]: ...
 def hash_prefix_zero_bits(item: str) -> int: ...
 
@@ -903,25 +1155,31 @@ def hash_prefix_zero_bits(item: str) -> int: ...
 # ------------------------------------------------------------------------------
 
 _Output = TypeVar("_Output")
+_Output_co = TypeVar("_Output_co", covariant=True)
 _Input = TypeVar("_Input")
 
-class PyGeneratorResponseCall:
+class Call(Generic[_Output_co]):
+    rule_id: str
     output_type: type
-    input_types: Sequence[type]
-    inputs: Sequence[Any]
+    args: tuple[Any, ...]
+    implicit_args: dict[Any, type]
 
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: dict[Any, type],
     ) -> None: ...
     @overload
-    def __init__(self, output_type: type, args: tuple[Any, ...], input_arg0: _Input) -> None: ...
+    def __init__(
+        self, rule_id: str, output_type: type, args: tuple[Any, ...], input_arg0: _Input
+    ) -> None: ...
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: type[_Input],
@@ -930,41 +1188,46 @@ class PyGeneratorResponseCall:
     @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type,
         args: tuple[Any, ...],
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
+    def __await__(self) -> Generator[Any, None, _Output_co]: ...
+    def __repr__(self) -> str: ...
 
-class PyGeneratorResponseGet(Generic[_Output]):
+class _Concurrently(Generic[_Output_co]):
+    def __init__(
+        self, calls: tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]
+    ) -> None: ...
+    def __await__(self) -> Generator[_Concurrently[_Output_co], None, _Output_co]: ...
+    @property
+    def calls(
+        self,
+    ) -> tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]: ...
+
+class RuleCallTrampoline(Generic[_Output]):
+    """The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so
+    each invocation constructs the already-awaitable `Call` directly.
+    `__getattribute__` forwards `__doc__` and other introspection attrs to the wrapped function.
+    """
+
+    rule_id: str
     output_type: type[_Output]
-    input_types: Sequence[type]
-    inputs: Sequence[Any]
+    rule: Any
+    __wrapped__: Callable[..., Any]
 
-    @overload
-    def __init__(self, output_type: type[_Output]) -> None: ...
-    @overload
     def __init__(
         self,
+        rule_id: str,
         output_type: type[_Output],
-        input_arg0: dict[Any, type],
+        wrapped: Callable[..., Any],
+        rule: Any,
     ) -> None: ...
-    @overload
-    def __init__(self, output_type: type[_Output], input_arg0: _Input) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: type[_Input],
-        input_arg1: _Input,
-    ) -> None: ...
-    @overload
-    def __init__(
-        self,
-        output_type: type[_Output],
-        input_arg0: type[_Input] | _Input,
-        input_arg1: _Input | None = None,
-    ) -> None: ...
+    def __call__(
+        self, *args: Any, __implicitly: Sequence[Any] = (), **kwargs: Any
+    ) -> Call[_Output]: ...
 
 # ------------------------------------------------------------------------------
 # (uncategorized)

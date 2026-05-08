@@ -18,10 +18,10 @@ use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
 use task_executor::{Executor, TailTasks};
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::task::JoinHandle;
 use ui::ConsoleUI;
-use workunit_store::{format_workunit_duration_ms, RunId, WorkunitStore};
+use workunit_store::{RunId, WorkunitStore, format_workunit_duration_ms};
 
 // When enabled, the interval at which all stragglers that have been running for longer than a
 // threshold should be logged. The threshold might become configurable, but this might not need
@@ -82,7 +82,7 @@ struct SessionState {
     // A place to store info about workunits in rust part
     workunit_store: WorkunitStore,
     // Per-Session values that have been set for this session.
-    session_values: Mutex<PyObject>,
+    session_values: Mutex<Value>,
     // An id used to control the visibility of uncacheable rules. Generally this is identical for an
     // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
     // same Session while still observing new values for uncacheable rules like Goals.
@@ -146,7 +146,7 @@ impl Session {
         ui_use_prodash: bool,
         mut max_workunit_level: log::Level,
         build_id: String,
-        session_values: PyObject,
+        session_values: Py<PyAny>,
         cancelled: AsyncLatch,
     ) -> Result<Session, String> {
         // We record workunits with the maximum level of:
@@ -181,7 +181,7 @@ impl Session {
                 preceding_graph_size,
                 roots: Mutex::new(HashMap::new()),
                 workunit_store,
-                session_values: Mutex::new(session_values),
+                session_values: Mutex::new(Value::new(session_values)),
                 run_id: AtomicU32::new(run_id.0),
                 tail_tasks: TailTasks::new(),
             }),
@@ -270,8 +270,9 @@ impl Session {
         roots.keys().map(|r| r.clone().into()).collect()
     }
 
-    pub fn session_values(&self) -> PyObject {
-        self.state.session_values.lock().clone()
+    pub fn session_values(&self) -> Value {
+        let obj = self.state.session_values.lock();
+        obj.clone()
     }
 
     pub fn preceding_graph_size(&self) -> usize {
@@ -316,7 +317,7 @@ impl Session {
             }
         };
         if let Err(e) = result {
-            warn!("{}", e);
+            warn!("{e}");
         }
     }
 
@@ -365,7 +366,7 @@ impl Session {
                                 .into_iter()
                                 .map(|(duration, desc)| format!(
                                     "{}\t{}",
-                                    format_workunit_duration_ms!(duration.as_millis()),
+                                    format_workunit_duration_ms(duration),
                                     desc
                                 ))
                                 .collect::<Vec<_>>()
@@ -468,14 +469,14 @@ impl Sessions {
                     let cancelled = handle.cancelled.clone();
                     let cancellation_triggered = async move {
                         cancelled.triggered().await;
-                        log::info!("Shutdown completed: {:?}", build_id)
+                        log::info!("Shutdown completed: {build_id:?}")
                     };
                     (handle.build_id.clone(), cancellation_triggered)
                 })
                 .unzip();
 
             if !build_ids.is_empty() {
-                log::info!("Waiting for shutdown of: {:?}", build_ids);
+                log::info!("Waiting for shutdown of: {build_ids:?}");
                 tokio::time::timeout(timeout, future::join_all(cancellation_latches))
                     .await
                     .map_err(|_| format!("Some Sessions did not shutdown within {timeout:?}."))?;

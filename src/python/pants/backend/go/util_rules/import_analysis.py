@@ -11,9 +11,8 @@ import ijson.backends.python as ijson
 from pants.backend.go.util_rules import go_mod
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.sdk import GoSdkProcess
-from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
@@ -62,14 +61,15 @@ class GoStdLibPackagesRequest:
 @rule(desc="Analyze Go standard library packages.", level=LogLevel.DEBUG)
 async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdLibPackages:
     maybe_race_arg = ["-race"] if request.with_race_detector else []
-    list_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            # "-find" skips determining dependencies and imports for each package.
-            command=("list", *maybe_race_arg, "-json", "std"),
-            env={"CGO_ENABLED": "1" if request.cgo_enabled else "0"},
-            description="Ask Go for its available import paths",
-        ),
+    list_result = await execute_process_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                # "-find" skips determining dependencies and imports for each package.
+                command=("list", *maybe_race_arg, "-json", "std"),
+                env={"CGO_ENABLED": "1" if request.cgo_enabled else "0"},
+                description="Ask Go for its available import paths",
+            )
+        )
     )
     stdlib_packages = {}
     for pkg_json in ijson.items(list_result.stdout, "", multiple_values=True):

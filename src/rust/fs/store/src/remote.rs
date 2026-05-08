@@ -1,0 +1,256 @@
+// Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::sync::Arc;
+use std::time::Instant;
+
+use bytes::Bytes;
+use futures::Future;
+use hashing::Digest;
+use log::Level;
+use remote_provider::{
+    BatchLoadDestination, ByteStoreProvider, LoadDestination, RemoteStoreOptions,
+    choose_byte_store_provider,
+};
+use tokio::fs::File;
+use workunit_store::{Metric, ObservationMetric, in_workunit};
+
+#[derive(Clone)]
+pub struct ByteStore {
+    instance_name: Option<String>,
+    provider: Arc<dyn ByteStoreProvider>,
+}
+
+impl fmt::Debug for ByteStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ByteStore(name={:?})", self.instance_name)
+    }
+}
+
+impl ByteStore {
+    pub fn new(
+        instance_name: Option<String>,
+        provider: Arc<dyn ByteStoreProvider + 'static>,
+    ) -> ByteStore {
+        ByteStore {
+            instance_name,
+            provider,
+        }
+    }
+
+    pub async fn from_options(options: RemoteStoreOptions) -> Result<ByteStore, String> {
+        let instance_name = options.instance_name.clone();
+        let provider = choose_byte_store_provider(options).await?;
+        Ok(ByteStore::new(instance_name, provider))
+    }
+
+    /// Store the bytes readable from `file` into the remote store
+    pub async fn store_file(&self, digest: Digest, file: File) -> Result<(), String> {
+        self.store_tracking("store", digest, || self.provider.store_file(digest, file))
+            .await
+    }
+
+    /// Store the bytes in `bytes` into the remote store, as an optimisation of `store_file` when the
+    /// bytes are already in memory
+    pub async fn store_bytes(&self, bytes: Bytes) -> Result<(), String> {
+        let digest = Digest::of_bytes(&bytes);
+        self.store_tracking("store_bytes", digest, || {
+            self.provider.store_bytes(digest, bytes)
+        })
+        .await
+    }
+
+    async fn store_tracking<DoStore, Fut>(
+        &self,
+        workunit: &'static str,
+        digest: Digest,
+        do_store: DoStore,
+    ) -> Result<(), String>
+    where
+        DoStore: FnOnce() -> Fut + Send,
+        Fut: Future<Output = Result<(), String>> + Send,
+    {
+        in_workunit!(
+            workunit,
+            Level::Trace,
+            desc = Some(format!("Storing {digest:?}")),
+            |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreWriteAttempts, 1);
+                let result = do_store().await;
+
+                let result_metric = match result {
+                    Ok(()) => {
+                        workunit.record_observation(
+                            ObservationMetric::RemoteStoreBlobBytesUploaded,
+                            digest.size_bytes as u64,
+                        );
+                        Metric::RemoteStoreWriteSuccesses
+                    }
+                    Err(_) => Metric::RemoteStoreWriteErrors,
+                };
+                workunit.increment_counter(result_metric, 1);
+
+                result
+            }
+        )
+        .await
+    }
+
+    async fn load_monomorphic(
+        &self,
+        digest: Digest,
+        destination: &mut dyn LoadDestination,
+    ) -> Result<bool, String> {
+        let start = Instant::now();
+        let workunit_desc = format!(
+            "Loading bytes at: {} {} ({} bytes)",
+            self.instance_name.as_ref().map_or("", |s| s),
+            digest.hash,
+            digest.size_bytes
+        );
+
+        in_workunit!(
+            "load",
+            Level::Trace,
+            desc = Some(workunit_desc),
+            |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreReadAttempts, 1);
+                let result = self.provider.load(digest, destination).await;
+                workunit.record_observation(
+                    ObservationMetric::RemoteStoreReadBlobTimeMicros,
+                    start.elapsed().as_micros() as u64,
+                );
+                let result_metric = match result {
+                    Ok(true) => {
+                        workunit.record_observation(
+                            ObservationMetric::RemoteStoreBlobBytesDownloaded,
+                            digest.size_bytes as u64,
+                        );
+                        Metric::RemoteStoreReadCached
+                    }
+                    Ok(false) => Metric::RemoteStoreReadUncached,
+                    Err(_) => Metric::RemoteStoreReadErrors,
+                };
+                workunit.increment_counter(result_metric, 1);
+
+                result
+            },
+        )
+        .await
+    }
+
+    async fn load<W: LoadDestination>(
+        &self,
+        digest: Digest,
+        mut destination: W,
+    ) -> Result<Option<W>, String> {
+        if self.load_monomorphic(digest, &mut destination).await? {
+            Ok(Some(destination))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Load the data for `digest` (if it exists in the remote store) into memory.
+    pub async fn load_bytes(&self, digest: Digest) -> Result<Option<Bytes>, String> {
+        let result = self
+            .load(digest, Vec::with_capacity(digest.size_bytes))
+            .await?;
+        Ok(result.map(Bytes::from))
+    }
+
+    pub async fn load_bytes_batch(
+        &self,
+        digests: Vec<Digest>,
+        destination: &mut dyn BatchLoadDestination,
+    ) -> Result<HashMap<Digest, Result<bool, String>>, String> {
+        let start = Instant::now();
+        let workunit_desc = format!(
+            "Loading batch at {} of {} digets ({} bytes)",
+            self.instance_name.as_ref().map_or("", |s| s),
+            digests.len(),
+            digests.iter().map(|d| d.size_bytes).sum::<usize>()
+        );
+
+        in_workunit!(
+            "load_bytes_batch",
+            Level::Trace,
+            desc = Some(workunit_desc),
+            |workunit| async move {
+                workunit.increment_counter(Metric::RemoteStoreReadAttempts, 1);
+                let batch_result = self.provider.load_batch(digests, destination).await;
+
+                workunit.record_observation(
+                    ObservationMetric::RemoteStoreReadBlobTimeMicros,
+                    start.elapsed().as_micros() as u64,
+                );
+
+                match batch_result {
+                    Ok(results) => {
+                        let mut total_bytes = 0;
+                        let mut misses = 0;
+
+                        results.iter().for_each(|(digest, result)| match result {
+                            Ok(_) => {
+                                total_bytes += digest.size_bytes;
+                            }
+                            Err(_) => {
+                                misses += 1;
+                            }
+                        });
+                        let hits = results.len() - misses;
+                        workunit.record_observation(
+                            ObservationMetric::RemoteStoreBlobBytesDownloaded,
+                            total_bytes as u64,
+                        );
+                        if hits > 0 {
+                            workunit.increment_counter(Metric::RemoteStoreReadCached, hits as u64);
+                        }
+                        if misses > 0 {
+                            workunit
+                                .increment_counter(Metric::RemoteStoreReadUncached, misses as u64);
+                        }
+                        Ok(results)
+                    }
+                    Err(e) => {
+                        workunit.increment_counter(Metric::RemoteStoreReadErrors, 1);
+                        Err(e)
+                    }
+                }
+            },
+        )
+        .await
+    }
+
+    pub fn batch_load_supported(&self) -> bool {
+        self.provider.batch_load_supported()
+    }
+
+    /// Write the data for `digest` (if it exists in the remote store) into `file`.
+    pub async fn load_file(
+        &self,
+        digest: Digest,
+        file: tokio::fs::File,
+    ) -> Result<Option<tokio::fs::File>, String> {
+        self.load(digest, file).await
+    }
+
+    ///
+    /// Given a collection of Digests (digests),
+    /// returns the set of digests from that collection not present in the CAS.
+    ///
+    pub async fn list_missing_digests<I>(&self, digests: I) -> Result<HashSet<Digest>, String>
+    where
+        I: IntoIterator<Item = Digest>,
+        I::IntoIter: Send,
+    {
+        let mut iter = digests.into_iter();
+        in_workunit!(
+            "list_missing_digests",
+            Level::Trace,
+            |_workunit| async move { self.provider.list_missing_digests(&mut iter).await }
+        )
+        .await
+    }
+}

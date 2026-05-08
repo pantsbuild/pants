@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -14,6 +14,8 @@ from pants.engine.rules import Rule, collect_rules
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 from pants.util.strutil import help_text
+
+# pants: infer-dep(clangformat.lock*)
 
 
 class ClangFormat(PythonToolBase):

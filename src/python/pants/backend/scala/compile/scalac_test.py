@@ -914,8 +914,10 @@ def test_compile_dep_on_scala_artifact(
     scala_stdlib_jvm_lockfile: JVMLockfileFixture,
     cats_jvm_lockfile: JVMLockfileFixture,
 ) -> None:
-    third_party_build_file = scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets() + dedent(
-        """\
+    third_party_build_file = (
+        scala_stdlib_jvm_lockfile.requirements_as_jvm_artifact_targets()
+        + dedent(
+            """\
         scala_artifact(
             name = "cats",
             group = "org.typelevel",
@@ -923,6 +925,7 @@ def test_compile_dep_on_scala_artifact(
             version = "2.9.0"
         )
         """
+        )
     )
     rule_runner.write_files(
         {

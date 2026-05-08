@@ -5,16 +5,16 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, List, Mapping, Tuple
+from typing import Literal
 
 from pants.engine.engine_aware import SideEffecting
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileDigest
 from pants.engine.internals.native_engine import (  # noqa: F401
     ProcessExecutionEnvironment as ProcessExecutionEnvironment,
 )
-from pants.engine.internals.selectors import Get
 from pants.engine.internals.session import RunId
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, rule
@@ -51,6 +51,57 @@ class ProcessCacheScope(Enum):
 
 
 @dataclass(frozen=True)
+class ProcessConcurrency:
+    kind: Literal["exactly", "range", "exclusive"]
+    min: int | None = None
+    max: int | None = None
+
+    def __post_init__(self):
+        if self.min is not None and self.min < 1:
+            raise ValueError(f"min concurrency must be >= 1, got {self.min}")
+        if self.max is not None and self.max < 1:
+            raise ValueError(f"max concurrency must be >= 1, got {self.max}")
+        if self.min is not None and self.max is not None and self.min > self.max:
+            raise ValueError(
+                f"min concurrency must be <= max concurrency, got {self.min} and {self.max}"
+            )
+        if self.kind == "exactly" and self.min != self.max:
+            raise ValueError(
+                f"exactly concurrency must have min and max equal, got {self.min} and {self.max}"
+            )
+
+    @staticmethod
+    def range(max: int, min: int = 1):
+        """The amount of parallelism that this process is capable of given its inputs. This value
+        does not directly set the number of cores allocated to the process: that is computed based
+        on availability, and provided as a template value in the arguments of the process.
+
+        When set, a `{pants_concurrency}` variable will be templated into the `argv` of the process.
+
+        Processes which set this value may be preempted (i.e. canceled and restarted) for a short
+        period after starting if available resources have changed (because other processes have
+        started or finished).
+        """
+        return ProcessConcurrency("range", min, max)
+
+    @staticmethod
+    def exactly(count: int):
+        """A specific number of cores required to run the process.
+
+        The process will wait until the specified number of cores are available.
+        """
+        return ProcessConcurrency("exactly", count, count)
+
+    @staticmethod
+    def exclusive():
+        """Exclusive access to all cores.
+
+        No other processes will be scheduled to run while this process is running.
+        """
+        return ProcessConcurrency("exclusive")
+
+
+@dataclass(frozen=True)
 class Process:
     argv: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
@@ -67,6 +118,7 @@ class Process:
     jdk_home: str | None
     execution_slot_variable: str | None
     concurrency_available: int
+    concurrency: ProcessConcurrency | None
     cache_scope: ProcessCacheScope
     remote_cache_speculation_delay_millis: int
     attempt: int
@@ -89,6 +141,7 @@ class Process:
         jdk_home: str | None = None,
         execution_slot_variable: str | None = None,
         concurrency_available: int = 0,
+        concurrency: ProcessConcurrency | None = None,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
         remote_cache_speculation_delay_millis: int = 0,
         attempt: int = 0,
@@ -101,23 +154,23 @@ class Process:
 
         Usually, you will want to provide input files/directories via the parameter `input_digest`.
         The process will then be able to access these paths through relative paths. If you want to
-        give multiple input digests, first merge them with `await Get(Digest, MergeDigests)`. Files
-        larger than 512KB will be read-only unless they are globbed as part of either `output_files`
-        or `output_directories`.
+        give multiple input digests, first merge them with `merge_digests()`. Files larger than
+        512KB will be read-only unless they are globbed as part of either `output_files` or
+        `output_directories`.
 
         Often, you will want to capture the files/directories created in the process. To do this,
         you can either set `output_files` or `output_directories`. The specified paths should be
         specified relative to the `working_directory`, if any, and will then be used to populate
         `output_digest` on the `ProcessResult`. If you want to split up this output digest into
-        multiple digests, use `await Get(Digest, DigestSubset)` on the `output_digest`.
+        multiple digests, use `digest_subset_to_digest()` on the `output_digest`.
 
-        To actually run the process, use `await Get(ProcessResult, Process)` or
-        `await Get(FallibleProcessResult, Process)`.
+        To actually run the process, use or `await execute_process(Process(...), **implicitly())`
+        or `await execute_process_or_raise(**implicitly(Process(...)))`.
 
         Example:
 
-            result = await Get(
-                ProcessResult, Process(["/bin/echo", "hello world"], description="demo")
+            result = await execute_process_or_raise(
+                **implicitly(Process(["/bin/echo", "hello world"], description="demo")
             )
             assert result.stdout == b"hello world"
         """
@@ -146,11 +199,19 @@ class Process:
         object.__setattr__(self, "jdk_home", jdk_home)
         object.__setattr__(self, "execution_slot_variable", execution_slot_variable)
         object.__setattr__(self, "concurrency_available", concurrency_available)
+        object.__setattr__(self, "concurrency", concurrency)
         object.__setattr__(self, "cache_scope", cache_scope)
         object.__setattr__(
             self, "remote_cache_speculation_delay_millis", remote_cache_speculation_delay_millis
         )
         object.__setattr__(self, "attempt", attempt)
+
+    def __post_init__(self) -> None:
+        if self.concurrency_available and self.concurrency:
+            raise ValueError(
+                "Cannot specify both concurrency_available and concurrency. "
+                "Only one concurrency setting may be used at a time."
+            )
 
 
 @dataclass(frozen=True)
@@ -201,7 +262,7 @@ class FallibleProcessResult:
 
 @dataclass(frozen=True)
 class ProcessResultWithRetries:
-    results: Tuple[FallibleProcessResult, ...]
+    results: tuple[FallibleProcessResult, ...]
 
     @property
     def last(self):
@@ -305,12 +366,12 @@ class ProcessExecutionFailure(Exception):
 
 
 @rule
-def get_multi_platform_request_description(req: Process) -> ProductDescription:
+async def get_multi_platform_request_description(req: Process) -> ProductDescription:
     return ProductDescription(req.description)
 
 
 @rule
-def fallible_to_exec_result_or_raise(
+async def fallible_to_exec_result_or_raise(
     fallible_result: FallibleProcessResult,
     description: ProductDescription,
     keep_sandboxes: KeepSandboxes,
@@ -352,22 +413,6 @@ def fallible_to_exec_result_or_raise(
 execute_process_or_raise = fallible_to_exec_result_or_raise
 
 
-@rule
-async def execute_process_with_retry(req: ProcessWithRetries) -> ProcessResultWithRetries:
-    results: List[FallibleProcessResult] = []
-    for attempt in range(0, req.attempts):
-        proc = dataclasses.replace(req.proc, attempt=attempt)
-        result = (
-            await Get(  # noqa: PNT30: We only know that we need to rerun the test after we run it
-                FallibleProcessResult, Process, proc
-            )
-        )
-        results.append(result)
-        if result.exit_code == 0:
-            break
-    return ProcessResultWithRetries(tuple(results))
-
-
 @dataclass(frozen=True)
 class InteractiveProcessResult:
     exit_code: int
@@ -396,12 +441,13 @@ class InteractiveProcess(SideEffecting):
         append_only_caches: Mapping[str, str] | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
         keep_sandboxes: KeepSandboxes = KeepSandboxes.never,
+        working_directory: str | None = None,
     ) -> None:
         """Request to run a subprocess in the foreground, similar to subprocess.run().
 
         Unlike `Process`, the result will not be cached.
 
-        To run the process, use `await Effect(InteractiveProcessResult, InteractiveProcess(..))`
+        To run the process, use `await run_interactive_process(InteractiveProcess(..))`
         in a `@goal_rule`.
 
         `forward_signals_to_process` controls whether pants will allow a SIGINT signal
@@ -418,6 +464,7 @@ class InteractiveProcess(SideEffecting):
                 input_digest=input_digest,
                 append_only_caches=append_only_caches,
                 immutable_input_digests=immutable_input_digests,
+                working_directory=working_directory,
             ),
         )
         object.__setattr__(self, "run_in_workspace", run_in_workspace)
@@ -444,6 +491,7 @@ class InteractiveProcess(SideEffecting):
             append_only_caches=process.append_only_caches,
             immutable_input_digests=process.immutable_input_digests,
             keep_sandboxes=keep_sandboxes,
+            working_directory=process.working_directory,
         )
 
 

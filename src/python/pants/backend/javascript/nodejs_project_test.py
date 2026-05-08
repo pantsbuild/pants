@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Iterable
+from collections.abc import Iterable
+from textwrap import dedent
 
 import pytest
 
@@ -251,6 +252,31 @@ def test_workspaces_without_conflicting_package_manager_versions_works(
             "src/js/foo/package.json": given_package("ham", "0.0.1", package_manager="npm@1"),
             "src/js/bar/BUILD": "package_json()",
             "src/js/bar/package.json": given_package("spam", "0.0.2", package_manager="npm@1"),
+        }
+    )
+
+    assert len(rule_runner.request(AllNodeJSProjects, [])) == 1
+
+
+def test_pnpm_workspaces_is_ignored_for_non_pnpm_projects(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            # Configure PNPM workspaces such that 'foo' is a project root dir - this should
+            # be ignored, but if not, would result in two projects
+            "src/js/pnpm-workspace.yaml": dedent(
+                """\
+                packages:
+                    - "foo/*"
+                """
+            ),
+            "src/js/package.json": given_package_with_workspaces(
+                "egg", "1.0.0", "foo", "bar", package_manager="npm@1"
+            ),
+            "src/js/BUILD": "package_json()",
+            "src/js/foo/BUILD": "package_json()",
+            "src/js/foo/package.json": given_package("ham", "0.0.1", package_manager="npm@1"),
         }
     )
 

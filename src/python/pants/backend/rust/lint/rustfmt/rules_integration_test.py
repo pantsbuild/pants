@@ -68,7 +68,7 @@ def run_rustfmt(
     *,
     extra_args: list[str] | None = None,
 ) -> FmtResult:
-    rule_runner.set_options(extra_args or (), env_inherit={"PATH"})
+    rule_runner.set_options(extra_args or (), env_inherit={"PATH", "RUSTUP_HOME"})
     field_sets = [RustfmtFieldSet.create(tgt) for tgt in targets]
     input_sources = rule_runner.request(
         SourceFiles,

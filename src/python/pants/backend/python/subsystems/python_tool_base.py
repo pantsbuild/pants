@@ -7,10 +7,13 @@ import importlib.resources
 import json
 import logging
 import os
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from functools import cache
-from typing import Callable, ClassVar, Iterable, Optional, Sequence
+from typing import ClassVar
 from urllib.parse import urlparse
+
+import toml
 
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -23,11 +26,13 @@ from pants.backend.python.util_rules.pex_requirements import (
     Lockfile,
     PexRequirements,
     Resolve,
+    get_lockfile_for_resolve,
+    load_lockfile,
     strip_comments_from_pex_json_lockfile,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import Get
+from pants.engine.rules import implicitly
 from pants.option.errors import OptionsError
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
@@ -62,7 +67,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
     #  requirements that reflect any minimum capabilities Pants assumes about the tool.
     default_requirements: Sequence[str] = []
 
-    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.8,<4"]
+    default_interpreter_constraints: ClassVar[Sequence[str]] = ["CPython>=3.9,<3.15"]
     register_interpreter_constraints: ClassVar[bool] = False
 
     default_lockfile_resource: ClassVar[tuple[str, str] | None] = None
@@ -193,7 +198,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
             If you would like to generate a lockfile for {resolve_name},
             follow the instructions for setting up lockfiles for tools
-            {doc_url('docs/python/overview/lockfiles#lockfiles-for-tools')}
+            {doc_url("docs/python/overview/lockfiles#lockfiles-for-tools")}
         """
         )
 
@@ -212,7 +217,7 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
 
     @classmethod
     @cache
-    def _default_package_name_and_version(cls) -> Optional[_PackageNameAndVersion]:
+    def _default_package_name_and_version(cls) -> _PackageNameAndVersion | None:
         if cls.default_lockfile_resource is None:
             return None
 
@@ -225,26 +230,60 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
                 lock_bytes = fp.read()
         elif parts.scheme == "resource":
             # The "netloc" in our made-up "resource://" scheme is the package.
-            lock_bytes = importlib.resources.read_binary(parts.netloc, lockfile_path)
+            lock_bytes = (
+                importlib.resources.files(parts.netloc).joinpath(lockfile_path).read_bytes()
+            )
         else:
             raise ValueError(
                 f"Unsupported scheme {parts.scheme} for lockfile URL: {lockfile.url} "
                 f"(origin: {lockfile.url_description_of_origin})"
             )
 
-        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
-        lockfile_contents = json.loads(stripped_lock_bytes)
-        # The first requirement must contain the primary package for this tool, otherwise
-        # this will pick up the wrong requirement.
+        # Note that this code relies on knowing the internal structure of uv and pex lockfiles,
+        # neither of which are guaranteed. If parsing fails we'll return None and the calling
+        # code will deal with it (by omitting some information from help strings).
         first_default_requirement = PipRequirement.parse(cls.default_requirements[0])
-        return next(
-            _PackageNameAndVersion(
-                name=first_default_requirement.project_name, version=requirement["version"]
+        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
+
+        try:  # Is it uv.lock?
+            lockfile_contents = toml.loads(lock_bytes.decode())
+            # The first requirement must contain the primary package for this tool, otherwise
+            # this will pick up the wrong requirement.
+            return next(
+                _PackageNameAndVersion(name=first_default_requirement.name, version=pkg["version"])
+                for pkg in lockfile_contents["package"]
+                if pkg["name"] == first_default_requirement.name
             )
-            for resolve in lockfile_contents["locked_resolves"]
-            for requirement in resolve["locked_requirements"]
-            if requirement["project_name"] == first_default_requirement.project_name
-        )
+        except KeyError:
+            # It's toml, but the schema is off.
+            logger.warning(f"File at {lockfile.url} was not of expected uv.lock schema.")
+            return None
+        except toml.TomlDecodeError:
+            # It's not toml, so it's not uv.lock format. Fall through to try pex lockfile format.
+            # TODO: This is only used internally, for generating help, based on the *default*
+            #  lockfiles. Once those are all uv, and we are confident they will remain so,
+            #  we can remove the JSON handling here.
+            pass
+
+        try:
+            lockfile_contents = json.loads(stripped_lock_bytes)
+            # The first requirement must contain the primary package for this tool, otherwise
+            # this will pick up the wrong requirement.
+            return next(
+                _PackageNameAndVersion(
+                    name=first_default_requirement.name, version=requirement["version"]
+                )
+                for resolve in lockfile_contents["locked_resolves"]
+                for requirement in resolve["locked_requirements"]
+                if requirement["project_name"] == first_default_requirement.name
+            )
+        except KeyError:
+            # It's json, but the schema is off.
+            logger.warning(f"File at {lockfile.url} was not of expected pex lock schema.")
+            return None
+        except json.JSONDecodeError:
+            # It's not json, so it's not pex lock format.
+            raise Exception(f"File at {lockfile.url} was not of any recognized lockfile format")
 
     def pex_requirements(
         self,
@@ -391,8 +430,8 @@ async def get_loaded_lockfile(subsystem: PythonToolBase) -> LoadedLockfile:
     else:
         assert isinstance(requirements, PexRequirements)
         assert isinstance(requirements.from_superset, Resolve)
-        lockfile = await Get(Lockfile, Resolve, requirements.from_superset)
-    loaded_lockfile = await Get(LoadedLockfile, LoadedLockfileRequest(lockfile))
+        lockfile = await get_lockfile_for_resolve(requirements.from_superset, **implicitly())
+    loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
     return loaded_lockfile
 
 

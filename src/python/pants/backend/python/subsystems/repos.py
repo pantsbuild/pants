@@ -84,13 +84,13 @@ class PythonRepos(Subsystem):
 
             Tip: you can avoid each user needing to manually configure this option and
             `[python-repos].find_links` by using a common file location, along with Pants's
-            interpolation support ({doc_url('docs/using-pants/key-concepts/options#config-file-interpolation')}. For example,
+            interpolation support ({doc_url("docs/using-pants/key-concepts/options#config-file-interpolation")}. For example,
             in `pants.toml`, you could set both options to `%(buildroot)s/python_wheels`
             to point to the directory `python_wheels` in the root of
             your repository; or, use the path `%(env.HOME)s/pants_wheels` for the path
             `~/pants_wheels`. If you are not able to use a common path like this, then we
             recommend setting that each user set these options via a `.pants.rc` file
-            ({doc_url('docs/using-pants/key-concepts/options#pantsrc-file')}.
+            ({doc_url("docs/using-pants/key-concepts/options#pantsrc-file")}.
 
             Note: Only takes effect if using Pex lockfiles, i.e. using the
             `generate-lockfiles` goal.

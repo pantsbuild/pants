@@ -105,6 +105,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert fmt_result.did_change is False
 
 
+@pytest.mark.platform_specific_behavior
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.sh": BAD_FILE, "BUILD": "shell_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.sh"))

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.engine.environment import EnvironmentName
 from pants.engine.internals.native_engine import Digest
-from pants.engine.rules import collect_rules
+from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import union
 from pants.util.frozendict import FrozenDict
 
@@ -22,6 +22,13 @@ class ImplicitLinkerDependenciesHook:
 class ImplicitLinkerDependencies:
     digest: Digest
     import_paths_to_pkg_a_files: FrozenDict[str, str]
+
+
+@rule(polymorphic=True)
+async def get_implicit_linker_dependencies(
+    req: ImplicitLinkerDependenciesHook, env_name: EnvironmentName
+) -> ImplicitLinkerDependencies:
+    raise NotImplementedError()
 
 
 def rules():

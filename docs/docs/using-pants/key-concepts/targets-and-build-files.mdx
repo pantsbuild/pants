@@ -182,7 +182,7 @@ Transitive excludes can only be used in target types that conventionally are not
 
 ## Using the generic `target`
 
-[`target`](../../..reference/targets/target) is a generic target with no specific type.
+[`target`](../../../reference/targets/target.mdx) is a generic target with no specific type.
 It can be used as a generic collection of targets to group related, but distinct targets into one single target.
 
 ### Referring to a group of targets
@@ -294,7 +294,7 @@ To add to a default value rather than replacing it, the current default value fo
 python_sources(
   name="my-one-top-level-target",
   sources=[
-    f"{pattern[0] if pattern.startswith("!") else ""}**/{pattern.lstrip("!")}"
+    f"{pattern[0] if pattern.startswith('!') else ''}**/{pattern.lstrip('!')}"
     for pattern in python_sources.sources.default
   ]
 )

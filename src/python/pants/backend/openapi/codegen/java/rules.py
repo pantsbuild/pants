@@ -21,11 +21,8 @@ from pants.backend.openapi.target_types import (
     OpenApiSourceField,
 )
 from pants.backend.openapi.util_rules import generator_process, pom_parser
-from pants.backend.openapi.util_rules.generator_process import (
-    OpenAPIGeneratorProcess,
-    OpenAPIGeneratorType,
-)
-from pants.backend.openapi.util_rules.pom_parser import AnalysePomRequest, PomReport
+from pants.backend.openapi.util_rules.generator_process import OpenAPIGeneratorProcess
+from pants.backend.openapi.util_rules.pom_parser import AnalysePomRequest, analyse_pom
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     AddPrefix,
@@ -37,19 +34,25 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     RemovePrefix,
-    Snapshot,
 )
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_subset_to_digest,
+    digest_to_snapshot,
+    merge_digests,
+    remove_prefix,
+)
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
-    HydratedSources,
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
-    TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
@@ -61,7 +64,7 @@ from pants.jvm.dependency_inference.artifact_mapper import (
 from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.logging import LogLevel
 
 
@@ -101,12 +104,12 @@ async def compile_openapi_into_java(
     request: CompileOpenApiIntoJavaRequest,
 ) -> CompiledJavaFromOpenApi:
     output_dir = "__gen"
-    output_digest = await Get(Digest, CreateDigest([Directory(output_dir)]))
+    output_digest = await create_digest(CreateDigest([Directory(output_dir)]))
 
-    merged_digests = await Get(Digest, MergeDigests([request.input_digest, output_digest]))
+    merged_digests = await merge_digests(MergeDigests([request.input_digest, output_digest]))
 
     process = OpenAPIGeneratorProcess(
-        generator_type=OpenAPIGeneratorType.JAVA,
+        generator_name="java",
         argv=[
             *(
                 ("--additional-properties", f"apiPackage={request.api_package}")
@@ -129,17 +132,21 @@ async def compile_openapi_into_java(
         level=LogLevel.DEBUG,
     )
 
-    result = await Get(ProcessResult, OpenAPIGeneratorProcess, process)
-    normalized_digest = await Get(Digest, RemovePrefix(result.output_digest, output_dir))
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly({process: OpenAPIGeneratorProcess})
+    )
+    normalized_digest = await remove_prefix(RemovePrefix(result.output_digest, output_dir))
 
-    pom_digest, java_sources_digest = await MultiGet(
-        Get(Digest, DigestSubset(normalized_digest, PathGlobs(["pom.xml"]))),
-        Get(Digest, DigestSubset(normalized_digest, PathGlobs(["src/main/java/**/*.java"]))),
+    pom_digest, java_sources_digest = await concurrently(
+        digest_subset_to_digest(DigestSubset(normalized_digest, PathGlobs(["pom.xml"]))),
+        digest_subset_to_digest(
+            DigestSubset(normalized_digest, PathGlobs(["src/main/java/**/*.java"]))
+        ),
     )
 
-    pom_report, stripped_java_sources_digest = await MultiGet(
-        Get(PomReport, AnalysePomRequest(pom_digest)),
-        Get(Digest, RemovePrefix(java_sources_digest, "src/main/java")),
+    pom_report, stripped_java_sources_digest = await concurrently(
+        analyse_pom(AnalysePomRequest(pom_digest)),
+        remove_prefix(RemovePrefix(java_sources_digest, "src/main/java")),
     )
 
     return CompiledJavaFromOpenApi(
@@ -153,50 +160,48 @@ async def generate_java_from_openapi(request: GenerateJavaFromOpenAPIRequest) ->
     if field_set.skip.value:
         return GeneratedSources(EMPTY_SNAPSHOT)
 
-    document_sources, transitive_targets = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(field_set.source)),
-        Get(TransitiveTargets, TransitiveTargetsRequest([field_set.address])),
+    document_sources, transitive_targets = await concurrently(
+        hydrate_sources(HydrateSourcesRequest(field_set.source), **implicitly()),
+        transitive_targets_get(TransitiveTargetsRequest([field_set.address]), **implicitly()),
     )
 
-    document_dependencies = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[OpenApiSourceField]))
+    document_dependencies = await concurrently(
+        hydrate_sources(HydrateSourcesRequest(tgt[OpenApiSourceField]), **implicitly())
         for tgt in transitive_targets.dependencies
         if tgt.has_field(OpenApiSourceField)
     )
 
-    input_digest = await Get(
-        Digest,
+    input_digest = await merge_digests(
         MergeDigests(
             [
                 document_sources.snapshot.digest,
                 *[dependency.snapshot.digest for dependency in document_dependencies],
             ]
-        ),
+        )
     )
 
-    compiled_sources = await MultiGet(
-        Get(
-            CompiledJavaFromOpenApi,
+    compiled_sources = await concurrently(
+        compile_openapi_into_java(
             CompileOpenApiIntoJavaRequest(
                 file,
                 input_digest=input_digest,
                 description=f"Generating Java sources from OpenAPI definition {field_set.address}",
                 api_package=field_set.api_package.value,
                 model_package=field_set.model_package.value,
-            ),
+            )
         )
         for file in document_sources.snapshot.files
     )
 
-    output_digest, source_root = await MultiGet(
-        Get(Digest, MergeDigests([sources.output_digest for sources in compiled_sources])),
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
+    output_digest, source_root = await concurrently(
+        merge_digests(MergeDigests([sources.output_digest for sources in compiled_sources])),
+        get_source_root(SourceRootRequest.for_target(request.protocol_target)),
     )
 
     source_root_restored = (
-        await Get(Snapshot, AddPrefix(output_digest, source_root.path))
+        await digest_to_snapshot(**implicitly(AddPrefix(output_digest, source_root.path)))
         if source_root.path != "."
-        else await Get(Snapshot, Digest, output_digest)
+        else await digest_to_snapshot(output_digest)
     )
     return GeneratedSources(source_root_restored)
 
@@ -230,19 +235,17 @@ async def infer_openapi_java_dependencies(
     # we use a sample OpenAPI spec to find out what are the runtime dependencies
     # for the given resolve and prevent creating a cycle in our rule engine.
     sample_spec_name = "__sample_spec.yaml"
-    sample_source_digest = await Get(
-        Digest,
+    sample_source_digest = await create_digest(
         CreateDigest(
             [FileContent(path=sample_spec_name, content=PETSTORE_SAMPLE_SPEC.encode("utf-8"))]
-        ),
+        )
     )
-    compiled_sources = await Get(
-        CompiledJavaFromOpenApi,
+    compiled_sources = await compile_openapi_into_java(
         CompileOpenApiIntoJavaRequest(
             input_file=sample_spec_name,
             input_digest=sample_source_digest,
             description=f"Inferring Java runtime dependencies for OpenAPI v{openapi_generator.version}",
-        ),
+        )
     )
 
     addresses = find_jvm_artifacts_or_raise(

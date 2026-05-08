@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Union
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageBuildArgsField
@@ -29,7 +28,7 @@ class DockerBuildArgs(KeyValueSequenceUtil):
             {k: overrides_dict.get(k, v) for k, v in self.to_dict().items()}
         )
 
-    def extended(self, more: Union[DockerBuildArgs, list[str]]) -> DockerBuildArgs:
+    def extended(self, more: DockerBuildArgs | list[str]) -> DockerBuildArgs:
         """Create a new DockerBuildArgs out of this and a list of strs to add."""
         if isinstance(more, DockerBuildArgs):
             return DockerBuildArgs.from_strings(*self, *more)

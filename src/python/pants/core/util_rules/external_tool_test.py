@@ -6,19 +6,32 @@ import re
 
 import pytest
 
+from pants.core.goals.export import ExportedBinary, ExportRequest
+from pants.core.goals.resolves import ExportableTool
+from pants.core.util_rules import external_tool
 from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExportExternalToolRequest,
     ExternalTool,
     ExternalToolError,
     ExternalToolRequest,
+    MaybeExportResult,
     TemplatedExternalTool,
     UnknownVersion,
     UnsupportedVersion,
     UnsupportedVersionUsage,
+    _ExportExternalToolForResolveRequest,
+    export_external_tool,
 )
-from pants.engine.fs import DownloadFile, FileDigest
+from pants.engine.fs import CreateDigest, DigestContents, DownloadFile, FileContent, FileDigest
+from pants.engine.internals.native_engine import Digest
 from pants.engine.platform import Platform
+from pants.engine.rules import QueryRule
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.scope import Scope, ScopedOptions
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import no_exception
+from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
 from pants.util.strutil import softwrap
 
 
@@ -55,12 +68,12 @@ class TemplatedFooBar(TemplatedExternalTool):
     options_scope = "foobar"
     default_version = "3.4.7"
     default_known_versions = [
-        "3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
-        "3.2.0|linux_ppc   |39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
-        "3.2.0|linux_x86_64|c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
-        "3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
         "3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
         "3.4.7|macos_arm64 |aca5c1da0192e2fd46b7b55ab290a92c5f07309e7b0ebf4e45ba95731ae98291|145678|https://macfoo.org/bin/v3.4.7/mac-m1-v3.4.7.tgz",
+        "3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
+        "3.2.0|linux_ppc   |39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
+        "3.2.0|linux_x86_64|c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
+        "3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
     ]
     default_url_template = "https://foobar.org/bin/v{version}/foobar-{version}-{platform}.tgz"
     default_url_platform_mapping = {
@@ -126,17 +139,97 @@ def test_generate_request() -> None:
         ).get_request(Platform.macos_x86_64)
 
 
+@pytest.fixture
+def rule_runner():
+    return RuleRunner(
+        rules=[QueryRule(ScopedOptions, (Scope,)), *external_tool.rules()],
+    )
+
+
+def test_export(rule_runner) -> None:
+    """Tests export_external_tool.
+
+    Ensures we locate the class and prepare the Digest correctly
+    """
+    platform = Platform.linux_x86_64
+    union_membership = UnionMembership.from_rules(
+        {
+            UnionRule(ExportRequest, ExportExternalToolRequest),
+            UnionRule(ExportableTool, TemplatedFooBar),
+        }
+    )
+
+    templated_foobar = create_subsystem(
+        TemplatedFooBar,
+        version=TemplatedFooBar.default_version,
+        known_versions=TemplatedFooBar.default_known_versions,
+        url_template=TemplatedFooBar.default_url_template,
+        url_platform_mapping=TemplatedFooBar.default_url_platform_mapping,
+    )
+
+    def fake_get_options(scope) -> ScopedOptions:
+        """Copy the options from the instantiated tool."""
+        assert scope.scope == "foobar"
+        return ScopedOptions(
+            Scope("foobar"),
+            templated_foobar.options,
+        )
+
+    def fake_download(_) -> DownloadedExternalTool:
+        exe = templated_foobar.generate_exe(platform)
+        digest = rule_runner.request(
+            Digest,
+            (
+                CreateDigest(
+                    [
+                        FileContent(exe, b"exe"),
+                        FileContent(
+                            "readme.md", b"another file that would conflict if exported to `bin`"
+                        ),
+                    ]
+                ),
+            ),
+        )
+
+        return DownloadedExternalTool(digest, exe)
+
+    result: MaybeExportResult = run_rule_with_mocks(
+        export_external_tool,
+        rule_args=[_ExportExternalToolForResolveRequest("foobar"), platform, union_membership],
+        mock_calls={
+            "pants.engine.internals.options_parsing.scope_options": fake_get_options,
+            "pants.core.util_rules.external_tool.download_external_tool": fake_download,
+        },
+        union_membership=union_membership,
+    )
+
+    assert result.result is not None, "failed to export anything at all"
+
+    exported = result.result
+    assert exported.exported_binaries == (ExportedBinary("foobar", "foobar-3.4.7/bin/foobar"),), (
+        "didn't request exporting correct bin"
+    )
+
+    exported_digest: DigestContents = rule_runner.request(DigestContents, (exported.digest,))
+    assert len(exported_digest) == 2, "digest didn't contain all files"
+
+    exported_files = {e.path: e.content for e in exported_digest}
+    assert exported_files["foobar-3.4.7/bin/foobar"] == b"exe", (
+        "digest didn't export our executable"
+    )
+
+
 class ConstrainedTool(TemplatedExternalTool):
     name = "foobar"
     options_scope = "foobar"
     version_constraints = ">3.2.1, <3.8"
     default_version = "v3.4.7"
     default_known_versions = [
-        "v3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
+        "v3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
+        "v3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
         "v3.2.0|linux_ppc   |39e5d64b0f31117c94651c880d0a776159e49eab42b2066219569934b936a5e7|124443",
         "v3.2.0|linux_x86_64|c0c667fb679a8221bed01bffeed1f80727c6c7827d0cbd8f162195efb12df9e4|121212",
-        "v3.4.7|macos_x86_64|9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be|123321",
-        "v3.4.7|linux_x86_64|a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5|134213",
+        "v3.2.0|macos_x86_64|1102324cdaacd589e50b8b7770595f220f54e18a1d76ee3c445198f80ab865b8|123346",
     ]
     default_url_template = "https://foobar.org/bin/v{version}/foobar-{version}-{platform}.tgz"
     default_url_platform_mapping = {

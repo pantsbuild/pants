@@ -7,8 +7,8 @@ import signal
 import sys
 import termios
 import time
+from collections.abc import Mapping
 from contextlib import contextmanager
-from typing import List, Mapping
 
 from pants.base.exiter import ExitCode
 from pants.engine.internals.native_engine import (
@@ -37,7 +37,7 @@ def interrupts_ignored():
 def ttynames_to_env(stdin, stdout, stderr):
     """Generate nailgun tty capability environment variables based on checking a set of fds.
 
-    TODO: There is a Rust implementation of this as well in `src/rust/engine/nailgun/src/client.rs`.
+    TODO: There is a Rust implementation of this as well in `src/rust/nailgun/src/client.rs`.
 
     :param file stdin: The stream to check for stdin tty capabilities.
     :param file stdout: The stream to check for stdout tty capabilities.
@@ -97,7 +97,7 @@ class RemotePantsRunner:
 
     def __init__(
         self,
-        args: List[str],
+        args: list[str],
         env: Mapping[str, str],
         options_bootstrapper: OptionsBootstrapper,
     ) -> None:

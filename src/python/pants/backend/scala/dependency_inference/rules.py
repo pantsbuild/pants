@@ -6,21 +6,23 @@ from dataclasses import dataclass
 
 from pants.backend.scala.compile import scalac_plugins
 from pants.backend.scala.dependency_inference import scala_parser, symbol_mapper
-from pants.backend.scala.dependency_inference.scala_parser import ScalaSourceDependencyAnalysis
+from pants.backend.scala.dependency_inference.scala_parser import (
+    resolve_fallible_result_to_analysis,
+)
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.backend.scala.subsystems.scala_infer import ScalaInferSubsystem
 from pants.backend.scala.target_types import ScalaDependenciesField, ScalaSourceField
 from pants.backend.scala.util_rules import versions
 from pants.backend.scala.util_rules.versions import (
     ScalaArtifactsForVersionRequest,
-    ScalaArtifactsForVersionResult,
+    resolve_scala_artifacts_for_version,
 )
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.internals.graph import determine_explicitly_provided_dependencies
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
-    ExplicitlyProvidedDependencies,
     FieldSet,
     InferDependenciesRequest,
     InferredDependencies,
@@ -61,9 +63,13 @@ async def infer_scala_dependencies_via_source_analysis(
         return InferredDependencies([])
 
     address = request.field_set.address
-    explicitly_provided_deps, analysis = await MultiGet(
-        Get(ExplicitlyProvidedDependencies, DependenciesRequest(request.field_set.dependencies)),
-        Get(ScalaSourceDependencyAnalysis, SourceFilesRequest([request.field_set.source])),
+    explicitly_provided_deps, analysis = await concurrently(
+        determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(request.field_set.dependencies))
+        ),
+        resolve_fallible_result_to_analysis(
+            **implicitly(SourceFilesRequest([request.field_set.source]))
+        ),
     )
 
     symbols: OrderedSet[str] = OrderedSet()
@@ -131,8 +137,8 @@ async def resolve_scala_library_for_resolve(
     scala_subsystem: ScalaSubsystem,
 ) -> ScalaRuntimeForResolve:
     scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    scala_artifacts = await Get(
-        ScalaArtifactsForVersionResult, ScalaArtifactsForVersionRequest(scala_version)
+    scala_artifacts = await resolve_scala_artifacts_for_version(
+        ScalaArtifactsForVersionRequest(scala_version)
     )
 
     addresses = find_jvm_artifacts_or_raise(
@@ -155,9 +161,8 @@ async def infer_scala_library_dependency(
     jvm: JvmSubsystem,
 ) -> InferredDependencies:
     resolve = request.field_set.resolve.normalized_value(jvm)
-    scala_library_target_info = await Get(
-        ScalaRuntimeForResolve,
-        ScalaRuntimeForResolveRequest(resolve),
+    scala_library_target_info = await resolve_scala_library_for_resolve(
+        ScalaRuntimeForResolveRequest(resolve), **implicitly()
     )
     return InferredDependencies(scala_library_target_info.addresses)
 

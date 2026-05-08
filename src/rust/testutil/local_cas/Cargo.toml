@@ -1,0 +1,15 @@
+[package]
+name = "local_cas"
+version = "0.0.1"
+edition = "2024"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+mock = { path = "../mock" }
+clap = { workspace = true }
+env_logger = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

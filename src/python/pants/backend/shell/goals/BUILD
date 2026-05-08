@@ -2,4 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources()
-python_tests(name="tests")
+python_tests(
+    name="tests",
+    overrides={
+        "test_test.py": {
+            "tags": ["platform_specific_behavior"],
+        }
+    },
+)

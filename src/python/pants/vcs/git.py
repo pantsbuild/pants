@@ -8,17 +8,19 @@ import logging
 import os
 import re
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from io import StringIO
+from io import BytesIO
 from os import PathLike
 from pathlib import Path, PurePath
-from typing import Any, DefaultDict, Iterable
+from typing import Any, DefaultDict
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
 from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.rules import collect_rules, rule
 from pants.util.contextutil import pushd
+from pants.vcs.change import ChangedFile, ChangeType
 from pants.vcs.hunk import Hunk, TextBlock
 
 logger = logging.getLogger(__name__)
@@ -63,13 +65,15 @@ class GitWorktree(EngineAwareReturnType):
 
     @property
     def commit_id(self):
-        return self._git_binary._invoke_unsandboxed(self._create_git_cmdline(["rev-parse", "HEAD"]))
+        return self._git_binary._invoke_unsandboxed(
+            self._create_git_cmdline(["rev-parse", "HEAD"])
+        ).decode()
 
     @property
     def branch_name(self) -> str | None:
         branch = self._git_binary._invoke_unsandboxed(
             self._create_git_cmdline(["rev-parse", "--abbrev-ref", "HEAD"])
-        )
+        ).decode()
         return None if branch == "HEAD" else branch
 
     def _fix_git_relative_path(self, worktree_path: str, relative_to: PurePath | str) -> str:
@@ -80,28 +84,33 @@ class GitWorktree(EngineAwareReturnType):
         from_commit: str | None = None,
         include_untracked: bool = False,
         relative_to: PurePath | str | None = None,
-    ) -> set[str]:
+    ) -> set[ChangedFile]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
         rel_suffix = ["--", str(relative_to)]
+
+        files: dict[str, ChangeType] = {}
+
         uncommitted_changes = self._git_binary._invoke_unsandboxed(
             self._create_git_cmdline(
-                ["diff", "--name-only", "HEAD"] + rel_suffix,
+                ["diff", "--name-status", "--no-renames", "HEAD"] + rel_suffix,
             )
         )
+        files.update(self._parse_name_status(uncommitted_changes))
 
-        files = set(uncommitted_changes.splitlines())
         if from_commit:
             # Grab the diff from the merge-base to HEAD using ... syntax.  This ensures we have just
             # the changes that have occurred on the current branch.
             committed_cmd = [
                 "diff",
-                "--name-only",
+                "--name-status",
+                "--no-renames",
                 from_commit + "...HEAD",
             ] + rel_suffix
             committed_changes = self._git_binary._invoke_unsandboxed(
                 self._create_git_cmdline(committed_cmd)
             )
-            files.update(committed_changes.splitlines())
+            files.update(self._parse_name_status(committed_changes))
+
         if include_untracked:
             untracked_cmd = [
                 "ls-files",
@@ -112,9 +121,36 @@ class GitWorktree(EngineAwareReturnType):
             untracked = self._git_binary._invoke_unsandboxed(
                 self._create_git_cmdline(untracked_cmd)
             )
-            files.update(untracked.splitlines())
+            files.update(
+                {path: ChangeType.ADDED for path in untracked.decode().splitlines() if path}
+            )
+
         # git will report changed files relative to the worktree: re-relativize to relative_to
-        return {self._fix_git_relative_path(f, relative_to) for f in files}
+        return {
+            ChangedFile(
+                path=self._fix_git_relative_path(path, relative_to),
+                change_type=change_type,
+            )
+            for path, change_type in files.items()
+        }
+
+    @staticmethod
+    def _parse_name_status(output: bytes) -> dict[str, ChangeType]:
+        """Parse `git diff --name-status` output into a dict of path -> ChangeType."""
+        result = {}
+        for line in output.decode().splitlines():
+            if not line:
+                continue
+            status, _, path = line.partition("\t")
+            letter = status[0].upper() if status else "M"
+            try:
+                change_type = ChangeType(letter)
+            except ValueError:
+                # Git may report various other esoteric statuses.
+                # We treat anything that isn't A, D or M as if it were M.
+                change_type = ChangeType.MODIFIED
+            result[path] = change_type
+        return result
 
     def changed_files_lines(
         self,
@@ -147,12 +183,16 @@ class GitWorktree(EngineAwareReturnType):
             # There is no git diff flag to include untracked files, so we get
             # the list of untracked files and manually create the diff by
             # comparing each file to an empty /dev/null.
-            untracked_files = self._git(
-                "ls-files",
-                "--other",
-                "--exclude-standard",
-                "--full-name",
-            ).splitlines()
+            untracked_files = (
+                self._git(
+                    "ls-files",
+                    "--other",
+                    "--exclude-standard",
+                    "--full-name",
+                )
+                .decode()
+                .splitlines()
+            )
             for file in set(untracked_files).intersection(paths):
                 untracked_diff = self._git_diff("--no-index", "/dev/null", str(relative_to / file))
                 assert len(untracked_diff) == 1
@@ -160,7 +200,7 @@ class GitWorktree(EngineAwareReturnType):
 
         return result
 
-    def _git(self, *args: str) -> str:
+    def _git(self, *args: str) -> bytes:
         """Run unsandboxed git command."""
         return self._git_binary._invoke_unsandboxed(self._create_git_cmdline(args))
 
@@ -168,11 +208,19 @@ class GitWorktree(EngineAwareReturnType):
         """Run unsandboxed git diff command and parse the diff."""
         return self._diff_parser.parse_unified_diff(self._git("diff", *args))
 
-    def changes_in(self, diffspec: str, relative_to: PurePath | str | None = None) -> set[str]:
+    def changes_in(
+        self, diffspec: str, relative_to: PurePath | str | None = None
+    ) -> set[ChangedFile]:
         relative_to = PurePath(relative_to) if relative_to is not None else self.worktree
-        cmd = ["diff-tree", "--no-commit-id", "--name-only", "-r", diffspec]
-        files = self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd)).splitlines()
-        return {self._fix_git_relative_path(f.strip(), relative_to) for f in files}
+        cmd = ["diff-tree", "--no-commit-id", "--name-status", "--no-renames", "-r", diffspec]
+        output = self._git_binary._invoke_unsandboxed(self._create_git_cmdline(cmd))
+        return {
+            ChangedFile(
+                path=self._fix_git_relative_path(path, relative_to),
+                change_type=change_type,
+            )
+            for path, change_type in self._parse_name_status(output).items()
+        }
 
     def _create_git_cmdline(self, args: Iterable[str]) -> list[str]:
         return [f"--git-dir={self._gitdir}", f"--work-tree={self.worktree}", *args]
@@ -187,8 +235,8 @@ class ParseError(Exception):
 
 
 class DiffParser:
-    def parse_unified_diff(self, content: str) -> dict[str, tuple[Hunk, ...]]:
-        buf = StringIO(content)
+    def parse_unified_diff(self, content: bytes) -> dict[str, tuple[Hunk, ...]]:
+        buf = BytesIO(content)
         current_file = None
         hunks: DefaultDict[str, list[Hunk]] = defaultdict(list)
         for line in buf:
@@ -197,22 +245,22 @@ class DiffParser:
             if match := self._filename_regex.match(line):
                 if current_file is not None:
                     # mypy false positive: https://github.com/python/mypy/issues/14987
-                    hunks.setdefault(  # type: ignore[unreachable]
+                    hunks.setdefault(
                         current_file, [Hunk(left=None, right=TextBlock(start=0, count=0))]
                     )
                 current_file = self._parse_filename(match)
                 if current_file is None:
-                    raise ValueError(f"failed to parse filename from line: `{line}`")
+                    raise ValueError(f"failed to parse filename from line: `{line!r}`")
                 continue
 
             if match := self._lines_changed_regex.match(line):
                 if current_file is None:
-                    raise ParseError(f"missing filename in the diff:\n{content}")
+                    raise ParseError(f"missing filename in the diff:\n{content!r}")
 
                 try:
                     hunk = self._parse_hunk(match, line)
                 except ValueError as e:
-                    raise ValueError(f"Failed to parse hunk: {line}") from e
+                    raise ValueError(f"Failed to parse hunk: {line!r}") from e
 
                 hunks[current_file].append(hunk)
                 continue
@@ -223,9 +271,9 @@ class DiffParser:
 
     @cached_property
     def _lines_changed_regex(self) -> re.Pattern:
-        return re.compile(r"^@@ -([0-9]+)(,([0-9]+))? \+([0-9]+)(,([0-9]+))? @@.*")
+        return re.compile(rb"^@@ -([0-9]+)(,([0-9]+))? \+([0-9]+)(,([0-9]+))? @@.*")
 
-    def _parse_hunk(self, match: re.Match, line: str) -> Hunk:
+    def _parse_hunk(self, match: re.Match, line: bytes) -> Hunk:
         g = match.groups()
         return Hunk(
             left=TextBlock(
@@ -242,13 +290,15 @@ class DiffParser:
     def _filename_regex(self) -> re.Pattern:
         # This only handles whitespaces. It doesn't work if a filename has something weird
         # in it that needs escaping, e.g. a double quote.
-        a_file = r'(?:a/(?:[^"]+)|"a/(:?(?:[^"]|\\")+)")'
-        b_file = r'(?:b/(?P<unquoted>[^"]+)|"b/(?P<quoted>(?:[^"]|\\")+)")'
-        return re.compile(rf"^diff --git {a_file} {b_file}$")
+        a_file = rb'(?:a/(?:[^"]+)|"a/(:?(?:[^"]|\\")+)")'
+        b_file = rb'(?:b/(?P<unquoted>[^"]+)|"b/(?P<quoted>(?:[^"]|\\")+)")'
+        return re.compile(b"^diff --git " + a_file + b" " + b_file + b"$")
 
     def _parse_filename(self, match: re.Match) -> str | None:
-        unquoted = str(g) if (g := match.group("unquoted")) is not None else None
-        quoted = str(g).replace(r"\"", '"') if (g := match.group("quoted")) is not None else None
+        unquoted = g.decode() if (g := match.group("unquoted")) is not None else None
+        quoted = (
+            g.decode().replace(r"\"", '"') if (g := match.group("quoted")) is not None else None
+        )
         return unquoted or quoted
 
 
@@ -292,7 +342,7 @@ async def get_git_worktree(
     git_worktree = GitWorktree(
         binary=git_binary,
         gitdir=git_worktree_request.gitdir,
-        worktree=PurePath(output),
+        worktree=PurePath(output.decode()),
     )
 
     logger.debug(

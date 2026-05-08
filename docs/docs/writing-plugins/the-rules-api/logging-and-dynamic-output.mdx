@@ -19,7 +19,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 @rule
-def demo(...) -> Foo:
+async def demo(...) -> Foo:
     logger.info("Inside the demo rule.")
     ...
 ```

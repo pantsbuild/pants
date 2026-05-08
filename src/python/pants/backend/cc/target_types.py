@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable
 
 from pants.engine.rules import Rule, collect_rules
 from pants.engine.target import (

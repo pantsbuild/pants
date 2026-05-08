@@ -1,8 +1,8 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 import json
+from collections.abc import Mapping
 from textwrap import dedent  # noqa: PNT20
-from typing import Mapping
 
 EXPECTED_VERSION = "1.17"
 EXPECTED_VERSION_NEXT_RELEASE = "1.18"

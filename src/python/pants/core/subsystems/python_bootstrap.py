@@ -6,23 +6,23 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import sys
+from collections.abc import Collection
 from dataclasses import dataclass
-from typing import Collection
 
-from pex.variables import Variables
-
+from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules import asdf, search_paths
 from pants.core.util_rules.asdf import AsdfPathString, AsdfToolPathsResult
-from pants.core.util_rules.environments import EnvironmentTarget
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.search_paths import (
-    ValidatedSearchPaths,
     ValidateSearchPathsRequest,
-    VersionManagerSearchPaths,
     VersionManagerSearchPathsRequest,
+    get_un_cachable_version_manager_paths,
+    validate_search_paths,
 )
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest, PathEnvironmentVariable
-from pants.engine.internals.selectors import MultiGet
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.internals.selectors import concurrently
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.option.option_types import DictOption, StrListOption
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
@@ -30,7 +30,7 @@ from pants.util.strutil import help_text, softwrap
 
 logger = logging.getLogger(__name__)
 
-_PBS_URL_TEMPLATE = "https://github.com/indygreg/python-build-standalone/releases/download/20230116/cpython-3.9.16+20230116-{}-install_only.tar.gz"
+_PBS_URL_TEMPLATE = "https://github.com/astral-sh/python-build-standalone/releases/download/20251014/cpython-3.14.0+20251014-{}-install_only_stripped.tar.gz"
 
 
 class PythonBootstrapSubsystem(Subsystem):
@@ -49,23 +49,23 @@ class PythonBootstrapSubsystem(Subsystem):
         default={
             "linux_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-unknown-linux-gnu"),
-                "1ba520c0db431c84305677f56eb9a4254f5097430ed443e92fc8617f8fba973d",
-                23873387,
+                "7dbb43b742c040835a277318355fb359b41e509dbf4fbb614da38005a9290e16",
+                29297561,
             ),
             "linux_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-unknown-linux-gnu"),
-                "7ba397787932393e65fc2fb9fcfabf54f2bb6751d5da2b45913cb25b2d493758",
-                26129729,
+                "493c477b4a88bb1ea2f6c6f57fa0e88ffbe55d9e7b1405c4699f2d41c04eb154",
+                34580370,
             ),
             "macos_arm64": (
                 _PBS_URL_TEMPLATE.format("aarch64-apple-darwin"),
-                "d732d212d42315ac27c6da3e0b69636737a8d72086c980daf844344c010cab80",
-                17084463,
+                "057476264b07222a2baeff68a733647f91a9d61c94f79beba46a44eb42101749",
+                16923076,
             ),
             "macos_x86_64": (
                 _PBS_URL_TEMPLATE.format("x86_64-apple-darwin"),
-                "3948384af5e8d4ee7e5ccc648322b99c1c5cf4979954ed5e6b3382c69d6db71e",
-                17059474,
+                "56dcb0cdafabac9d6d976690fb05d9ee92d20ce798c3aabe9049259ebe7d3e0d",
+                16905036,
             ),
         },
         help=softwrap(
@@ -182,11 +182,12 @@ async def _expand_interpreter_search_paths(
     expanded: list[str] = []
     from_pexrc = None
 
-    pyenv_env = await Get(EnvironmentVars, EnvironmentVarsRequest(("PYENV_ROOT", "HOME")))
+    pyenv_env = await environment_vars_subset(
+        EnvironmentVarsRequest(("PYENV_ROOT", "HOME")), **implicitly()
+    )
     pyenv_root = _get_pyenv_root(pyenv_env)
-    pyenv_path_results = await MultiGet(
-        Get(
-            VersionManagerSearchPaths,
+    pyenv_path_results = await concurrently(
+        get_un_cachable_version_manager_paths(
             VersionManagerSearchPathsRequest(
                 env_tgt,
                 pyenv_root,
@@ -194,7 +195,7 @@ async def _expand_interpreter_search_paths(
                 f"[{PythonBootstrapSubsystem.options_scope}].search_path",
                 (".python-version",),
                 s if s == "<PYENV_LOCAL>" else None,
-            ),
+            )
         )
         for s in interpreter_search_paths
         if s == "<PYENV>" or s == "<PYENV_LOCAL>"
@@ -226,13 +227,49 @@ async def _expand_interpreter_search_paths(
     return _SearchPaths(tuple(expanded))
 
 
+# This method is copied from the pex package, located at pex.variables.Variables._get_kv().
+# It is copied here to avoid a hard dependency on pex.
+def _get_kv(variable: str) -> list[str] | None:
+    kv = variable.strip().split("=")
+    if len(list(filter(None, kv))) == 2:
+        return kv
+    else:
+        return None
+
+
+# This method is copied from the pex package, located at pex.variables.Variables.from_rc().
+# It is copied here to avoid a hard dependency on pex.
+def _read_pex_rc(rc: str | None = None) -> dict[str, str]:
+    """Read pex runtime configuration variables from a pexrc file.
+
+    :param rc: an absolute path to a pexrc file.
+    :return: A dict of key value pairs found in processed pexrc files.
+    """
+    ret_vars = {}
+    rc_locations = [
+        os.path.join(os.sep, "etc", "pexrc"),
+        os.path.join("~", ".pexrc"),
+        os.path.join(os.path.dirname(sys.argv[0]), ".pexrc"),
+    ]
+    if rc:
+        rc_locations.append(rc)
+    for filename in rc_locations:
+        try:
+            with open(os.path.expanduser(filename)) as fh:
+                rc_items = map(_get_kv, fh)
+                ret_vars.update(dict(filter(None, rc_items)))
+        except OSError:
+            continue
+    return ret_vars
+
+
 def _get_pex_python_paths():
     """Returns a list of paths to Python interpreters as defined in a pexrc file.
 
     These are provided by a PEX_PYTHON_PATH in either of '/etc/pexrc', '~/.pexrc'. PEX_PYTHON_PATH
     defines a colon-separated list of paths to interpreters that a pex can be built and run against.
     """
-    ppp = Variables.from_rc().get("PEX_PYTHON_PATH")
+    ppp = _read_pex_rc().get("PEX_PYTHON_PATH")
     if ppp:
         return ppp.split(os.pathsep)
     else:
@@ -254,8 +291,7 @@ def _get_pyenv_root(env: EnvironmentVars) -> str | None:
 async def python_bootstrap(
     python_bootstrap_subsystem: PythonBootstrapSubsystem.EnvironmentAware,
 ) -> PythonBootstrap:
-    interpreter_search_paths = await Get(
-        ValidatedSearchPaths,
+    interpreter_search_paths = await validate_search_paths(
         ValidateSearchPathsRequest(
             env_tgt=python_bootstrap_subsystem.env_tgt,
             search_paths=tuple(python_bootstrap_subsystem.search_path),
@@ -271,16 +307,16 @@ async def python_bootstrap(
                     "<PEXRC>",
                 )
             ),
-        ),
+        )
     )
     interpreter_names = python_bootstrap_subsystem.names
 
-    expanded_paths = await Get(
-        _SearchPaths,
+    expanded_paths = await _expand_interpreter_search_paths(
         _ExpandInterpreterSearchPathsRequest(
             interpreter_search_paths,
             python_bootstrap_subsystem.env_tgt,
         ),
+        **implicitly(),
     )
 
     return PythonBootstrap(

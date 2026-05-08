@@ -6,15 +6,16 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from collections.abc import Callable, Iterator
 from functools import partial
 from pathlib import Path, PurePath
 from textwrap import dedent
-from typing import Any, Callable, Iterator
+from typing import Any
 
 import pytest
 
 from pants.core.util_rules.system_binaries import GitBinary, GitBinaryException, MaybeGitBinary
-from pants.engine.rules import Get, rule
+from pants.engine.rules import implicitly, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
 from pants.util.contextutil import environment_as, pushd
 from pants.util.dirutil import touch
@@ -150,7 +151,7 @@ parametrize_changed_files = pytest.mark.parametrize(
     [
         (
             "changed_files",
-            lambda git: git.changed_files,
+            lambda git: lambda **kwargs: {cf.path for cf in git.changed_files(**kwargs)},
             lambda files: set(files.keys()),
         ),
         (
@@ -285,6 +286,10 @@ def test_changes_in(gitdir: PurePath, worktree: Path, git: MutatingGitWorktree) 
     it will pass the diffspec to git diff-tree, but this should serve to at least document the
     functionality we believe works.
     """
+
+    def changes(diffspec: str) -> set[tuple[str, str]]:
+        return {(cf.path, cf.change_type.value) for cf in git.changes_in(diffspec)}
+
     with environment_as(GIT_DIR=str(gitdir), GIT_WORK_TREE=str(worktree)):
 
         def commit_contents_to_files(content: str, *files: str) -> str:
@@ -296,41 +301,46 @@ def test_changes_in(gitdir: PurePath, worktree: Path, git: MutatingGitWorktree) 
 
         # We can get changes in HEAD or by SHA
         c1 = commit_contents_to_files("1", "foo")
-        assert {"foo"} == git.changes_in("HEAD")
-        assert {"foo"} == git.changes_in(c1)
+        assert {("foo", "A")} == changes("HEAD")
+        assert {("foo", "A")} == changes(c1)
 
         # Changes in new HEAD, from old-to-new HEAD, in old HEAD, or from old-old-head to new.
         commit_contents_to_files("2", "bar")
-        assert {"bar"} == git.changes_in("HEAD")
-        assert {"bar"} == git.changes_in("HEAD^..HEAD")
-        assert {"foo"} == git.changes_in("HEAD^")
-        assert {"foo"} == git.changes_in("HEAD~1")
-        assert {"foo", "bar"} == git.changes_in("HEAD^^..HEAD")
+        assert {("bar", "A")} == changes("HEAD")
+        assert {("bar", "A")} == changes("HEAD^..HEAD")
+        assert {("foo", "A")} == changes("HEAD^")
+        assert {("foo", "A")} == changes("HEAD~1")
+        assert {("foo", "A"), ("bar", "A")} == changes("HEAD^^..HEAD")
 
         # New commit doesn't change results-by-sha
-        assert {"foo"} == git.changes_in(c1)
+        assert {("foo", "A")} == changes(c1)
 
-        # Files changed in multiple diffs within a range
+        # Files changed in multiple diffs within a range: foo was added in c1 then modified in c3.
         c3 = commit_contents_to_files("3", "foo")
-        assert {"foo", "bar"} == git.changes_in(f"{c1}..{c3}")
+        assert {("bar", "A"), ("foo", "M")} == changes(f"{c1}..{c3}")
 
-        # Changes in a tag
+        # Changes in a tag; foo was modified in c3
         subprocess.check_call(["git", "tag", "v1"])
-        assert {"foo"} == git.changes_in("v1")
+        assert {("foo", "M")} == changes("v1")
 
         # Introduce a new filename
         c4 = commit_contents_to_files("4", "baz")
-        assert {"baz"} == git.changes_in("HEAD")
+        assert {("baz", "A")} == changes("HEAD")
 
         # Tag-to-sha
-        assert {"baz"} == git.changes_in(f"v1..{c4}")
+        assert {("baz", "A")} == changes(f"v1..{c4}")
 
-        # We can get multiple changes from one ref
+        # We can get multiple changes from one ref: bar was added in c2 then modified in c5.
         commit_contents_to_files("5", "foo", "bar")
-        assert {"foo", "bar"} == git.changes_in("HEAD")
-        assert {"foo", "bar", "baz"} == git.changes_in("HEAD~4..HEAD")
-        assert {"foo", "bar", "baz"} == git.changes_in(f"{c1}..HEAD")
-        assert {"foo", "bar", "baz"} == git.changes_in(f"{c1}..{c4}")
+        assert {("foo", "M"), ("bar", "M")} == changes("HEAD")
+        assert {("foo", "M"), ("bar", "A"), ("baz", "A")} == changes("HEAD~4..HEAD")
+        assert {("foo", "M"), ("bar", "A"), ("baz", "A")} == changes(f"{c1}..HEAD")
+        assert {("bar", "A"), ("foo", "M"), ("baz", "A")} == changes(f"{c1}..{c4}")
+
+        (worktree / "baz").unlink()
+        subprocess.check_call(["git", "rm", "baz"])
+        subprocess.check_call(["git", "commit", "-m", "delete baz"])
+        assert {("baz", "D")} == changes("HEAD")
 
 
 @parametrize_changed_files
@@ -455,7 +465,7 @@ def test_worktree_invalidation(origin: Path) -> None:
 
         @rule
         async def worktree_id_string() -> str:
-            worktree = await Get(MaybeGitWorktree, GitWorktreeRequest())
+            worktree = await get_git_worktree(GitWorktreeRequest(), **implicitly())
             return str(id(worktree))
 
         rule_runner = RuleRunner(
@@ -597,9 +607,21 @@ def test_worktree_invalidation(origin: Path) -> None:
             ),
             {"empty": (Hunk(None, TextBlock(0, 0)),)},
         ],
+        [
+            (
+                b"diff --git a/file.txt b/file.txt\n"
+                b"index e69de29..9daeafb 100644\n"
+                b"--- a/file.txt\n"
+                b"+++ b/file.txt\n"
+                b"@@ -1 +1 @@\n"
+                b"-test\n"
+                b"+test\x90\n"
+            ),
+            {"file.txt": (Hunk(TextBlock(1, 1), TextBlock(1, 1)),)},
+        ],
     ],
 )
 def test_parse_unified_diff(diff, expected):
     wt = DiffParser()
-    actual = wt.parse_unified_diff(diff)
+    actual = wt.parse_unified_diff(diff.encode() if isinstance(diff, str) else diff)
     assert expected == actual

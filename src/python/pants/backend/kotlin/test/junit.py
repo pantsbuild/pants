@@ -7,8 +7,7 @@ from dataclasses import dataclass
 from pants.backend.kotlin.subsystems.kotlin import KotlinSubsystem
 from pants.backend.kotlin.target_types import KotlinJunitTestDependenciesField
 from pants.build_graph.address import Address
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
@@ -75,8 +74,8 @@ async def infer_kotlin_junit_dependency(
 ) -> InferredDependencies:
     resolve = request.field_set.resolve.normalized_value(jvm)
 
-    kotlin_junit_libraries = await Get(
-        KotlinJunitLibrariesForResolve, KotlinJunitLibrariesForResolveRequest(resolve)
+    kotlin_junit_libraries = await resolve_kotlin_junit_libraries_for_resolve(
+        KotlinJunitLibrariesForResolveRequest(resolve), **implicitly()
     )
     return InferredDependencies(kotlin_junit_libraries.addresses)
 

@@ -8,9 +8,8 @@ import textwrap
 import pytest
 
 from pants.backend.go import target_type_rules
-from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
+from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest, transform_test_args
 from pants.backend.go.goals.test import rules as test_rules
-from pants.backend.go.goals.test import transform_test_args
 from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,

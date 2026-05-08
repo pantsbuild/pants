@@ -50,7 +50,7 @@ impl PyStubCASBuilder {
         py_executor
             .borrow()
             .0
-            .enter(|| Ok(PyStubCAS(builder.build())))
+            .block_on(async move { Ok(PyStubCAS(builder.build().await)) })
     }
 }
 
@@ -76,6 +76,22 @@ impl PyStubCAS {
             .map(|fd| fd.0)
             .or_else(|_| digest.extract::<PyDigest>().map(|d| d.0.as_digest()))?;
         Ok(self.0.remove(digest.hash))
+    }
+
+    fn contains(&self, digest: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let digest = digest
+            .extract::<PyFileDigest>()
+            .map(|fd| fd.0)
+            .or_else(|_| digest.extract::<PyDigest>().map(|d| d.0.as_digest()))?;
+        Ok(self.0.contains(digest.hash))
+    }
+
+    fn contains_action_result(&self, digest: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let digest = digest
+            .extract::<PyFileDigest>()
+            .map(|fd| fd.0)
+            .or_else(|_| digest.extract::<PyDigest>().map(|d| d.0.as_digest()))?;
+        Ok(self.0.contains_action_result(digest.hash))
     }
 
     fn action_cache_len(&self) -> usize {

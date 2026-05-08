@@ -66,6 +66,27 @@ JDKs used by Pants are automatically fetched using [Coursier](https://get-coursi
 
 To override the default on a particular target, you can use the [`jdk=` field](../../reference/targets/java_source.mdx#jdk). It can be useful to use the [`parametrize` builtin](../using-pants/key-concepts/targets-and-build-files.mdx#parametrizing-targets) with the `jdk=` field, particularly to run test targets under multiple JDKs.
 
+To get a list of available JDK versions:
+
+```sh
+$ coursier java --available
+adoptium:1.11.0.15
+adoptium:1.11.0.16
+...
+```
+
+Please note that JDKs later than 17 are not supported by nailgun
+(see [#20603](https://github.com/pantsbuild/pants/issues/20603)), which
+must be disabled manually:
+
+```toml title="pants.toml"
+[GLOBAL]
+process_execution_local_enable_nailgun = false
+
+[jvm]
+jdk = "temurin:1.22"
+```
+
 #### Scala version
 
 The Scala version to use is configured on a resolve-by-resolve basis (see the "Third-party dependencies" section below) using the [`[scala].version_for_resolve` option](../../reference/subsystems/scala.mdx#version_for_resolve). The default Scala version for your repository will thus be whichever Scala version is configured for the "default" resolve, which is configured by the [`[jvm].default_resolve` option](../../reference/subsystems/jvm#default_resolve).
@@ -82,6 +103,10 @@ The Scala backend currently requires that a `jvm_artifact` target for the `org.s
 
 In many cases, the dependencies of your first-party code are automatically inferred via [dependency inference](https://blog.pantsbuild.org/automatically-unlocking-concurrent-builds-and-fine-grained-caching-on-the-jvm-with-dependency-inference/) based on your `import` statements. If you do need to declare additional dependencies for any reason, you can do so using Pants' [syntax for declaring dependencies for targets](../using-pants/key-concepts/targets-and-build-files.mdx).
 
+:::caution Scala 3 top-level definitions
+Pants's Scala dependency inference does not implement Scala 3's full scoping rules. References to Scala 3 top-level definitions (`val`/`def`/etc. declared directly in a package, without an enclosing `object` or `class`) in another file of the same package [will not be inferred](https://github.com/pantsbuild/pants/issues/23023). For those cross-file references, declare the dependency explicitly via the target's `dependencies` field.
+:::
+
 ### Third-party dependencies and lockfiles
 
 Third-party dependencies (i.e. those from repositories like [Maven central](https://search.maven.org/)) are also automatically inferred via dependency inference, but must first be declared once per repository as [`jvm_artifact` targets](../../reference/targets/jvm_artifact.mdx):
@@ -96,7 +121,7 @@ jvm_artifact(
 )
 ```
 
-If your third party dependency is a Scala library, you should use the `scala_artifact` target instead like follows:
+If your third party dependency is a Scala library, you should use the `scala_artifact` target instead as follows:
 
 ```python title="BUILD"
 scala_artifact(
@@ -330,11 +355,11 @@ Test runs are _hermetic_, meaning that they are stripped of the parent `pants` p
 
 To add any arbitrary environment variable back to the process, you can either add the environment variable to the specific tests with the `extra_env_vars` field on `junit_test` / `junit_tests` / `scala_junit_test` / `scala_junit_tests` / `scalatest_test` / `scalatest_tests` targets or to all your tests with the `[test].extra_env_vars` option. Generally, prefer the field `extra_env_vars` field so that more of your tests are hermetic.
 
-With both `[test].extra_env_vars` and the `extra_env_vars` field, you can either hardcode a value or leave off a value to "allowlist" it and read from the parent `pants` process's environment.
+With both `[test].extra_env_vars` and the `extra_env_vars` field, you can specify a value with the form `"VAR1=hardcoded_value"` or read it from the parent `pants` process's environment with the form `VAR2`. `fnmatch` globs like `"VAR_PREFIXED_*"` can be used to read multiple environment variables.
 
 ```toml tab={"label":"pants.toml"}
 [test]
-extra_env_vars = ["VAR1", "VAR2=hardcoded_value"]
+extra_env_vars = ["VAR1=hardcoded_value", "VAR2", "VAR_PREFIXED_*"]
 ```
 
 ```python tab={"label":"project/BUILD"}
@@ -441,7 +466,7 @@ jvm-default = "semanticdb"
 :::note Scalafix and Scala 3
 At the moment the support for Scalac 3 in Scalafix is limited, most of the syntactic rules work but not that many in the semantic front.
 
-Despite those raugh edges, Scalafix is a great linting tool for Scala 3, just note that the setup is different than from prior versions: Instead of adding a scalac plugin to our build, we only need to add the `-Xsemanticdb` flag to our `[scalac].args` settings to enable the generation of `.semanticdb` compiled files.
+Despite those rough edges, Scalafix is a great linting tool for Scala 3, just note that the setup is different than from prior versions: Instead of adding a scalac plugin to our build, we only need to add the `-Xsemanticdb` flag to our `[scalac].args` settings, or the appropriate entry in `[scalac].args_for_resolve`, to enable the generation of `.semanticdb` compiled files.
 :::
 
 ## Working in an IDE

@@ -6,21 +6,21 @@ use std::hash::{Hash, Hasher};
 use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
-use pyo3::{IntoPy, PyObject, Python};
 
 use fs::DirectoryDigest;
-use protos::gen::pants::cache::{
-    dependency_inference_request, javascript_inference_metadata, JavascriptInferenceMetadata,
+use protos::pb::pants::cache::{
+    JavascriptInferenceMetadata, dependency_inference_request, javascript_inference_metadata,
 };
 
 use crate::externs::fs::PyDigest;
+use crate::python::PyComparedBool;
 
 pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyNativeDependenciesRequest>()?;
     m.add_class::<PyInferenceMetadata>()
 }
 
-#[pyclass(name = "InferenceMetadata")]
+#[pyclass(name = "InferenceMetadata", from_py_object)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PyInferenceMetadata(pub dependency_inference_request::Metadata);
 
@@ -59,12 +59,12 @@ impl PyInferenceMetadata {
         )))
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python) -> PyObject {
-        match op {
-            CompareOp::Eq => (self == other).into_py(py),
-            CompareOp::Ne => (self != other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(self == other),
+            CompareOp::Ne => Some(self != other),
+            _ => None,
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -78,7 +78,7 @@ impl PyInferenceMetadata {
     }
 }
 
-#[pyclass(name = "NativeDependenciesRequest")]
+#[pyclass(name = "NativeDependenciesRequest", from_py_object)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct PyNativeDependenciesRequest {
     pub directory_digest: DirectoryDigest,
@@ -88,6 +88,7 @@ pub struct PyNativeDependenciesRequest {
 #[pymethods]
 impl PyNativeDependenciesRequest {
     #[new]
+    #[pyo3(signature = (digest, metadata=None))]
     fn __new__(digest: PyDigest, metadata: Option<PyInferenceMetadata>) -> Self {
         Self {
             directory_digest: digest.0,
@@ -110,11 +111,11 @@ impl PyNativeDependenciesRequest {
         )
     }
 
-    fn __richcmp__(&self, other: &Self, op: CompareOp, py: Python) -> PyObject {
-        match op {
-            CompareOp::Eq => (self == other).into_py(py),
-            CompareOp::Ne => (self != other).into_py(py),
-            _ => py.NotImplemented(),
-        }
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> PyComparedBool {
+        PyComparedBool(match op {
+            CompareOp::Eq => Some(self == other),
+            CompareOp::Ne => Some(self != other),
+            _ => None,
+        })
     }
 }

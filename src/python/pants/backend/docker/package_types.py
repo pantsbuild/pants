@@ -4,9 +4,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum, auto
 
 from pants.core.goals.package import BuiltPackageArtifact
+from pants.engine.addresses import Address
 from pants.util.strutil import bullet_list, pluralize
+
+
+class DockerPushOnPackageBehavior(StrEnum):
+    """Controls whether Docker images can push to registries during packaging."""
+
+    ALLOW = auto()
+    IGNORE = auto()
+    WARN = auto()
+    ERROR = auto()
+
+
+class DockerPushOnPackageException(Exception):
+    """Exception raised when a Docker image would push but push behavior is ERROR."""
+
+    def __init__(self, address: Address):
+        super().__init__(
+            f"The docker_image target {address} would push to a registry but "
+            f'`[docker].push_on_package` is set to "error".'
+        )
 
 
 @dataclass(frozen=True)

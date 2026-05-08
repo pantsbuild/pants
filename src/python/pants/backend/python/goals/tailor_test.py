@@ -17,7 +17,9 @@ from pants.backend.python.macros.python_requirements import PythonRequirementsTa
 from pants.backend.python.target_types import (
     PexBinary,
     PythonSourcesGeneratorTarget,
+    PythonTestsGeneratingSourcesField,
     PythonTestsGeneratorTarget,
+    PythonTestUtilsGeneratingSourcesField,
     PythonTestUtilsGeneratorTarget,
 )
 from pants.core.goals.tailor import AllOwnedSources, PutativeTarget, PutativeTargets
@@ -47,7 +49,11 @@ def test_classify_source_files() -> None:
         PythonTestsGeneratorTarget: test_files,
         PythonSourcesGeneratorTarget: source_files,
         PythonTestUtilsGeneratorTarget: test_util_files,
-    } == classify_source_files(test_files | source_files | test_util_files)
+    } == classify_source_files(
+        test_files | source_files | test_util_files,
+        PythonTestsGeneratingSourcesField.default,
+        PythonTestUtilsGeneratingSourcesField.default,
+    )
 
 
 @pytest.fixture
@@ -176,6 +182,59 @@ def test_find_putative_targets(rule_runner: RuleRunner) -> None:
                     "src/python/foo/bar",
                     "test_utils",
                     ["conftest.py"],
+                ),
+            ]
+        )
+        == pts
+    )
+
+
+def test_custom_globs(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        [
+            "--python-tailor-test-file-globs=['*_mytests.py']",
+            "--python-tailor-testutils-file-globs=['myconftest.py', '*_mytests.pyi']",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            f"src/python/foo/{fp}": ""
+            for fp in (
+                "bar/baz.py",
+                "bar/baz_test.py",
+                "bar/baz_mytests.py",
+                "bar/baz_mytests.pyi",
+                "bar/myconftest.py",
+            )
+        }
+    )
+    pts = rule_runner.request(
+        PutativeTargets,
+        [
+            PutativePythonTargetsRequest(("src/python/foo/bar",)),
+            AllOwnedSources([]),
+        ],
+    )
+    assert (
+        PutativeTargets(
+            [
+                PutativeTarget.for_target_type(
+                    PythonSourcesGeneratorTarget,
+                    "src/python/foo/bar",
+                    None,
+                    ["baz.py", "baz_test.py"],
+                ),
+                PutativeTarget.for_target_type(
+                    PythonTestsGeneratorTarget,
+                    "src/python/foo/bar",
+                    "tests",
+                    ["baz_mytests.py"],
+                ),
+                PutativeTarget.for_target_type(
+                    PythonTestUtilsGeneratorTarget,
+                    "src/python/foo/bar",
+                    "test_utils",
+                    ["baz_mytests.pyi", "myconftest.py"],
                 ),
             ]
         )

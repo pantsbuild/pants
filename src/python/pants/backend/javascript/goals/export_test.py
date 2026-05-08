@@ -32,20 +32,33 @@ def rule_runner() -> RuleRunner:
 
 
 def given_package_with_name(name: str) -> str:
-    return json.dumps({"name": name, "version": "0.0.1", "devDependencies": {"jest": "*"}})
+    return json.dumps(
+        {
+            "name": name,
+            "version": "0.0.1",
+            "devDependencies": {
+                "@types/jest": "*",
+                "jest": "*",
+                "ts-jest": "*",
+                "typescript": "*",
+            },
+            "packageManager": "npm@10.9.2",
+        }
+    )
 
 
 def get_snapshot(rule_runner: RuleRunner, digest: Digest) -> Snapshot:
     return rule_runner.request(Snapshot, [digest])
 
 
+@pytest.mark.platform_specific_behavior
 def test_export_node_modules(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(["--export-resolve=nodejs-default"], env_inherit={"PATH"})
     rule_runner.write_files(
         {
             "BUILD": "package_json(name='root')",
             "package-lock.json": (
-                Path(__file__).parent / "jest_resources/package-lock.json"
+                Path(__file__).parent / "test_resources/jest_project/package-lock.json"
             ).read_text(),
             "package.json": given_package_with_name("ham"),
         }

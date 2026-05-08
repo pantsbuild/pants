@@ -2,24 +2,24 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+from collections.abc import Iterable
 from pathlib import PurePath
-from typing import Iterable
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.address import BuildFileAddressRequest
-from pants.engine.addresses import Addresses, BuildFileAddress
+from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.internals.build_files import find_build_file
+from pants.engine.internals.graph import hydrate_sources, resolve_unexpanded_targets
+from pants.engine.internals.graph import transitive_targets as transitive_targets_get
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly
 from pants.engine.target import (
     AlwaysTraverseDeps,
-    HydratedSources,
     HydrateSourcesRequest,
     SourcesField,
     Target,
-    TransitiveTargets,
     TransitiveTargetsRequest,
-    UnexpandedTargets,
 )
 from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
@@ -72,22 +72,19 @@ async def file_deps(
 ) -> Filedeps:
     targets: Iterable[Target]
     if filedeps_subsystem.transitive:
-        transitive_targets = await Get(
-            TransitiveTargets,
+        transitive_targets = await transitive_targets_get(
             TransitiveTargetsRequest(
                 addresses, should_traverse_deps_predicate=AlwaysTraverseDeps()
             ),
+            **implicitly(),
         )
         targets = transitive_targets.closure
     else:
         # NB: We must preserve target generators, not replace with their generated targets.
-        targets = await Get(UnexpandedTargets, Addresses, addresses)
+        targets = await resolve_unexpanded_targets(addresses)
 
-    build_file_addresses = await MultiGet(
-        Get(
-            BuildFileAddress,
-            BuildFileAddressRequest(tgt.address, description_of_origin="CLI arguments"),
-        )
+    build_file_addresses = await concurrently(
+        find_build_file(BuildFileAddressRequest(tgt.address, description_of_origin="CLI arguments"))
         for tgt in targets
     )
     unique_rel_paths = {bfa.rel_path for bfa in build_file_addresses}
@@ -99,8 +96,9 @@ async def file_deps(
             )
         )
     else:
-        all_hydrated_sources = await MultiGet(
-            Get(HydratedSources, HydrateSourcesRequest(tgt.get(SourcesField))) for tgt in targets
+        all_hydrated_sources = await concurrently(
+            hydrate_sources(HydrateSourcesRequest(tgt.get(SourcesField)), **implicitly())
+            for tgt in targets
         )
         unique_rel_paths.update(
             itertools.chain.from_iterable(

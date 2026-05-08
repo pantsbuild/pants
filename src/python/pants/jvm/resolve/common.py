@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 from urllib.parse import quote_plus as url_quote_plus
 
 from pants.engine.collection import DeduplicatedCollection

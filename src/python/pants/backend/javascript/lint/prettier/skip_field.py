@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget, JSSourceTarget
 from pants.engine.rules import Rule

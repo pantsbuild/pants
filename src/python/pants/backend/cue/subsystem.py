@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
+from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 from pants.util.strutil import help_text
 
@@ -25,10 +27,10 @@ class Cue(TemplatedExternalTool):
     )
     default_version = "v0.4.3"
     default_known_versions = [
-        "v0.4.3|macos_x86_64|1161254cf38b928b87a7ac1552dc2e12e6c5da298f9ce370d80e5518ddb6513d|6240316",
-        "v0.4.3|macos_arm64 |3d84b85a7288f94301a4726dcf95b2d92c8ff796c4d45c4733fbdcc04ceaf21d|5996085",
-        "v0.4.3|linux_x86_64|5e7ecb614b5926acfc36eb1258800391ab7c6e6e026fa7cacbfe92006bac895c|6037013",
         "v0.4.3|linux_arm64 |a8c3f4140d18c324cc69f5de4df0566e529e1636cff340095a42475799bf3fed|5548404",
+        "v0.4.3|linux_x86_64|5e7ecb614b5926acfc36eb1258800391ab7c6e6e026fa7cacbfe92006bac895c|6037013",
+        "v0.4.3|macos_arm64 |3d84b85a7288f94301a4726dcf95b2d92c8ff796c4d45c4733fbdcc04ceaf21d|5996085",
+        "v0.4.3|macos_x86_64|1161254cf38b928b87a7ac1552dc2e12e6c5da298f9ce370d80e5518ddb6513d|6240316",
     ]
     default_url_template = "https://github.com/cue-lang/cue/releases/download/{version}/cue_{version}_{platform}.tar.gz"
     default_url_platform_mapping = {
@@ -42,3 +44,7 @@ class Cue(TemplatedExternalTool):
 
     def generate_exe(self, plat: Platform) -> str:
         return "cue"
+
+
+def rules():
+    return (UnionRule(ExportableTool, Cue),)

@@ -27,7 +27,7 @@ class BuiltinGoal(ABC, GoalSubsystem):
     prioritized. This is to support things like `./pants some-builtin-goal --help`.
     """
 
-    # Used by `pants.option.arg_splitter.ArgSplitter()` to optionally allow aliasing builtin goals.
+    # Used by the arg splitter to optionally allow aliasing builtin goals.
     aliases: ClassVar[tuple[str, ...]] = ()
 
     @classmethod

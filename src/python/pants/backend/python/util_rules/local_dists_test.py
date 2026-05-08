@@ -48,8 +48,7 @@ def test_build_local_dists(rule_runner: PythonRuleRunner) -> None:
     foo = PurePath("foo")
     rule_runner.write_files(
         {
-            foo
-            / "BUILD": dedent(
+            foo / "BUILD": dedent(
                 """
             python_sources()
 
@@ -63,8 +62,7 @@ def test_build_local_dists(rule_runner: PythonRuleRunner) -> None:
             """
             ),
             foo / "bar.py": "BAR = 42",
-            foo
-            / "setup.py": dedent(
+            foo / "setup.py": dedent(
                 """
                 from setuptools import setup
 

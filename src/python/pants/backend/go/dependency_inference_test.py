@@ -7,8 +7,11 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.go import target_type_rules
+from pants.backend.go.dependency_inference import rules as dependency_inference_rules
 from pants.backend.go.goals.test import GoTestFieldSet, GoTestRequest
-from pants.backend.go.goals.test import rules as test_rules
+from pants.backend.go.goals.test import (
+    rules as rules_for_test,  # Naming this test_rules would cause pytest to attempt to collect tests from it.
+)
 from pants.backend.go.target_types import GoBinaryTarget, GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
@@ -35,10 +38,11 @@ from pants.testutil.rule_runner import RuleRunner
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
-            *test_rules(),
+            *rules_for_test(),
             *assembly.rules(),
             *build_pkg.rules(),
             *build_pkg_target.rules(),
+            *dependency_inference_rules(),
             *first_party_pkg.rules(),
             *go_mod.rules(),
             *link.rules(),

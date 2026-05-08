@@ -74,8 +74,7 @@ def run_yamllint(
     *,
     extra_args: list[str] | None = None,
     expected_partitions: None = None,
-) -> LintResult:
-    ...
+) -> LintResult: ...
 
 
 @overload
@@ -84,8 +83,7 @@ def run_yamllint(
     *,
     extra_args: list[str] | None = None,
     expected_partitions: tuple[tuple[str, ...], dict[str, tuple[str, ...]]],
-) -> list[LintResult]:
-    ...
+) -> list[LintResult]: ...
 
 
 def run_yamllint(
@@ -163,6 +161,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert_success(rule_runner)
 
 
+@pytest.mark.platform_specific_behavior
 def test_failure(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"test.yaml": REPEATED_KEY, "not_yaml": NOT_YAML})
     assert_failure_with('duplication of key "this"', rule_runner)

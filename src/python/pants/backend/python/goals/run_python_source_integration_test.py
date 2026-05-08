@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import os
 from textwrap import dedent
-from typing import Tuple
 
 import pytest
 
@@ -75,7 +74,7 @@ def run_run_request(
     rule_runner: PythonRuleRunner,
     target: Target,
     test_debug_adapter: bool = True,
-) -> Tuple[int, str, str]:
+) -> tuple[int, str, str]:
     run_request = rule_runner.request(RunRequest, [PythonSourceFieldSet.create(target)])
     run_process = InteractiveProcess(
         argv=run_request.args,
@@ -203,9 +202,11 @@ def test_run_sample_script(
         f"--debug-adapter-port={debugadapter_port_for_testing()}",
         *(
             (
-                "--python-default-run-goal-use-sandbox"
-                if global_default_value
-                else "--no-python-default-run-goal-use-sandbox",
+                (
+                    "--python-default-run-goal-use-sandbox"
+                    if global_default_value
+                    else "--no-python-default-run-goal-use-sandbox"
+                ),
             )
             if global_default_value is not None
             else ()

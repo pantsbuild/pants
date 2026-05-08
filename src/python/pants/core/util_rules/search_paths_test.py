@@ -3,21 +3,21 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
 import pytest
 
 from pants.build_graph.address import Address
-from pants.core.util_rules import search_paths
-from pants.core.util_rules.asdf import AsdfPathString
-from pants.core.util_rules.environments import (
+from pants.core.environments.target_types import (
     DockerEnvironmentTarget,
     DockerImageField,
     EnvironmentTarget,
     LocalEnvironmentTarget,
     RemoteEnvironmentTarget,
 )
+from pants.core.util_rules import search_paths
+from pants.core.util_rules.asdf import AsdfPathString
 from pants.core.util_rules.search_paths import (
     ValidateSearchPathsRequest,
     VersionManagerSearchPaths,
@@ -92,9 +92,9 @@ def rule_runner() -> RuleRunner:
     ),
 )
 def test_validated_search_paths(
-    env_tgt_type: type[LocalEnvironmentTarget]
-    | type[DockerEnvironmentTarget]
-    | type[RemoteEnvironmentTarget],
+    env_tgt_type: (
+        type[LocalEnvironmentTarget] | type[DockerEnvironmentTarget] | type[RemoteEnvironmentTarget]
+    ),
     search_paths: tuple[str],
     is_default: bool,
     expected: tuple[str] | type[ValueError],
@@ -142,7 +142,7 @@ def test_validated_search_paths(
 @contextmanager
 def fake_tool_root(
     fake_versions: list[str], fake_local_version: str
-) -> Generator[tuple[str, tuple[str, ...], tuple[str]], None, None]:
+) -> Generator[tuple[str, tuple[str, ...], tuple[str]]]:
     with temporary_dir() as tool_root:
         fake_version_dirs = tuple(
             os.path.join(tool_root, "versions", v, "bin") for v in fake_versions

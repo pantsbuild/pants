@@ -3,9 +3,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -16,10 +16,9 @@ from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.subsystems.python_tool_base import get_lockfile_interpreter_constraints
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
+from pants.backend.python.util_rules.lockfile_metadata import LockfileFormat, PythonLockfileMetadata
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
-    LoadedLockfileRequest,
     Lockfile,
 )
 from pants.core.goals.update_build_files import (
@@ -35,6 +34,7 @@ from pants.core.goals.update_build_files import (
     format_build_file_with_buildifier,
     format_build_file_with_ruff,
     format_build_file_with_yapf,
+    rewrite_build_file,
     update_build_files,
 )
 from pants.core.target_types import GenericTarget
@@ -44,7 +44,7 @@ from pants.engine.rules import rule
 from pants.engine.unions import UnionRule
 from pants.option.ranked_value import Rank, RankedValue
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import GoalRuleResult, MockGet, RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import GoalRuleResult, RuleRunner, run_rule_with_mocks
 
 # ------------------------------------------------------------------------------------------
 # Generic goal
@@ -60,14 +60,14 @@ class MockRewriteReverseLines(RewrittenBuildFileRequest):
 
 
 @rule
-def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
+async def add_line(request: MockRewriteAddLine) -> RewrittenBuildFile:
     return RewrittenBuildFile(
         request.path, (*request.lines, "# added line"), change_descriptions=("Add a new line",)
     )
 
 
 @rule
-def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
+async def reverse_lines(request: MockRewriteReverseLines) -> RewrittenBuildFile:
     return RewrittenBuildFile(
         request.path, tuple(reversed(request.lines)), change_descriptions=("Reverse lines",)
     )
@@ -79,6 +79,7 @@ def generic_goal_rule_runner() -> RuleRunner:
         rules=(
             add_line,
             reverse_lines,
+            rewrite_build_file,
             format_build_file_with_ruff,
             format_build_file_with_yapf,
             update_build_files,
@@ -158,6 +159,14 @@ def test_get_lockfile_interpreter_constraints() -> None:
         only_binary=set(),
         no_binary=set(),
         manylinux=None,
+        excludes=set(),
+        overrides=set(),
+        sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
+        uploaded_prior_to=None,
+        lockfile_format=LockfileFormat.PEX,
+        resolve="resolve_name",
     )
 
     def assert_ics(
@@ -181,7 +190,7 @@ def test_get_lockfile_interpreter_constraints() -> None:
             "black.lock",
             metadata=metadata,
             requirement_estimate=1,
-            is_pex_native=True,
+            lockfile_format=LockfileFormat.PEX,
             as_constraints_strings=None,
             original_lockfile=Lockfile(
                 "black.lock", url_description_of_origin="foo", resolve_name="black"
@@ -190,13 +199,9 @@ def test_get_lockfile_interpreter_constraints() -> None:
         result = run_rule_with_mocks(
             get_lockfile_interpreter_constraints,
             rule_args=[black],
-            mock_gets=[
-                MockGet(
-                    output_type=LoadedLockfile,
-                    input_types=(LoadedLockfileRequest,),
-                    mock=lambda _: loaded_lock,
-                )
-            ],
+            mock_calls={
+                "pants.backend.python.util_rules.pex_requirements.load_lockfile": lambda _: loaded_lock,
+            },
         )
         assert result == InterpreterConstraints(expected)
 
@@ -218,6 +223,7 @@ BLACK_ENV_INHERIT = {"PATH", "PYENV_ROOT", "HOME", "LANG", "LC_ALL"}
 def black_rule_runner() -> RuleRunner:
     return RuleRunner(
         rules=(
+            rewrite_build_file,
             format_build_file_with_black,
             format_build_file_with_ruff,
             format_build_file_with_yapf,
@@ -299,6 +305,7 @@ def run_ruff(
     """Returns the Goal's result and contents of the BUILD file after execution."""
     rule_runner = RuleRunner(
         rules=(
+            rewrite_build_file,
             format_build_file_with_ruff,
             update_build_files,
             *config_files.rules(),
@@ -350,6 +357,7 @@ def run_buildifier(
     """Returns the Goal's result and contents of the BUILD file after execution."""
     rule_runner = RuleRunner(
         rules=(
+            rewrite_build_file,
             format_build_file_with_buildifier,
             update_build_files,
             *config_files.rules(),
@@ -401,6 +409,7 @@ def run_yapf(
     """Returns the Goal's result and contents of the BUILD file after execution."""
     rule_runner = RuleRunner(
         rules=(
+            rewrite_build_file,
             format_build_file_with_yapf,
             update_build_files,
             *config_files.rules(),

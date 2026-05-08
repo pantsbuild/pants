@@ -234,6 +234,7 @@ def test_generate_package_without_contents(
     _assert_one_built_artifact(_PKG_NAME, built_package, field_set_type)
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize("field_set_type,extra_metadata,valid_target", _TEST_CASES)
 def test_generate_package_with_contents(
     rule_runner: RuleRunner,
@@ -268,7 +269,7 @@ def test_generate_package_with_contents(
                     )
                 """
             ),
-            **{path: "" for path in scripts.values()},
+            **dict.fromkeys(scripts.values(), ""),
             "contents/BUILD": dedent(
                 f"""
                 file(

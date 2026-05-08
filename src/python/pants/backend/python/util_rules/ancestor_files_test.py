@@ -33,7 +33,9 @@ def assert_injected(
     expected_discovered: list[str],
     ignore_empty_files: bool,
 ) -> None:
-    rule_runner.write_files({**{f: "" for f in empty_files}, **{f: "foo" for f in nonempty_files}})
+    rule_runner.write_files(
+        {**dict.fromkeys(empty_files, ""), **dict.fromkeys(nonempty_files, "foo")}
+    )
     request = AncestorFilesRequest(
         requested=("__init__.py",),
         input_files=tuple(input_files),

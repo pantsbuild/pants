@@ -4,15 +4,17 @@
 from dataclasses import dataclass
 
 from pants.backend.go.target_types import GoPackageSourcesField
-from pants.backend.go.util_rules.build_opts import GoBuildOptions, GoBuildOptionsFromTargetRequest
-from pants.backend.go.util_rules.build_pkg import (
-    BuildGoPackageRequest,
-    FallibleBuildGoPackageRequest,
-    FallibleBuiltGoPackage,
+from pants.backend.go.util_rules.build_opts import (
+    GoBuildOptionsFromTargetRequest,
+    go_extract_build_options_from_target,
 )
-from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
+from pants.backend.go.util_rules.build_pkg import build_go_package
+from pants.backend.go.util_rules.build_pkg_target import (
+    BuildGoPackageTargetRequest,
+    setup_build_go_package_target_request,
+)
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -30,14 +32,15 @@ class GoCheckRequest(CheckRequest):
 
 @rule(desc="Check Go compilation", level=LogLevel.DEBUG)
 async def check_go(request: GoCheckRequest) -> CheckResults:
-    build_opts_for_field_sets = await MultiGet(
-        Get(GoBuildOptions, GoBuildOptionsFromTargetRequest(field_set.address))
+    build_opts_for_field_sets = await concurrently(
+        go_extract_build_options_from_target(
+            GoBuildOptionsFromTargetRequest(field_set.address), **implicitly()
+        )
         for field_set in request.field_sets
     )
-    build_requests = await MultiGet(
-        Get(
-            FallibleBuildGoPackageRequest,
-            BuildGoPackageTargetRequest(field_set.address, build_opts=build_opts),
+    build_requests = await concurrently(
+        setup_build_go_package_target_request(
+            BuildGoPackageTargetRequest(field_set.address, build_opts=build_opts), **implicitly()
         )
         for field_set, build_opts in zip(request.field_sets, build_opts_for_field_sets)
     )
@@ -49,8 +52,8 @@ async def check_go(request: GoCheckRequest) -> CheckResults:
         else:
             valid_requests.append(fallible_request.request)
 
-    build_results = await MultiGet(
-        Get(FallibleBuiltGoPackage, BuildGoPackageRequest, request) for request in valid_requests
+    build_results = await concurrently(
+        build_go_package(request, **implicitly()) for request in valid_requests
     )
 
     # NB: We don't pass stdout/stderr as it will have already been rendered as streaming.

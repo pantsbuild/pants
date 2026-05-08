@@ -6,10 +6,10 @@ from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Callable, ClassVar, Iterator, Optional, cast
-
-from typing_extensions import final
+from enum import Enum
+from typing import ClassVar, cast, final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -19,7 +19,7 @@ from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import GlobMatchErrorBehavior
+from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -81,7 +81,7 @@ class DockerImageContextRootField(StringField):
     )
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[str], address: Address) -> Optional[str]:
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None:
         value_or_default = super().compute_value(raw_value, address=address)
         if isinstance(value_or_default, str) and value_or_default.startswith("/"):
             val = value_or_default.strip("/")
@@ -90,7 +90,7 @@ class DockerImageContextRootField(StringField):
                     f"""
                     The `{cls.alias}` field in target {address} must be a relative path, but was
                     {value_or_default!r}. Use {val!r} for a path relative to the build root, or
-                    {'./' + val!r} for a path relative to the BUILD file
+                    {"./" + val!r} for a path relative to the BUILD file
                     (i.e. {os.path.join(address.spec_path, val)!r}).
                     """
                 )
@@ -151,7 +151,7 @@ class DockerImageTagsField(StringSequenceField):
 
         {_interpolation_help.format(kind="tag")}
 
-        See {doc_url('docs/docker/tagging-docker-images')}.
+        See {doc_url("docs/docker/tagging-docker-images")}.
         """
     )
 
@@ -335,8 +335,7 @@ class DockerBuildKitOptionField:
     """Mixin to indicate a BuildKit-specific option."""
 
     @abstractmethod
-    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]:
-        ...
+    def options(self, value_formatter: OptionValueFormatter) -> Iterator[str]: ...
 
     required_help = "This option requires BuildKit to be enabled via the Docker subsystem options."
 
@@ -432,6 +431,99 @@ class DockerImageBuildImageOutputField(
         """
     )
     docker_build_option = "--output"
+
+
+class DockerImageOutputFilesField(StringSequenceField):
+    alias = "output_files"
+    default = ()
+    help = help_text(
+        """
+        Files to capture from a BuildKit local output export, relative to the build root.
+
+        When this field or `output_directories` is set, Pants overrides the default Docker build
+        output with `--output=type=local,dest=.` and captures only the requested files and
+        directories as the package digest.
+
+        Use `target_stage` to capture output from a specific Dockerfile stage.
+        """
+    )
+
+
+class DockerImageOutputDirectoriesField(StringSequenceField):
+    alias = "output_directories"
+    default = ()
+    help = help_text(
+        """
+        Directories to capture from a BuildKit local output export, relative to the build root.
+
+        When this field or `output_files` is set, Pants overrides the default Docker build output
+        with `--output=type=local,dest=.` and captures only the requested files and directories as
+        the package digest.
+
+        Use `target_stage` to capture output from a specific Dockerfile stage.
+        """
+    )
+
+
+class DockerImageOutputsMatchModeValue(Enum):
+    ALL = "all"
+    ALL_WARN = "all_warn"
+    AT_LEAST_ONE = "at_least_one"
+    AT_LEAST_ONE_WARN = "at_least_one_warn"
+    ALLOW_EMPTY = "allow_empty"
+
+    @property
+    def glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+        if self in (
+            DockerImageOutputsMatchModeValue.ALL,
+            DockerImageOutputsMatchModeValue.AT_LEAST_ONE,
+        ):
+            return GlobMatchErrorBehavior.error
+        return GlobMatchErrorBehavior.warn
+
+    @property
+    def glob_expansion_conjunction(self) -> GlobExpansionConjunction | None:
+        if self in (
+            DockerImageOutputsMatchModeValue.ALL,
+            DockerImageOutputsMatchModeValue.ALL_WARN,
+        ):
+            return GlobExpansionConjunction.all_match
+        if self in (
+            DockerImageOutputsMatchModeValue.AT_LEAST_ONE,
+            DockerImageOutputsMatchModeValue.AT_LEAST_ONE_WARN,
+        ):
+            return GlobExpansionConjunction.any_match
+        return None
+
+
+class DockerImageOutputsMatchModeField(StringField):
+    alias = "outputs_match_mode"
+    default = DockerImageOutputsMatchModeValue.ALL_WARN.value
+    help = help_text(
+        """
+        Configure whether all, or some, of the values in the `output_files` and
+        `output_directories` fields must actually match outputs from the Docker build.
+
+        Valid values are:
+
+        - `all_warn`: Log a warning if any glob fails to match an output. (In other words, all
+        globs must match to avoid a warning.) This is the default value.
+
+        - `all`: Ensure all globs match an output or else raise an error.
+
+        - `at_least_one_warn`: Log a warning if none of the globs match an output.
+
+        - `at_least_one`: Ensure at least one glob matches an output or else raise an error.
+
+        - `allow_empty`: Allow empty digests (which means nothing was captured). This disables
+        checking that globs match outputs.
+        """
+    )
+    valid_choices = DockerImageOutputsMatchModeValue
+
+    @property
+    def enum_value(self) -> DockerImageOutputsMatchModeValue:
+        return DockerImageOutputsMatchModeValue(self.value)
 
 
 class DockerImageBuildSecretsOptionField(
@@ -623,6 +715,9 @@ class DockerImageTarget(Target):
         DockerImageBuildImageCacheToField,
         DockerImageBuildImageCacheFromField,
         DockerImageBuildImageOutputField,
+        DockerImageOutputFilesField,
+        DockerImageOutputDirectoriesField,
+        DockerImageOutputsMatchModeField,
         DockerImageRunExtraArgsField,
         OutputPathField,
         RestartableField,
@@ -669,12 +764,19 @@ class DockerImageTags(Collection[str]):
     """Additional image tags to apply to built Docker images."""
 
 
+@rule(polymorphic=True)
+async def get_docker_image_tags(
+    req: DockerImageTagsRequest, env_name: EnvironmentName
+) -> DockerImageTags:
+    raise NotImplementedError()
+
+
 class AllDockerImageTargets(Targets):
     pass
 
 
 @rule
-def all_docker_targets(all_targets: AllTargets) -> AllDockerImageTargets:
+async def all_docker_targets(all_targets: AllTargets) -> AllDockerImageTargets:
     return AllDockerImageTargets(
         [tgt for tgt in all_targets if tgt.has_field(DockerImageSourceField)]
     )

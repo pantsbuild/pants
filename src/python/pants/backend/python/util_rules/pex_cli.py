@@ -5,34 +5,45 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-import os.path
+import os
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, List, Mapping, Optional, Tuple
 
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.util_rules import pex_environment
-from pants.backend.python.util_rules.pex_environment import PexEnvironment, PexSubsystem
+from pants.backend.python.util_rules.pex_environment import (
+    PexEnvironment,
+    PexSubsystem,
+    PythonExecutable,
+)
+from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules import adhoc_binaries, external_tool
 from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
-    ExternalToolRequest,
     TemplatedExternalTool,
+    download_external_tool,
 )
 from pants.engine.fs import CreateDigest, Digest, Directory, MergeDigests
-from pants.engine.internals.selectors import MultiGet
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
+from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions, ca_certs_path_to_file_content
 from pants.option.option_types import ArgsListOption
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.meta import classproperty
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+_PEX_VERSION = "v2.93.2"
+_PEX_BINARY_HASH = "75222f01b34cbe2bbe0aa9564dbf554d10dd22875ce59b6ea0c16665c92adc33"
+_PEX_BINARY_SIZE = 5116653
 
 
 class PexCli(TemplatedExternalTool):
@@ -40,9 +51,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = "v2.19.1"
+    default_version = _PEX_VERSION
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.13.0,<3.0"
+    version_constraints = ">=2.76.0,<3.0"
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
@@ -56,30 +67,23 @@ class PexCli(TemplatedExternalTool):
         ),
     )
 
-    @classproperty
-    def default_known_versions(cls):
-        return [
-            "|".join(
-                (
-                    cls.default_version,
-                    plat,
-                    "86ef2ac38d36aba203dc5b9819b77c3e25fb8588b01c9d15f66b1c94bdbc989b",
-                    "4310578",
-                )
-            )
-            for plat in ["macos_arm64", "macos_x86_64", "linux_x86_64", "linux_arm64"]
-        ]
+    default_known_versions = [
+        f"{_PEX_VERSION}|{platform}|{_PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}"
+        for platform in ["macos_x86_64", "macos_arm64", "linux_x86_64", "linux_arm64"]
+    ]
 
 
 @dataclass(frozen=True)
 class PexCliProcess:
+    interpreter: PythonExecutable | PythonBuildStandaloneBinary | None
     subcommand: tuple[str, ...]
     extra_args: tuple[str, ...]
     description: str = dataclasses.field(compare=False)
-    additional_input_digest: Optional[Digest]
-    extra_env: Optional[FrozenDict[str, str]]
-    output_files: Optional[Tuple[str, ...]]
-    output_directories: Optional[Tuple[str, ...]]
+    additional_input_digest: Digest | None
+    extra_env: FrozenDict[str, str] | None
+    append_only_caches: FrozenDict[str, str] | None
+    output_files: tuple[str, ...] | None
+    output_directories: tuple[str, ...] | None
     level: LogLevel
     concurrency_available: int
     cache_scope: ProcessCacheScope
@@ -87,22 +91,30 @@ class PexCliProcess:
     def __init__(
         self,
         *,
+        interpreter: PythonExecutable | PythonBuildStandaloneBinary | None = None,
         subcommand: Iterable[str],
         extra_args: Iterable[str],
         description: str,
-        additional_input_digest: Optional[Digest] = None,
-        extra_env: Optional[Mapping[str, str]] = None,
-        output_files: Optional[Iterable[str]] = None,
-        output_directories: Optional[Iterable[str]] = None,
+        additional_input_digest: Digest | None = None,
+        extra_env: Mapping[str, str] | None = None,
+        append_only_caches: Mapping[str, str] | None = None,
+        output_files: Iterable[str] | None = None,
+        output_directories: Iterable[str] | None = None,
         level: LogLevel = LogLevel.INFO,
         concurrency_available: int = 0,
         cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
     ) -> None:
+        object.__setattr__(self, "interpreter", interpreter)
         object.__setattr__(self, "subcommand", tuple(subcommand))
         object.__setattr__(self, "extra_args", tuple(extra_args))
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "additional_input_digest", additional_input_digest)
         object.__setattr__(self, "extra_env", FrozenDict(extra_env) if extra_env else None)
+        object.__setattr__(
+            self,
+            "append_only_caches",
+            FrozenDict(append_only_caches) if append_only_caches else None,
+        )
         object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
         object.__setattr__(
             self, "output_directories", tuple(output_directories) if output_directories else None
@@ -124,7 +136,7 @@ class PexPEX(DownloadedExternalTool):
 
 @rule
 async def download_pex_pex(pex_cli: PexCli, platform: Platform) -> PexPEX:
-    pex_pex = await Get(DownloadedExternalTool, ExternalToolRequest, pex_cli.get_request(platform))
+    pex_pex = await download_external_tool(pex_cli.get_request(platform))
     return PexPEX(digest=pex_pex.digest, exe=pex_pex.exe)
 
 
@@ -141,19 +153,19 @@ async def setup_pex_cli_process(
     python_setup: PythonSetup,
 ) -> Process:
     tmpdir = ".tmp"
-    gets: List[Get] = [Get(Digest, CreateDigest([Directory(tmpdir)]))]
+    gets = [create_digest(CreateDigest([Directory(tmpdir)]))]
 
     cert_args = []
     if global_options.ca_certs_path:
         ca_certs_fc = ca_certs_path_to_file_content(global_options.ca_certs_path)
-        gets.append(Get(Digest, CreateDigest((ca_certs_fc,))))
+        gets.append(create_digest(CreateDigest((ca_certs_fc,))))
         cert_args = ["--cert", ca_certs_fc.path]
 
     digests_to_merge = [pex_pex.digest]
-    digests_to_merge.extend(await MultiGet(gets))
+    digests_to_merge.extend(await concurrently(gets))
     if request.additional_input_digest:
         digests_to_merge.append(request.additional_input_digest)
-    input_digest = await Get(Digest, MergeDigests(digests_to_merge))
+    input_digest = await merge_digests(MergeDigests(digests_to_merge))
 
     global_args = [
         # Ensure Pex and its subprocesses create temporary files in the process execution
@@ -201,11 +213,13 @@ async def setup_pex_cli_process(
     ]
 
     complete_pex_env = pex_env.in_sandbox(working_directory=None)
-    normalized_argv = complete_pex_env.create_argv(pex_pex.exe, *args)
+    normalized_argv = complete_pex_env.create_argv(
+        pex_pex.exe, *args, python=request.interpreter or bootstrap_python
+    )
     env = {
-        **complete_pex_env.environment_dict(python=bootstrap_python),
+        **complete_pex_env.environment_dict(python_configured=True),
         **python_native_code.subprocess_env_vars,
-        **(request.extra_env or {}),  # type: ignore[dict-item]
+        **(request.extra_env or {}),
         # If a subcommand is used, we need to use the `pex3` console script.
         **({"PEX_SCRIPT": "pex3"} if request.subcommand else {}),
     }
@@ -216,8 +230,11 @@ async def setup_pex_cli_process(
         input_digest=input_digest,
         env=env,
         output_files=request.output_files,
-        output_directories=request.output_directories,
-        append_only_caches=complete_pex_env.append_only_caches,
+        output_directories=request.output_directories or tuple(),
+        append_only_caches={
+            **complete_pex_env.append_only_caches,
+            **(request.append_only_caches or FrozenDict({})),
+        },
         level=request.level,
         concurrency_available=request.concurrency_available,
         cache_scope=request.cache_scope,
@@ -239,4 +256,5 @@ def rules():
         *external_tool.rules(),
         *pex_environment.rules(),
         *adhoc_binaries.rules(),
+        UnionRule(ExportableTool, PexCli),
     ]

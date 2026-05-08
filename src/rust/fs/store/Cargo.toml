@@ -1,0 +1,47 @@
+[package]
+name = "store"
+version = "0.1.0"
+authors = ["Daniel Wagner-Hall <dwagnerhall@twitter.com>"]
+edition = "2024"
+
+[dependencies]
+async-trait = { workspace = true }
+protos = { path = "../../protos" }
+bytes = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+async-oncecell = { workspace = true }
+deepsize = { workspace = true }
+fs = { path = ".." }
+fs-set-times = { workspace = true }
+futures = { workspace = true }
+grpc_util = { path = "../../grpc_util" }
+hashing = { path = "../../hashing" }
+itertools = { workspace = true }
+log = { workspace = true }
+parking_lot = { workspace = true }
+prost = { workspace = true }
+remote_provider = { path = "../../remote_provider" }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+sharded_lmdb = { path = "../../sharded_lmdb" }
+task_executor = { path = "../../task_executor" }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["fs"] }
+tryfuture = { path = "../../tryfuture" }
+workunit_store = { path = "../../workunit_store" }
+
+[dev-dependencies]
+criterion = { workspace = true }
+mock = { path = "../../testutil/mock" }
+num_cpus = { workspace = true }
+testutil = { path = "../../testutil" }
+tokio = { workspace = true, features = ["rt", "macros"] }
+walkdir = { workspace = true }
+
+[[bench]]
+name = "store"
+# Using criterion: see https://bheisler.github.io/criterion.rs/book/getting_started.html
+harness = false
+
+[lints]
+workspace = true

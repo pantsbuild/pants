@@ -18,18 +18,6 @@ class ShellSetup(Subsystem):
         help="Infer Shell dependencies on other Shell files by analyzing `source` statements.",
         advanced=True,
     )
-    tailor = BoolOption(
-        default=True,
-        help=softwrap("If true, add `shell_sources` targets with the `tailor` goal."),
-        removal_version="2.25.0.dev0",
-        removal_hint=softwrap(
-            """
-            Use `tailor_sources` and/or `tailor_shunit2_tests` instead.
-            For backwards compatibility, if this option is `False`, it will override the other options.
-            """
-        ),
-        advanced=True,
-    )
     tailor_sources = BoolOption(
         default=True,
         help=softwrap("If true, add `shell_sources` targets with the `tailor` goal."),

@@ -17,22 +17,24 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules import binary
-from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
+from pants.backend.go.util_rules.binary import (
+    GoBinaryMainPackageRequest,
+    determine_main_pkg_for_go_binary,
+)
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address, AddressInput
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import Digest
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.internals.build_files import resolve_address
+from pants.engine.internals.graph import hydrate_sources, resolve_target, resolve_unexpanded_targets
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     AllUnexpandedTargets,
-    HydratedSources,
     HydrateSourcesRequest,
     InvalidTargetException,
     Targets,
-    UnexpandedTargets,
-    WrappedTarget,
     WrappedTargetRequest,
 )
 from pants.util.docutil import bin_name
@@ -81,12 +83,13 @@ async def find_nearest_ancestor_go_mod(
     request: NearestAncestorGoModRequest,
 ) -> NearestAncestorGoModResult:
     # We don't expect `go_mod` targets to be generated, so we can use UnexpandedTargets.
-    candidate_targets = await Get(
-        UnexpandedTargets,
-        RawSpecs(
-            ancestor_globs=(AncestorGlobSpec(request.address.spec_path),),
-            description_of_origin="the `OwningGoMod` rule",
-        ),
+    candidate_targets = await resolve_unexpanded_targets(
+        **implicitly(
+            RawSpecs(
+                ancestor_globs=(AncestorGlobSpec(request.address.spec_path),),
+                description_of_origin="the `OwningGoMod` rule",
+            )
+        )
     )
 
     # Sort by address.spec_path in descending order so the nearest go_mod target is sorted first.
@@ -142,13 +145,13 @@ async def _find_explict_owning_go_mod_address(
         relative_to=address.spec_path,
         description_of_origin=f"the `{GoOwningGoModAddressField.alias}` field of target `{address}`",
     )
-    candidate_go_mod_address = await Get(Address, AddressInput, address_input)
-    wrapped_target = await Get(
-        WrappedTarget,
+    candidate_go_mod_address = await resolve_address(**implicitly({address_input: AddressInput}))
+    wrapped_target = await resolve_target(
         WrappedTargetRequest(
             candidate_go_mod_address,
             description_of_origin=f"the `{GoOwningGoModAddressField.alias}` field of target `{address}`",
         ),
+        **implicitly(),
     )
     if not wrapped_target.target.has_field(GoModDependenciesField):
         raise InvalidTargetException(
@@ -166,9 +169,9 @@ async def _find_explict_owning_go_mod_address(
 async def find_owning_go_mod(
     request: OwningGoModRequest, all_go_mod_targets: AllGoModTargets
 ) -> OwningGoMod:
-    wrapped_target = await Get(
-        WrappedTarget,
+    wrapped_target = await resolve_target(
         WrappedTargetRequest(request.address, description_of_origin="the `OwningGoMod` rule"),
+        **implicitly(),
     )
     target = wrapped_target.target
 
@@ -176,8 +179,8 @@ async def find_owning_go_mod(
         return OwningGoMod(request.address)
 
     if target.has_field(GoPackageSourcesField):
-        nearest_go_mod_result = await Get(
-            NearestAncestorGoModResult, NearestAncestorGoModRequest(request.address)
+        nearest_go_mod_result = await find_nearest_ancestor_go_mod(
+            NearestAncestorGoModRequest(request.address)
         )
         return OwningGoMod(nearest_go_mod_result.address)
 
@@ -187,10 +190,12 @@ async def find_owning_go_mod(
         return OwningGoMod(generator_address)
 
     if target.has_field(GoBinaryMainPackageField):
-        main_pkg = await Get(
-            GoBinaryMainPackage, GoBinaryMainPackageRequest(target.get(GoBinaryMainPackageField))
+        main_pkg = await determine_main_pkg_for_go_binary(
+            GoBinaryMainPackageRequest(target.get(GoBinaryMainPackageField))
         )
-        owning_go_mod_for_main_pkg = await Get(OwningGoMod, OwningGoModRequest(main_pkg.address))
+        owning_go_mod_for_main_pkg = await find_owning_go_mod(
+            OwningGoModRequest(main_pkg.address), **implicitly()
+        )
         return owning_go_mod_for_main_pkg
 
     if target.has_field(GoOwningGoModAddressField):
@@ -235,9 +240,9 @@ async def determine_go_mod_info(
     request: GoModInfoRequest,
 ) -> GoModInfo:
     if isinstance(request.source, Address):
-        wrapped_target = await Get(
-            WrappedTarget,
+        wrapped_target = await resolve_target(
             WrappedTargetRequest(request.source, description_of_origin="<go mod info rule>"),
+            **implicitly(),
         )
         sources_field = wrapped_target.target[GoModSourcesField]
     else:
@@ -246,17 +251,18 @@ async def determine_go_mod_info(
     go_mod_dir = os.path.dirname(go_mod_path)
 
     # Get the `go.mod` (and `go.sum`) and strip so the file has no directory prefix.
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(sources_field))
+    hydrated_sources = await hydrate_sources(HydrateSourcesRequest(sources_field), **implicitly())
     sources_digest = hydrated_sources.snapshot.digest
 
-    mod_json = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            command=("mod", "edit", "-json"),
-            input_digest=sources_digest,
-            working_dir=go_mod_dir,
-            description=f"Parse {go_mod_path}",
-        ),
+    mod_json = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                command=("mod", "edit", "-json"),
+                input_digest=sources_digest,
+                working_dir=go_mod_dir,
+                description=f"Parse {go_mod_path}",
+            )
+        )
     )
     module_metadata = json.loads(mod_json.stdout)
     return GoModInfo(

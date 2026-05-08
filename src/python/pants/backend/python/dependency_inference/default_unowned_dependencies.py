@@ -1,16 +1,18 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List
 
+# See https://docs.python.org/3/library/sys.html#sys.stdlib_module_names
+# No modules should be removed, unless the version of Python that removed the module is no longer being supported by Pants.
+# After updating the internal Python, update this list with `>> sorted(sys.stdlib_module_names)` and review/re-add removals
 _STDLIB_MODULES = [
-    # See https://docs.python.org/3/library/sys.html#sys.stdlib_module_names
-    # No modules should be removed, unless the version of Python that removed the module is no longer
-    # being supported by Pants.
     "__future__",
     "_abc",
     "_aix_support",
+    "_android_support",
+    "_apple_support",
     "_ast",
+    "_ast_unparse",
     "_asyncio",
     "_bisect",
     "_blake2",
@@ -25,6 +27,7 @@ _STDLIB_MODULES = [
     "_codecs_tw",
     "_collections",
     "_collections_abc",
+    "_colorize",
     "_compat_pickle",
     "_compression",
     "_contextvars",
@@ -43,8 +46,13 @@ _STDLIB_MODULES = [
     "_gdbm",
     "_hashlib",
     "_heapq",
+    "_hmac",
     "_imp",
+    "_interpchannels",
+    "_interpqueues",
+    "_interpreters",
     "_io",
+    "_ios_support",
     "_json",
     "_locale",
     "_lsprof",
@@ -55,6 +63,7 @@ _STDLIB_MODULES = [
     "_multibytecodec",
     "_multiprocessing",
     "_opcode",
+    "_opcode_metadata",
     "_operator",
     "_osx_support",
     "_overlapped",
@@ -62,11 +71,18 @@ _STDLIB_MODULES = [
     "_posixshmem",
     "_posixsubprocess",
     "_py_abc",
+    "_py_warnings",
+    "_pydatetime",
     "_pydecimal",
     "_pyio",
+    "_pylong",
+    "_pyrepl",
     "_queue",
     "_random",
+    "_remote_debugging",
+    "_scproxy",
     "_sha1",
+    "_sha2",
     "_sha256",
     "_sha3",
     "_sha512",
@@ -81,20 +97,28 @@ _STDLIB_MODULES = [
     "_string",
     "_strptime",
     "_struct",
+    "_suggestions",
     "_symtable",
+    "_sysconfig",
     "_thread",
     "_threading_local",
     "_tkinter",
+    "_tokenize",
     "_tracemalloc",
+    "_types",
     "_typeshed",
+    "_typing",
     "_uuid",
     "_warnings",
     "_weakref",
     "_weakrefset",
     "_winapi",
+    "_wmi",
     "_zoneinfo",
+    "_zstd",
     "abc",
     "aifc",
+    "annotationlib",
     "antigravity",
     "argparse",
     "array",
@@ -124,6 +148,7 @@ _STDLIB_MODULES = [
     "collections",
     "colorsys",
     "compileall",
+    "compression",
     "concurrent",
     "configparser",
     "contextlib",
@@ -313,7 +338,7 @@ _STDLIB_MODULES = [
     "zoneinfo",
 ]
 
-_KNOWN_SYSTEM_MODULES: List[str] = [
+_KNOWN_SYSTEM_MODULES: list[str] = [
     # Add the first one, if ye dare!
 ]
 

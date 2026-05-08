@@ -126,6 +126,7 @@ def test_detectors_loaded(rule_runner: RuleRunner) -> None:
     assert TOTAL_DETECTORS + 1 == extract_total_detector_count(fmt_result.stderr)
 
 
+@pytest.mark.platform_specific_behavior
 def test_secret_detected(rule_runner: RuleRunner) -> None:
     # Write the configuration file
     rule_runner.write_files(

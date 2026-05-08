@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os.path
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -14,6 +14,8 @@ from pants.engine.rules import collect_rules
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
+
+# pants: infer-dep(yapf.lock*)
 
 
 class Yapf(PythonToolBase):

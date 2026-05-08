@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 
 import pytest
 
@@ -14,6 +15,14 @@ from pants.testutil.rule_runner import RuleRunner, mock_console
 
 rule_runner = rule_runner_with_auto_approve
 standard_deployment = standard_deployment
+
+
+def _extract_terraform_argv_from_script(script_argv) -> tuple[str, ...]:
+    """Extract the argv of the invocation of Terraform from its launcher script."""
+    script = script_argv[2]
+    tf_invocation = script.split("&&")
+    argv = shlex.split(tf_invocation[-1])
+    return tuple(argv)
 
 
 def test_run_terraform_deploy(rule_runner: RuleRunner, standard_deployment, tmpdir) -> None:
@@ -44,7 +53,7 @@ def test_deploy_terraform_forwards_args(rule_runner: RuleRunner, standard_deploy
     deploy_process = rule_runner.request(DeployProcess, [field_set])
     assert deploy_process.process
 
-    argv = deploy_process.process.process.argv
+    argv = _extract_terraform_argv_from_script(deploy_process.process.process.argv)
 
     assert "-chdir=src/tf" in argv, "Did not find expected -chdir"
     assert "-var-file=stg.tfvars" in argv, "Did not find expected -var-file"
@@ -70,7 +79,7 @@ def test_deploy_terraform_adheres_to_dry_run_flag(
     deploy_process = rule_runner.request(DeployProcess, [field_set])
     assert deploy_process.process
 
-    argv = deploy_process.process.process.argv
+    argv = _extract_terraform_argv_from_script(deploy_process.process.process.argv)
 
     assert action in argv, f"Expected {action} in argv"
     assert not_action not in argv, f"Did not expect {not_action} in argv"

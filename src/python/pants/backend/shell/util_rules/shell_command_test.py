@@ -20,22 +20,26 @@ from pants.backend.shell.target_types import (
 from pants.backend.shell.util_rules.shell_command import (
     GenerateFilesFromShellCommandRequest,
     RunShellCommand,
+    RunShellCommandBuild,
     ShellCommandProcessFromTargetRequest,
 )
 from pants.backend.shell.util_rules.shell_command import rules as shell_command_rules
+from pants.core.environments.target_types import LocalWorkspaceEnvironmentTarget
 from pants.core.goals.run import RunRequest
 from pants.core.target_types import ArchiveTarget, FilesGeneratorTarget, FileSourceField
 from pants.core.target_types import rules as core_target_type_rules
 from pants.core.util_rules import archive, source_files
-from pants.core.util_rules.adhoc_process_support import AdhocProcessRequest
-from pants.core.util_rules.environments import LocalWorkspaceEnvironmentTarget
+from pants.core.util_rules.adhoc_process_support import (
+    AdhocProcessRequest,
+    PreparedAdhocProcessRequest,
+)
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents
 from pants.engine.internals.native_engine import IntrinsicError
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.process import Process, ProcessExecutionFailure
+from pants.engine.process import ProcessExecutionFailure
 from pants.engine.target import (
     GeneratedSources,
     GenerateSourcesRequest,
@@ -55,9 +59,12 @@ def rule_runner() -> RuleRunner:
             *source_files.rules(),
             *core_target_type_rules(),
             QueryRule(GeneratedSources, [GenerateFilesFromShellCommandRequest]),
-            QueryRule(Process, [AdhocProcessRequest]),
-            QueryRule(Process, [EnvironmentName, ShellCommandProcessFromTargetRequest]),
+            QueryRule(PreparedAdhocProcessRequest, [AdhocProcessRequest]),
+            QueryRule(
+                PreparedAdhocProcessRequest, [EnvironmentName, ShellCommandProcessFromTargetRequest]
+            ),
             QueryRule(RunRequest, [RunShellCommand]),
+            QueryRule(RunRequest, [RunShellCommandBuild]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
@@ -556,7 +563,7 @@ def test_run_shell_command_request(
 @pytest.mark.parametrize(
     ("tool_name", "should_succeed"),
     (
-        ("python3.8", True),
+        ("python3.11", True),
         ("cd", False),
         ("floop", False),
     ),
@@ -592,7 +599,7 @@ def test_path_populated_with_tools(
             raise exerr
 
     if should_succeed:
-        assert caplog.records[0].msg.strip().endswith("python3.8")
+        assert caplog.records[0].msg.strip().endswith("python3.11")
     else:
         # `which` is silent in `bash` when nothing is found
         assert not caplog.records
@@ -606,7 +613,7 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
                 shell_command(
                   name="boot-script-test",
                   tools=[
-                    "python3.8",
+                    "python3.11",
                   ],
                   command="./command.script",
                   workdir=".",
@@ -617,7 +624,10 @@ def test_shell_command_boot_script(rule_runner: RuleRunner) -> None:
     )
 
     tgt = rule_runner.get_target(Address("src", target_name="boot-script-test"))
-    res = rule_runner.request(Process, [ShellCommandProcessFromTargetRequest(tgt)])
+    prepred_request = rule_runner.request(
+        PreparedAdhocProcessRequest, [ShellCommandProcessFromTargetRequest(tgt)]
+    )
+    res = prepred_request.process
     assert "bash" in res.argv[0]
     assert res.argv[1] == "-c"
     assert res.argv[2].startswith("cd src &&")
@@ -635,7 +645,7 @@ def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> Non
                 shell_command(
                   name="boot-script-test",
                   tools=[
-                    "python3.8",
+                    "python3.11",
                   ],
                   command="./command.script",
                 )
@@ -645,7 +655,10 @@ def test_shell_command_boot_script_in_build_root(rule_runner: RuleRunner) -> Non
     )
 
     tgt = rule_runner.get_target(Address("", target_name="boot-script-test"))
-    res = rule_runner.request(Process, [ShellCommandProcessFromTargetRequest(tgt)])
+    prepared_request = rule_runner.request(
+        PreparedAdhocProcessRequest, [ShellCommandProcessFromTargetRequest(tgt)]
+    )
+    res = prepared_request.process
     assert "bash" in res.argv[0]
     assert res.argv[1] == "-c"
     assert "bash -c" in res.argv[2]
@@ -1061,3 +1074,109 @@ def test_shell_command_check_outputs(rule_runner: RuleRunner) -> None:
         Address("", target_name="at_least_one_with_present_directory"),
         {"some-directory/foo.txt": ""},
     )
+
+
+@pytest.mark.parametrize(
+    ("workdir", "expected_boot"),
+    [
+        (None, "cd src; "),
+        (".", "cd src; "),
+        ("/", ""),
+        ("src/with space'n quote", """cd 'src/with space'\"'\"'n quote'; """),
+        ("./with space'n quote", """cd 'src/with space'\"'\"'n quote'; """),
+    ],
+)
+def test_run_shell_command_build_request(
+    rule_runner: RuleRunner, workdir: None | str, expected_boot: str
+) -> None:
+    """Test that shell_command targets can generate RunRequest for the run goal."""
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                f"""\
+                shell_command(
+                  name="test",
+                  command="some cmd string",
+                  tools=["echo"],
+                  workdir={workdir!r},
+                )
+                """
+            ),
+        }
+    )
+
+    args = ("bash", "-c", expected_boot + "some cmd string", "pants run src:test --")
+
+    tgt = rule_runner.get_target(Address("src", target_name="test"))
+    run = RunShellCommandBuild.create(tgt)
+    request = rule_runner.request(RunRequest, [run])
+    assert len(args) == len(request.args)
+    # handle the binary name specially, because the path may differ
+    assert args[0] in request.args[0]
+    for arg, request_arg in zip(args[1:], request.args[1:]):
+        assert arg == request_arg
+
+
+def test_run_shell_command_build_with_tools(rule_runner: RuleRunner) -> None:
+    """Test that shell_command with tools field generates correct RunRequest."""
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                shell_command(
+                  name="with-tools",
+                  command="echo hello",
+                  tools=["echo", "cat"],
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src", target_name="with-tools"))
+    run = RunShellCommandBuild.create(tgt)
+    request = rule_runner.request(RunRequest, [run])
+
+    # Verify the command is properly formed
+    assert "bash" in request.args[0]
+    assert "-c" in request.args
+    assert "echo hello" in request.args[2]
+
+    # Verify that tools are included in immutable_input_digests
+    assert request.immutable_input_digests is not None
+
+
+def test_run_shell_command_build_with_dependencies(rule_runner: RuleRunner) -> None:
+    """Test that shell_command with execution_dependencies generates correct RunRequest."""
+    rule_runner.write_files(
+        {
+            "src/BUILD": dedent(
+                """\
+                shell_command(
+                  name="msg-gen",
+                  command="echo message > msg.txt",
+                  tools=["echo"],
+                  output_files=["msg.txt"],
+                )
+
+                shell_command(
+                  name="with-deps",
+                  command="cat msg.txt",
+                  tools=["cat"],
+                  execution_dependencies=[":msg-gen"],
+                )
+                """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("src", target_name="with-deps"))
+    run = RunShellCommandBuild.create(tgt)
+    request = rule_runner.request(RunRequest, [run])
+
+    # Verify the command is properly formed
+    assert "bash" in request.args[0]
+    assert "cat msg.txt" in request.args[2]
+
+    # Verify that the digest contains dependencies
+    assert request.digest is not None

@@ -867,7 +867,7 @@ def test_file_specific_rules(rule_runner: RuleRunner) -> None:
                 files(sources=["**/*.txt"])
                 """
             ),
-            **{path: "" for path in files},
+            **dict.fromkeys(files, ""),
         },
     )
 

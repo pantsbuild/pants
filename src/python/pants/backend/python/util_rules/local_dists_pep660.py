@@ -11,7 +11,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.target_types import PythonProvidesField, PythonResolveField
 from pants.backend.python.util_rules import package_dists
 from pants.backend.python.util_rules.dists import BuildBackendError, DistBuildRequest
@@ -19,10 +18,10 @@ from pants.backend.python.util_rules.dists import rules as dists_rules
 from pants.backend.python.util_rules.package_dists import (
     DependencyOwner,
     ExportedTarget,
-    OwnedDependencies,
     create_dist_build_request,
+    get_owned_dependencies,
 )
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.system_binaries import BashBinary, UnzipBinary
@@ -34,11 +33,13 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
     RemovePrefix,
-    Snapshot,
 )
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import AllTargets, Target, Targets, WrappedTarget, WrappedTargetRequest
+from pants.engine.internals.graph import resolve_target
+from pants.engine.internals.native_engine import Address
+from pants.engine.intrinsics import create_digest, digest_to_snapshot, merge_digests, remove_prefix
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import AllTargets, Target, Targets, WrappedTargetRequest
 from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
@@ -69,7 +70,7 @@ def dump_backend_wrapper_json(
     """Build the settings json for our PEP 517 / PEP 660 wrapper script."""
 
     def clean_config_settings(
-        cs: FrozenDict[str, tuple[str, ...]] | None
+        cs: FrozenDict[str, tuple[str, ...]] | None,
     ) -> dict[str, list[str]] | None:
         # setuptools.build_meta expects list values and chokes on tuples.
         # We assume/hope that other backends accept lists as well.
@@ -149,9 +150,8 @@ async def run_pep660_build(
     backend_wrapper_content = read_resource(_scripts_package, "pep660_backend_wrapper.py")
     assert backend_wrapper_content is not None
 
-    conf_digest, backend_wrapper_digest, build_backend_pex = await MultiGet(
-        Get(
-            Digest,
+    conf_digest, backend_wrapper_digest, build_backend_pex = await concurrently(
+        create_digest(
             CreateDigest(
                 [
                     FileContent(pth_file_path, pth_file_contents.encode()),
@@ -162,29 +162,27 @@ async def run_pep660_build(
                         ),
                     ),
                 ]
-            ),
+            )
         ),
         # The backend_wrapper has its own digest for cache reuse.
-        Get(
-            Digest,
-            CreateDigest([FileContent(backend_wrapper_path, backend_wrapper_content)]),
-        ),
+        create_digest(CreateDigest([FileContent(backend_wrapper_path, backend_wrapper_content)])),
         # Note that this pex has no entrypoint. We use it to run our wrapper, which
         # in turn imports from and invokes the build backend.
-        Get(
-            VenvPex,
-            PexRequest(
-                output_filename="build_backend.pex",
-                internal_only=True,
-                requirements=request.build_system.requires,
-                pex_path=request.extra_build_time_requirements,
-                interpreter_constraints=request.interpreter_constraints,
-            ),
+        create_venv_pex(
+            **implicitly(
+                PexRequest(
+                    output_filename="build_backend.pex",
+                    internal_only=True,
+                    requirements=request.build_system.requires,
+                    pex_path=request.extra_build_time_requirements,
+                    interpreter_constraints=request.interpreter_constraints,
+                )
+            )
         ),
     )
 
-    merged_digest = await Get(
-        Digest, MergeDigests((request.input, conf_digest, backend_wrapper_digest))
+    merged_digest = await merge_digests(
+        MergeDigests((request.input, conf_digest, backend_wrapper_digest))
     )
 
     extra_env = {
@@ -194,22 +192,23 @@ async def run_pep660_build(
     if python_setup.macos_big_sur_compatibility and is_macos_big_sur():
         extra_env["MACOSX_DEPLOYMENT_TARGET"] = "10.16"
 
-    result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            build_backend_pex,
-            argv=(backend_wrapper_name, backend_wrapper_json),
-            input_digest=merged_digest,
-            extra_env=extra_env,
-            working_directory=request.working_directory,
-            output_directories=(dist_dir,),  # Relative to the working_directory.
-            description=(
-                f"Run {request.build_system.build_backend} to gather .dist-info for {request.target_address_spec}"
-                if request.target_address_spec
-                else f"Run {request.build_system.build_backend} to gather .dist-info"
-            ),
-            level=LogLevel.DEBUG,
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            VenvPexProcess(
+                build_backend_pex,
+                argv=(backend_wrapper_name, backend_wrapper_json),
+                input_digest=merged_digest,
+                extra_env=extra_env,
+                working_directory=request.working_directory,
+                output_directories=(dist_dir,),  # Relative to the working_directory.
+                description=(
+                    f"Run {request.build_system.build_backend} to gather .dist-info for {request.target_address_spec}"
+                    if request.target_address_spec
+                    else f"Run {request.build_system.build_backend} to gather .dist-info"
+                ),
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     output_lines = result.stdout.decode().splitlines()
     line_prefix = "editable_path: "
@@ -220,8 +219,8 @@ async def run_pep660_build(
             break
 
     # Note that output_digest paths are relative to the working_directory.
-    output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
-    output_snapshot = await Get(Snapshot, Digest, output_digest)
+    output_digest = await remove_prefix(RemovePrefix(result.output_digest, dist_dir))
+    output_snapshot = await digest_to_snapshot(output_digest)
     if editable_path not in output_snapshot.files:
         raise BuildBackendError(
             softwrap(
@@ -246,63 +245,64 @@ class LocalDistPEP660Wheels:
 
 @rule
 async def isolate_local_dist_pep660_wheels(
-    dist_field_set: PythonDistributionFieldSet,
+    dist_target_address: Address,
     bash: BashBinary,
     unzip_binary: UnzipBinary,
     python_setup: PythonSetup,
     union_membership: UnionMembership,
 ) -> LocalDistPEP660Wheels:
     dist_build_request = await create_dist_build_request(
-        field_set=dist_field_set,
+        dist_target_address=dist_target_address,
         python_setup=python_setup,
         union_membership=union_membership,
         # editable wheel ignores build_wheel+build_sdist args
         validate_wheel_sdist=False,
     )
-    pep660_result = await Get(PEP660BuildResult, DistBuildRequest, dist_build_request)
+    pep660_result = await run_pep660_build(dist_build_request, **implicitly())
 
     # the output digest should only contain wheels, but filter to be safe.
-    wheels_snapshot = await Get(
-        Snapshot, DigestSubset(pep660_result.output, PathGlobs(["**/*.whl"]))
+    wheels_snapshot = await digest_to_snapshot(
+        **implicitly(DigestSubset(pep660_result.output, PathGlobs(["**/*.whl"])))
     )
 
     wheels = tuple(sorted(wheels_snapshot.files))
 
     if not wheels:
-        tgt = await Get(
-            WrappedTarget,
-            WrappedTargetRequest(dist_field_set.address, description_of_origin="<infallible>"),
+        tgt = await resolve_target(
+            WrappedTargetRequest(dist_target_address, description_of_origin="<infallible>"),
+            **implicitly(),
         )
         logger.warning(
             softwrap(
                 f"""
-                Encountered a dependency on the {tgt.target.alias} target at {dist_field_set.address},
+                Encountered a dependency on the {tgt.target.alias} target at {dist_target_address},
                 but this target does not produce a Python wheel artifact. Therefore this target's
                 code will be used directly from sources, without a distribution being built,
                 and any native extensions in it will not be built.
 
-                See {doc_url('docs/python/overview/building-distributions')} for details on how to set up a
+                See {doc_url("docs/python/overview/building-distributions")} for details on how to set up a
                 {tgt.target.alias} target to produce a wheel.
                 """
             )
         )
 
-    wheels_listing_result = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                bash.path,
-                "-c",
-                f"""
+    wheels_listing_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                argv=[
+                    bash.path,
+                    "-c",
+                    f"""
                 set -ex
-                for f in {' '.join(shlex.quote(f) for f in wheels)}; do
+                for f in {" ".join(shlex.quote(f) for f in wheels)}; do
                   {unzip_binary.path} -Z1 "$f"
                 done
                 """,
-            ],
-            input_digest=wheels_snapshot.digest,
-            description=f"List contents of editable artifacts produced by {dist_field_set.address}",
-        ),
+                ],
+                input_digest=wheels_snapshot.digest,
+                description=f"List contents of editable artifacts produced by {dist_target_address}",
+            )
+        )
     )
     provided_files = set(wheels_listing_result.stdout.decode().splitlines())
 
@@ -315,7 +315,7 @@ class AllPythonDistributionTargets:
 
 
 @rule(desc="Find all Python Distribution targets in project", level=LogLevel.DEBUG)
-def find_all_python_distributions(
+async def find_all_python_distributions(
     all_targets: AllTargets,
 ) -> AllPythonDistributionTargets:
     return AllPythonDistributionTargets(
@@ -344,8 +344,9 @@ async def sort_all_python_distributions_by_resolve(
             FrozenDict({resolve: tuple(all_dists.targets)})
         )
 
-    dist_owned_deps = await MultiGet(
-        Get(OwnedDependencies, DependencyOwner(ExportedTarget(tgt))) for tgt in all_dists.targets
+    dist_owned_deps = await concurrently(
+        get_owned_dependencies(DependencyOwner(ExportedTarget(tgt)), **implicitly())
+        for tgt in all_dists.targets
     )
 
     for dist, owned_deps in zip(all_dists.targets, dist_owned_deps):
@@ -404,13 +405,8 @@ async def build_editable_local_dists(
     if not resolve_dists:
         return EditableLocalDists(None)
 
-    local_dists_wheels = await MultiGet(
-        Get(
-            LocalDistPEP660Wheels,
-            PythonDistributionFieldSet,
-            PythonDistributionFieldSet.create(target),
-        )
-        for target in resolve_dists
+    local_dists_wheels = await concurrently(
+        isolate_local_dist_pep660_wheels(target.address, **implicitly()) for target in resolve_dists
     )
 
     wheels: list[str] = []
@@ -419,7 +415,7 @@ async def build_editable_local_dists(
         wheels.extend(local_dist_wheels.pep660_wheel_paths)
         wheels_digests.append(local_dist_wheels.pep660_wheels_digest)
 
-    wheels_digest = await Get(Digest, MergeDigests(wheels_digests))
+    wheels_digest = await merge_digests(MergeDigests(wheels_digests))
 
     return EditableLocalDists(wheels_digest)
 

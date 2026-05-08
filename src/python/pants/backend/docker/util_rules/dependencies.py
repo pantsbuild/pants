@@ -6,18 +6,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo, DockerfileInfoRequest
+from pants.backend.docker.subsystems.dockerfile_parser import (
+    DockerfileInfoRequest,
+    parse_dockerfile,
+)
 from pants.backend.docker.target_types import DockerImageDependenciesField
 from pants.backend.docker.util_rules.docker_build_args import (
-    DockerBuildArgs,
     DockerBuildArgsRequest,
+    docker_build_args,
 )
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import FileLiteralSpec, RawSpecs
 from pants.core.goals.package import AllPackageableTargets, OutputPathField
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
-from pants.engine.rules import Get, collect_rules, rule
-from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies, Targets
+from pants.engine.internals.graph import resolve_targets, resolve_unparsed_address_inputs
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.util.strutil import softwrap
 
@@ -38,16 +42,19 @@ async def infer_docker_dependencies(
     request: InferDockerDependencies, all_packageable_targets: AllPackageableTargets
 ) -> InferredDependencies:
     """Inspects the Dockerfile for references to known packageable targets."""
-    dockerfile_info = await Get(DockerfileInfo, DockerfileInfoRequest(request.field_set.address))
-    targets = await Get(Targets, Addresses([request.field_set.address]))
-    build_args = await Get(DockerBuildArgs, DockerBuildArgsRequest(targets.expect_single()))
+    dockerfile_info = await parse_dockerfile(
+        DockerfileInfoRequest(request.field_set.address), **implicitly()
+    )
+    targets = await resolve_targets(**implicitly(Addresses([request.field_set.address])))
+    build_args = await docker_build_args(
+        DockerBuildArgsRequest(targets.expect_single()), **implicitly()
+    )
     dockerfile_build_args = dockerfile_info.from_image_build_args.with_overrides(
         build_args
     ).nonempty()
 
     putative_image_addresses = set(
-        await Get(
-            Addresses,
+        await resolve_unparsed_address_inputs(
             UnparsedAddressInputs(
                 dockerfile_build_args.values(),
                 owning_address=dockerfile_info.address,
@@ -59,11 +66,11 @@ async def infer_docker_dependencies(
                 ),
                 skip_invalid_addresses=True,
             ),
+            **implicitly(),
         )
     )
     putative_copy_target_addresses = set(
-        await Get(
-            Addresses,
+        await resolve_unparsed_address_inputs(
             UnparsedAddressInputs(
                 dockerfile_info.copy_build_args.nonempty().values(),
                 owning_address=dockerfile_info.address,
@@ -75,6 +82,7 @@ async def infer_docker_dependencies(
                 ),
                 skip_invalid_addresses=True,
             ),
+            **implicitly(),
         )
     )
     maybe_output_paths = set(dockerfile_info.copy_source_paths) | set(
@@ -110,19 +118,20 @@ async def infer_docker_dependencies(
             inferred_addresses.append(target.address)
 
     # add addresses from source paths if they are files directly
-    addresses_from_source_paths = await Get(
-        Targets,
-        RawSpecs(
-            description_of_origin="halp",
-            unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
-            file_literals=tuple(
-                FileLiteralSpec(e)
-                for e in [
-                    *dockerfile_info.copy_source_paths,
-                    *dockerfile_info.copy_build_args.nonempty().values(),
-                ]
-            ),
-        ),
+    addresses_from_source_paths = await resolve_targets(
+        **implicitly(
+            RawSpecs(
+                description_of_origin="halp",
+                unmatched_glob_behavior=GlobMatchErrorBehavior.ignore,
+                file_literals=tuple(
+                    FileLiteralSpec(e)
+                    for e in [
+                        *dockerfile_info.copy_source_paths,
+                        *dockerfile_info.copy_build_args.nonempty().values(),
+                    ]
+                ),
+            )
+        )
     )
 
     inferred_addresses.extend(e.address for e in addresses_from_source_paths)

@@ -6,32 +6,33 @@ from pathlib import PurePath
 
 from pants.backend.python import dependency_inference
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
+    ExplicitPythonDependencies,
     ParsedPythonAssetPaths,
-    ParsedPythonDependencies,
     ParsedPythonImportInfo,
     ParsedPythonImports,
+    PythonFileDependencies,
 )
 from pants.backend.python.dependency_inference.rules import (
     ImportOwnerStatus,
     PythonImportDependenciesInferenceFieldSet,
-    ResolvedParsedPythonDependencies,
     ResolvedParsedPythonDependenciesRequest,
+    resolve_parsed_dependencies,
 )
 from pants.backend.python.framework.django.detect_apps import DjangoApps
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import EntryPoint
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.pex import PexRequest, VenvPex, VenvPexProcess
+from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
 from pants.base.specs import FileGlobSpec, RawSpecs
 from pants.core.util_rules.source_files import SourceFilesRequest
-from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
+from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.native_engine import Digest
-from pants.engine.internals.selectors import Get
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.target import InferDependenciesRequest, InferredDependencies, Targets
+from pants.engine.internals.graph import resolve_targets
+from pants.engine.intrinsics import create_digest
+from pants.engine.process import execute_process_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.resources import read_resource
@@ -53,34 +54,36 @@ async def _django_migration_dependencies(
     python_setup: PythonSetup,
     django_apps: DjangoApps,
 ) -> InferredDependencies:
-    stripped_sources = await Get(
-        StrippedSourceFiles, SourceFilesRequest([request.field_set.source])
+    stripped_sources = await strip_source_roots(
+        **implicitly(SourceFilesRequest([request.field_set.source]))
     )
     assert len(stripped_sources.snapshot.files) == 1
 
     file_content = FileContent("__visitor.py", read_resource(__name__, _visitor_resource))
-    visitor_digest = await Get(Digest, CreateDigest([file_content]))
-    venv_pex = await Get(
-        VenvPex,
-        PexRequest(
-            output_filename="__visitor.pex",
-            internal_only=True,
-            main=EntryPoint("__visitor"),
-            interpreter_constraints=InterpreterConstraints.create_from_compatibility_fields(
-                [request.field_set.interpreter_constraints], python_setup=python_setup
-            ),
-            sources=visitor_digest,
-        ),
+    visitor_digest = await create_digest(CreateDigest([file_content]))
+    venv_pex = await create_venv_pex(
+        **implicitly(
+            PexRequest(
+                output_filename="__visitor.pex",
+                internal_only=True,
+                main=EntryPoint("__visitor"),
+                interpreter_constraints=InterpreterConstraints.create_from_field_sets(
+                    [request.field_set], python_setup=python_setup
+                ),
+                sources=visitor_digest,
+            )
+        )
     )
-    process_result = await Get(
-        ProcessResult,
-        VenvPexProcess(
-            venv_pex,
-            argv=[stripped_sources.snapshot.files[0]],
-            description=f"Determine Django app dependencies for {request.field_set.address}",
-            input_digest=stripped_sources.snapshot.digest,
-            level=LogLevel.DEBUG,
-        ),
+    process_result = await execute_process_or_raise(
+        **implicitly(
+            VenvPexProcess(
+                venv_pex,
+                argv=[stripped_sources.snapshot.files[0]],
+                description=f"Determine Django app dependencies for {request.field_set.address}",
+                input_digest=stripped_sources.snapshot.digest,
+                level=LogLevel.DEBUG,
+            )
+        )
     )
     # See in script for where we explicitly encoded as utf8. Even though utf8 is the
     # default for decode(), we make that explicit here for emphasis.
@@ -92,18 +95,19 @@ async def _django_migration_dependencies(
     ]
     resolve = request.field_set.resolve.normalized_value(python_setup)
 
-    resolved_dependencies = await Get(
-        ResolvedParsedPythonDependencies,
+    resolved_dependencies = await resolve_parsed_dependencies(
         ResolvedParsedPythonDependenciesRequest(
             request.field_set,
-            ParsedPythonDependencies(
+            PythonFileDependencies(
                 ParsedPythonImports(
                     (module, ParsedPythonImportInfo(0, False)) for module in modules
                 ),
                 ParsedPythonAssetPaths(),
+                ExplicitPythonDependencies(),
             ),
             resolve,
         ),
+        **implicitly(),
     )
 
     return InferredDependencies(
@@ -136,19 +140,20 @@ async def _django_app_implicit_dependencies(
 
     resolve = request.field_set.resolve.normalized_value(python_setup)
 
-    resolved_dependencies = await Get(
-        ResolvedParsedPythonDependencies,
+    resolved_dependencies = await resolve_parsed_dependencies(
         ResolvedParsedPythonDependenciesRequest(
             request.field_set,
-            ParsedPythonDependencies(
+            PythonFileDependencies(
                 ParsedPythonImports(
                     (package, ParsedPythonImportInfo(0, False))
                     for package in implicit_dependency_packages
                 ),
                 ParsedPythonAssetPaths(),
+                ExplicitPythonDependencies(),
             ),
             resolve,
         ),
+        **implicitly(),
     )
 
     spec_paths = [
@@ -158,13 +163,13 @@ async def _django_app_implicit_dependencies(
         for address in result.address
     ]
 
-    targets = await Get(
-        Targets,
-        RawSpecs,
-        RawSpecs.create(
-            specs=[FileGlobSpec(f"{spec_path}/*.py") for spec_path in spec_paths],
-            description_of_origin="Django implicit dependency detection",
-        ),
+    targets = await resolve_targets(
+        **implicitly(
+            RawSpecs.create(
+                specs=[FileGlobSpec(f"{spec_path}/*.py") for spec_path in spec_paths],
+                description_of_origin="Django implicit dependency detection",
+            )
+        )
     )
 
     return InferredDependencies(sorted(target.address for target in targets))
@@ -188,9 +193,9 @@ async def infer_django_dependencies(
 
 
 def rules():
-    return [
+    return (
         *collect_rules(),
         *pex.rules(),
         *dependency_inference.rules.rules(),
         UnionRule(InferDependenciesRequest, InferDjangoDependencies),
-    ]
+    )

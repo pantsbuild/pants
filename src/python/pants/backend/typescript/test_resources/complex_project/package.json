@@ -1,0 +1,18 @@
+{
+  "name": "@test/typescript-workspace",
+  "version": "1.0.0",
+  "description": "TypeScript workspace for testing",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "common-types",
+    "shared-utils",
+    "main-app"
+  ],
+  "devDependencies": {
+    "@types/node": "24.9.1",
+    "@types/react": "19.2.2",
+    "react": "19.2.0",
+    "typescript": "5.9.3"
+  }
+}

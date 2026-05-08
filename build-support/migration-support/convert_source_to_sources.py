@@ -8,19 +8,18 @@ from difflib import unified_diff
 from io import BytesIO
 from pathlib import Path
 from token import NAME, OP
-from typing import Dict, List, Optional, Set
 
 
 def main() -> None:
     args = create_parser().parse_args()
-    build_files: Set[Path] = {
+    build_files: set[Path] = {
         fp
         for folder in args.folders
         for fp in [*folder.rglob("BUILD"), *folder.rglob("BUILD.*")]
         # Check that it really is a BUILD file
         if fp.is_file() and fp.stem == "BUILD"
     }
-    updates: Dict[Path, List[str]] = {}
+    updates: dict[Path, list[str]] = {}
     for build in build_files:
         possibly_new_build = maybe_rewrite_build(build)
         if possibly_new_build is not None:
@@ -48,7 +47,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def maybe_rewrite_line(line: str) -> Optional[str]:
+def maybe_rewrite_line(line: str) -> str | None:
     try:
         tokens = list(tokenize.tokenize(BytesIO(line.encode()).readline))
     except tokenize.TokenError:
@@ -75,7 +74,7 @@ def maybe_rewrite_line(line: str) -> Optional[str]:
     return f"{prefix}sources{interfix}[{source_value.string}]{suffix}"
 
 
-def maybe_rewrite_build(build_file: Path) -> Optional[List[str]]:
+def maybe_rewrite_build(build_file: Path) -> list[str] | None:
     original_text = build_file.read_text()
     original_text_lines = original_text.splitlines()
     updated_text_lines = original_text_lines.copy()
@@ -88,7 +87,7 @@ def maybe_rewrite_build(build_file: Path) -> Optional[List[str]]:
     return updated_text_lines if updated_text_lines != original_text_lines else None
 
 
-def generate_diff(build_file: Path, new_content: List[str]) -> str:
+def generate_diff(build_file: Path, new_content: list[str]) -> str:
     def green(s: str) -> str:
         return f"\x1b[32m{s}\x1b[0m"
 

@@ -2,10 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable, Tuple
-
-from typing_extensions import assert_never
+from typing import Any, assert_never
 
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import PexRequest, VenvPexProcess, create_venv_pex
@@ -28,7 +27,7 @@ from pants.util.strutil import pluralize
 
 class SqlfluffFixRequest(FixTargetsRequest):
     field_set_type = SqlfluffFieldSet
-    tool_subsystem = Sqlfluff
+    tool_subsystem = Sqlfluff  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     # We don't need to include automatically added lint rules for this SqlfluffFixRequest,
@@ -38,13 +37,13 @@ class SqlfluffFixRequest(FixTargetsRequest):
 
 class SqlfluffLintRequest(LintTargetsRequest):
     field_set_type = SqlfluffFieldSet
-    tool_subsystem = Sqlfluff
+    tool_subsystem = Sqlfluff  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
 
 class SqlfluffFormatRequest(FmtTargetsRequest):
     field_set_type = SqlfluffFieldSet
-    tool_subsystem = Sqlfluff
+    tool_subsystem = Sqlfluff  # type: ignore[assignment]
     partitioner_type = PartitionerType.DEFAULT_SINGLE_PARTITION
 
     @classproperty
@@ -73,7 +72,7 @@ async def run_sqlfluff(
         MergeDigests((request.snapshot.digest, config_files.snapshot.digest))
     )
 
-    initial_args: Tuple[str, ...] = ()
+    initial_args: tuple[str, ...] = ()
     if request.mode is SqlfluffMode.FMT:
         initial_args = ("format",)
     elif request.mode is SqlfluffMode.FIX:

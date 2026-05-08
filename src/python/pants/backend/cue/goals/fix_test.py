@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections import namedtuple
+from collections.abc import Iterable
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -110,6 +110,7 @@ def test_simple_cue_fmt(rule_runner: RuleRunner) -> None:
     )
 
 
+@pytest.mark.platform_specific_behavior
 def test_simple_cue_fmt_issue(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

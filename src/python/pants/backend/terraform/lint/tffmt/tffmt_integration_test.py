@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import textwrap
-from typing import List, NewType
+from typing import NewType
 
 import pytest
 
@@ -22,7 +22,7 @@ from pants.engine.internals.native_engine import Snapshot
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
-RuleRunnerOptions = NewType("RuleRunnerOptions", List[str])
+RuleRunnerOptions = NewType("RuleRunnerOptions", list[str])
 
 
 available_tf_versions = [
@@ -105,7 +105,7 @@ FIXED_BAD_SOURCE = FileContent(
 
 
 def make_target(
-    rule_runner: RuleRunner, source_files: List[FileContent], *, target_name="target"
+    rule_runner: RuleRunner, source_files: list[FileContent], *, target_name="target"
 ) -> Target:
     rule_runner.write_files(
         {
@@ -118,7 +118,7 @@ def make_target(
 
 def run_tffmt(
     rule_runner: RuleRunner,
-    targets: List[Target],
+    targets: list[Target],
     options: RuleRunnerOptions,
 ) -> FmtResult | None:
     rule_runner.set_options(options)
@@ -159,7 +159,7 @@ def get_content(rule_runner: RuleRunner, digest: Digest) -> DigestContents:
     return rule_runner.request(DigestContents, [digest])
 
 
-def get_snapshot(rule_runner: RuleRunner, source_files: List[FileContent]) -> Snapshot:
+def get_snapshot(rule_runner: RuleRunner, source_files: list[FileContent]) -> Snapshot:
     digest = rule_runner.request(Digest, [CreateDigest(source_files)])
     return rule_runner.request(Snapshot, [digest])
 

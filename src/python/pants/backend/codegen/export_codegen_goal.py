@@ -4,13 +4,14 @@
 import logging
 
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.fs import Digest, MergeDigests, Workspace
+from pants.engine.fs import MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.internals.graph import hydrate_sources
+from pants.engine.intrinsics import merge_digests
+from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly
 from pants.engine.target import (
     FilteredTargets,
     GenerateSourcesRequest,
-    HydratedSources,
     HydrateSourcesRequest,
     RegisteredTargetTypes,
     SourcesField,
@@ -71,27 +72,26 @@ async def export_codegen(
             softwrap(
                 f"""
                 No codegen files/targets matched. All codegen target types:
-                {', '.join(codegen_targets)}
+                {", ".join(codegen_targets)}
                 """
             )
         )
         return ExportCodegen(exit_code=0)
 
-    all_hydrated_sources = await MultiGet(
-        Get(
-            HydratedSources,
+    all_hydrated_sources = await concurrently(
+        hydrate_sources(
             HydrateSourcesRequest(
                 sources,
                 for_sources_types=(output_type,),
                 enable_codegen=True,
             ),
+            **implicitly(),
         )
         for sources, output_type in codegen_sources_fields_with_output
     )
 
-    merged_digest = await Get(
-        Digest,
-        MergeDigests(hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources),
+    merged_digest = await merge_digests(
+        MergeDigests(hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources)
     )
 
     dest = str(dist_dir.relpath / "codegen")

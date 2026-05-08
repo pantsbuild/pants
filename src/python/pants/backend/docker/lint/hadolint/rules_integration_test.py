@@ -78,6 +78,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert_success(rule_runner, tgt)
 
 
+@pytest.mark.platform_specific_behavior
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"Dockerfile": BAD_FILE, "BUILD": "docker_image(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t"))

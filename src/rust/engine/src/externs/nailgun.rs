@@ -12,11 +12,11 @@ use task_executor::Executor;
 pub fn register(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add(
         "PantsdConnectionException",
-        py.get_type_bound::<PantsdConnectionException>(),
+        py.get_type::<PantsdConnectionException>(),
     )?;
     m.add(
         "PantsdClientException",
-        py.get_type_bound::<PantsdClientException>(),
+        py.get_type::<PantsdClientException>(),
     )?;
     m.add_class::<PyNailgunClient>()?;
     Ok(())
@@ -59,7 +59,7 @@ impl PyNailgunClient {
             .map(|kv_pair| kv_pair.extract::<(String, String)>())
             .collect::<Result<Vec<_>, _>>()?;
 
-        py.allow_threads(|| {
+        py.detach(|| {
             self.executor
                 .block_on(nailgun::client_execute(self.port, command, args, env_list))
                 .map_err(|e| match e {

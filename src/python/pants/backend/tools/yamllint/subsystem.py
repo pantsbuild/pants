@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -19,6 +19,8 @@ from pants.option.option_types import (
     StrOption,
 )
 from pants.util.strutil import softwrap
+
+# pants: infer-dep(yamllint.lock*)
 
 
 class Yamllint(PythonToolBase):

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import dataclasses
-import difflib
 import json
 import logging
 import os
@@ -13,8 +12,7 @@ from typing import Any
 
 import ijson.backends.python as ijson
 
-from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
-from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
@@ -27,17 +25,22 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
-    DigestContents,
     DigestSubset,
     FileContent,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
-    Snapshot,
 )
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_to_snapshot,
+    execute_process,
+    get_digest_contents,
+    merge_digests,
+)
+from pants.engine.process import Process, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -110,7 +113,7 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
 
 
 @dataclass(frozen=True)
-class AllThirdPartyPackages(FrozenDict[str, ThirdPartyPkgAnalysis]):
+class AllThirdPartyPackages:
     """All the packages downloaded from a go.mod, along with a digest of the downloaded files.
 
     The digest has files in the format `gopath/pkg/mod`, which is what `GoSdkProcess` sets `GOPATH`
@@ -152,15 +155,33 @@ class ModuleDescriptors:
 
 
 @dataclass(frozen=True)
-class AnalyzeThirdPartyModuleRequest:
-    go_mod_address: Address
-    go_mod_digest: Digest
-    go_mod_path: str
-    import_path: str
+class ModuleDownloadRequest:
+    """Download and analyze a Go module, keyed by (name, version, minimum_go_version,
+    build_opts, go_sum_entries).
+
+    This enables cross-go.mod deduplication: if mod-a and mod-b both depend on
+    grpc@v1.60.0 with the same go.sum entries, the download and analysis only
+    happens once because the Pants engine memoizes by the full request key.
+
+    ``go_sum_entries`` carries the two go.sum lines for ``<name> <version>`` and
+    ``<name> <version>/go.mod`` extracted from the consuming go.mod's real
+    go.sum. These entries are content-addressable by design: two well-formed
+    go.sums MUST agree on them for the same module@version. Including them in
+    the dedup key has two effects:
+
+    1. Happy path: all consumers of module@version share one download, and the
+       synthetic go.sum written into the sandbox lets Go perform its normal
+       checksum verification (no GONOSUMCHECK override).
+    2. Tampered path: if one go.sum disagrees, the two consumers produce
+       distinct requests -- each verified independently against its own
+       entries -- and the tampered one fails with Go's usual SECURITY ERROR.
+    """
+
     name: str
     version: str
     minimum_go_version: str | None
     build_opts: GoBuildOptions
+    go_sum_entries: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -206,17 +227,18 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
     #   closure that cannot be built, but we should  not blow up Pants. For example, a package that sets the
     #   special value `package documentation` and has no source files would naively error due to
     #   `build constraints exclude all Go files`, even though we should not error on that package.
-    mod_list_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            command=["list", "-mod=readonly", "-e", "-m", "-json", "all"],
-            input_digest=request.digest,
-            output_directories=("gopath",),
-            working_dir=request.path if request.path else None,
-            # Allow downloads of the module metadata (i.e., go.mod files).
-            allow_downloads=True,
-            description="Analyze Go module dependencies.",
-        ),
+    mod_list_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                command=["list", "-mod=readonly", "-e", "-m", "-json", "all"],
+                input_digest=request.digest,
+                output_directories=("gopath",),
+                working_dir=request.path if request.path else None,
+                # Allow downloads of the module metadata (i.e., go.mod files).
+                allow_downloads=True,
+                description="Analyze Go module dependencies.",
+            )
+        )
     )
 
     if len(mod_list_result.stdout) == 0:
@@ -227,6 +249,11 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
     for mod_json in ijson.items(mod_list_result.stdout, "", multiple_values=True):
         # Skip the first-party module being analyzed.
         if "Main" in mod_json and mod_json["Main"]:
+            continue
+
+        # Skip first-party modules referenced from other first-party modules.
+        # TODO Issue #22097: These cross-module references could be used for dependency inference
+        if "Replace" in mod_json and "Version" not in mod_json["Replace"]:
             continue
 
         if "Replace" in mod_json:
@@ -266,6 +293,45 @@ def strip_sandbox_prefix(path: str, marker: str) -> str:
         return path
 
 
+def _parse_go_sum(go_sum_content: bytes) -> dict[tuple[str, str], tuple[str, ...]]:
+    """Parse a go.sum file into a dict keyed by (module name, version).
+
+    A well-formed go.sum has up to two lines per (module, version):
+
+        <name> <version> h1:<content hash>=
+        <name> <version>/go.mod h1:<go.mod hash>=
+
+    Returns a dict mapping (name, version) to a tuple of the matching lines,
+    enabling O(1) lookup per module instead of re-scanning the file.
+    """
+    entries: dict[tuple[str, str], list[str]] = {}
+    for line in go_sum_content.decode("utf-8").splitlines():
+        if not line:
+            continue
+        parts = line.split(" ", 2)
+        if len(parts) < 3:
+            continue
+        name = parts[0]
+        version_field = parts[1]
+        # Strip the "/go.mod" suffix to get the base version for grouping.
+        version = version_field.removesuffix("/go.mod")
+        key = (name, version)
+        entries.setdefault(key, []).append(line)
+    return {k: tuple(v) for k, v in entries.items()}
+
+
+def _extract_go_sum_entries_for_module(
+    go_sum_content: bytes, name: str, version: str
+) -> tuple[str, ...]:
+    """Return the go.sum lines for a given module@version.
+
+    Thin wrapper around _parse_go_sum for callers that only need one module.
+    Prefer _parse_go_sum when looking up multiple modules from the same go.sum.
+    """
+    parsed = _parse_go_sum(go_sum_content)
+    return parsed.get((name, version), ())
+
+
 def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
     result = {}
     for k, v in d.items():
@@ -283,159 +349,6 @@ def _freeze_json_dict(d: dict[Any, Any]) -> FrozenDict[str, Any]:
             raise AssertionError(f"Unsupported value type for _freeze_json_dict: {type(v)}")
         result[k] = f
     return FrozenDict(result)
-
-
-async def _check_go_sum_has_not_changed(
-    input_digest: Digest,
-    output_digest: Digest,
-    dir_path: str,
-    import_path: str,
-    go_mod_address: Address,
-) -> None:
-    input_entries, output_entries = await MultiGet(
-        Get(DigestContents, Digest, input_digest),
-        Get(DigestContents, Digest, output_digest),
-    )
-
-    go_sum_path = os.path.join(dir_path, "go.sum")
-
-    input_go_sum_entry: bytes | None = None
-    for entry in input_entries:
-        if entry.path == go_sum_path:
-            input_go_sum_entry = entry.content
-
-    output_go_sum_entry: bytes | None = None
-    for entry in output_entries:
-        if entry.path == go_sum_path:
-            output_go_sum_entry = entry.content
-
-    if input_go_sum_entry is not None or output_go_sum_entry is not None:
-        if input_go_sum_entry != output_go_sum_entry:
-            go_sum_diff = list(
-                difflib.unified_diff(
-                    (input_go_sum_entry or b"").decode().splitlines(),
-                    (output_go_sum_entry or b"").decode().splitlines(),
-                )
-            )
-            go_sum_diff_rendered = "\n".join(line.rstrip() for line in go_sum_diff)
-            raise ValueError(
-                f"For `{GoModTarget.alias}` target `{go_mod_address}`, the go.sum file is incomplete "
-                f"because it was updated while processing third-party dependency `{import_path}`. "
-                "Please re-generate the go.sum file by running `go mod download all` in the module directory. "
-                "(Pants does not currently have support for updating the go.sum checksum database itself.)\n\n"
-                f"Diff:\n{go_sum_diff_rendered}"
-            )
-
-
-@rule
-async def analyze_go_third_party_module(
-    request: AnalyzeThirdPartyModuleRequest,
-    analyzer: PackageAnalyzerSetup,
-) -> AnalyzedThirdPartyModule:
-    # Download the module.
-    download_result = await Get(
-        ProcessResult,
-        GoSdkProcess(
-            ("mod", "download", "-json", f"{request.name}@{request.version}"),
-            input_digest=request.go_mod_digest,  # for go.sum
-            working_dir=os.path.dirname(request.go_mod_path),
-            # Allow downloads of the module sources.
-            allow_downloads=True,
-            output_directories=("gopath",),
-            output_files=(os.path.join(os.path.dirname(request.go_mod_path), "go.sum"),),
-            description=f"Download Go module {request.name}@{request.version}.",
-        ),
-    )
-
-    if len(download_result.stdout) == 0:
-        raise AssertionError(
-            f"Expected output from `go mod download` for {request.name}@{request.version}."
-        )
-
-    # Make sure go.sum has not changed.
-    await _check_go_sum_has_not_changed(
-        input_digest=request.go_mod_digest,
-        output_digest=download_result.output_digest,
-        dir_path=os.path.dirname(request.go_mod_path),
-        import_path=request.import_path,
-        go_mod_address=request.go_mod_address,
-    )
-
-    module_metadata = json.loads(download_result.stdout)
-    module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
-    go_mod_relpath = strip_sandbox_prefix(module_metadata["GoMod"], "gopath/")
-
-    # Subset the output directory to just the module sources and go.mod (which may be generated).
-    module_sources_snapshot = await Get(
-        Snapshot,
-        DigestSubset(
-            download_result.output_digest,
-            PathGlobs(
-                [f"{module_sources_relpath}/**", go_mod_relpath],
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                conjunction=GlobExpansionConjunction.all_match,
-                description_of_origin=f"the download of Go module {request.name}@{request.version}",
-            ),
-        ),
-    )
-
-    # Determine directories with potential Go packages in them.
-    candidate_package_dirs = []
-    files_by_dir = group_by_dir(
-        p for p in module_sources_snapshot.files if p.startswith(module_sources_relpath)
-    )
-    for maybe_pkg_dir, files in files_by_dir.items():
-        # Skip directories where "testdata" would end up in the import path.
-        # See https://github.com/golang/go/blob/f005df8b582658d54e63d59953201299d6fee880/src/go/build/build.go#L580-L585
-        if "testdata" in maybe_pkg_dir.split("/"):
-            continue
-
-        # Consider directories with at least one `.go` file as package candidates.
-        if any(f for f in files if f.endswith(".go")):
-            candidate_package_dirs.append(maybe_pkg_dir)
-    candidate_package_dirs.sort()
-
-    # Analyze all of the packages in this module.
-    analyzer_relpath = "__analyzer"
-    analysis_result = await Get(
-        ProcessResult,
-        Process(
-            [os.path.join(analyzer_relpath, analyzer.path), *candidate_package_dirs],
-            input_digest=module_sources_snapshot.digest,
-            immutable_input_digests={
-                analyzer_relpath: analyzer.digest,
-            },
-            description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
-            level=LogLevel.DEBUG,
-            env={"CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0"},
-        ),
-    )
-
-    if len(analysis_result.stdout) == 0:
-        return AnalyzedThirdPartyModule(FrozenOrderedSet())
-
-    package_analysis_gets = []
-    for pkg_path, pkg_json in zip(
-        candidate_package_dirs, ijson.items(analysis_result.stdout, "", multiple_values=True)
-    ):
-        package_analysis_gets.append(
-            Get(
-                FallibleThirdPartyPkgAnalysis,
-                AnalyzeThirdPartyPackageRequest(
-                    pkg_json=_freeze_json_dict(pkg_json),
-                    module_sources_digest=module_sources_snapshot.digest,
-                    module_sources_path=module_sources_relpath,
-                    module_import_path=request.name,
-                    package_path=pkg_path,
-                    minimum_go_version=request.minimum_go_version,
-                ),
-            )
-        )
-    analyzed_packages_fallible = await MultiGet(package_analysis_gets)
-    analyzed_packages = [
-        pkg.analysis for pkg in analyzed_packages_fallible if pkg.analysis and pkg.exit_code == 0
-    ]
-    return AnalyzedThirdPartyModule(FrozenOrderedSet(analyzed_packages))
 
 
 @rule
@@ -527,22 +440,23 @@ async def analyze_go_third_party_package(
                 "XTestEmbedPatterns": analysis.xtest_embed_patterns,
             }
         ).encode("utf-8")
-        embedder, patterns_json_digest = await MultiGet(
-            Get(LoadedGoBinary, LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder")),
-            Get(Digest, CreateDigest([FileContent("patterns.json", patterns_json)])),
+        embedder, patterns_json_digest = await concurrently(
+            setup_go_binary(
+                LoadedGoBinaryRequest("embedcfg", ("main.go",), "./embedder"), **implicitly()
+            ),
+            create_digest(CreateDigest([FileContent("patterns.json", patterns_json)])),
         )
-        input_digest = await Get(
-            Digest,
-            MergeDigests((request.module_sources_digest, patterns_json_digest, embedder.digest)),
+        input_digest = await merge_digests(
+            MergeDigests((request.module_sources_digest, patterns_json_digest, embedder.digest))
         )
-        embed_result = await Get(
-            FallibleProcessResult,
+        embed_result = await execute_process(
             Process(
                 ("./embedder", "patterns.json", request.package_path),
                 input_digest=input_digest,
                 description=f"Create embed mapping for {import_path}",
                 level=LogLevel.DEBUG,
             ),
+            **implicitly(),
         )
         if embed_result.exit_code != 0:
             return FallibleThirdPartyPkgAnalysis(
@@ -570,35 +484,180 @@ async def analyze_go_third_party_package(
     )
 
 
+@rule
+async def download_and_analyze_module(
+    request: ModuleDownloadRequest,
+    analyzer: PackageAnalyzerSetup,
+) -> AnalyzedThirdPartyModule:
+    """Download and analyze a single Go module via a synthetic go.mod + go.sum.
+
+    Keyed by (name, version, minimum_go_version, build_opts, go_sum_entries),
+    which lets the Pants engine deduplicate identical module downloads across
+    go.mods.
+
+    A synthetic go.mod + go.sum pair is written into the sandbox so that Go's
+    normal checksum verification still runs -- the go.sum entries come straight
+    from the consuming go.mod's real go.sum (see ModuleDownloadRequest for the
+    full argument for why this is safe).
+    """
+    # Create a synthetic go.mod (and go.sum when entries are available) that
+    # only requires this one module. When the consuming go.sum contains the
+    # entries for this module@version, we emit them verbatim so `go mod
+    # download` performs its usual local checksum verification. When they
+    # are absent (e.g., a transitive discovered during MVS that the consumer's
+    # go.sum hasn't recorded yet, or a go.sum that is entirely missing), we
+    # omit the synthetic go.sum and let Go fall back to GOSUMDB
+    # (sum.golang.org by default) for verification. This is a softer signal
+    # than the pre-dedup rule, which raised an error pointing the user at
+    # `go mod download all`; the warning below preserves that guidance.
+    if not request.go_sum_entries:
+        logger.warning(
+            "No go.sum entries found for %s@%s; falling back to GOSUMDB for "
+            "checksum verification. This usually means the consuming go.mod's "
+            "go.sum is incomplete -- run `go mod download all` (or `go mod "
+            "tidy`) in that module's directory to record the checksum locally.",
+            request.name,
+            request.version,
+        )
+    go_version = request.minimum_go_version or "1.21"
+    synthetic_go_mod = (
+        f"module synthetic.invalid\n\ngo {go_version}\n\nrequire {request.name} {request.version}\n"
+    )
+    synthetic_files = [FileContent("go.mod", synthetic_go_mod.encode())]
+    if request.go_sum_entries:
+        synthetic_go_sum = "\n".join(request.go_sum_entries) + "\n"
+        synthetic_files.append(FileContent("go.sum", synthetic_go_sum.encode()))
+    synthetic_digest = await create_digest(CreateDigest(synthetic_files))
+
+    download_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            GoSdkProcess(
+                ("mod", "download", "-json", f"{request.name}@{request.version}"),
+                input_digest=synthetic_digest,
+                allow_downloads=True,
+                output_directories=("gopath",),
+                description=f"Download Go module {request.name}@{request.version}.",
+            )
+        )
+    )
+
+    if len(download_result.stdout) == 0:
+        raise AssertionError(
+            f"Expected output from `go mod download` for {request.name}@{request.version}."
+        )
+
+    module_metadata = json.loads(download_result.stdout)
+    module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
+    go_mod_relpath = strip_sandbox_prefix(module_metadata["GoMod"], "gopath/")
+
+    module_sources_snapshot = await digest_to_snapshot(
+        **implicitly(
+            DigestSubset(
+                download_result.output_digest,
+                PathGlobs(
+                    [f"{module_sources_relpath}/**", go_mod_relpath],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    conjunction=GlobExpansionConjunction.all_match,
+                    description_of_origin=f"the download of Go module {request.name}@{request.version}",
+                ),
+            )
+        )
+    )
+
+    candidate_package_dirs = []
+    files_by_dir = group_by_dir(
+        p for p in module_sources_snapshot.files if p.startswith(module_sources_relpath)
+    )
+    for maybe_pkg_dir, files in files_by_dir.items():
+        # Skip directories where "testdata" would end up in the import path.
+        # See https://github.com/golang/go/blob/f005df8b582658d54e63d59953201299d6fee880/src/go/build/build.go#L580-L585
+        if "testdata" in maybe_pkg_dir.split("/"):
+            continue
+        if any(f for f in files if f.endswith(".go")):
+            candidate_package_dirs.append(maybe_pkg_dir)
+    candidate_package_dirs.sort()
+
+    analyzer_relpath = "__analyzer"
+    analysis_result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                [os.path.join(analyzer_relpath, analyzer.path), *candidate_package_dirs],
+                input_digest=module_sources_snapshot.digest,
+                immutable_input_digests={
+                    analyzer_relpath: analyzer.digest,
+                },
+                description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
+                level=LogLevel.DEBUG,
+                env={"CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0"},
+            )
+        )
+    )
+
+    if len(analysis_result.stdout) == 0:
+        return AnalyzedThirdPartyModule(FrozenOrderedSet())
+
+    package_analysis_gets = []
+    for pkg_path, pkg_json in zip(
+        candidate_package_dirs, ijson.items(analysis_result.stdout, "", multiple_values=True)
+    ):
+        package_analysis_gets.append(
+            analyze_go_third_party_package(
+                AnalyzeThirdPartyPackageRequest(
+                    pkg_json=_freeze_json_dict(pkg_json),
+                    module_sources_digest=module_sources_snapshot.digest,
+                    module_sources_path=module_sources_relpath,
+                    module_import_path=request.name,
+                    package_path=pkg_path,
+                    minimum_go_version=request.minimum_go_version,
+                )
+            )
+        )
+    analyzed_packages_fallible = await concurrently(package_analysis_gets)
+    analyzed_packages = [
+        pkg.analysis for pkg in analyzed_packages_fallible if pkg.analysis and pkg.exit_code == 0
+    ]
+    return AnalyzedThirdPartyModule(FrozenOrderedSet(analyzed_packages))
+
+
 @rule(desc="Download and analyze all third-party Go packages", level=LogLevel.DEBUG)
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
 ) -> AllThirdPartyPackages:
-    module_analysis = await Get(
-        ModuleDescriptors,
+    module_analysis = await analyze_module_dependencies(
         ModuleDescriptorsRequest(
             digest=request.go_mod_digest,
             path=os.path.dirname(request.go_mod_path),
-        ),
+        )
     )
 
-    go_mod_digest = await Get(
-        Digest, MergeDigests([request.go_mod_digest, module_analysis.go_mods_digest])
-    )
+    # Read the real go.sum once so we can extract per-module entries for the
+    # download sandbox. This keeps Go's checksum verification intact while
+    # allowing the engine to memoize identical module@version downloads
+    # across different go.mods.
+    go_sum_path = os.path.join(os.path.dirname(request.go_mod_path), "go.sum")
+    digest_contents = await get_digest_contents(request.go_mod_digest)
+    go_sum_content = b""
+    for entry in digest_contents:
+        if entry.path == go_sum_path:
+            go_sum_content = entry.content
+            break
 
-    analyzed_modules = await MultiGet(
-        Get(
-            AnalyzedThirdPartyModule,
-            AnalyzeThirdPartyModuleRequest(
-                go_mod_address=request.go_mod_address,
-                go_mod_digest=go_mod_digest,
-                go_mod_path=request.go_mod_path,
-                import_path=mod.name,
+    # Parse the go.sum once into a dict for O(1) lookup per module.
+    go_sum_index = _parse_go_sum(go_sum_content)
+
+    # The engine memoizes by (name, version, minimum_go_version, build_opts,
+    # go_sum_entries), so identical modules across go.mods are downloaded
+    # once -- reducing downloads from O(N*M) to O(M).
+    analyzed_modules = await concurrently(
+        download_and_analyze_module(
+            ModuleDownloadRequest(
                 name=mod.name,
                 version=mod.version,
                 minimum_go_version=mod.minimum_go_version,
                 build_opts=request.build_opts,
+                go_sum_entries=go_sum_index.get((mod.name, mod.version), ()),
             ),
+            **implicitly(),
         )
         for mod in module_analysis.modules
     )
@@ -614,14 +673,13 @@ async def download_and_analyze_third_party_packages(
 
 @rule
 async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPartyPkgAnalysis:
-    all_packages = await Get(
-        AllThirdPartyPackages,
+    all_packages = await download_and_analyze_third_party_packages(
         AllThirdPartyPackagesRequest(
             request.go_mod_address,
             request.go_mod_digest,
             request.go_mod_path,
             build_opts=request.build_opts,
-        ),
+        )
     )
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:

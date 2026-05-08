@@ -5,21 +5,22 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, DefaultDict
+from typing import Any, DefaultDict
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules.environments import EnvironmentsSubsystem
+from pants.core.environments.subsystems import EnvironmentsSubsystem
 from pants.engine.goal import GoalSubsystem
-from pants.engine.rules import Rule, RuleIndex
+from pants.engine.rules import Rule, RuleIndex, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.ng.goal import GoalSubsystemNg
 from pants.option.alias import CliOptions
 from pants.option.global_options import GlobalOptions
-from pants.option.scope import normalize_scope
+from pants.option.scope import OptionsParsingSettings, ScopeInfo, normalize_scope
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
@@ -74,6 +75,10 @@ class BuildConfiguration:
                 key=lambda x: x.options_scope,
             )
         )
+
+    @property
+    def known_scope_infos(self) -> tuple[ScopeInfo, ...]:
+        return tuple(subsystem.get_scope_info() for subsystem in self.all_subsystems)
 
     @property
     def target_types(self) -> tuple[type[Target], ...]:
@@ -139,6 +144,7 @@ class BuildConfiguration:
         )
         _allow_unknown_options: bool = False
         _remote_auth_plugin: Callable | None = None
+        _pants_ng: bool = False
 
         def registered_aliases(self) -> BuildFileAliases:
             """Return the registered aliases exposed in BUILD files.
@@ -185,13 +191,13 @@ class BuildConfiguration:
         ):
             if alias in self._exposed_context_aware_object_factory_by_alias:
                 logger.debug(
-                    "This context aware object factory alias {} has already been registered. "
-                    "Overwriting!".format(alias)
+                    f"This context aware object factory alias {alias} has already been registered. "
+                    "Overwriting!"
                 )
 
-            self._exposed_context_aware_object_factory_by_alias[
-                alias
-            ] = context_aware_object_factory
+            self._exposed_context_aware_object_factory_by_alias[alias] = (
+                context_aware_object_factory
+            )
 
         def register_subsystems(
             self, plugin_or_backend: str, subsystems: Iterable[type[Subsystem]]
@@ -213,6 +219,15 @@ class BuildConfiguration:
                 )
 
             for subsystem in subsystems:
+                if (
+                    issubclass(subsystem, GoalSubsystem)
+                    and issubclass(subsystem, GoalSubsystemNg) != self._pants_ng
+                ):
+                    # Don't register goal subsystems that aren't pertinent to our og/ng state.
+                    # This allows GoalSubsystemNgs to use the same scopes as og GoalSubsystems
+                    # without collision. Note that the @rules that consume these subsystems
+                    # can still be registered, but the subsystems cannot be configured.
+                    continue
                 self._subsystem_to_providers[subsystem].append(plugin_or_backend)
 
         def register_rules(self, plugin_or_backend: str, rules: Iterable[Rule | UnionRule]):
@@ -223,16 +238,16 @@ class BuildConfiguration:
             # "Index" the rules to normalize them and expand their dependencies.
             rule_index = RuleIndex.create(rules)
             rules_and_queries: tuple[Rule, ...] = (*rule_index.rules, *rule_index.queries)
-            for rule in rules_and_queries:
-                self._rule_to_providers[rule].append(plugin_or_backend)
+            for _rule in rules_and_queries:
+                self._rule_to_providers[_rule].append(plugin_or_backend)
             for union_rule in rule_index.union_rules:
                 self._union_rule_to_providers[union_rule].append(plugin_or_backend)
             self.register_subsystems(
                 plugin_or_backend,
                 (
-                    rule.output_type
-                    for rule in rules_and_queries
-                    if issubclass(rule.output_type, Subsystem)
+                    _rule.output_type
+                    for _rule in rules_and_queries
+                    if issubclass(_rule.output_type, Subsystem)
                 ),
             )
 
@@ -317,3 +332,17 @@ class BuildConfiguration:
                 allow_unknown_options=self._allow_unknown_options,
                 remote_auth_plugin_func=self._remote_auth_plugin,
             )
+
+
+@rule
+async def get_full_options_parsing_settings(
+    build_config: BuildConfiguration,
+) -> OptionsParsingSettings:
+    return OptionsParsingSettings(
+        build_config.known_scope_infos,
+        build_config.allow_unknown_options,
+    )
+
+
+def rules():
+    return collect_rules()

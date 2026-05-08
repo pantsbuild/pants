@@ -10,6 +10,8 @@ from pants.engine.rules import collect_rules
 from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, SkipOption
 
+# pants: infer-dep(pyupgrade.lock*)
+
 
 class PyUpgrade(PythonToolBase):
     options_scope = "pyupgrade"

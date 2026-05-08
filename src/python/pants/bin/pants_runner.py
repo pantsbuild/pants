@@ -6,8 +6,8 @@ import os
 import platform
 import sys
 import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import List, Mapping
 
 from packaging.version import Version
 
@@ -15,18 +15,22 @@ from pants.base.deprecated import warn_or_error
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
 from pants.engine.env_vars import CompleteEnvironmentVars
+from pants.engine.internals.native_engine import PyNgInvocation
 from pants.init.logging import initialize_stdio, stdio_destination
 from pants.init.util import init_workdir
+from pants.option.bootstrap_options import BootstrapOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.docutil import doc_url
-from pants.util.osutil import is_macos_before_12
+from pants.util.osutil import get_normalized_arch_name, macos_major_version
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-# Pants 2.18 is using a new distribution model, that's supported (sans bugs) in 0.10.0.
-MINIMUM_SCIE_PANTS_VERSION = Version("0.10.0")
+# First version with working Python 3.11 support:
+# https://github.com/pantsbuild/scie-pants/releases/tag/v0.12.2
+# TODO: Likely still need to update scie-pants
+MINIMUM_SCIE_PANTS_VERSION = Version("0.12.2")
 
 
 @dataclass(frozen=True)
@@ -34,7 +38,7 @@ class PantsRunner:
     """A higher-level runner that delegates runs to either a LocalPantsRunner or
     RemotePantsRunner."""
 
-    args: List[str]
+    args: list[str]
     env: Mapping[str, str]
 
     # This could be a bootstrap option, but it's preferable to keep these very limited to make it
@@ -71,22 +75,45 @@ class PantsRunner:
     def run(self, start_time: float) -> ExitCode:
         self.scrub_pythonpath()
 
-        options_bootstrapper = OptionsBootstrapper.create(
-            env=self.env, args=self.args, allow_pantsrc=True
-        )
+        # Create a transient OptionsBootstrapper with no args, to read the value of pants_ng from
+        # config and env. We can't parse args until we know if we're ng or og.
+        options_bootstrapper = OptionsBootstrapper.create(args=[], env=self.env, allow_pantsrc=True)
+        pants_ng = options_bootstrapper.bootstrap_options.for_global_scope().pants_ng
+
+        if pants_ng:
+            logger.info("PantsRunner running as pants_ng")
+            ng_invocation = PyNgInvocation.from_args(tuple(self.args[1:]))
+            # Allow the existing logic to read flags in global position (note, these can be
+            # prefixed with a scope so they are not necessarily just global options), so
+            # that the engine can configure itself.
+            global_flags = ng_invocation.global_flag_strings()
+            options_bootstrapper = OptionsBootstrapper.create(
+                args=[self.args[0], *global_flags], env=self.env, allow_pantsrc=True
+            )
+        else:
+            ng_invocation = None
+            options_bootstrapper = OptionsBootstrapper.create(
+                args=self.args, env=self.env, allow_pantsrc=True
+            )
+
         with warnings.catch_warnings(record=True):
             bootstrap_options = options_bootstrapper.bootstrap_options
             global_bootstrap_options = bootstrap_options.for_global_scope()
+
+        BootstrapOptions.maybe_enable_stack_trampoline(global_bootstrap_options)
 
         # We enable logging here, and everything before it will be routed through regular
         # Python logging.
         stdin_fileno = sys.stdin.fileno()
         stdout_fileno = sys.stdout.fileno()
         stderr_fileno = sys.stderr.fileno()
-        with initialize_stdio(global_bootstrap_options), stdio_destination(
-            stdin_fileno=stdin_fileno,
-            stdout_fileno=stdout_fileno,
-            stderr_fileno=stderr_fileno,
+        with (
+            initialize_stdio(global_bootstrap_options),
+            stdio_destination(
+                stdin_fileno=stdin_fileno,
+                stdout_fileno=stdout_fileno,
+                stderr_fileno=stderr_fileno,
+            ),
         ):
             run_via_scie = "SCIE" in os.environ
             enable_scie_warnings = "NO_SCIE_WARNING" not in os.environ
@@ -115,34 +142,16 @@ class PantsRunner:
                         else "Run `PANTS_BOOTSTRAP_VERSION=report pants` to see the current version of the `pants` launcher binary"
                     )
                     warn_or_error(
-                        "2.18.0.dev6",
+                        "2.25.0.dev0",
                         f"using a `pants` launcher binary older than {MINIMUM_SCIE_PANTS_VERSION}",
                         softwrap(
                             f"""
-                            {current_version_text}, and see {doc_url("docs/getting-started/installing-pants")} for how to upgrade.
+                            {current_version_text}, and see {doc_url("docs/getting-started/installing-pants#upgrading-pants")} for how to upgrade.
                             """
                         ),
                     )
 
-            if (
-                not global_bootstrap_options.allow_deprecated_macos_before_12
-                and is_macos_before_12()
-            ):
-                warn_or_error(
-                    "2.24.0.dev0",
-                    "using Pants on macOS 10.15 - 11",
-                    softwrap(
-                        f"""
-                        Future versions of Pants will only run on macOS 12 and newer, but this machine
-                        appears older ({platform.platform()}).
-
-                        You can temporarily silence this warning with the
-                        `[GLOBAL].allow_deprecated_macos_before_12` option. If you have questions or
-                        concerns about this, please reach out to us at
-                        {doc_url("community/getting-help")}.
-                        """
-                    ),
-                )
+            _validate_macos_version(global_bootstrap_options)
 
             # N.B. We inline imports to speed up the python thin client run, and avoids importing
             # engine types until after the runner has had a chance to set __PANTS_BIN_NAME.
@@ -165,5 +174,65 @@ class PantsRunner:
                 env=CompleteEnvironmentVars(self.env),
                 working_dir=os.getcwd(),
                 options_bootstrapper=options_bootstrapper,
+                ng_invocation=ng_invocation,
             )
             return runner.run(start_time)
+
+
+# for each architecture, indicate the first Pants version that doesn't support the given version of
+# macOS, if it is (soon to be) unsupported:
+_MACOS_VERSION_BECOMES_UNSUPPORTED_IN = {
+    # macos-14 is currently oldest github hosted runner for arm
+    "arm64": {
+        10: "2.24.0.dev0",
+        11: "2.24.0.dev0",
+        12: "2.25.0.dev0",
+        13: "2.25.0.dev0",
+        # adding new values here should update the phrasing of the message below
+    },
+    # macos-13 will soon be the oldest (and only) github hosted runner for x86-64 (see https://github.com/pantsbuild/pants/issues/21333)
+    "x86_64": {
+        10: "2.24.0.dev0",
+        11: "2.24.0.dev0",
+        12: "2.25.0.dev0",
+        # adding new values here should update the phrasing of the message below
+    },
+}
+
+
+def _validate_macos_version(global_bootstrap_options: OptionValueContainer) -> None:
+    """Check for running on deprecated/unsupported versions of macOS, and similar."""
+
+    macos_version = macos_major_version()
+    if macos_version is None:
+        # Not macOS, no validation/deprecations required!
+        return
+
+    arch_versions = _MACOS_VERSION_BECOMES_UNSUPPORTED_IN[get_normalized_arch_name()]
+    unsupported_version = arch_versions.get(macos_version)
+
+    is_permitted_deprecated_macos_version = (
+        str(macos_version) in global_bootstrap_options.allow_deprecated_macos_versions
+    )
+
+    if unsupported_version is not None and not is_permitted_deprecated_macos_version:
+        warn_or_error(
+            unsupported_version,
+            "using Pants on older macOS",
+            softwrap(
+                f"""
+                Recent versions of Pants only support macOS 13 and newer (on x86-64) and macOS
+                14 and newer (on arm64), but this machine appears older ({platform.platform()}
+                implies macOS version {macos_version}). This version also isn't permitted by your
+                `[GLOBAL].allow_deprecated_macos_versions` configuration
+                ({global_bootstrap_options.allow_deprecated_macos_versions}).
+
+                Either upgrade your operating system(s), or silence this message (and thus opt-in to
+                potential breakage) by adding "{macos_version}" to the
+                `[GLOBAL].allow_deprecated_macos_versions` list.
+
+                If you have questions or concerns about this, please reach out to us at
+                {doc_url("community/getting-help")}.
+                """
+            ),
+        )

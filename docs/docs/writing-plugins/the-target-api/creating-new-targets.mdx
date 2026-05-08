@@ -70,7 +70,7 @@ For example, you might like how `pex_binary` behaves in general, but you have a 
 Rather than subclassing the original target type, use this pattern:
 
 ```python
-from pants.backend.python.target_types import PexBinaryTarget, PexEntryPointField
+from pants.backend.python.target_types import PexBinary, PexEntryPointField
 from pants.engine.target import Target
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -81,12 +81,12 @@ class DjangoEntryPointField(PexEntryPointField):
 class DjangoManagePyTarget(Target):
    alias = "django_manage_py"
    core_fields = (
-       *(FrozenOrderedSet(PexBinaryTarget.core_fields) - {PexEntryPoint}),
+       *(FrozenOrderedSet(PexBinary.core_fields) - {PexEntryPointField}),
        DjangoEntryPointField,
    )
 ```
 
-In this example, we register all of the fields of `PexBinaryTarget`, except for the field `PexEntryPoint `. We instead register our custom field `DjangoEntryPointField `.
+In this example, we register all of the fields of `PexBinary`, except for the field `PexEntryPointField`. We instead register our custom field `DjangoEntryPointField`.
 :::
 
 ## Step 2: Register the target type in `register.py`

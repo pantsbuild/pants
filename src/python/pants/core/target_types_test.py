@@ -43,7 +43,7 @@ from pants.engine.target import (
     TransitiveTargets,
     TransitiveTargetsRequest,
 )
-from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.option.bootstrap_options import UnmatchedBuildFileGlobs
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule, mock_console
 
@@ -343,7 +343,7 @@ def test_url_assets(use_per_platform: bool) -> None:
                 f"""\
                 resource(
                     name='antigravity',
-                    source={source_field_value(f'http_source({http_source_info})')}
+                    source={source_field_value(f"http_source({http_source_info})")}
                 )
                 resource(
                     name='antigravity_renamed',

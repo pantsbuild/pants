@@ -1,0 +1,25 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "options_pants_ng"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+fs = { path = "../../fs" }
+glob = { workspace = true }
+hashing = { path = "../../hashing" }
+maplit = { workspace = true }
+options = { path = "../../options" }
+parking_lot = { workspace = true }
+regex = { workspace = true }
+shellexpand = { workspace = true }
+sha2 = { workspace = true }
+shlex = { workspace = true }
+tempfile = { workspace = true }
+whoami = { workspace = true }
+
+[dev-dependencies]
+
+[lints]
+workspace = true

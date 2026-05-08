@@ -3,8 +3,9 @@
 
 # from __future__ import annotations
 
+from collections.abc import Mapping
 from textwrap import dedent
-from typing import Any, Mapping
+from typing import Any
 
 import pytest
 

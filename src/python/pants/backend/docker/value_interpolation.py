@@ -13,7 +13,7 @@ class DockerBuildArgsInterpolationError(InterpolationError):
     ) -> DockerBuildArgsInterpolationError:
         msg = f"The build arg {attribute!r} is undefined."
         if value and isinstance(value, DockerBuildArgsInterpolationValue):
-            msg += f' Defined build args are: {", ".join(value.keys())}.'
+            msg += f" Defined build args are: {', '.join(value.keys())}."
         msg += (
             "\n\nThis build arg may be defined with the `[docker].build_args` option or directly "
             "on the `docker_image` target using the `extra_build_args` field."

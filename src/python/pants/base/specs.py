@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Iterator, Protocol, cast
+from typing import ClassVar, Protocol, cast
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
@@ -348,8 +349,7 @@ class RawSpecs:
 class RawSpecsWithoutFileOwners:
     """The subset of `RawSpecs` that do not use the `Owners` rule to match targets.
 
-    This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
-    `Get(Addresses, RawSpecs)`, which will result in this rule being used.
+    This exists to work around a cycle in the rule graph. Usually, consumers should use RawSpecs.
     """
 
     description_of_origin: str
@@ -435,8 +435,7 @@ class RawSpecsWithoutFileOwners:
 class RawSpecsWithOnlyFileOwners:
     """The subset of `RawSpecs` that require using the `Owners` rule to match targets.
 
-    This exists to work around a cycle in the rule graph. Usually, consumers should use the simpler
-    `Get(Addresses, RawSpecs)`, which will result in this rule being used.
+    This exists to work around a cycle in the rule graph. Usually, consumers should use RawSpecs.
     """
 
     description_of_origin: str

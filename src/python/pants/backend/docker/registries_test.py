@@ -42,9 +42,9 @@ def test_docker_registries() -> None:
     # Test defaults.
     registries = DockerRegistries.from_dict(
         {
-            "reg1": {"address": "myregistry1domain:port", "default": "false"},
-            "reg2": {"address": "myregistry2domain:port", "default": "true"},
-            "reg3": {"address": "myregistry3domain:port", "default": "true"},
+            "reg1": {"address": "myregistry1domain:port", "default": False},
+            "reg2": {"address": "myregistry2domain:port", "default": True},
+            "reg3": {"address": "myregistry3domain:port", "default": True},
         }
     )
 
@@ -65,7 +65,7 @@ def test_skip_push() -> None:
         {
             "reg1": {"address": "registry1"},
             "reg2": {"address": "registry2", "skip_push": True},
-            "reg3": {"address": "registry3", "skip_push": "false"},
+            "reg3": {"address": "registry3", "skip_push": False},
         }
     )
 

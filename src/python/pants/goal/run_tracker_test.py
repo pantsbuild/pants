@@ -12,6 +12,7 @@ from freezegun import freeze_time
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.goal.run_tracker import RunTracker
+from pants.option.options import Options
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.contextutil import environment_as
 from pants.util.osutil import getuser
@@ -73,13 +74,18 @@ def test_run_information(exit_code: ExitCode, expected: str, tmp_path: Path, **k
 
 
 @freeze_time(datetime.datetime(2020, 1, 10, 12, 0, 1), as_kwarg="frozen_time")
-def test_anonymous_telemetry(monkeypatch, tmp_path: Path, **kwargs) -> None:
+def test_anonymous_telemetry(tmp_path: Path, **kwargs) -> None:
     frozen_time = kwargs["frozen_time"]
     buildroot = tmp_path.as_posix()
     with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
         ob = create_options_bootstrapper([])
         opts = ob.bootstrap_options
-        monkeypatch.setattr(opts, "_goals", ["test", "customgoal", "lint"])
+
+        class MonkeyPatchedOpts(Options):
+            goals = ["test", "customgoal", "lint"]
+
+        opts.__class__ = MonkeyPatchedOpts
+
         run_tracker = RunTracker(ob.args, opts)
         run_tracker.start(run_start_time=time.time(), specs=[])
         frozen_time.tick(delta=datetime.timedelta(seconds=1))

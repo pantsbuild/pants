@@ -9,16 +9,16 @@ from pants.backend.go.util_rules import coverage_html
 from pants.backend.go.util_rules.coverage import GoCoverageData
 from pants.backend.go.util_rules.coverage_html import (
     RenderGoCoverageProfileToHtmlRequest,
-    RenderGoCoverageProfileToHtmlResult,
+    render_go_coverage_profile_to_html,
 )
 from pants.core.goals.test import CoverageDataCollection, CoverageReports, FilesystemCoverageReport
 from pants.core.util_rules import distdir
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.engine_aware import EngineAwareParameter
-from pants.engine.fs import CreateDigest, DigestContents, FileContent
-from pants.engine.internals.native_engine import Digest, Snapshot
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.fs import CreateDigest, FileContent
+from pants.engine.internals.selectors import concurrently
+from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -52,32 +52,32 @@ async def go_render_coverage_report(
         address=request.raw_report.pkg_target_address,
         import_path=request.raw_report.import_path,
     )
-    snapshot, digest_contents = await MultiGet(
-        Get(Snapshot, Digest, request.raw_report.coverage_digest),
-        Get(DigestContents, Digest, request.raw_report.coverage_digest),
+    snapshot, digest_contents = await concurrently(
+        digest_to_snapshot(request.raw_report.coverage_digest),
+        get_digest_contents(request.raw_report.coverage_digest),
     )
 
     html_coverage_report: FilesystemCoverageReport | None = None
     if go_test_subsystem.coverage_html:
-        html_result = await Get(
-            RenderGoCoverageProfileToHtmlResult,
+        html_result = await render_go_coverage_profile_to_html(
             RenderGoCoverageProfileToHtmlRequest(
                 raw_coverage_profile=digest_contents[0].content,
                 description_of_origin=f"Go package with import path `{request.raw_report.import_path}`",
                 sources_digest=request.raw_report.sources_digest,
                 sources_dir_path=request.raw_report.sources_dir_path,
-            ),
+            )
         )
-        html_report_snapshot = await Get(
-            Snapshot,
-            CreateDigest(
-                [
-                    FileContent(
-                        path="coverage.html",
-                        content=html_result.html_output,
-                    )
-                ]
-            ),
+        html_report_snapshot = await digest_to_snapshot(
+            **implicitly(
+                CreateDigest(
+                    [
+                        FileContent(
+                            path="coverage.html",
+                            content=html_result.html_output,
+                        )
+                    ]
+                )
+            )
         )
 
         html_coverage_report = FilesystemCoverageReport(
@@ -105,12 +105,12 @@ async def go_render_coverage_report(
 async def go_gather_coverage_reports(
     raw_coverage_reports: GoCoverageDataCollection,
 ) -> CoverageReports:
-    coverage_report_results = await MultiGet(
-        Get(
-            RenderGoCoverageReportResult,
+    coverage_report_results = await concurrently(
+        go_render_coverage_report(
             RenderGoCoverageReportRequest(
                 raw_report=raw_coverage_report,
             ),
+            **implicitly(),
         )
         for raw_coverage_report in raw_coverage_reports
     )

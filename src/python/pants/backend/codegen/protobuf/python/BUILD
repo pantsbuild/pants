@@ -2,13 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_sources(dependencies=[":lockfile"])
-resources(name="lockfile", sources=["mypy_protobuf.lock", "grpclib.lock"])
-resource(name="test_lockfile", source="test_grpc_pre_v2_mypy_plugin.lock")
+resources(name="lockfile", sources=["mypy_protobuf.lock*", "grpclib.lock*"])
+resources(name="test_lockfile", sources=["test_grpc_pre_v2_mypy_plugin.lock*"])
 
 python_tests(
     name="python_protobuf_module_mapper_test", sources=["python_protobuf_module_mapper_test.py"]
 )
 python_tests(name="python_protobuf_subsystem_test", sources=["python_protobuf_subsystem_test.py"])
+python_tests(
+    name="python_protobuf_dependency_inference_test",
+    sources=["python_protobuf_dependency_inference_test.py"],
+)
 python_tests(
     name="rules_integration_test",
     sources=["rules_integration_test.py"],

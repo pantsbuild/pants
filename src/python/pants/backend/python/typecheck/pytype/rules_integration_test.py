@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -104,6 +104,7 @@ def test_passing(rule_runner: PythonRuleRunner) -> None:
     assert result[0].report == EMPTY_DIGEST
 
 
+@pytest.mark.platform_specific_behavior
 def test_failing(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files({f"{PACKAGE}/f.py": BAD_FILE, f"{PACKAGE}/BUILD": "python_sources()"})
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
@@ -112,7 +113,8 @@ def test_failing(rule_runner: PythonRuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert "FAILED:" in result[0].stdout
-    assert f'{PACKAGE}/f.py", line 4' in result[0].stdout
+    assert f"{PACKAGE}/f.py:4:1" in result[0].stdout
+    assert "[wrong-arg-types]" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 
 
@@ -133,7 +135,8 @@ def test_multiple_targets(rule_runner: PythonRuleRunner) -> None:
     assert len(result) == 1
     assert result[0].exit_code == 1
     assert f"{PACKAGE}/good.py" not in result[0].stdout
-    assert f'{PACKAGE}/bad.py", line 4' in result[0].stdout
+    assert f"{PACKAGE}/bad.py:4:1" in result[0].stdout
+    assert "[wrong-arg-types]" in result[0].stdout
     assert "Analyzing 2 sources" in result[0].stdout
     assert result[0].report == EMPTY_DIGEST
 

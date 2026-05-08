@@ -101,7 +101,7 @@ You can also [manually add](../../using-pants/key-concepts/targets-and-build-fil
 python_sources(dependencies=["models:models"])
 ```
 
-:::note TIp: set `namespace py`
+:::note Tip: set `namespace py`
 Pants can handle Thrift regardless of whether you set `namespace py`.
 
 However, it's often a good idea to set the namespace because it can make your imports more predictable and declarative. It also reduces the risk of your Thrift file names conflicting with other Python modules used, such as those from third-party requirements.
@@ -114,7 +114,17 @@ For example, compare `import user.ttypes` to `import codegen.models.user.ttypes`
 
 You do not need to run this goal for codegen to work when using Pants; `export-codegen` is only for external consumption outside of Pants.
 
-Note: You can also export the generated sources using the [`--export-py-generated-sources` option](../../../reference/goals/export#py_generated_sources) to the [`pants export` goal](../../../reference/goals/export). This is useful when you want to provide an IDE with third-party dependencies and generated sources in a single place.
+Note: You can also export the generated sources using the `--export-py-generated-sources-in-resolve` option to the `pants export` goal. This is useful when you want to provide an IDE with third-party dependencies and generated sources in a single place.
+
+For example,
+
+```bash
+❯ pants export \
+    --resolve=python-default \
+    --export-py-generated-sources-in-resolve=python-default
+```
+
+This assumes that you have a `resolve` named `python-default` (see [Getting started with resolves](../overview/lockfiles.mdx#getting-started-with-resolves)). For a concrete example of a project that sets a resolve named `python-default` see this [example `pants.toml`](https://github.com/pantsbuild/example-python/blob/main/pants.toml).
 :::
 
 ## Multiple resolves
@@ -135,7 +145,7 @@ python_requirement(
     name="thrift-requirement",
     # Here, we use the same version of Thrift in both resolves. You could instead create
     # a distinct target per resolve so that they have different versions.
-    requirements=["thrift==0.15.0""],
+    requirements=["thrift==0.15.0"],
     resolve=parametrize("resolve-a", "resolve-b"),
 )
 

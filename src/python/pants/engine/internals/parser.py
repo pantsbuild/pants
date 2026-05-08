@@ -11,11 +11,13 @@ import threading
 import tokenize
 import traceback
 import typing
+from annotationlib import Format, ForwardRef, call_annotate_function
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import InitVar, dataclass, field
 from difflib import get_close_matches
 from io import StringIO
 from pathlib import PurePath
-from typing import Annotated, Any, Callable, Iterable, Mapping, TypeVar
+from typing import Annotated, Any, TypeVar
 
 import typing_extensions
 
@@ -66,15 +68,12 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
 
     @classmethod
     def create(cls, ns: Mapping[str, Any], env_vars: Iterable[str]) -> BuildFilePreludeSymbols:
-        info = {}
-        annotations_name = "__annotations__"
-        annotations = ns.get(annotations_name, {})
-        for name, symb in ns.items():
-            if name == annotations_name:
-                # don't include the annotations themselves as a symbol
-                continue
+        annotations: dict[str, Any | ForwardRef] = {}
+        if annotation_function := ns.get("__annotate__"):
+            annotations = call_annotate_function(annotation_function, format=Format.FORWARDREF)
 
-            info[name] = BuildFileSymbolInfo(
+        info = {
+            name: BuildFileSymbolInfo(
                 name,
                 symb,
                 # We only need type hints via `annotations` for top-level values which doesn't work with `inspect`.
@@ -82,6 +81,9 @@ class BuildFilePreludeSymbols(BuildFileSymbolsInfo):
                 # If the user has defined a _ symbol, we assume they don't want it in `pants help` output.
                 hide_from_help=name.startswith("_"),
             )
+            for name, symb in ns.items()
+            if name not in ["__annotate__", "__annotations__", "__conditional_annotations__"]
+        }
 
         return cls(info=FrozenDict(info), referenced_env_vars=tuple(sorted(env_vars)))
 
@@ -487,7 +489,7 @@ class Parser:
             help_str = softwrap(
                 f"""
                 If you expect to see more symbols activated in the below list, refer to
-                {doc_url('docs/using-pants/key-concepts/backends')} for all available backends to activate.
+                {doc_url("docs/using-pants/key-concepts/backends")} for all available backends to activate.
                 """
             )
             valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")

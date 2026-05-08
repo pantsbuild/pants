@@ -68,7 +68,7 @@ _Our [JavaScript demo](https://github.com/pantsbuild/example-adhoc/tree/main/jav
 
 To get the best cache efficiency, it can make sense to break your `adhoc_tool` into smaller incremental steps. For example, if your process needs to fetch dependencies and then build a library based on those dependencies and some first-party source files, having one `adhoc_tool` for each of those steps means that the dependency-fetching stage will only be re-run when your requirements change, and not when the first-party source files change.
 
-Generally, if you are chaining `adhoc_tool` targets together , it will be easier to use the default `workdir` and `root_output_directory` fields for each step that will be consumed by an `adhoc_tool` in the same `BUILD` file. Change the `root_output_directory` only for targets that are intended to be used in other places or ways.
+Generally, if you are chaining `adhoc_tool` targets together, it will be easier to use the default `workdir` and `root_output_directory` fields for each step that will be consumed by an `adhoc_tool` in the same `BUILD` file. Change the `root_output_directory` only for targets that are intended to be used in other places or ways.
 
 ### Wrapping generated sources for use by other targets
 
@@ -84,7 +84,7 @@ _Our [JavaScript demo](https://github.com/pantsbuild/example-adhoc/tree/main/jav
 
 Some build processes need to make use of tools that can't be modeled within a Pants codebase. The `system_binary` target lets you make use of a binary that is installed on the system. `system_binary` targets may be specified as `runnable` or `runnable_dependency` values for `adhoc_tool`.
 
-`system_binary` will search for a binary in pre-defined or user-supplied search paths with a given `binary_name`. To improve reproducibility, it's possible to test matching binaries with sample arguments, to see if its output matches a given regular expression. This can be used to match against version strings. If a such a binary does not exist on the system where Pants is being run, any build involving this `system_binary` target will fail.
+`system_binary` will search for a binary in pre-defined or user-supplied search paths with a given `binary_name`. To improve reproducibility, it's possible to test matching binaries with sample arguments, to see if its output matches a given regular expression. This can be used to match against version strings. If such a binary does not exist on the system where Pants is being run, any build involving this `system_binary` target will fail.
 
 When specified as a `runnable_dependency`, the binary will be available on the `PATH` with the target name of the dependency. This can be important if the `runnable` field invokes a subprocess (for example, `yarn` tries to invoke a binary called `node` as its interpreter).
 

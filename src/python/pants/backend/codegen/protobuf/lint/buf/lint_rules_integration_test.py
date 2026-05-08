@@ -91,6 +91,7 @@ def test_passing(rule_runner: RuleRunner) -> None:
     assert_success(rule_runner, tgt)
 
 
+@pytest.mark.platform_specific_behavior
 def test_failing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {"foo/v1/f.proto": BAD_FILE, "foo/v1/BUILD": "protobuf_sources(name='t')"}

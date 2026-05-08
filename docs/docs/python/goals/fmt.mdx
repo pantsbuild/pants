@@ -1,13 +1,13 @@
 ---
-    title: fmt
+    title: fmt and fix
     sidebar_position: 1
 ---
 
-Autoformat source code.
+Autoformat and autofix source code.
 
 ---
 
-See [here](../overview/linters-and-formatters.mdx) for how to opt in to specific formatters, along with how to configure them:
+See [here](../overview/linters-and-formatters.mdx) for how to opt in to specific formatters and fixers, along with how to configure them:
 
 - Autoflake
 - Black
@@ -16,4 +16,4 @@ See [here](../overview/linters-and-formatters.mdx) for how to opt in to specific
 - Pyupgrade
 - yapf
 
-If you activate multiple formatters, Pants will run them sequentially so that they do not overwrite each other. You may need to update each formatter's config file to ensure that it is compatible with the other activated formatters.
+If you activate multiple tools, Pants will run them sequentially so that they do not overwrite each other. You may need to update each tool's config file to ensure that it is compatible with the other activated tools.

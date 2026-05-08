@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 from collections import namedtuple
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import pytest
 
@@ -69,7 +70,7 @@ def registered_target_types() -> RegisteredTargetTypes:
 
 @pytest.fixture
 def union_membership() -> UnionMembership:
-    return UnionMembership({})
+    return UnionMembership.empty()
 
 
 def test_assumptions(
@@ -247,7 +248,7 @@ Scenario = namedtuple(
                 args=(
                     {
                         Test1Target.alias: {
-                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]),
+                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]),  # type: ignore[arg-type]
                             **Parametrize(
                                 "splat", description="splat-desc", dependencies=["splat:dep"]
                             ),
@@ -309,7 +310,7 @@ Scenario = namedtuple(
                 args=(
                     {
                         TestGenTargetGenerator.alias: {
-                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]),
+                            "tags": Parametrize(["foo"], ["bar"], baz=["baz"]),  # type: ignore[arg-type]
                             **Parametrize(
                                 "splat", description="splat-desc", dependencies=["splat:dep"]
                             ),

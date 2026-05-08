@@ -4,11 +4,10 @@
 from dataclasses import dataclass
 
 from pants.backend.go.go_sources import load_go_binary
-from pants.backend.go.go_sources.load_go_binary import LoadedGoBinary, LoadedGoBinaryRequest
+from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.engine.fs import Digest
-from pants.engine.internals.selectors import Get
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 
 
 @dataclass(frozen=True)
@@ -28,13 +27,13 @@ async def setup_go_package_analyzer(goroot: GoRoot) -> PackageAnalyzerSetup:
         "syslist.go",
         "tags.go1.17.go" if goroot.is_compatible_version("1.17") else "tags.go",
     )
-    binary = await Get(
-        LoadedGoBinary,
+    binary = await setup_go_binary(
         LoadedGoBinaryRequest(
             "analyze_package",
             sources,
             binary_path,
         ),
+        **implicitly(),
     )
     return PackageAnalyzerSetup(
         digest=binary.digest,

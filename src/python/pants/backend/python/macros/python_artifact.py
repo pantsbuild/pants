@@ -4,14 +4,14 @@
 import collections.abc
 import copy
 import json
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from pants.util.strutil import softwrap
 
 
 def _normalize_entry_points(
-    all_entry_points: Dict[str, Union[List[str], Dict[str, str]]]
-) -> Dict[str, Dict[str, str]]:
+    all_entry_points: dict[str, list[str] | dict[str, str]],
+) -> dict[str, dict[str, str]]:
     """Ensure any entry points are in the form Dict[str, Dict[str, str]]."""
     if not isinstance(all_entry_points, collections.abc.Mapping):
         raise ValueError(
@@ -66,7 +66,7 @@ class PythonArtifact:
             # coerce entry points from Dict[str, List[str]] to Dict[str, Dict[str, str]]
             kwargs["entry_points"] = _normalize_entry_points(kwargs["entry_points"])
 
-        self._kw: Dict[str, Any] = copy.deepcopy(kwargs)
+        self._kw: dict[str, Any] = copy.deepcopy(kwargs)
         # The kwargs come from a BUILD file, and can contain somewhat arbitrary nested structures,
         # so we don't have a principled way to make them into a hashable data structure.
         # E.g., we can't naively turn all lists into tuples because distutils checks that some
@@ -76,10 +76,10 @@ class PythonArtifact:
         self._hash: int = hash(json.dumps(kwargs, sort_keys=True))
 
     @property
-    def kwargs(self) -> Dict[str, Any]:
+    def kwargs(self) -> dict[str, Any]:
         return self._kw
 
-    def asdict(self) -> Dict[str, Any]:
+    def asdict(self) -> dict[str, Any]:
         return self.kwargs
 
     def __eq__(self, other: Any) -> bool:

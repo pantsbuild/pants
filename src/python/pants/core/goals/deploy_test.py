@@ -16,10 +16,12 @@ from pants.core.goals.publish import (
 )
 from pants.core.register import rules as core_rules
 from pants.engine import process
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import EMPTY_DIGEST
+from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import InteractiveProcess
-from pants.engine.rules import Get, rule
+from pants.engine.rules import implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -27,7 +29,6 @@ from pants.engine.target import (
     StringField,
     StringSequenceField,
     Target,
-    Targets,
 )
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
@@ -91,7 +92,9 @@ class MockDeployFieldSet(DeployFieldSet):
 
 
 @rule
-async def mock_package(request: MockPackageFieldSet) -> BuiltPackage:
+async def mock_package(
+    request: MockPackageFieldSet, environment_name: EnvironmentName
+) -> BuiltPackage:
     artifact = BuiltPackageArtifact(
         relpath=request.address.path_safe_spec,
         extra_log_lines=tuple(
@@ -128,15 +131,15 @@ async def mock_deploy(field_set: MockDeployFieldSet) -> DeployProcess:
     if not field_set.destination.value:
         return DeployProcess(name="test-deploy", publish_dependencies=(), process=None)
 
-    dependencies = await Get(Targets, DependenciesRequest(field_set.dependencies))
+    dependencies = await resolve_targets(**implicitly(DependenciesRequest(field_set.dependencies)))
     dest = field_set.destination.value
     return DeployProcess(
         name="test-deploy",
         publish_dependencies=tuple(dependencies),
         description="(requested)" if dest == "skip" else None,
-        process=None
-        if dest == "skip"
-        else InteractiveProcess(["echo", dest], run_in_workspace=True),
+        process=(
+            None if dest == "skip" else InteractiveProcess(["echo", dest], run_in_workspace=True)
+        ),
     )
 
 

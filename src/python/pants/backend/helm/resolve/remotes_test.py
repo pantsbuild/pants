@@ -38,9 +38,9 @@ def test_helm_remotes() -> None:
     remotes = HelmRemotes.from_dict(
         {
             "default": {"address": "oci://www.example.com/default"},
-            "reg1": {"address": "oci://www.example.com/charts1", "default": "false"},
-            "reg2": {"address": "oci://www.example.com/charts2", "default": "true"},
-            "reg3": {"address": "oci://www.example.com/charts3", "default": "true"},
+            "reg1": {"address": "oci://www.example.com/charts1", "default": False},
+            "reg2": {"address": "oci://www.example.com/charts2", "default": True},
+            "reg3": {"address": "oci://www.example.com/charts3", "default": True},
         },
     )
 

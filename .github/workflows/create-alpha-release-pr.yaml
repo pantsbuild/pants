@@ -1,0 +1,143 @@
+name: Create Alpha Release PR
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The release version to create (e.g. 2.42.4a0).
+        required: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  org-check:
+    name: Check GitHub Organization
+    if: ${{ github.repository_owner == 'pantsbuild' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Noop
+        run: "true"
+
+  github-pr:
+    name: Create an alpha release pull request
+    needs: org-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Required for contributors file
+
+      - name: Determine release version
+        id: validate-version
+        run: |
+          version="${{ inputs.version }}"
+
+          if [[ -z "$version" ]]; then
+              echo "::error::An input 'version' must be specified"
+              exit 1
+
+          elif (( ${#version} > 10 )); then
+              echo "::error::The input 'version' must be smaller than 11 characters (i.e. allows '2.99.99a99')"
+              exit 1
+
+          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(a[0-9]+)?$ ]]; then
+              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCH (1.2.3) with an optional 'a' specifier (8.9.10a99)"
+              exit 1
+          fi
+
+          echo "::notice::Release version is: ${version}"
+          echo "release-version=${version}" >> $GITHUB_OUTPUT
+      
+      - name: Update CONTRIBUTORS.md and VERSION files
+        env:
+          RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
+        run: |
+          if [[ -z "$RELEASE_VERSION" ]]; then
+              echo "::error::The 'release_version' was empty"
+              exit 1
+          fi
+
+          echo "$RELEASE_VERSION" > src/python/pants/VERSION
+
+          # Create an alphabetical list of all contributors, using the .mailmap where available (stripping bots)
+          # The `sed` at the end is to match the existing Python code which prefixes a "+ " to each name
+          {
+            printf "Created as part of the release process.\n\n"
+            
+            git log --use-mailmap --format=format:%aN HEAD \
+                | sort -u \
+                | grep -vxF \
+                    -e "dependabot[bot]" \
+                    -e "github-actions[bot]" \
+                    -e "Worker Pants (Pantsbuild GitHub Automation Bot)" \
+                | sed 's/^/+ /'
+          } > CONTRIBUTORS.md
+
+      - name: Create empty release notes for upcoming version
+        env:
+          RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
+          TEMPLATE_PATH: docs/notes/release-notes-template.md
+        run: |
+          if [[ -z "$RELEASE_VERSION" ]]; then
+              echo "::error::The 'release_version' was empty"
+              exit 1
+          fi
+          
+          MAJOR_MINOR=$(echo "$RELEASE_VERSION" | grep -oE '^[0-9]+\.[0-9]+')
+          MAJOR=$(echo "$MAJOR_MINOR" | grep -oE '^[0-9]+')
+          MINOR=$(echo "$MAJOR_MINOR" | grep -oE '[0-9]+$')
+
+          if [[ -z "$MAJOR" || -z "$MINOR" ]]; then
+              echo "::error::Failed to extract major/minor version components from $RELEASE_VERSION"
+              exit 1
+          fi
+
+          INCREMENTED_MINOR=$((MINOR + 1))
+          NEXT_NOTES_PATH="docs/notes/${MAJOR}.${INCREMENTED_MINOR}.x.md"
+
+          if [[ -f "$NEXT_NOTES_PATH" ]]; then
+            echo "::notice::Upcoming release notes already exists at ${NEXT_NOTES_PATH}. Skipping creation..."
+          else
+            echo "::notice::No release notes found at ${NEXT_NOTES_PATH}. Creating..."
+            cp "$TEMPLATE_PATH" "$NEXT_NOTES_PATH"
+            sed -i "1s/MAJOR\.MINOR/${MAJOR}.${INCREMENTED_MINOR}/" "$NEXT_NOTES_PATH"
+          fi
+
+      - name: Commit changes and create pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
+        run: |
+          if [[ -z $(git status --porcelain) ]]; then
+            echo "::error::No changes detected in VERSION or CONTRIBUTORS.md - skipping PR creation"
+            exit 1
+          fi
+
+          # Assign our general account to the local user
+          git config --local user.email "pantsbuild+github-automation@gmail.com"
+          git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
+
+          # Create and checkout a new release branch
+          BRANCH_NAME="automation/release/$RELEASE_VERSION"
+          git checkout -b "$BRANCH_NAME"
+
+          # Commit and push to the release branch
+          TITLE="Prepare $RELEASE_VERSION"
+          git add src/python/pants/VERSION CONTRIBUTORS.md
+          git commit -m "$TITLE"
+          git push -u origin "$BRANCH_NAME"
+
+          # Create PR from the release branch to main
+          gh pr create \
+            --title "$TITLE" \
+            --body "" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --label "automation:release-prep,category:internal" \
+            --assignee "${{ github.actor }}"

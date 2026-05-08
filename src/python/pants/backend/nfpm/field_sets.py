@@ -31,6 +31,7 @@ from pants.backend.nfpm.fields.scripts import NfpmPackageScriptsField
 from pants.backend.nfpm.target_types import APK_FIELDS, ARCHLINUX_FIELDS, DEB_FIELDS, RPM_FIELDS
 from pants.core.goals.package import PackageFieldSet
 from pants.engine.fs import FileEntry
+from pants.engine.internals.native_engine import Field
 from pants.engine.rules import collect_rules
 from pants.engine.target import DescriptionField, FieldSet, Target
 from pants.engine.unions import UnionRule, union
@@ -48,7 +49,13 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
     description: DescriptionField
     scripts: NfpmPackageScriptsField
 
-    def nfpm_config(self, tgt: Target, *, default_mtime: str | None) -> dict[str, Any]:
+    def nfpm_config(
+        self,
+        tgt: Target,
+        injected_fields: FrozenDict[type[Field], Field],
+        *,
+        default_mtime: str | None,
+    ) -> dict[str, Any]:
         config: dict[str, Any] = {
             # pants handles any globbing before passing contents to nFPM.
             "disable_globbing": True,
@@ -84,7 +91,7 @@ class NfpmPackageFieldSet(PackageFieldSet, metaclass=ABCMeta):
                 # field opted out of being included in this config (like dependencies)
                 continue
 
-            field_value = tgt[field].value
+            field_value = injected_fields.get(field, tgt[field]).value
             # NB: This assumes that nfpm fields have 'none_is_valid_value=False'.
             if not field.required and field_value is None:
                 # Omit any undefined optional values unless default applied.
@@ -137,8 +144,14 @@ class NfpmRpmPackageFieldSet(NfpmPackageFieldSet):
     required_fields = RPM_FIELDS
     ghost_contents: NfpmRpmGhostContents
 
-    def nfpm_config(self, tgt: Target, *, default_mtime: str | None) -> dict[str, Any]:
-        config = super().nfpm_config(tgt, default_mtime=default_mtime)
+    def nfpm_config(
+        self,
+        tgt: Target,
+        injected_fields: FrozenDict[type[Field], Field],
+        *,
+        default_mtime: str | None,
+    ) -> dict[str, Any]:
+        config = super().nfpm_config(tgt, injected_fields, default_mtime=default_mtime)
         config["contents"].extend(self.ghost_contents.nfpm_contents)
         return config
 
@@ -238,12 +251,19 @@ class NfpmContentFileFieldSet(NfpmContentFieldSet):
     ) -> NfpmContent:
         source: str | None = self.source.file_path
         src: str | None = self.src.file_path
+        src_value: str | None = self.src.value
         dst: str = self.dst.value
         if source is not None and not src:
             # If defined, 'source' provides the default value for 'src'.
             src = source
+            src_value = self.source.value
         if src is None:  # src is NOT required; prepare to raise an error.
             raise self.InvalidTarget()
+        if src not in content_sandbox_files and src_value in content_sandbox_files:
+            # A field's file_path assumes the field's value is relative to the BUILD file.
+            # But, for packages the field's value can be relative to the build_root instead,
+            # because a package's output_path can be any arbitrary build_root relative path.
+            src = src_value
         sandbox_file: FileEntry | None = content_sandbox_files.get(src)
         if sandbox_file is None:
             raise self.SrcMissingFomSandbox()

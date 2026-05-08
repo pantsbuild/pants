@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package pants.sandboxer;
+
+import "build/bazel/remote/execution/v2/remote_execution.proto";
+
+service SandboxerGrpc {
+  rpc MaterializeDirectory (MaterializeDirectoryRequest) returns (MaterializeDirectoryResponse);
+}
+
+message MaterializeDirectoryRequest {
+  // Materialize into this directory.
+  string destination = 1;
+
+  // A common root under which destination directories are created. Must be an ancestor of
+  // (or identical to) destination.
+  // Used to determine whether files can be hardlinked from the store into destination.
+  // Determining this is slightly expensive, so instead of doing so for each destination
+  // we determine hardlinkability on (and therefore under) this root dir and cache that knowledge.
+  string destination_root = 2;
+
+  // The digest to materialize. Must represent a directory.
+  build.bazel.remote.execution.v2.Digest digest = 3;
+
+  // Paths listed here will not be hardlinked.
+  repeated string mutable_paths = 4;
+}
+
+message MaterializeDirectoryResponse {
+}

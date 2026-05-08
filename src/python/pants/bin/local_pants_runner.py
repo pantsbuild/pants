@@ -10,13 +10,17 @@ from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
-from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.goal import CurrentExecutingGoals
 from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import PyExecutor, PySessionCancellationLatch
+from pants.engine.internals.native_engine import (
+    PyExecutor,
+    PyNgInvocation,
+    PyNgOptions,
+    PySessionCancellationLatch,
+)
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
@@ -33,7 +37,8 @@ from pants.init.engine_initializer import EngineInitializer, GraphScheduler, Gra
 from pants.init.logging import stdio_destination_use_color
 from pants.init.options_initializer import OptionsInitializer
 from pants.init.specs_calculator import calculate_specs
-from pants.option.global_options import DynamicRemoteOptions, DynamicUIRenderer, GlobalOptions
+from pants.option.bootstrap_options import DynamicRemoteOptions
+from pants.option.global_options import DynamicUIRenderer, GlobalOptions
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.logging import LogLevel
@@ -62,6 +67,7 @@ class LocalPantsRunner:
     union_membership: UnionMembership
     is_pantsd_run: bool
     working_dir: str
+    ng_invocation: PyNgInvocation | None
 
     @classmethod
     def create(
@@ -72,6 +78,7 @@ class LocalPantsRunner:
         options_initializer: OptionsInitializer | None = None,
         scheduler: GraphScheduler | None = None,
         cancellation_latch: PySessionCancellationLatch | None = None,
+        ng_invocation: PyNgInvocation | None = None,
     ) -> LocalPantsRunner:
         """Creates a new LocalPantsRunner instance by parsing options.
 
@@ -102,21 +109,14 @@ class LocalPantsRunner:
         run_tracker = RunTracker(options_bootstrapper.args, options)
         native_engine.maybe_set_panic_handler()
 
-        # Option values are usually computed lazily on demand, but command line options are
-        # eagerly computed for validation.
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             # Verify CLI flags.
             if not build_config.allow_unknown_options:
                 options.verify_args()
 
-            for scope, values in options.scope_to_flags.items():
-                if values:
-                    # Only compute values if there were any command line options presented.
-                    options.for_scope(scope)
-
         # Verify configs.
         if global_bootstrap_options.verify_config:
-            options.verify_configs(options_bootstrapper.config)
+            options.verify_configs()
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
@@ -125,15 +125,25 @@ class LocalPantsRunner:
             dynamic_remote_options, _ = DynamicRemoteOptions.from_options(
                 options, env, remote_auth_plugin_func=build_config.remote_auth_plugin_func
             )
-            bootstrap_options = options.bootstrap_option_values()
+            bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
             assert bootstrap_options is not None
             scheduler = EngineInitializer.setup_graph(
                 bootstrap_options, build_config, dynamic_remote_options, executor
             )
         with options_initializer.handle_unknown_flags(options_bootstrapper, env, raise_=True):
             global_options = options.for_global_scope()
+            session_values_dict = {
+                OptionsBootstrapper: options_bootstrapper,
+                CompleteEnvironmentVars: env,
+                CurrentExecutingGoals: CurrentExecutingGoals(),
+            }
+            if ng_invocation is not None:
+                session_values_dict[PyNgInvocation] = ng_invocation
+                session_values_dict[PyNgOptions] = PyNgOptions(
+                    ng_invocation, dict(env.items()), include_derivation=False
+                )
         graph_session = scheduler.new_session(
-            run_tracker.run_id,
+            build_id=run_tracker.run_id,
             dynamic_ui=global_options.dynamic_ui,
             ui_use_prodash=global_options.dynamic_ui_renderer
             == DynamicUIRenderer.experimental_prodash,
@@ -146,17 +156,17 @@ class LocalPantsRunner:
                     for level in global_options.log_levels_by_target.values()
                 ),
             ),
-            session_values=SessionValues(
-                {
-                    OptionsBootstrapper: options_bootstrapper,
-                    CompleteEnvironmentVars: env,
-                    CurrentExecutingGoals: CurrentExecutingGoals(),
-                }
-            ),
+            session_values=SessionValues(session_values_dict),
             cancellation_latch=cancellation_latch,
         )
 
+        if ng_invocation:
+            specs_strs = ng_invocation.specs()
+        else:
+            specs_strs = tuple(options.specs)
+
         specs = calculate_specs(
+            specs_strs=specs_strs,
             options_bootstrapper=options_bootstrapper,
             options=options,
             session=graph_session.scheduler_session,
@@ -175,6 +185,7 @@ class LocalPantsRunner:
             union_membership=union_membership,
             is_pantsd_run=is_pantsd_run,
             working_dir=working_dir,
+            ng_invocation=ng_invocation,
         )
 
     def _perform_run(self, goals: tuple[str, ...]) -> ExitCode:
@@ -213,7 +224,7 @@ class LocalPantsRunner:
             determine_bootstrap_environment(self.graph_session.scheduler_session),
         )
         (workunits_callback_factories,) = self.graph_session.scheduler_session.product_request(
-            WorkunitsCallbackFactories, [params]
+            WorkunitsCallbackFactories, params
         )
         return tuple(filter(bool, (wcf.callback_factory() for wcf in workunits_callback_factories)))
 
@@ -257,10 +268,12 @@ class LocalPantsRunner:
             )
 
     def _run_inner(self) -> ExitCode:
-        if self.options.builtin_or_auxiliary_goal:
+        if self.ng_invocation:
+            goals = self.ng_invocation.goals()
+        elif self.options.builtin_or_auxiliary_goal:
             return self._run_builtin_or_auxiliary_goal(self.options.builtin_or_auxiliary_goal)
-
-        goals = tuple(self.options.goals)
+        else:
+            goals = tuple(self.options.goals)
         if not goals:
             return PANTS_SUCCEEDED_EXIT_CODE
 
@@ -274,13 +287,8 @@ class LocalPantsRunner:
             return PANTS_FAILED_EXIT_CODE
 
     def run(self, start_time: float) -> ExitCode:
-        spec_parser = SpecsParser(working_dir=self.working_dir)
-        specs = []
-        for spec_str in self.options.specs:
-            spec, is_ignore = spec_parser.parse_spec(spec_str)
-            specs.append(f"-{spec}" if is_ignore else str(spec))
-
-        self.run_tracker.start(run_start_time=start_time, specs=specs)
+        specs_strs = list(self.ng_invocation.specs()) if self.ng_invocation else self.options.specs
+        self.run_tracker.start(run_start_time=start_time, specs=specs_strs)
         global_options = self.options.for_global_scope()
 
         streaming_reporter = StreamingWorkunitHandler(

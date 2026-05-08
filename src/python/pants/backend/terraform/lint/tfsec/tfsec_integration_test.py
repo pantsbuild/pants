@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from textwrap import dedent
 
+import pytest
+
 from pants.backend.terraform import tool
 from pants.backend.terraform.lint.tffmt.tffmt import PartitionMetadata
 from pants.backend.terraform.lint.tfsec.rules import rules as tfsec_rules
@@ -83,6 +85,7 @@ def set_up_rule_runner(tfsec_args: list[str]) -> RuleRunner:
     return rule_runner
 
 
+@pytest.mark.platform_specific_behavior
 def test_run_tfsec():
     rule_runner = set_up_rule_runner([])
 
@@ -95,12 +98,12 @@ def test_run_tfsec():
 
     assert result.exit_code == 1
     assert "1 ignored" in result.stdout, "Error wasn't ignored, did we pull in the config file?"
-    assert (
-        "\x1b[1m" not in result.stdout
-    ), "Found colour control code in ouput, are extra-args being passed?"
-    assert (
-        TFSEC_CUSTOM_ERROR_CODE.lower() in result.stdout
-    ), "Custom check code wasn't found in output, did we pull in our custom config (all files in .tfsec folder)?"
+    assert "\x1b[1m" not in result.stdout, (
+        "Found colour control code in ouput, are extra-args being passed?"
+    )
+    assert TFSEC_CUSTOM_ERROR_CODE.lower() in result.stdout, (
+        "Custom check code wasn't found in output, did we pull in our custom config (all files in .tfsec folder)?"
+    )
 
 
 def test_run_tfsec_with_report():
@@ -118,11 +121,11 @@ def test_run_tfsec_with_report():
     )
 
     assert result.exit_code == 1
-    assert (
-        "1 file(s) written: reports/tfsec.txt" in result.stderr
-    ), "No file was written, are extra args being passed?"
+    assert "1 file(s) written: reports/tfsec.txt" in result.stderr, (
+        "No file was written, are extra args being passed?"
+    )
     assert result.report != EMPTY_DIGEST
     assert "1 ignored" in result.stdout, "Error wasn't ignored, did we pull in the config file?"
-    assert (
-        "\x1b[1m" not in result.stdout
-    ), "Found colour control code in ouput, are extra-args being passed?"
+    assert "\x1b[1m" not in result.stdout, (
+        "Found colour control code in ouput, are extra-args being passed?"
+    )

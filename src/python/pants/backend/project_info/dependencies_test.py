@@ -1,9 +1,11 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import json
 from functools import partial
 from textwrap import dedent
-from typing import List, Optional
+from typing import Any
 
 import pytest
 
@@ -37,7 +39,7 @@ def rule_runner() -> PythonRuleRunner:
 
 
 def create_python_sources(
-    rule_runner: PythonRuleRunner, directory: str, *, dependencies: Optional[List[str]] = None
+    rule_runner: PythonRuleRunner, directory: str, *, dependencies: list[str] | None = None
 ) -> None:
     rule_runner.write_files(
         {
@@ -82,10 +84,10 @@ def create_targets(rule_runner: PythonRuleRunner) -> None:
 def assert_dependencies(
     rule_runner: PythonRuleRunner,
     *,
-    specs: List[str],
-    expected: List[str],
+    specs: list[str],
+    expected: list[str] | dict[str, Any],
     transitive: bool = False,
-    output_file: Optional[str] = None,
+    output_file: str | None = None,
     closed: bool = False,
     output_format: DependenciesOutputFormat = DependenciesOutputFormat.text,
 ) -> None:
@@ -112,6 +114,7 @@ def assert_dependencies(
         with rule_runner.pushd():
             with open(output_file) as f:
                 if output_format == DependenciesOutputFormat.text:
+                    assert isinstance(expected, list)
                     assert f.read().splitlines() == expected
                 elif output_format == DependenciesOutputFormat.json:
                     assert json.load(f) == expected
@@ -246,9 +249,10 @@ def test_python_dependencies(rule_runner: PythonRuleRunner) -> None:
 
 def test_python_dependencies_output_format_json_direct_deps(rule_runner: PythonRuleRunner) -> None:
     create_targets(rule_runner)
+
     assert_deps = partial(
         assert_dependencies,
-        rule_runner,
+        rule_runner=rule_runner,
         output_format=DependenciesOutputFormat.json,
     )
 
@@ -372,9 +376,10 @@ def test_python_dependencies_output_format_json_transitive_deps(
     rule_runner: PythonRuleRunner,
 ) -> None:
     create_targets(rule_runner)
+
     assert_deps = partial(
         assert_dependencies,
-        rule_runner,
+        rule_runner=rule_runner,
         output_format=DependenciesOutputFormat.json,
     )
 

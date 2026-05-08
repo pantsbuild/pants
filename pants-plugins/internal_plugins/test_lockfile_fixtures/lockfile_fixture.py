@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from _pytest.fixtures import FixtureRequest
 
@@ -84,20 +84,25 @@ class JVMLockfileFixture:
     requirements: ArtifactRequirements
 
     def requirements_as_jvm_artifact_targets(
-        self, *, version_in_target_name: bool = False, resolve: str | None = None
+        self,
+        *,
+        version_in_target_name: bool = False,
+        resolve: str | None = None,
+        target_name_prefix: str | None = None,
     ) -> str:
+        maybe_resolve_str = f'resolve="{resolve}",' if resolve else ""
+        maybe_target_name_prefix_str = f"{target_name_prefix}_" if target_name_prefix else ""
         targets = ""
         for requirement in self.requirements:
             maybe_version = f"_{requirement.coordinate.version}" if version_in_target_name else ""
-            maybe_resolve = f'resolve="{resolve}",' if resolve else ""
             targets += textwrap.dedent(
                 f"""\
             jvm_artifact(
-              name="{requirement.coordinate.group}_{requirement.coordinate.artifact}{maybe_version}",
+              name="{maybe_target_name_prefix_str}{requirement.coordinate.group}_{requirement.coordinate.artifact}{maybe_version}",
               group="{requirement.coordinate.group}",
               artifact="{requirement.coordinate.artifact}",
               version="{requirement.coordinate.version}",
-              {maybe_resolve}
+              {maybe_resolve_str}
             )
             """
             )

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
 from textwrap import dedent
-from typing import Iterable
 
 import pytest
 
@@ -42,6 +42,7 @@ from pants.core.util_rules import source_files
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.skip_utils import skip_if_linux_arm64
 
 
 @pytest.fixture
@@ -502,6 +503,7 @@ def test_cgo_with_fortran_source(rule_runner: RuleRunner) -> None:
     assert result.stdout.decode() == "Answer: 42\n"
 
 
+@skip_if_linux_arm64
 @pytest.mark.no_error_if_skipped
 def test_cgo_with_embedded_static_library(rule_runner: RuleRunner) -> None:
     # gcc needed for linking

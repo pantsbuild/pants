@@ -17,11 +17,22 @@ from pants.backend.javascript.goals.test import (
     JSTestRequest,
     TestMetadata,
 )
+from pants.backend.javascript.goals.testutil import load_js_test_project
 from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import (
     JSSourcesGeneratorTarget,
     JSTestsGeneratorTarget,
     JSTestTarget,
+)
+from pants.backend.tsx.target_types import (
+    TSXSourcesGeneratorTarget,
+    TSXTestsGeneratorTarget,
+    TSXTestTarget,
+)
+from pants.backend.typescript.target_types import (
+    TypeScriptSourcesGeneratorTarget,
+    TypeScriptTestsGeneratorTarget,
+    TypeScriptTestTarget,
 )
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
@@ -50,6 +61,12 @@ def rule_runner(package_manager: str) -> RuleRunner:
             JSSourcesGeneratorTarget,
             JSTestsGeneratorTarget,
             JSTestTarget,
+            TypeScriptSourcesGeneratorTarget,
+            TypeScriptTestsGeneratorTarget,
+            TypeScriptTestTarget,
+            TSXSourcesGeneratorTarget,
+            TSXTestsGeneratorTarget,
+            TSXTestTarget,
         ],
         objects=dict(package_json.build_file_aliases().objects),
     )
@@ -63,30 +80,12 @@ def rule_runner(package_manager: str) -> RuleRunner:
     return rule_runner
 
 
-_LOCKFILE_FILE_NAMES = {
-    "pnpm": "pnpm-lock.yaml",
-    "npm": "package-lock.json",
-    "yarn": "yarn.lock",
-}
-
-
-def _find_lockfile_resource(package_manager: str, resource_dir: str) -> dict[str, str]:
-    for file in (Path(__file__).parent / resource_dir).iterdir():
-        if _LOCKFILE_FILE_NAMES.get(package_manager) == file.name:
-            return {file.name: file.read_text()}
-    raise AssertionError(
-        f"No lockfile for {package_manager} set up in test resouces directory {resource_dir}."
+@pytest.fixture
+def jest_dev_dependencies() -> dict[str, str]:
+    pkg = json.loads(
+        (Path(__file__).parent / "test_resources/jest_project/package.json").read_text()
     )
-
-
-@pytest.fixture
-def jest_lockfile(package_manager: str) -> dict[str, str]:
-    return _find_lockfile_resource(package_manager, "jest_resources")
-
-
-@pytest.fixture
-def mocha_lockfile(package_manager: str) -> dict[str, str]:
-    return _find_lockfile_resource(package_manager, "mocha_resources")
+    return cast(dict[str, str], pkg["devDependencies"])
 
 
 def make_source_to_test(passing: bool = True):
@@ -104,7 +103,8 @@ def make_source_to_test(passing: bool = True):
 def given_package_json(
     *,
     test_script: dict[str, str],
-    runner: dict[str, str],
+    dev_dependencies: dict[str, str],
+    **kwargs,
 ) -> str:
     return json.dumps(
         {
@@ -112,12 +112,14 @@ def given_package_json(
             "version": "0.0.1",
             "type": "module",
             "scripts": {**test_script},
-            "devDependencies": runner,
+            "devDependencies": dev_dependencies,
             "main": "./src/index.mjs",
+            **kwargs,
         }
     )
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "test_script, package_json_target",
     [
@@ -141,38 +143,23 @@ def test_jest_tests_are_successful(
     test_script: dict[str, str],
     package_json_target: str,
     passing: bool,
-    jest_lockfile: dict[str, str],
+    package_manager: str,
+    jest_dev_dependencies: dict[str, str],
 ) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": package_json_target,
-            "foo/package.json": given_package_json(
-                test_script=test_script,
-                runner={"jest": "^29.7.0"},
-            ),
-            **{f"foo/{key}": value for key, value in jest_lockfile.items()},
-            "foo/src/BUILD": "javascript_sources()",
-            "foo/src/index.mjs": make_source_to_test(passing),
-            "foo/src/tests/BUILD": "javascript_tests(name='tests')",
-            "foo/src/tests/index.test.js": textwrap.dedent(
-                """\
-                /**
-                 * @jest-environment node
-                 */
-
-                import { expect } from "@jest/globals"
-
-                import { add } from "../index.mjs"
-
-                test('adds 1 + 2 to equal 3', () => {
-                    expect(add(1, 2)).toBe(3);
-                });
-                """
-            ),
-        }
+    test_files = load_js_test_project("jest_project", package_manager=package_manager)
+    test_files["jest_project/BUILD"] = package_json_target
+    test_files["jest_project/package.json"] = given_package_json(
+        test_script=test_script,
+        dev_dependencies=jest_dev_dependencies,
     )
-    tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.js"))
-    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    test_files["jest_project/src/index.mjs"] = make_source_to_test(passing)
+
+    rule_runner.write_files(test_files)
+
+    tgt = rule_runner.get_target(
+        Address("jest_project/src/tests", relative_file_path="index.test.js")
+    )
+    package = rule_runner.get_target(Address("jest_project", generated_name="pkg"))
     result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
     if passing:
         assert b"Test Suites: 1 passed, 1 total" in result.stderr_bytes
@@ -184,91 +171,102 @@ def test_jest_tests_are_successful(
 
 def test_batched_jest_tests_are_successful(
     rule_runner: RuleRunner,
-    jest_lockfile: dict[str, str],
+    package_manager: str,
 ) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": "package_json()",
-            "foo/package.json": given_package_json(
-                test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
-                runner={"jest": "^29.7.0"},
-            ),
-            **{f"foo/{key}": value for key, value in jest_lockfile.items()},
-            "foo/src/BUILD": "javascript_sources()",
-            "foo/src/index.mjs": make_source_to_test(),
-            "foo/src/tests/BUILD": "javascript_tests(name='tests', batch_compatibility_tag='default')",
-            "foo/src/tests/index.test.js": textwrap.dedent(
-                """\
-                /**
-                 * @jest-environment node
-                 */
-
-                import { expect } from "@jest/globals"
-
-                import { add } from "../index.mjs"
-
-                test('adds 1 + 2 to equal 3', () => {
-                    expect(add(1, 2)).toBe(3);
-                });
-                """
-            ),
-            "foo/src/tests/another.test.js": textwrap.dedent(
-                """\
-                /**
-                 * @jest-environment node
-                 */
-
-                import { expect } from "@jest/globals"
-
-                import { add } from "../index.mjs"
-
-                test('adds 2 + 3 to equal 5', () => {
-                    expect(add(2, 3)).toBe(5);
-                });
-                """
-            ),
-        }
+    test_files = load_js_test_project("jest_project", package_manager=package_manager)
+    test_files["jest_project/src/tests/BUILD"] = (
+        "javascript_tests(name='tests', batch_compatibility_tag='default')"
     )
-    tgt_1 = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.js"))
-    tgt_2 = rule_runner.get_target(Address("foo/src/tests", relative_file_path="another.test.js"))
-    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    test_files["jest_project/src/tests/another.test.js"] = textwrap.dedent(
+        """\
+        /**
+         * @jest-environment node
+         */
+
+        import { expect } from "@jest/globals"
+
+        import { add } from "../index.mjs"
+
+        test('adds 2 + 3 to equal 5', () => {
+            expect(add(2, 3)).toBe(5);
+        });
+        """
+    )
+
+    rule_runner.write_files(test_files)
+
+    tgt_1 = rule_runner.get_target(
+        Address("jest_project/src/tests", relative_file_path="index.test.js")
+    )
+    tgt_2 = rule_runner.get_target(
+        Address("jest_project/src/tests", relative_file_path="another.test.js")
+    )
+    package = rule_runner.get_target(Address("jest_project", generated_name="pkg"))
     result = rule_runner.request(TestResult, [given_request_for(tgt_1, tgt_2, package=package)])
     assert b"Test Suites: 2 passed, 2 total" in result.stderr_bytes
+    assert result.exit_code == 0
+
+
+def test_jest_tests_import_typescript_file(
+    rule_runner: RuleRunner,
+    package_manager: str,
+    jest_dev_dependencies: dict[str, str],
+) -> None:
+    test_files = load_js_test_project("jest_project", package_manager=package_manager)
+    test_files["jest_project/package.json"] = given_package_json(
+        test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
+        dev_dependencies=jest_dev_dependencies,
+        jest={
+            "extensionsToTreatAsEsm": [".ts"],
+        },
+    )
+    test_files["jest_project/src/BUILD"] = "typescript_sources()"
+    test_files["jest_project/src/index.ts"] = make_source_to_test()
+    test_files["jest_project/src/tests/BUILD"] = (
+        "javascript_tests(name='tests', batch_compatibility_tag='default')"
+    )
+    test_files["jest_project/src/tests/index.test.js"] = textwrap.dedent(
+        """\
+        /**
+         * @jest-environment node
+         */
+
+        import { expect } from "@jest/globals"
+
+        import { add } from "../index.ts"
+
+        test('adds 1 + 2 to equal 3', () => {
+            expect(add(1, 2)).toBe(3);
+        });
+        """
+    )
+
+    rule_runner.write_files(test_files)
+
+    tgt_1 = rule_runner.get_target(
+        Address("jest_project/src/tests", relative_file_path="index.test.js")
+    )
+    package = rule_runner.get_target(Address("jest_project", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt_1, package=package)])
+    assert b"Test Suites: 1 passed, 1 total" in result.stderr_bytes
     assert result.exit_code == 0
 
 
 @pytest.mark.parametrize("passing", [True, False])
 def test_mocha_tests(
     passing: bool,
-    mocha_lockfile: dict[str, str],
+    package_manager: str,
     rule_runner: RuleRunner,
 ) -> None:
-    rule_runner.write_files(
-        {
-            "foo/BUILD": "package_json()",
-            "foo/package.json": given_package_json(
-                test_script={"test": "mocha"},
-                runner={"mocha": "^10.4.0"},
-            ),
-            **{f"foo/{key}": value for key, value in mocha_lockfile.items()},
-            "foo/src/BUILD": "javascript_sources()",
-            "foo/src/index.mjs": make_source_to_test(passing),
-            "foo/src/tests/BUILD": "javascript_tests(name='tests')",
-            "foo/src/tests/index.test.mjs": textwrap.dedent(
-                """\
-                import assert from "assert"
+    test_files = load_js_test_project("mocha_project", package_manager=package_manager)
+    test_files["mocha_project/src/index.mjs"] = make_source_to_test(passing)
 
-                import { add } from "../index.mjs"
+    rule_runner.write_files(test_files)
 
-                it('adds 1 + 2 to equal 3', () => {
-                    assert.equal(add(1, 2), 3);
-                });
-                """
-            ),
-        }
+    tgt = rule_runner.get_target(
+        Address("mocha_project/src/tests", relative_file_path="index.test.mjs")
     )
-    tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.mjs"))
-    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+    package = rule_runner.get_target(Address("mocha_project", generated_name="pkg"))
     result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
     if passing:
         assert b"1 passing" in result.stdout_bytes
@@ -281,53 +279,32 @@ def test_mocha_tests(
 def test_jest_test_with_coverage_reporting(
     package_manager: str,
     rule_runner: RuleRunner,
-    jest_lockfile: dict[str, str],
 ) -> None:
     rule_runner.set_options(
         args=[f"--nodejs-package-manager={package_manager}", "--test-use-coverage", "True"],
         env_inherit={"PATH"},
     )
-    rule_runner.write_files(
-        {
-            "foo/BUILD": textwrap.dedent(
-                """\
-                package_json(
-                    scripts=[
-                        node_test_script(
-                            coverage_args=['--coverage', '--coverage-directory=.coverage/'],
-                            coverage_output_files=['.coverage/clover.xml'],
-                        )
-                    ],
+
+    test_files = load_js_test_project("jest_project", package_manager=package_manager)
+    test_files["jest_project/BUILD"] = textwrap.dedent(
+        """\
+        package_json(
+            scripts=[
+                node_test_script(
+                    coverage_args=['--coverage', '--coverage-directory=.coverage/'],
+                    coverage_output_files=['.coverage/clover.xml'],
                 )
-                """
-            ),
-            "foo/package.json": given_package_json(
-                test_script={"test": "NODE_OPTIONS=--experimental-vm-modules jest"},
-                runner={"jest": "^29.7.0"},
-            ),
-            **{f"foo/{key}": value for key, value in jest_lockfile.items()},
-            "foo/src/BUILD": "javascript_sources()",
-            "foo/src/index.mjs": make_source_to_test(),
-            "foo/src/tests/BUILD": "javascript_tests(name='tests')",
-            "foo/src/tests/index.test.js": textwrap.dedent(
-                """\
-                /**
-                 * @jest-environment node
-                 */
-
-                import { expect } from "@jest/globals"
-
-                import { add } from "../index.mjs"
-
-                test('adds 1 + 2 to equal 3', () => {
-                    expect(add(1, 2)).toBe(3);
-                });
-                """
-            ),
-        }
+            ],
+        )
+        """
     )
-    tgt = rule_runner.get_target(Address("foo/src/tests", relative_file_path="index.test.js"))
-    package = rule_runner.get_target(Address("foo", generated_name="pkg"))
+
+    rule_runner.write_files(test_files)
+
+    tgt = rule_runner.get_target(
+        Address("jest_project/src/tests", relative_file_path="index.test.js")
+    )
+    package = rule_runner.get_target(Address("jest_project", generated_name="pkg"))
     result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
     assert result.coverage_data
 
@@ -341,3 +318,88 @@ def given_request_for(*js_test: Target, package: Target) -> JSTestRequest.Batch:
         tuple(JSTestFieldSet.create(tgt) for tgt in js_test),
         TestMetadata(tuple(), package),
     )
+
+
+def test_typescript_test_files(
+    rule_runner: RuleRunner,
+    package_manager: str,
+    jest_dev_dependencies: dict[str, str],
+) -> None:
+    test_files = load_js_test_project("jest_project", package_manager=package_manager)
+    test_files["jest_project/package.json"] = given_package_json(
+        test_script={"test": "jest"},
+        dev_dependencies=jest_dev_dependencies,
+        jest={
+            "preset": "ts-jest",
+        },
+    )
+    test_files["jest_project/src/BUILD"] = "typescript_sources()"
+    test_files["jest_project/src/index.ts"] = textwrap.dedent(
+        """\
+        export function add(x: number, y: number): number {
+          return x + y;
+        }
+        """
+    )
+    test_files["jest_project/src/tests/BUILD"] = "typescript_tests(name='tests')"
+    test_files["jest_project/src/tests/index.test.ts"] = textwrap.dedent(
+        """\
+        import { add } from '../index';
+
+        test('adds 1 + 2 to equal 3', () => {
+            expect(add(1, 2)).toBe(3);
+        });
+        """
+    )
+
+    rule_runner.write_files(test_files)
+
+    tgt = rule_runner.get_target(
+        Address("jest_project/src/tests", relative_file_path="index.test.ts")
+    )
+    package = rule_runner.get_target(Address("jest_project", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
+    assert b"Test Suites: 1 passed, 1 total" in result.stderr_bytes
+    assert result.exit_code == 0
+
+
+def test_tsx_test_files(
+    rule_runner: RuleRunner,
+    package_manager: str,
+    jest_dev_dependencies: dict[str, str],
+) -> None:
+    test_files = load_js_test_project("jest_project", package_manager=package_manager)
+    test_files["jest_project/package.json"] = given_package_json(
+        test_script={"test": "jest"},
+        dev_dependencies=jest_dev_dependencies,
+        jest={"preset": "ts-jest", "globals": {"ts-jest": {"tsconfig": {"jsx": "react"}}}},
+    )
+    test_files["jest_project/tsconfig.json"] = json.dumps({"compilerOptions": {"jsx": "react"}})
+    test_files["jest_project/src/BUILD"] = "tsx_sources()"
+    test_files["jest_project/src/index.tsx"] = textwrap.dedent(
+        """\
+        export function add(x: number, y: number): number {
+          return x + y;
+        }
+        """
+    )
+    test_files["jest_project/src/tests/BUILD"] = "tsx_tests(name='tests')"
+    test_files["jest_project/src/tests/index.test.tsx"] = textwrap.dedent(
+        """\
+        import { add } from '../index';
+
+        test('adds 1 + 2 to equal 3', () => {
+            expect(add(1, 2)).toBe(3);
+        });
+        """
+    )
+
+    rule_runner.write_files(test_files)
+
+    tgt = rule_runner.get_target(
+        Address("jest_project/src/tests", relative_file_path="index.test.tsx")
+    )
+    package = rule_runner.get_target(Address("jest_project", generated_name="pkg"))
+    result = rule_runner.request(TestResult, [given_request_for(tgt, package=package)])
+    assert b"Test Suites: 1 passed, 1 total" in result.stderr_bytes
+    assert result.exit_code == 0

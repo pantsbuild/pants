@@ -18,7 +18,7 @@ def test_line_oriented_goal() -> None:
         environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
     @goal_rule
-    def output_rule(console: Console, options: OutputtingGoalOptions) -> OutputtingGoal:
+    async def output_rule(console: Console, options: OutputtingGoalOptions) -> OutputtingGoal:
         with options.output(console) as write_stdout:
             write_stdout("output...")
         with options.line_oriented(console) as print_stdout:
@@ -55,7 +55,7 @@ def test_current_executing_goals() -> None:
         environment_behavior = Goal.EnvironmentBehavior.LOCAL_ONLY
 
     @goal_rule
-    def output_rule(
+    async def output_rule(
         console: Console,
         options: OutputtingGoalOptions,
         current_executing_goals: CurrentExecutingGoals,

@@ -27,6 +27,7 @@ from pants.backend.nfpm.util_rules.generate_config import (
     NfpmPackageConfigRequest,
 )
 from pants.backend.nfpm.util_rules.generate_config import rules as nfpm_generate_config_rules
+from pants.backend.nfpm.util_rules.inject_config import rules as nfpm_inject_config_rules
 from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_type_rules
 from pants.engine.fs import CreateDigest, DigestContents, FileContent
@@ -54,6 +55,7 @@ def rule_runner() -> RuleRunner:
             *nfpm_target_types_rules(),
             *nfpm_dependency_inference_rules(),
             *nfpm_generate_config_rules(),
+            *nfpm_inject_config_rules(),
             *(
                 UnionRule(NfpmContentFieldSet, field_set_type)
                 for field_set_type in NFPM_CONTENT_FIELD_SET_TYPES
@@ -261,6 +263,57 @@ def get_digest(rule_runner: RuleRunner, source_files: dict[str, str]) -> Digest:
             None,
             id="rpm-with-deps-and-ghost",
         ),
+        # with dummy_package dependency
+        pytest.param(
+            "apk",
+            NfpmApkPackageFieldSet,
+            ["contents:dummy_package"],
+            {},
+            ["dummy", "output_path/package"],
+            {},
+            None,
+            id="apk-with-pkg-dep",
+        ),
+        pytest.param(
+            "archlinux",
+            NfpmArchlinuxPackageFieldSet,
+            ["contents:dummy_package"],
+            {},
+            ["dummy", "output_path/package"],
+            {},
+            None,
+            id="archlinux-with-pkg-dep",
+        ),
+        pytest.param(
+            "deb",
+            NfpmDebPackageFieldSet,
+            ["contents:dummy_package"],
+            {},
+            ["dummy", "output_path/package"],
+            {},
+            None,
+            id="deb-with-pkg-dep",
+        ),
+        pytest.param(
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            ["contents:dummy_package"],
+            {},
+            ["dummy", "output_path/package"],
+            {},
+            None,
+            id="rpm-with-pkg-dep",
+        ),
+        pytest.param(
+            "rpm",
+            NfpmRpmPackageFieldSet,
+            ["contents:dummy_package"],
+            {},
+            ["dummy", "output_path/package"],
+            {"ghost_contents": ["/var/log/pkg.log"]},
+            None,
+            id="rpm-with-pkg-dep-and-ghost",
+        ),
         # with malformed dependency
         pytest.param(
             "apk",
@@ -396,7 +449,7 @@ def test_generate_nfpm_yaml(
     extra_metadata: dict[str, Any],
     expect_raise: ContextManager | None,
 ):
-    content_sandbox_digest = get_digest(rule_runner, {path: "" for path in content_sandbox_files})
+    content_sandbox_digest = get_digest(rule_runner, dict.fromkeys(content_sandbox_files, ""))
 
     description = f"A {packager} package"
     rule_runner.write_files(
@@ -408,7 +461,7 @@ def test_generate_nfpm_yaml(
                     description="{description}",
                     package_name="{_PKG_NAME}",
                     version="{_PKG_VERSION}",
-                    {'' if packager != 'deb' else 'maintainer="Foo Bar <deb@example.com>",'}
+                    {"" if packager != "deb" else 'maintainer="Foo Bar <deb@example.com>",'}
                     dependencies={repr(dependencies)},
                     scripts={repr(scripts)},
                     **{extra_metadata},
@@ -477,6 +530,25 @@ def test_generate_nfpm_yaml(
                     dst="/etc/{_PKG_NAME}",
                     file_mode=0o700,
                 )
+                file(
+                    name="dummy",
+                    source="dummy",
+                    # For this test, the dummy target should be
+                    # treated as if it were a package that defines:
+                    # output_path="output_path/package"
+                    # Instead of wiring an actual package target,
+                    # the test imitates packaging by injecting the file
+                    # into the digest.
+                )
+                nfpm_content_file(
+                    name="dummy_package",
+                    dependencies=[":dummy"],
+                    # NOTE: src pointing to package dep is relative to
+                    # the build_root instead of this BUILD file.
+                    src="output_path/package",
+                    dst="/usr/bin/dummy_package",
+                    file_mode=0o550,
+                )
                 nfpm_content_file(
                     name="malformed",  # needs either source or src.
                     dst="/usr/bin/foo",
@@ -494,16 +566,16 @@ def test_generate_nfpm_yaml(
                 )
                 """
             ),
-            **{
-                path: ""
-                for path in [
+            **dict.fromkeys(
+                [
                     "scripts/postinstall.sh",
                     "scripts/apk-postupgrade.sh",
                     "scripts/arch-postupgrade.sh",
                     "scripts/deb-config.sh",
                     "scripts/rpm-verify.sh",
-                ]
-            },
+                ],
+                "",
+            ),
         }
     )
     target = rule_runner.get_target(Address("", target_name=_PKG_NAME))
@@ -629,6 +701,14 @@ def test_generate_nfpm_yaml(
             assert dst in contents_by_dst
             entry = contents_by_dst.pop(dst)
             assert "ghost" == entry["type"]
+
+    if "contents:dummy_package" in dependencies:
+        assert "dummy" not in contents_by_dst
+        dst = "/usr/bin/dummy_package"
+        assert dst in contents_by_dst
+        entry = contents_by_dst.pop(dst)
+        assert "" == entry["type"]
+        assert 0o0550 == entry["file_info"]["mode"]
 
     # make sure all contents have been accounted for (popped off above)
     assert len(contents_by_dst) == 0

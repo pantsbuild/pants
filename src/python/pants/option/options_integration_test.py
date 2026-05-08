@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
 from pathlib import Path
 from textwrap import dedent
 
 from pants.fs.fs import safe_filename_from_path
 from pants.testutil.pants_integration_test import (
     ensure_daemon,
+    read_pants_log,
     run_pants,
     run_pants_with_workdir,
     setup_tmpdir,
@@ -23,7 +25,7 @@ def test_invalid_options() -> None:
     }
     config_errors = [
         "ERROR] Invalid option 'invalid_global' under [GLOBAL]",
-        "ERROR] Invalid section [invalid_scope]",
+        "ERROR] Invalid table name [invalid_scope]",
         "ERROR] Invalid option 'bad_option' under [pytest]",
     ]
 
@@ -108,3 +110,50 @@ def test_pants_symlink_workdirs(tmp_path: Path) -> None:
     pants_run.assert_success()
     # Make sure symlink workdir is pointing to physical workdir
     assert Path(os.readlink(symlink_workdir.as_posix())) == physical_workdir
+
+
+def test_fromfile_invalidation(tmp_path: Path) -> None:
+    workdir = (tmp_path / "workdir").as_posix()
+    pid = None
+
+    def assert_same_daemon():
+        nonlocal pid
+        logs = "\n".join(read_pants_log(workdir))
+        pids = [m.group("pid") for m in re.finditer(r"running with PID: (?P<pid>\d+)", logs)]
+        assert len(pids) == 1
+        if pid is None:
+            pid = pids[0]
+        else:
+            assert pids[0] == pid
+
+    fromfile_path = tmp_path / "fromfile.txt"
+    fromfile_path.write_text("dist1")
+    pants_run = run_pants_with_workdir(
+        [f"--pants-distdir=@{fromfile_path}"],
+        use_pantsd=True,
+        workdir=workdir,
+    )
+    assert "Scheduler initialized." in pants_run.stderr
+    assert_same_daemon()
+
+    pants_run = run_pants_with_workdir(
+        [f"--pants-distdir=@{fromfile_path}"],
+        use_pantsd=True,
+        workdir=workdir,
+    )
+    # Same pantsd process, same scheduler.
+    assert_same_daemon()
+    assert "Scheduler initialized." not in pants_run.stderr
+
+    fromfile_path.write_text("dist2")
+    pants_run = run_pants_with_workdir(
+        [f"--pants-distdir=@{fromfile_path}"],
+        use_pantsd=True,
+        workdir=workdir,
+    )
+    # Same pantsd process, new scheduler.
+    assert_same_daemon()
+    assert "Initialization options changed" in pants_run.stderr
+    assert "pants_distdir" in pants_run.stderr
+    assert "Reinitializing scheduler" in pants_run.stderr
+    assert "Scheduler initialized." in pants_run.stderr

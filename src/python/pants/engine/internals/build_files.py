@@ -10,9 +10,11 @@ import logging
 import os.path
 import sys
 import typing
+from collections import defaultdict
+from collections.abc import Coroutine, Sequence
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Any, Sequence, cast
+from typing import Any, cast
 
 import typing_extensions
 
@@ -24,32 +26,41 @@ from pants.build_graph.address import (
     MaybeAddress,
     ResolveError,
 )
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestContents, FileContent, GlobMatchErrorBehavior, PathGlobs, Paths
+from pants.engine.fs import FileContent, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.defaults import BuildFileDefaults, BuildFileDefaultsParserState
 from pants.engine.internals.dep_rules import (
     BuildFileDependencyRules,
     DependencyRuleApplication,
     MaybeBuildFileDependencyRulesImplementation,
 )
-from pants.engine.internals.mapper import AddressFamily, AddressMap
+from pants.engine.internals.mapper import (
+    DELETED_SPEC_PATH,
+    AddressFamily,
+    AddressMap,
+    DuplicateNameError,
+)
 from pants.engine.internals.parser import (
     BuildFilePreludeSymbols,
     BuildFileSymbolsInfo,
     Parser,
     error_on_imports,
 )
+from pants.engine.internals.selectors import concurrently
 from pants.engine.internals.session import SessionValues
 from pants.engine.internals.synthetic_targets import (
-    SyntheticAddressMaps,
     SyntheticAddressMapsRequest,
+    get_synthetic_address_maps,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
-from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, rule
+from pants.engine.intrinsics import get_digest_contents, path_globs_to_paths
+from pants.engine.rules import QueryRule, collect_rules, implicitly, rule
 from pants.engine.target import (
     DependenciesRuleApplication,
     DependenciesRuleApplicationRequest,
+    InvalidTargetException,
     RegisteredTargetTypes,
 )
 from pants.engine.unions import UnionMembership
@@ -59,6 +70,24 @@ from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+# Singleton for use as a reference to the DeletedTarget pseudo-target.
+# A backend can inject a dependency on DELETED_ADDRESS if it is capable of detecting
+# (via naming conventions) that a file depends on some other, deleted file.
+# The generic change detection mechanism will use that dependency to include the
+# files in the transitive closure of dependents of changed files.
+# This is somewhat limited - the backend doesn't get the content of the deleted file,
+# and so cannot use it in the regular inference pipeline.
+#
+# This is not the most elegant solution, but the legacy design of dep inference and of
+# change detection does not admit a simple one.
+#
+# A more global solution, that doesn't rely on backend specifics, would be to capture the
+# state of the repo before and after the changes and apply dep inference to both.
+# However that is a very substantial change from the status quo, so for now this
+# incremental improvement will suffice.
+DELETED_ADDRESS = Address(DELETED_SPEC_PATH)
 
 
 class BuildFileSyntaxError(SyntaxError):
@@ -94,7 +123,7 @@ class BuildFileOptions:
 
 
 @rule
-def extract_build_file_options(
+async def extract_build_file_options(
     global_options: GlobalOptions,
     bootstrap_status: BootstrapStatus,
 ) -> BuildFileOptions:
@@ -112,12 +141,13 @@ async def evaluate_preludes(
     build_file_options: BuildFileOptions,
     parser: Parser,
 ) -> BuildFilePreludeSymbols:
-    prelude_digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            build_file_options.prelude_globs,
-            glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-        ),
+    prelude_digest_contents = await get_digest_contents(
+        **implicitly(
+            PathGlobs(
+                build_file_options.prelude_globs,
+                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
+            )
+        )
     )
     globals: dict[str, Any] = {
         # Later entries have precendence replacing conflicting keys from previous entries, so we
@@ -161,9 +191,11 @@ async def get_all_build_file_symbols_info(
 
 @rule
 async def maybe_resolve_address(address_input: AddressInput) -> MaybeAddress:
+    if address_input.path_component == DELETED_ADDRESS.spec_path:
+        return MaybeAddress(DELETED_ADDRESS)
     # Determine the type of the path_component of the input.
     if address_input.path_component:
-        paths = await Get(Paths, PathGlobs(globs=(address_input.path_component,)))
+        paths = await path_globs_to_paths(PathGlobs(globs=(address_input.path_component,)))
         is_file, is_dir = bool(paths.files), bool(paths.dirs)
     else:
         # It is an address in the root directory.
@@ -220,6 +252,11 @@ class OptionalAddressFamily:
         raise ResolveError(f"Directory '{self.path}' does not contain any BUILD files.")
 
 
+_DELETED_OPTIONAL_ADDRESS_FAMILY = OptionalAddressFamily(
+    DELETED_ADDRESS.spec_path, AddressFamily.create(DELETED_ADDRESS.spec_path, [])
+)
+
+
 @rule
 async def ensure_address_family(request: OptionalAddressFamily) -> AddressFamily:
     return request.ensure()
@@ -257,7 +294,7 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
                 value = arg.value if isinstance(arg, ast.Constant) else None
             if value:
                 # Found env name in this call, we're done here.
-                self.env_vars.add(value)
+                self.env_vars.add(value)  # type: ignore[arg-type]
                 return
             else:
                 logger.warning(
@@ -272,11 +309,11 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
 
 @rule(desc="Search for addresses in BUILD files")
 async def parse_address_family(
+    directory: AddressFamilyDir,
     parser: Parser,
     bootstrap_status: BootstrapStatus,
     build_file_options: BuildFileOptions,
     prelude_symbols: BuildFilePreludeSymbols,
-    directory: AddressFamilyDir,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
     maybe_build_file_dependency_rules_implementation: MaybeBuildFileDependencyRulesImplementation,
@@ -286,17 +323,21 @@ async def parse_address_family(
 
     The AddressFamily may be empty, but it will not be None.
     """
-    digest_contents, all_synthetic_address_maps = await MultiGet(
-        Get(
-            DigestContents,
-            PathGlobs(
-                globs=(
-                    *(os.path.join(directory.path, p) for p in build_file_options.patterns),
-                    *(f"!{p}" for p in build_file_options.ignores),
+    if directory.path == _DELETED_OPTIONAL_ADDRESS_FAMILY.path:
+        return _DELETED_OPTIONAL_ADDRESS_FAMILY
+
+    digest_contents, all_synthetic_address_maps = await concurrently(
+        get_digest_contents(
+            **implicitly(
+                PathGlobs(
+                    globs=(
+                        *(os.path.join(directory.path, p) for p in build_file_options.patterns),
+                        *(f"!{p}" for p in build_file_options.ignores),
+                    )
                 )
             ),
         ),
-        Get(SyntheticAddressMaps, SyntheticAddressMapsRequest(directory.path)),
+        get_synthetic_address_maps(SyntheticAddressMapsRequest(directory.path), **implicitly()),
     )
     synthetic_address_maps = tuple(itertools.chain(all_synthetic_address_maps))
     if not digest_contents and not synthetic_address_maps:
@@ -307,8 +348,8 @@ async def parse_address_family(
     dependencies_rules: BuildFileDependencyRules | None = None
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
-        maybe_parents = await MultiGet(
-            Get(OptionalAddressFamily, AddressFamilyDir(str(parent_dir)))
+        maybe_parents = await concurrently(
+            parse_address_family(AddressFamilyDir(str(parent_dir)), **implicitly())
             for parent_dir in parent_dirs
         )
         for maybe_parent in maybe_parents:
@@ -340,25 +381,19 @@ async def parse_address_family(
 
     def _extract_env_vars(
         file_content: FileContent, extra_env: Sequence[str], env: CompleteEnvironmentVars
-    ) -> Get[EnvironmentVars]:
+    ) -> Coroutine[Any, Any, EnvironmentVars]:
         """For BUILD file env vars, we only ever consult the local systems env."""
         env_vars = (*BUILDFileEnvVarExtractor.get_env_vars(file_content), *extra_env)
-        return Get(
-            EnvironmentVars,
-            {
-                EnvironmentVarsRequest(env_vars): EnvironmentVarsRequest,
-                env: CompleteEnvironmentVars,
-            },
-        )
+        return environment_vars_subset(EnvironmentVarsRequest(env_vars), env)
 
-    all_env_vars = await MultiGet(
+    all_env_vars = await concurrently(
         _extract_env_vars(
             fc, prelude_symbols.referenced_env_vars, session_values[CompleteEnvironmentVars]
         )
         for fc in digest_contents
     )
 
-    address_maps = [
+    declared_address_maps = [
         AddressMap.parse(
             fc.path,
             fc.content.decode(),
@@ -372,6 +407,7 @@ async def parse_address_family(
         )
         for fc, env_vars in zip(digest_contents, all_env_vars)
     ]
+    declared_address_maps.sort(key=lambda x: x.path)
 
     # Freeze defaults and dependency rules
     frozen_defaults = defaults_parser_state.get_frozen_defaults()
@@ -387,16 +423,104 @@ async def parse_address_family(
     )
 
     # Process synthetic targets.
-    for address_map in address_maps:
-        for synthetic in synthetic_address_maps:
-            synthetic.process_declared_targets(address_map)
-            synthetic.apply_defaults(frozen_defaults)
+
+    def apply_defaults(tgt: TargetAdaptor) -> TargetAdaptor:
+        default_values = frozen_defaults.get(tgt.type_alias)
+        if default_values is None:
+            return tgt
+        return tgt.with_new_kwargs(**{**default_values, **tgt.kwargs})
+
+    name_to_path_and_synthetic_target: dict[str, tuple[str, TargetAdaptor]] = {}
+    for synthetic_address_map in synthetic_address_maps:
+        for name, target in synthetic_address_map.name_to_target_adaptor.items():
+            name_to_path_and_synthetic_target[name] = (
+                synthetic_address_map.path,
+                apply_defaults(target),
+            )
+
+    name_to_path_and_declared_target: dict[str, tuple[str, TargetAdaptor]] = {}
+    for declared_address_map in declared_address_maps:
+        for name, target in declared_address_map.name_to_target_adaptor.items():
+            if name in name_to_path_and_declared_target:
+                # This is a duplicate declared name, raise an exception.
+                duplicate_path = name_to_path_and_declared_target[name][0]
+                raise DuplicateNameError(
+                    f"A target already exists at `{duplicate_path}` with name `{name}` and target type "
+                    f"`{target.type_alias}`. The `{name}` target in `{declared_address_map.path}` "
+                    "cannot use the same name."
+                )
+
+            name_to_path_and_declared_target[name] = (declared_address_map.path, target)
+
+    # We copy the dict so we can modify the original in the loop.
+    for name, (
+        declared_target_path,
+        declared_target,
+    ) in name_to_path_and_declared_target.copy().items():
+        # Pop the synthetic target to let the declared target take precedence.
+        synthetic_target_path, synthetic_target = name_to_path_and_synthetic_target.pop(
+            name, (None, None)
+        )
+        if "_extend_synthetic" not in declared_target.kwargs:
+            # The explicitly declared target should replace the synthetic one.
+            continue
+
+        # The _extend_synthetic kwarg was explicitly provided, so we must strip it.
+        declared_target_kwargs = dict(declared_target.kwargs)
+        extend_synthetic = declared_target_kwargs.pop("_extend_synthetic")
+        if extend_synthetic:
+            if synthetic_target is None:
+                raise InvalidTargetException(
+                    softwrap(
+                        f"""
+                            The `{declared_target.type_alias}` target {name!r} in {declared_target_path} has
+                            `_extend_synthetic=True` but there is no synthetic target to extend.
+                            """
+                    )
+                )
+
+            if synthetic_target.type_alias != declared_target.type_alias:
+                raise InvalidTargetException(
+                    softwrap(
+                        f"""
+                        The `{declared_target.type_alias}` target {name!r} in {declared_target_path} is
+                        of a different type than the synthetic target
+                        `{synthetic_target.type_alias}` from {synthetic_target_path}.
+
+                        When `_extend_synthetic` is true the target types must match, set this to
+                        false if you want to replace the synthetic target with the target from your
+                        BUILD file.
+                        """
+                    )
+                )
+
+            # Preserve synthetic field values not overriden by the declared target from the BUILD.
+            kwargs = {**synthetic_target.kwargs, **declared_target_kwargs}
+        else:
+            kwargs = declared_target_kwargs
+        name_to_path_and_declared_target[name] = (
+            declared_target_path,
+            declared_target.with_new_kwargs(**kwargs),
+        )
+
+    # Now reconstitute into AddressMaps, to pass into AddressFamily.create().
+    # We no longer need to distinguish between synthetic and declared AddressMaps.
+    # TODO: We might want to move the validation done by AddressFamily.create() to here, since
+    #  we're already iterating over the AddressMap data, and simplify AddressFamily.
+    path_to_targets = defaultdict(list)
+    for name_to_path_and_target in [
+        name_to_path_and_declared_target,
+        name_to_path_and_synthetic_target,
+    ]:
+        for path_and_target in name_to_path_and_target.values():
+            path_to_targets[path_and_target[0]].append(path_and_target[1])
+    address_maps = [AddressMap.create(path, targets) for path, targets in path_to_targets.items()]
 
     return OptionalAddressFamily(
         directory.path,
         AddressFamily.create(
             spec_path=directory.path,
-            address_maps=(*address_maps, *synthetic_address_maps),
+            address_maps=address_maps,
             defaults=frozen_defaults,
             dependents_rules=frozen_dependents_rules,
             dependencies_rules=frozen_dependencies_rules,
@@ -407,7 +531,7 @@ async def parse_address_family(
 @rule
 async def find_build_file(request: BuildFileAddressRequest) -> BuildFileAddress:
     address = request.address
-    address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    address_family = await ensure_address_family(**implicitly(AddressFamilyDir(address.spec_path)))
     owning_address = address.maybe_convert_to_target_generator()
     if address_family.get_target_adaptor(owning_address) is None:
         raise ResolveError.did_you_mean(
@@ -447,7 +571,7 @@ async def find_target_adaptor(request: TargetAdaptorRequest) -> TargetAdaptor:
             "Generated targets are not defined in BUILD files, and so do not have "
             f"TargetAdaptors: {request}"
         )
-    address_family = await Get(AddressFamily, AddressFamilyDir(address.spec_path))
+    address_family = await ensure_address_family(**implicitly(AddressFamilyDir(address.spec_path)))
     target_adaptor = _get_target_adaptor(address, address_family, request.description_of_origin)
     return target_adaptor
 
@@ -471,8 +595,9 @@ async def _get_target_family_and_adaptor_for_dep_rules(
             {address.spec_path, _rules_path(address)} for address in addresses
         )
     )
-    maybe_address_families = await MultiGet(
-        Get(OptionalAddressFamily, AddressFamilyDir(rules_path)) for rules_path in rules_paths
+    maybe_address_families = await concurrently(
+        parse_address_family(AddressFamilyDir(rules_path), **implicitly())
+        for rules_path in rules_paths
     )
     maybe_families = {maybe.path: maybe for maybe in maybe_address_families}
 
@@ -504,9 +629,12 @@ async def get_dependencies_rule_application(
         return DependenciesRuleApplication.allow_all()
 
     (
-        origin_rules_family,
-        origin_target,
-    ), *dependencies_family_adaptor = await _get_target_family_and_adaptor_for_dep_rules(
+        (
+            origin_rules_family,
+            origin_target,
+        ),
+        *dependencies_family_adaptor,
+    ) = await _get_target_family_and_adaptor_for_dep_rules(
         request.address,
         *request.dependencies,
         description_of_origin=request.description_of_origin,
@@ -516,15 +644,15 @@ async def get_dependencies_rule_application(
     for dependency_address, (dependency_rules_family, dependency_target) in zip(
         request.dependencies, dependencies_family_adaptor
     ):
-        dependencies_rule[
-            dependency_address
-        ] = build_file_dependency_rules_class.check_dependency_rules(
-            origin_address=request.address,
-            origin_adaptor=origin_target,
-            dependencies_rules=origin_rules_family.dependencies_rules,
-            dependency_address=dependency_address,
-            dependency_adaptor=dependency_target,
-            dependents_rules=dependency_rules_family.dependents_rules,
+        dependencies_rule[dependency_address] = (
+            build_file_dependency_rules_class.check_dependency_rules(
+                origin_address=request.address,
+                origin_adaptor=origin_target,
+                dependencies_rules=origin_rules_family.dependencies_rules,
+                dependency_address=dependency_address,
+                dependency_adaptor=dependency_target,
+                dependents_rules=dependency_rules_family.dependents_rules,
+            )
         )
     return DependenciesRuleApplication(request.address, FrozenDict(dependencies_rule))
 

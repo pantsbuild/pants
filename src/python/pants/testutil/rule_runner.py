@@ -5,48 +5,43 @@ from __future__ import annotations
 
 import atexit
 import dataclasses
+import difflib
 import functools
+import inspect
 import os
 import re
 import sys
+import warnings
+from collections.abc import Callable, Coroutine, Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path, PurePath
-from pprint import pformat
 from tempfile import mkdtemp
-from typing import (
-    Any,
-    Callable,
-    Coroutine,
-    Generator,
-    Generic,
-    Iterable,
-    Iterator,
-    Mapping,
-    Sequence,
-    Type,
-    TypeVar,
-    cast,
-    overload,
-)
+from typing import Any, TypeVar, cast, overload
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.specs_parser import SpecsParser
+from pants.build_graph import build_configuration
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules import adhoc_binaries
+from pants.core.goals.run import generate_run_request
+from pants.core.util_rules import adhoc_binaries, misc
 from pants.engine.addresses import Address
 from pants.engine.console import Console
 from pants.engine.env_vars import CompleteEnvironmentVars
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
 from pants.engine.goal import CurrentExecutingGoals, Goal
-from pants.engine.internals import native_engine
-from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
+from pants.engine.internals import native_engine, options_parsing
+from pants.engine.internals.native_engine import (
+    ProcessExecutionEnvironment,
+    PyExecutor,
+    _Concurrently,
+)
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
-from pants.engine.internals.selectors import Call, Effect, Get, Params
+from pants.engine.internals.selectors import Call, Params
 from pants.engine.internals.session import SessionValues
 from pants.engine.platform import Platform
 from pants.engine.process import InteractiveProcess, InteractiveProcessResult
@@ -56,12 +51,8 @@ from pants.engine.unions import UnionMembership, UnionRule
 from pants.goal.auxiliary_goal import AuxiliaryGoal
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import initialize_stdio, initialize_stdio_raw, stdio_destination
-from pants.option.global_options import (
-    DynamicRemoteOptions,
-    ExecutionOptions,
-    GlobalOptions,
-    LocalStoreOptions,
-)
+from pants.option.bootstrap_options import DynamicRemoteOptions, ExecutionOptions, LocalStoreOptions
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.testutil.option_util import create_options_bootstrapper
@@ -97,10 +88,11 @@ def logging(original_function=None, *, level: LogLevel = LogLevel.INFO):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             stdout_fileno, stderr_fileno = sys.stdout.fileno(), sys.stderr.fileno()
-            with temporary_dir() as tempdir, initialize_stdio_raw(
-                level, False, False, {}, True, [], tempdir
-            ), stdin_context() as stdin, stdio_destination(
-                stdin.fileno(), stdout_fileno, stderr_fileno
+            with (
+                temporary_dir() as tempdir,
+                initialize_stdio_raw(level, False, False, {}, True, [], tempdir),
+                stdin_context() as stdin,
+                stdio_destination(stdin.fileno(), stdout_fileno, stderr_fileno),
             ):
                 return func(*args, **kwargs)
 
@@ -167,6 +159,9 @@ def engine_error(
             else:
                 errmsg = str(underlying)
             if contains not in errmsg:
+                diff = "\n".join(
+                    difflib.Differ().compare(contains.splitlines(), errmsg.splitlines())
+                )
                 raise AssertionError(
                     softwrap(
                         f"""
@@ -175,6 +170,8 @@ def engine_error(
                         => Expected: {contains}
 
                         => Actual: {errmsg}
+
+                        => Diff: {diff}
                         """
                     )
                 )
@@ -292,8 +289,13 @@ class RuleRunner:
         self.rules = tuple(rewrite_rule_for_inherent_environment(rule) for rule in (rules or ()))
         all_rules = (
             *self.rules,
+            *build_configuration.rules(),
             *source_root.rules(),
+            *options_parsing.rules(),
+            *misc.rules(),
             *adhoc_binaries.rules(),
+            # Many tests indirectly rely on this rule.
+            generate_run_request,
             QueryRule(WrappedTarget, [WrappedTargetRequest]),
             QueryRule(AllTargets, []),
             QueryRule(UnionMembership, []),
@@ -325,10 +327,11 @@ class RuleRunner:
                 args=bootstrap_args, env=None
             )
             options = self.options_bootstrapper.full_options(
-                self.build_config,
+                known_scope_infos=self.build_config.known_scope_infos,
                 union_membership=UnionMembership.from_rules(
                     rule for rule in self.rules if isinstance(rule, UnionRule)
                 ),
+                allow_unknown_options=self.build_config.allow_unknown_options,
             )
             global_options = self.options_bootstrapper.bootstrap_options.for_global_scope()
 
@@ -355,6 +358,7 @@ class RuleRunner:
                 local_store_options=local_store_options,
                 local_execution_root_dir=local_execution_root_dir,
                 named_caches_dir=named_caches_dir,
+                pants_workdir=self.pants_workdir,
                 build_root=self.build_root,
                 build_configuration=self.build_config,
                 # Each Scheduler that is created borrows the global executor, which is shut down `atexit`.
@@ -409,7 +413,7 @@ class RuleRunner:
             else Params(*inputs)
         )
         with self.pushd():
-            result = assert_single_element(self.scheduler.product_request(output_type, [params]))
+            result = assert_single_element(self.scheduler.product_request(output_type, params))
         return cast(_O, result)
 
     def run_goal_rule(
@@ -542,12 +546,10 @@ class RuleRunner:
         return path
 
     @overload
-    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]:
-        ...
+    def write_files(self, files: Mapping[str, str | bytes]) -> tuple[str, ...]: ...
 
     @overload
-    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]:
-        ...
+    def write_files(self, files: Mapping[PurePath, str | bytes]) -> tuple[str, ...]: ...
 
     def write_files(
         self, files: Mapping[PurePath, str | bytes] | Mapping[str, str | bytes]
@@ -594,7 +596,7 @@ class RuleRunner:
 
         :API: public
         """
-        return self.make_snapshot({fp: "" for fp in files})
+        return self.make_snapshot(dict.fromkeys(files, ""))
 
     def get_target(self, address: Address) -> Target:
         """Find the target for a given address.
@@ -635,16 +637,9 @@ class RuleRunner:
                     remote_execution=False,
                     remote_execution_extra_platform_properties=[],
                     execute_in_workspace=False,
+                    keep_sandboxes="never",
                 ),
             )
-
-    def do_not_use_mock(self, output_type: Type, input_types: Iterable[type]) -> MockGet:
-        """Returns a `MockGet` whose behavior is to run the actual rule using this `RuleRunner`"""
-        return MockGet(
-            output_type=output_type,
-            input_types=tuple(input_types),
-            mock=lambda *input_values: self.request(output_type, input_values),
-        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -652,65 +647,46 @@ class RuleRunner:
 # -----------------------------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class MockEffect(Generic[_O]):
-    output_type: type[_O]
-    input_types: tuple[type, ...]
-    mock: Callable[..., _O]
-
-
-@dataclass(frozen=True)
-class MockGet(Generic[_O]):
-    output_type: type[_O]
-    input_types: tuple[type, ...]
-    mock: Callable[..., _O]
-
-
 def run_rule_with_mocks(
     rule: Callable[..., Coroutine[Any, Any, _O]],
     *,
     rule_args: Sequence[Any] = (),
-    mock_gets: Sequence[MockGet | MockEffect] = (),
+    mock_calls: Mapping[str, Callable] | None = None,
     union_membership: UnionMembership | None = None,
+    show_warnings: bool = True,
 ) -> _O:
-    """A test helper function that runs an @rule with a set of arguments and mocked Get providers.
+    """A test helper that runs an @rule with a set of args and mocked underlying @rule invocations.
 
-    An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
-    like so:
+    An @rule named `my_rule` that takes one argument and invokes no other @rules (by-name  or via
+    `Get` requests) can be invoked like so:
 
     ```
     return_value = run_rule_with_mocks(my_rule, rule_args=[arg1])
     ```
 
-    In the case of an @rule that makes Get requests, things get more interesting: the
-    `mock_gets` argument must be provided as a sequence of `MockGet`s and `MockEffect`s. Each
-    MockGet takes the Product and Subject type, along with a one-argument function that takes a
-    subject value and returns a product value.
+    In the case of an @rule that invokes other @rules, either by name or via `Get` requests,
+    the `mock_calls` argument must be provided.
 
-    So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
-    for a product type `Listing` with subject type `Dir`, the invoke might look like:
+    `mock_calls` is a mapping of fully-qualified rule name to the function that mocks that rule,
+    and mocks out calls by name to the corresponding rules.
+
+    So in the case of an @rule named `my_co_rule` that takes one argument and calls the @rule
+    `path.to.module.list_dir` by name to produce a `Listing` from a `Dir`, the invoke might look
+    like:
 
     ```
     return_value = run_rule_with_mocks(
       my_co_rule,
       rule_args=[arg1],
-      mock_gets=[
-        MockGet(
-          output_type=Listing,
-          input_type=Dir,
-          mock=lambda dir_subject: Listing(..),
-        ),
-      ],
+      mock_calls={
+        "path.to.module.list_dir": lambda dir_subject: Listing(..),
+      },
     )
     ```
 
-    If any of the @rule's Get requests involve union members, you should pass a `UnionMembership`
-    mapping the union base to any union members you'd like to test. For example, if your rule has
-    `await Get(TestResult, TargetAdaptor, target_adaptor)`, you may pass
-    `UnionMembership({TargetAdaptor: PythonTestsTargetAdaptor})` to this function.
-
     :returns: The return value of the completed @rule.
     """
+    mock_calls = mock_calls or {}
 
     task_rule = getattr(rule, "rule", None)
 
@@ -721,15 +697,11 @@ def run_rule_with_mocks(
     if task_rule:
         if len(rule_args) != len(task_rule.parameters):
             raise ValueError(
-                f"Rule expected to receive arguments of the form: {task_rule.parameters}; got: {rule_args}"
+                "Error running rule with mocks:\n"
+                f"Rule {task_rule.func.__qualname__} expected to receive arguments of the "
+                f"form: {task_rule.parameters}; got: {rule_args}"
             )
 
-        if len(mock_gets) != len(task_rule.awaitables):
-            raise ValueError(
-                f"Rule expected to receive Get providers for:\n"
-                f"{pformat(task_rule.awaitables)}\ngot:\n"
-                f"{pformat(mock_gets)}"
-            )
         # Access the original function, rather than the trampoline that we would get by calling
         # it directly.
         func = task_rule.func
@@ -740,43 +712,47 @@ def run_rule_with_mocks(
     if not isinstance(res, (Coroutine, Generator)):
         return res
 
-    def get(res: Get | Effect | Call):
-        provider = next(
-            (
-                mock_get.mock
-                for mock_get in mock_gets
-                if mock_get.output_type == res.output_type
-                and all(
-                    type(val) in mock_get.input_types
-                    or (
-                        union_membership
-                        and any(
-                            input_type in union_membership
-                            and union_membership.is_member(input_type, val)
-                            for input_type in mock_get.input_types
-                        )
-                    )
-                    for val in res.inputs
-                )
-            ),
-            None,
-        )
-        if provider is None:
-            raise AssertionError(f"Rule requested: {res}, which cannot be satisfied.")
-        return provider(*res.inputs)
+    unconsumed_mock_calls = set(mock_calls.keys())
+
+    def get(res: Any):
+        if not isinstance(res, Call):
+            raise AssertionError(f"Bad arg type: {res}")
+        mock_call = mock_calls.get(res.rule_id)
+        if mock_call is None:
+            raise AssertionError(f"No mock_call provided for {res.rule_id}.")
+        unconsumed_mock_calls.discard(res.rule_id)
+        # NB: if the mock declares an `__implicitly` parameter, forward the raw `(dict,)` so it
+        # can inspect declared types (e.g. to route polymorphic dispatch); otherwise unpack the
+        # implicit values positionally.
+        implicit = res.implicit_args
+        if implicit and "__implicitly" in inspect.signature(mock_call).parameters:
+            return mock_call(*res.args, __implicitly=(implicit,))
+        return mock_call(*res.args, *implicit)
 
     rule_coroutine = res
     rule_input = None
+
+    def warn_on_unconsumed_mocks():
+        # Note that we used `warnings` instead of `logger.warning` because the latter may
+        # get captured or swallowed by the test framework.
+        if show_warnings:
+            if unconsumed_mock_calls:
+                warnings.warn(f"Unconsumed mock_calls: {unconsumed_mock_calls}")
+
     while True:
         try:
             res = rule_coroutine.send(rule_input)
-            if isinstance(res, (Get, Effect, Call)):
+            if isinstance(res, Call):
                 rule_input = get(res)
+            elif isinstance(res, _Concurrently):
+                rule_input = [get(g) for g in res.calls]
             elif type(res) in (tuple, list):
-                rule_input = [get(g) for g in res]  # type: ignore[union-attr]
+                rule_input = [get(g) for g in res]
             else:
-                return res  # type: ignore[return-value]
+                warn_on_unconsumed_mocks()
+                return res  # type: ignore[no-any-return]
         except StopIteration as e:
+            warn_on_unconsumed_mocks()
             return e.value  # type: ignore[no-any-return]
 
 
@@ -801,26 +777,31 @@ def mock_console(
         global_bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         colors = (
             options_bootstrapper.full_options_for_scopes(
-                [GlobalOptions.get_scope_info()], UnionMembership({}), allow_unknown_options=True
+                [GlobalOptions.get_scope_info()],
+                UnionMembership.empty(),
+                allow_unknown_options=True,
             )
             .for_global_scope()
             .colors
         )
 
-    with initialize_stdio(global_bootstrap_options), stdin_context(
-        stdin_content
-    ) as stdin, temporary_file(binary_mode=False) as stdout, temporary_file(
-        binary_mode=False
-    ) as stderr, stdio_destination(
-        stdin_fileno=stdin.fileno(),
-        stdout_fileno=stdout.fileno(),
-        stderr_fileno=stderr.fileno(),
+    with (
+        initialize_stdio(global_bootstrap_options),
+        stdin_context(stdin_content) as stdin,
+        temporary_file(binary_mode=False) as stdout,
+        temporary_file(binary_mode=False) as stderr,
+        stdio_destination(
+            stdin_fileno=stdin.fileno(),
+            stdout_fileno=stdout.fileno(),
+            stderr_fileno=stderr.fileno(),
+        ),
     ):
         # NB: We yield a Console without overriding the destination argument, because we have
         # already done a sys.std* level replacement. The replacement is necessary in order for
         # InteractiveProcess to have native file handles to interact with.
-        yield Console(use_colors=colors), StdioReader(
-            _stdout=Path(stdout.name), _stderr=Path(stderr.name)
+        yield (
+            Console(use_colors=colors),
+            StdioReader(_stdout=Path(stdout.name), _stderr=Path(stderr.name)),
         )
 
 

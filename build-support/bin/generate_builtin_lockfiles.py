@@ -1,5 +1,7 @@
 # Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+#
+# Run with: pants run build-support/bin/generate_builtin_lockfiles.py
 
 from __future__ import annotations
 
@@ -8,9 +10,10 @@ import logging
 import os
 import shutil
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Generic, Sequence, Type, TypeVar, cast
+from typing import Generic, TypeVar, cast
 
 from pants.backend.cc.lint.clangformat.subsystem import ClangFormat
 from pants.backend.codegen.avro.java.subsystem import AvroSubsystem
@@ -27,6 +30,7 @@ from pants.backend.helm.subsystems.post_renderer import HelmPostRendererSubsyste
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
+from pants.backend.nfpm.native_libs.elfdeps.subsystem import Elfdeps
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingComma
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
@@ -38,7 +42,6 @@ from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.pydocstyle.subsystem import Pydocstyle
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.lint.pyupgrade.subsystem import PyUpgrade
-from pants.backend.python.lint.ruff.subsystem import Ruff
 from pants.backend.python.lint.yapf.subsystem import Yapf
 from pants.backend.python.packaging.pyoxidizer.subsystem import PyOxidizer
 from pants.backend.python.subsystems.debugpy import DebugPy
@@ -50,6 +53,7 @@ from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.backend.python.typecheck.pytype.subsystem import Pytype
+from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
 from pants.backend.scala.subsystems.scalatest import Scalatest
 from pants.backend.sql.lint.sqlfluff.subsystem import Sqlfluff
@@ -59,13 +63,14 @@ from pants.backend.tools.yamllint.subsystem import Yamllint
 from pants.base.build_environment import get_buildroot
 from pants.jvm.resolve.jvm_tool import JvmToolBase
 from pants.jvm.shading.jarjar import JarJar
+from pants.option.global_options import KeepSandboxes
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 
 logger = logging.getLogger(__name__)
 
 
-default_python_interpreter_constraints = "CPython>=3.8,<4"
+default_python_interpreter_constraints = "CPython>=3.9,<3.15"
 
 
 ToolBaseT = TypeVar("ToolBaseT")
@@ -73,7 +78,7 @@ ToolBaseT = TypeVar("ToolBaseT")
 
 @dataclass
 class Tool(Generic[ToolBaseT]):
-    cls: Type[ToolBaseT]
+    cls: type[ToolBaseT]
     backend: str
 
     @property
@@ -90,13 +95,11 @@ class Tool(Generic[ToolBaseT]):
 
 
 @dataclass
-class PythonTool(Tool[PythonToolRequirementsBase]):
-    ...
+class PythonTool(Tool[PythonToolRequirementsBase]): ...
 
 
 @dataclass
-class JvmTool(Tool[JvmToolBase]):
-    ...
+class JvmTool(Tool[JvmToolBase]): ...
 
 
 all_python_tools = tuple(
@@ -113,6 +116,7 @@ all_python_tools = tuple(
             PythonTool(DebugPy, "pants.backend.python"),
             PythonTool(Docformatter, "pants.backend.python.lint.docformatter"),
             PythonTool(DockerfileParser, "pants.backend.docker"),
+            PythonTool(Elfdeps, "pants.backend.experimental.nfpm.native_libs"),
             PythonTool(Flake8, "pants.backend.python.lint.flake8"),
             PythonTool(HelmKubeParserSubsystem, "pants.backend.experimental.helm"),
             PythonTool(HelmPostRendererSubsystem, "pants.backend.experimental.helm"),
@@ -127,9 +131,6 @@ all_python_tools = tuple(
             PythonTool(PythonProtobufGrpclibPlugin, "pants.backend.codegen.protobuf.python"),
             PythonTool(Pytype, "pants.backend.experimental.python.typecheck.pytype"),
             PythonTool(PyOxidizer, "pants.backend.experimental.python.packaging.pyoxidizer"),
-            # Note - Ruff has two backends (<package>.check and <package>.format).
-            # Both of these rely on the same resolve underneath so we just pick one here.
-            PythonTool(Ruff, "pants.backend.experimental.python.lint.ruff.check"),
             PythonTool(SemgrepSubsystem, "pants.backend.experimental.tools.semgrep"),
             PythonTool(Setuptools, "pants.backend.python"),
             PythonTool(SetuptoolsSCM, "pants.backend.python"),
@@ -198,17 +199,29 @@ def create_parser() -> argparse.ArgumentParser:
         const=logging.DEBUG,
         default=logging.INFO,
     )
+    parser.add_argument(
+        "--keep-sandboxes",
+        type=KeepSandboxes,
+        choices=list(KeepSandboxes),
+        default=KeepSandboxes.never,
+        help="Set this to 'always' or 'on_failure' to preserve temp directories and chroots.",
+    )
     return parser
 
 
-def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -> None:
+def generate_python_tool_lockfiles(
+    tools: Sequence[PythonTool], dry_run: bool, keep_sandboxes: KeepSandboxes
+) -> None:
     def req_file(_tool: PythonTool) -> str:
         return f"{_tool.name}-requirements.txt"
 
+    cleanup_tmp = keep_sandboxes == KeepSandboxes.never
     # Generate the builtin lockfiles via temporary named resolves in a tmp repo.
     # This is to completely disassociate the generation of builtin lockfiles from
     # the consumption of lockfiles in the Pants repo.
-    with temporary_dir() as tmp_buildroot:
+    with temporary_dir(cleanup=cleanup_tmp) as tmp_buildroot:
+        if not cleanup_tmp:
+            logger.info(f"Preserving temp buildroot: {tmp_buildroot}")
         for tool in tools:
             with open(os.path.join(tmp_buildroot, req_file(tool)), "w") as reqs_file:
                 for req_str in tool.cls.default_requirements:
@@ -239,6 +252,7 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
             "--python-pip-version=latest",
             f"--python-interpreter-constraints=['{default_python_interpreter_constraints}']",
             "--python-enable-resolves",
+            "--python-resolver=uv",
             # Unset any existing resolve names in the Pants repo, and set to just our temporary ones.
             f"--python-resolves={resolves}",
             f"--python-resolves-to-interpreter-constraints={resolves_to_ics}",
@@ -246,15 +260,22 @@ def generate_python_tool_lockfiles(tools: Sequence[PythonTool], dry_run: bool) -
             "--python-resolves-to-constraints-file={}",
             "--python-resolves-to-no-binary={}",
             "--python-resolves-to-only-binary={}",
+            "--python-separate-lockfile-metadata-file",
+            "--pex-emit-warnings=true",
         ]
-        generate(tmp_buildroot, tools, python_args, dry_run)
+        generate(tmp_buildroot, tools, python_args, dry_run, keep_sandboxes)
 
 
-def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool], dry_run: bool) -> None:
+def generate_jvm_tool_lockfiles(
+    tools: Sequence[JvmTool], dry_run: bool, keep_sandboxes: KeepSandboxes
+) -> None:
+    cleanup_tmp = keep_sandboxes == KeepSandboxes.never
     # Generate the builtin lockfiles via temporary named resolves in a tmp repo.
     # This is to completely disassociate the generation of builtin lockfiles from
     # the consumption of lockfiles in the Pants repo.
-    with temporary_dir() as tmp_buildroot:
+    with temporary_dir(cleanup=cleanup_tmp) as tmp_buildroot:
+        if not cleanup_tmp:
+            logger.info(f"Preserving temp buildroot: {tmp_buildroot}")
         jvm_args = []
         for tool in tools:
             jvm_args.extend(
@@ -264,10 +285,16 @@ def generate_jvm_tool_lockfiles(tools: Sequence[JvmTool], dry_run: bool) -> None
                     f"--{tool.name}-lockfile={tool.lockfile_name}",
                 ]
             )
-        generate(tmp_buildroot, tools, jvm_args, dry_run)
+        generate(tmp_buildroot, tools, jvm_args, dry_run, keep_sandboxes)
 
 
-def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run: bool) -> None:
+def generate(
+    buildroot: str,
+    tools: Sequence[Tool],
+    args: Sequence[str],
+    dry_run: bool,
+    keep_sandboxes: KeepSandboxes,
+) -> None:
     def lockfile_inrepo_dest(lockfile_pkg, lockfile_filename):
         return os.path.join(
             "src",
@@ -286,6 +313,7 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run
     args = [
         os.path.join(pants_repo_root, "pants"),
         "--concurrent",
+        f"--keep-sandboxes={keep_sandboxes.value}",
         "--anonymous-telemetry-enabled=false",
         f"--backend-packages={backends}",
         *args,
@@ -295,7 +323,8 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run
     ]
 
     if dry_run:
-        logger.info("Would run: " + " ".join(args))
+        cmd = " ".join(repr(arg) for arg in args)
+        logger.info(f"Would run: `{cmd}` in {buildroot}")
         return
 
     # If there is a pre-existing lockfile, seed it so we get the pretty lockfile diff
@@ -305,17 +334,29 @@ def generate(buildroot: str, tools: Sequence[Tool], args: Sequence[str], dry_run
         if os.path.isfile(lockfile_dest):
             logger.debug(f"copying existing lockfile from {lockfile_dest}")
             shutil.copy(lockfile_dest, lockfile_buildroot_filename(tool.lockfile_name))
+            try:
+                # If there's sidecar metadata, copy that too.
+                shutil.copy(
+                    lockfile_dest + ".metadata",
+                    lockfile_buildroot_filename(tool.lockfile_name) + ".metadata",
+                )
+            except FileNotFoundError:
+                pass
 
-    logger.debug("Running: " + " ".join(args))
+    logger.debug("Running: " + " ".join(repr(arg) for arg in args))
     subprocess.run(args, cwd=buildroot, check=True)
 
     # Copy the generated lockfiles from the tmp repo to the Pants repo.
     for tool in tools:
         lockfile_pkg, lockfile_filename = tool.cls.default_lockfile_resource
-        shutil.copy(
-            lockfile_buildroot_filename(tool.lockfile_name),
-            lockfile_inrepo_dest(lockfile_pkg, lockfile_filename),
-        )
+        src = lockfile_buildroot_filename(tool.lockfile_name)
+        dst = lockfile_inrepo_dest(lockfile_pkg, lockfile_filename)
+        shutil.copy(src, dst)
+        if os.path.exists(PythonLockfileMetadata.metadata_location_for_lockfile(src)):
+            shutil.copy(
+                PythonLockfileMetadata.metadata_location_for_lockfile(src),
+                PythonLockfileMetadata.metadata_location_for_lockfile(dst),
+            )
 
 
 def main() -> None:
@@ -347,9 +388,9 @@ def main() -> None:
             "or via the --all-python/--all-jvm flags."
         )
     if python_tools:
-        generate_python_tool_lockfiles(python_tools, args.dry_run)
+        generate_python_tool_lockfiles(python_tools, args.dry_run, args.keep_sandboxes)
     if jvm_tools:
-        generate_jvm_tool_lockfiles(jvm_tools, args.dry_run)
+        generate_jvm_tool_lockfiles(jvm_tools, args.dry_run, args.keep_sandboxes)
 
 
 if __name__ == "__main__":

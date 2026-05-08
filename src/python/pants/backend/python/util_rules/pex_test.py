@@ -7,23 +7,24 @@ import os.path
 import pkgutil
 import re
 import shutil
+import subprocess
 import textwrap
 import zipfile
 from pathlib import Path
 
 import pytest
 import requests
+from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
-from pkg_resources import Requirement
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.lockfile import GeneratePexLockfile, GenerateUvLockfile
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import EntryPoint, PexCompletePlatformsField
+from pants.backend.python.target_types import EntryPoint, PexCompletePlatformsField, PexLayout
 from pants.backend.python.util_rules import pex_test_utils
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
+from pants.backend.python.util_rules.lockfile_metadata import LockfileFormat, PythonLockfileMetadata
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     Pex,
@@ -46,19 +47,19 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfile,
-    LoadedLockfileRequest,
     Lockfile,
     PexRequirements,
     Resolve,
-    ResolvePexConfig,
-    ResolvePexConfigRequest,
+    ResolveConfig,
 )
 from pants.backend.python.util_rules.pex_test_utils import (
     create_pex_and_get_all_data,
     create_pex_and_get_pex_info,
     parse_requirements,
 )
+from pants.backend.python.util_rules.uv import rules as uv_rules
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
+from pants.core.register import wrap_as_resources
 from pants.core.target_types import FileTarget, ResourceTarget
 from pants.core.util_rules.lockfile_metadata import InvalidLockfileError
 from pants.engine.fs import (
@@ -75,7 +76,6 @@ from pants.option.global_options import GlobalOptions
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import (
     PYTHON_BOOTSTRAP_ENV,
-    MockGet,
     QueryRule,
     RuleRunner,
     engine_error,
@@ -93,15 +93,20 @@ def rule_runner() -> RuleRunner:
         rules=[
             *pex_test_utils.rules(),
             *pex_rules(),
+            *lockfile.rules(),
+            *uv_rules(),
+            *wrap_as_resources.rules,
             QueryRule(GlobalOptions, []),
             QueryRule(ProcessResult, (Process,)),
             QueryRule(PexResolveInfo, (Pex,)),
             QueryRule(PexResolveInfo, (VenvPex,)),
             QueryRule(CompletePlatforms, (PexCompletePlatformsField,)),
+            QueryRule(GenerateLockfileResult, (GenerateUvLockfile,)),
         ],
         target_types=[
             ResourceTarget,
             FileTarget,
+            *wrap_as_resources.target_types,
         ],
     )
 
@@ -130,7 +135,6 @@ def test_pex_execution(
         sources=sources,
     )
 
-    assert "pex" not in pex_data.files
     assert "main.py" in pex_data.files
     assert "subdir/sub.py" in pex_data.files
 
@@ -181,7 +185,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
             "--subprocess-environment-env-vars=LANG",  # Value should come from environment.
             "--subprocess-environment-env-vars=ftp_proxy=dummyproxy",
         ),
-        interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
+        interpreter_constraints=InterpreterConstraints(["CPython>=3.8"]),
         env={"LANG": "es_PY.UTF-8"},
     )
 
@@ -190,7 +194,7 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
         Process,
         [
             pex_process_type(
-                pex_data.pex,
+                pex_data.pex,  # type: ignore[arg-type]
                 description="Run the pex and check its reported environment",
             ),
         ],
@@ -202,8 +206,19 @@ def test_pex_environment(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex])
 
 
 @pytest.mark.parametrize("pex_type", [Pex, VenvPex])
-def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | VenvPex]) -> None:
-    named_caches_dir = rule_runner.request(GlobalOptions, []).named_caches_dir
+def test_pex_working_directory(tmp_path: Path, pex_type: type[Pex | VenvPex]) -> None:
+    named_caches_dir = tmp_path / "named_caches"
+
+    rule_runner = RuleRunner(
+        rules=[
+            *pex_test_utils.rules(),
+            *pex_rules(),
+            QueryRule(Pex, (PexRequest,)),
+            QueryRule(VenvPex, (PexRequest,)),
+        ],
+        bootstrap_args=[f"--named-caches-dir={named_caches_dir}"],
+    )
+
     sources = rule_runner.request(
         Digest,
         [
@@ -232,7 +247,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
         pex_type=pex_type,
         main=EntryPoint("main"),
         sources=sources,
-        interpreter_constraints=InterpreterConstraints(["CPython>=3.6"]),
+        interpreter_constraints=InterpreterConstraints(["CPython>=3.8"]),
     )
 
     pex_process_type = PexProcess if isinstance(pex_data.pex, Pex) else VenvPexProcess
@@ -248,7 +263,7 @@ def test_pex_working_directory(rule_runner: RuleRunner, pex_type: type[Pex | Ven
             Process,
             [
                 pex_process_type(
-                    pex_data.pex,
+                    pex_data.pex,  # type: ignore[arg-type]
                     description="Run the pex and check its cwd",
                     working_directory=working_dir,
                     input_digest=runtime_files,
@@ -393,6 +408,59 @@ def test_lockfiles(rule_runner: RuleRunner) -> None:
                 }
                 """
             ),
+            "uv.lock.metadata": textwrap.dedent(
+                """\
+                {
+                    "version": 8,
+                    "valid_for_interpreter_constraints": [
+                        "CPython==3.14.*"
+                    ],
+                    "generated_with_requirements": [
+                        "ansicolors==1.1.8"
+                    ],
+                    "manylinux": null,
+                    "requirement_constraints": [],
+                    "only_binary": [],
+                    "no_binary": [],
+                    "excludes": [],
+                    "overrides": [],
+                    "sources": [],
+                    "lock_style": "universal",
+                    "complete_platforms": [],
+                    "uploaded_prior_to": null,
+                    "lockfile_format": "uv",
+                    "resolve": "test",
+                    "description": ""
+                }
+                """
+            ),
+            "uv.lock": textwrap.dedent(
+                """\
+                version = 1
+                revision = 3
+                requires-python = "==3.14.*"
+
+                [[package]]
+                name = "ansicolors"
+                version = "1.1.8"
+                source = { registry = "https://pypi.org/simple" }
+                sdist = { url = "https://files.pythonhosted.org/packages/76/31/7faed52088732704523c259e24c26ce6f2f33fbeff2ff59274560c27628e/ansicolors-1.1.8.zip", hash = "sha256:99f94f5e3348a0bcd43c82e5fc4414013ccc19d70bd939ad71e0133ce9c372e0", size = 23027, upload-time = "2017-06-02T21:22:10.729Z" }
+                wheels = [
+                    { url = "https://files.pythonhosted.org/packages/53/18/a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/ansicolors-1.1.8-py2.py3-none-any.whl", hash = "sha256:00d2dde5a675579325902536738dd27e4fac1fd68f773fe36c21044eb559e187", size = 13847, upload-time = "2017-06-02T21:22:12.67Z" },
+                ]
+
+                [[package]]
+                name = "pants-lockfile-for-test"
+                version = "0.0.0"
+                source = { virtual = "." }
+                dependencies = [
+                    { name = "ansicolors" },
+                ]
+
+                [package.metadata]
+                requires-dist = [{ name = "ansicolors", specifier = "==1.1.8" }]
+                """
+            ),
             "reqs_lock.txt": textwrap.dedent(
                 """\
                 ansicolors==1.1.8 \
@@ -403,7 +471,7 @@ def test_lockfiles(rule_runner: RuleRunner) -> None:
         }
     )
 
-    def create_lock(path: str) -> None:
+    def create_lock(path: str, enable_resolves: bool, resolver: str = "pex") -> None:
         lock = Lockfile(
             path,
             url_description_of_origin="foo",
@@ -412,11 +480,60 @@ def test_lockfiles(rule_runner: RuleRunner) -> None:
         create_pex_and_get_pex_info(
             rule_runner,
             requirements=EntireLockfile(lock, ("ansicolors",)),
-            additional_pants_args=("--python-invalid-lockfile-behavior=ignore",),
+            additional_pants_args=(
+                "--python-interpreter-constraints===3.14.*",
+                f"--python-enable-resolves={str(enable_resolves).lower()}",
+                f"--python-resolver={resolver}",
+                "--python-invalid-lockfile-behavior=error",
+            ),
         )
 
-    create_lock("pex_lock.json")
-    create_lock("reqs_lock.txt")
+    create_lock("pex_lock.json", enable_resolves=True, resolver="pex")
+    create_lock("uv.lock", enable_resolves=True, resolver="uv")
+    create_lock("reqs_lock.txt", enable_resolves=False)
+
+
+def test_build_pex_from_uv_lockfile(rule_runner: RuleRunner) -> None:
+    ic = InterpreterConstraints(["CPython==3.14.*"])
+    rule_runner.set_options(
+        ["--python-resolves={'test': 'test.lock'}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    gen_result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GenerateUvLockfile(
+                requirements=FrozenOrderedSet(
+                    [
+                        "ansicolors==1.1.8",
+                        "cowsay @ git+https://github.com/VaasuDevanS/cowsay-python@dcf7236f0b5ece9ed56e91271486e560526049cf",
+                    ]
+                ),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=ic,
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+            )
+        ],
+    )
+    digest_contents = rule_runner.request(DigestContents, [gen_result.digest])
+    rule_runner.write_files({fc.path: fc.content for fc in digest_contents})
+
+    lock = Lockfile("test.lock", url_description_of_origin="test uv lockfile", resolve_name="test")
+    pex_data = create_pex_and_get_all_data(
+        rule_runner,
+        requirements=EntireLockfile(lock),
+        interpreter_constraints=ic,
+        layout=PexLayout.ZIPAPP,
+    )
+
+    res = subprocess.run(
+        [pex_data.local_path, "-c", "import colors; import cowsay; print('ok')"],
+        capture_output=True,
+    )
+    assert res.returncode == 0
+    assert b"ok" in res.stdout
 
 
 def test_entry_point(rule_runner: RuleRunner) -> None:
@@ -426,7 +543,7 @@ def test_entry_point(rule_runner: RuleRunner) -> None:
 
 
 def test_interpreter_constraints(rule_runner: RuleRunner) -> None:
-    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6,<3.12"])
+    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.8,<3.12"])
     pex_info = create_pex_and_get_pex_info(
         rule_runner, interpreter_constraints=constraints, internal_only=False
     )
@@ -442,7 +559,7 @@ def test_platforms(rule_runner: RuleRunner) -> None:
     # We use Python 2.7, rather than Python 3, to ensure that the specified platform is
     # actually used.
     platforms = PexPlatforms(["linux-x86_64-cp-27-cp27mu"])
-    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.6"])
+    constraints = InterpreterConstraints(["CPython>=2.7,<3", "CPython>=3.8"])
     pex_data = create_pex_and_get_all_data(
         rule_runner,
         requirements=PexRequirements(["cryptography==2.9"]),
@@ -469,7 +586,7 @@ def test_local_requirements_and_path_mappings(
             *pex_test_utils.rules(),
             *pex_rules(),
             *lockfile.rules(),
-            QueryRule(GenerateLockfileResult, [GeneratePythonLockfile]),
+            QueryRule(GenerateLockfileResult, [GeneratePexLockfile]),
             QueryRule(PexResolveInfo, (Pex,)),
         ],
         bootstrap_args=[f"--named-caches-dir={tmp_path}"],
@@ -505,19 +622,22 @@ def test_local_requirements_and_path_mappings(
                 f"--named-caches-dir={tmp_path}",
                 # Use the vendored pip, so we don't have to set up a wheel for it in dir1_path.
                 "--python-pip-version=20.3.4-patched",
+                "--python-enable-resolves=true",
             )
 
         rule_runner.set_options(options(dir1_path), env_inherit=PYTHON_BOOTSTRAP_ENV)
         lock_result = rule_runner.request(
             GenerateLockfileResult,
             [
-                GeneratePythonLockfile(
+                GeneratePexLockfile(
                     requirements=FrozenOrderedSet([wheel_req_str]),
                     find_links=FrozenOrderedSet([]),
-                    interpreter_constraints=InterpreterConstraints([">=3.8,<4"]),
+                    interpreter_constraints=InterpreterConstraints([">=3.8,<3.15"]),
                     resolve_name="test",
                     lockfile_dest="test.lock",
                     diff=False,
+                    lock_style="universal",
+                    complete_platforms=(),
                 )
             ],
         )
@@ -614,8 +734,8 @@ def test_venv_pex_resolve_info(rule_runner: RuleRunner, pex_type: type[Pex | Ven
     assert dists[3].project_name == "requests"
     assert dists[3].version == Version("2.23.0")
     # requires_dists is parsed from metadata written by the pex tool, and is always
-    #   a set of valid pkg_resources.Requirements.
-    assert Requirement.parse('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
+    #   a set of valid requirements.
+    assert Requirement('PySocks!=1.5.7,>=1.5.6; extra == "socks"') in dists[3].requires_dists
     assert dists[4].project_name == "urllib3"
 
 
@@ -644,20 +764,21 @@ def test_determine_pex_python_and_platforms() -> None:
         result = run_rule_with_mocks(
             _determine_pex_python_and_platforms,
             rule_args=[request],
-            mock_gets=[
-                MockGet(
-                    output_type=PythonExecutable,
-                    input_types=(InterpreterConstraints,),
-                    mock=lambda _: discovered_python,
-                )
-            ],
+            mock_calls={
+                "pants.backend.python.util_rules.pex.find_interpreter": lambda _: discovered_python
+            },
         )
         assert result == expected
 
-    assert_setup(expected=_BuildPexPythonSetup(None, []))
+    assert_setup(
+        expected=_BuildPexPythonSetup(discovered_python, ["--python-path", discovered_python.path])
+    )
     assert_setup(
         interpreter_constraints=ics,
-        expected=_BuildPexPythonSetup(None, ["--interpreter-constraint", "CPython==3.8"]),
+        expected=_BuildPexPythonSetup(
+            discovered_python,
+            ["--interpreter-constraint", "CPython==3.8", "--python-path", discovered_python.path],
+        ),
     )
     assert_setup(
         internal_only=True,
@@ -701,7 +822,9 @@ def test_setup_pex_requirements() -> None:
             lockfile_path,
             metadata=None,
             requirement_estimate=2,
-            is_pex_native=is_pex_lock,
+            lockfile_format=LockfileFormat.PEX
+            if is_pex_lock
+            else LockfileFormat.CONSTRAINTS_DEPRECATED,
             as_constraints_strings=None,
             original_lockfile=lockfile_obj,
         )
@@ -721,46 +844,36 @@ def test_setup_pex_requirements() -> None:
         result = run_rule_with_mocks(
             _setup_pex_requirements,
             rule_args=[request, create_subsystem(PythonSetup)],
-            mock_gets=[
-                MockGet(
-                    output_type=Lockfile,
-                    input_types=(Resolve,),
-                    mock=lambda _: lockfile_obj,
+            mock_calls={
+                "pants.backend.python.util_rules.pex_requirements.determine_resolve_config": lambda _: ResolveConfig(
+                    indexes=("custom-index",),
+                    find_links=("custom-find-links",),
+                    manylinux=None,
+                    constraints_file=None,
+                    only_binary=FrozenOrderedSet(),
+                    no_binary=FrozenOrderedSet(),
+                    path_mappings=(),
+                    excludes=FrozenOrderedSet(),
+                    overrides=FrozenOrderedSet(),
+                    sources=FrozenOrderedSet(),
+                    lock_style="universal",
+                    complete_platforms=(),
+                    uploaded_prior_to=None,
                 ),
-                MockGet(
-                    output_type=LoadedLockfile,
-                    input_types=(LoadedLockfileRequest,),
-                    mock=lambda _: create_loaded_lockfile(is_pex_lock),
-                ),
-                MockGet(
-                    output_type=PexRequirementsInfo,
-                    input_types=(PexRequirements,),
-                    mock=lambda _: PexRequirementsInfo(
+                "pants.backend.python.util_rules.pex.get_req_strings": lambda _: PexRequirementsInfo(
+                    (
                         tuple(str(x) for x in requirements.req_strings_or_addrs)
                         if isinstance(requirements, PexRequirements)
-                        else tuple(),
-                        ("imma/link",) if include_find_links else tuple(),
+                        else tuple()
                     ),
+                    ("imma/link",) if include_find_links else tuple(),
                 ),
-                MockGet(
-                    output_type=ResolvePexConfig,
-                    input_types=(ResolvePexConfigRequest,),
-                    mock=lambda _: ResolvePexConfig(
-                        indexes=("custom-index",),
-                        find_links=("custom-find-links",),
-                        manylinux=None,
-                        constraints_file=None,
-                        only_binary=FrozenOrderedSet(),
-                        no_binary=FrozenOrderedSet(),
-                        path_mappings=(),
-                    ),
+                "pants.engine.intrinsics.create_digest": lambda _: constraints_digest,
+                "pants.backend.python.util_rules.pex_requirements.load_lockfile": lambda _: create_loaded_lockfile(
+                    is_pex_lock
                 ),
-                MockGet(
-                    output_type=Digest,
-                    input_types=(CreateDigest,),
-                    mock=lambda _: constraints_digest,
-                ),
-            ],
+                "pants.backend.python.util_rules.pex_requirements.get_lockfile_for_resolve": lambda _: lockfile_obj,
+            },
         )
         assert result == expected
 
@@ -907,6 +1020,14 @@ def test_lockfile_validation(rule_runner: RuleRunner) -> None:
         only_binary=set(),
         no_binary=set(),
         manylinux=None,
+        excludes=set(),
+        overrides=set(),
+        sources=set(),
+        lock_style="universal",
+        complete_platforms=(),
+        uploaded_prior_to=None,
+        lockfile_format=LockfileFormat.PEX,
+        resolve="resolve_name",
     ).add_header_to_lockfile(b"", regenerate_command="regen", delimeter="#")
     rule_runner.write_files({"lock.txt": lock_content.decode()})
 
@@ -940,6 +1061,34 @@ def test_digest_complete_platforms(rule_runner: RuleRunner, target_type: str) ->
     complete_platforms = rule_runner.request(
         CompletePlatforms,
         [PexCompletePlatformsField([":complete_platforms"], target.address)],
+    )
+
+    # Verify the result
+    assert len(complete_platforms) == 1
+    assert complete_platforms.digest != EMPTY_DIGEST
+
+
+def test_digest_complete_platforms_codegen(rule_runner: RuleRunner) -> None:
+    # Read the complete_platforms content using pkgutil
+    complete_platforms_content = pkgutil.get_data(__name__, "complete_platform_pex_test.json")
+    assert complete_platforms_content is not None
+
+    # Create a target with the complete platforms file
+    rule_runner.write_files(
+        {
+            "BUILD": """\
+file(name='complete_platforms', source='complete_platforms.json')
+experimental_wrap_as_resources(name="codegen", inputs=[':complete_platforms'], )
+            """,
+            "complete_platforms.json": complete_platforms_content,
+        }
+    )
+
+    # Get the CompletePlatforms object
+    target = rule_runner.get_target(Address("", target_name="codegen"))
+    complete_platforms = rule_runner.request(
+        CompletePlatforms,
+        [PexCompletePlatformsField([":codegen"], target.address)],
     )
 
     # Verify the result

@@ -5,17 +5,18 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
 from textwrap import dedent
-from typing import Any, Mapping, cast
+from typing import Any
 
 import pytest
 
 from pants.build_graph.address import BuildFileAddressRequest, MaybeAddress, ResolveError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.target_types import GenericTarget
+from pants.core.target_types import GenericTarget, ResourceTarget
 from pants.engine.addresses import Address, AddressInput, BuildFileAddress
-from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.fs import DigestContents, FileContent, PathGlobs
+from pants.engine.env_vars import CompleteEnvironmentVars, EnvironmentVars
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.build_files import (
     AddressFamilyDir,
     BUILDFileEnvVarExtractor,
@@ -25,17 +26,14 @@ from pants.engine.internals.build_files import (
     evaluate_preludes,
     parse_address_family,
 )
-from pants.engine.internals.defaults import ParametrizeDefault
+from pants.engine.internals.defaults import BuildFileDefaults, ParametrizeDefault
 from pants.engine.internals.dep_rules import MaybeBuildFileDependencyRulesImplementation
 from pants.engine.internals.mapper import AddressFamily
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, BuildFileSymbolInfo, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.session import SessionValues
-from pants.engine.internals.synthetic_targets import (
-    SyntheticAddressMaps,
-    SyntheticAddressMapsRequest,
-)
+from pants.engine.internals.synthetic_targets import SyntheticAddressMap, SyntheticAddressMaps
 from pants.engine.internals.target_adaptor import TargetAdaptor, TargetAdaptorRequest
 from pants.engine.target import (
     Dependencies,
@@ -51,13 +49,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.init.bootstrap_scheduler import BootstrapStatus
 from pants.testutil.pytest_util import assert_logged
-from pants.testutil.rule_runner import (
-    MockGet,
-    QueryRule,
-    RuleRunner,
-    engine_error,
-    run_rule_with_mocks,
-)
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, run_rule_with_mocks
 from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
@@ -67,50 +59,124 @@ def test_parse_address_family_empty() -> None:
     optional_af = run_rule_with_mocks(
         parse_address_family,
         rule_args=[
+            AddressFamilyDir("/dev/null"),
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
             BootstrapStatus(in_progress=False),
             BuildFileOptions(("BUILD",)),
             BuildFilePreludeSymbols(FrozenDict(), ()),
-            AddressFamilyDir("/dev/null"),
             RegisteredTargetTypes({}),
-            UnionMembership({}),
+            UnionMembership.empty(),
             MaybeBuildFileDependencyRulesImplementation(None),
             SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
+                [FileContent(path="/dev/null/BUILD", content=b"")]
             ),
-            MockGet(
-                output_type=OptionalAddressFamily,
-                input_types=(AddressFamilyDir,),
-                mock=lambda _: OptionalAddressFamily("/dev"),
+            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda _: SyntheticAddressMaps(),
+            "pants.engine.internals.build_files.parse_address_family": lambda *_: OptionalAddressFamily(
+                "/dev"
             ),
-            MockGet(
-                output_type=SyntheticAddressMaps,
-                input_types=(SyntheticAddressMapsRequest,),
-                mock=lambda _: SyntheticAddressMaps(),
-            ),
-            MockGet(
-                output_type=EnvironmentVars,
-                input_types=(EnvironmentVarsRequest, CompleteEnvironmentVars),
-                mock=lambda _1, _2: EnvironmentVars({}),
-            ),
-        ],
+            "pants.core.util_rules.env_vars.environment_vars_subset": lambda _1,
+            _2: EnvironmentVars({}),
+        },
     )
     assert optional_af.path == "/dev/null"
     assert optional_af.address_family is not None
     af = optional_af.address_family
     assert af.namespace == "/dev/null"
     assert len(af.name_to_target_adaptors) == 0
+
+
+def test_extend_synthetic_target() -> None:
+    optional_af = run_rule_with_mocks(
+        parse_address_family,
+        rule_args=[
+            AddressFamilyDir("/foo"),
+            Parser(
+                build_root="",
+                registered_target_types=RegisteredTargetTypes({"resource": ResourceTarget}),
+                union_membership=UnionMembership.empty(),
+                object_aliases=BuildFileAliases(),
+                ignore_unrecognized_symbols=False,
+            ),
+            BootstrapStatus(in_progress=False),
+            BuildFileOptions(("BUILD",)),
+            BuildFilePreludeSymbols(FrozenDict(), ()),
+            RegisteredTargetTypes({"resource": ResourceTarget}),
+            UnionMembership.empty(),
+            MaybeBuildFileDependencyRulesImplementation(None),
+            SessionValues({CompleteEnvironmentVars: CompleteEnvironmentVars({})}),
+        ],
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
+                [
+                    FileContent(
+                        path="/foo/BUILD.1", content=b"resource(name='aaa', description='a')"
+                    ),
+                    FileContent(
+                        path="/foo/BUILD.2",
+                        content=b"resource(name='bar', description='b', _extend_synthetic=True)",
+                    ),
+                ]
+            ),
+            "pants.engine.internals.synthetic_targets.get_synthetic_address_maps": lambda __implicitly: SyntheticAddressMaps(
+                [
+                    SyntheticAddressMap.create(
+                        "/foo/synthetic1",
+                        [
+                            TargetAdaptor("resource", "xxx", "", description="x"),
+                        ],
+                    ),
+                    SyntheticAddressMap.create(
+                        "/foo/synthetic2",
+                        [
+                            TargetAdaptor("resource", "yyy", ""),
+                            TargetAdaptor("resource", "bar", "", extend=42),
+                        ],
+                    ),
+                ]
+            ),
+            "pants.engine.internals.build_files.parse_address_family": lambda __implicitly: OptionalAddressFamily(
+                "/",
+                address_family=AddressFamily.create(
+                    "/",
+                    [],
+                    defaults=BuildFileDefaults(
+                        FrozenDict({"resource": FrozenDict({"description": "q"})})
+                    ),
+                ),
+            ),
+            "pants.core.util_rules.env_vars.environment_vars_subset": lambda _1,
+            _2: EnvironmentVars({}),
+        },
+    )
+    assert optional_af.path == "/foo"
+    assert optional_af.address_family is not None
+    af = optional_af.address_family
+    assert af.namespace == "/foo"
+
+    path, tgt = af.name_to_target_adaptors["aaa"]
+    assert path == "/foo/BUILD.1"
+    assert tgt.kwargs == FrozenDict({"description": "a"})
+
+    path, tgt = af.name_to_target_adaptors["xxx"]
+    assert path == "/foo/synthetic1"
+    assert tgt.kwargs == FrozenDict({"description": "x"})
+
+    path, tgt = af.name_to_target_adaptors["yyy"]
+    assert path == "/foo/synthetic2"
+    assert tgt.kwargs == FrozenDict({"description": "q"})
+
+    path, tgt = af.name_to_target_adaptors["bar"]
+    assert path == "/foo/BUILD.2"
+    assert tgt.kwargs == FrozenDict({"description": "b", "extend": 42})
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
@@ -121,22 +187,18 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({"target": GenericTarget}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents(
-                    [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
-                ),
-            ),
-        ],
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda __implicitly: DigestContents(
+                [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
+            )
+        },
     )
-    return cast(BuildFilePreludeSymbols, symbols)
+    return symbols
 
 
 def test_prelude_parsing_good() -> None:
@@ -259,9 +321,9 @@ def test_prelude_type_hint_code() -> None:
             extra_build_args: Optional[List[str]] = None,
             source: Optional[str] = None,
             target_stage: Optional[str] = None,
-            instructions: Optional[List[str]] = None,
+            instructions: Optional[list[str]] = None,
             repository: Optional[str] = None,
-            context_root: Optional[str] = None,
+            context_root: Union[str, None] = None,
             push_in_pants_ci: bool = True,
             push_latest: bool = False,
         ) -> int:
@@ -270,47 +332,25 @@ def test_prelude_type_hint_code() -> None:
     )
     result = run_prelude_parsing_rule(prelude_content)
     ecr_docker_image = result.info["ecr_docker_image"]
-    assert ecr_docker_image.signature in (
-        (
-            "(*,"
-            " name: Optional[str] = None,"
-            " dependencies: Optional[List[str]] = None,"
-            " image_tags: Optional[List[str]] = None,"
-            " git_tag_prefix: Optional[str] = None,"
-            " latest_tag_prefix: Optional[str] = None,"
-            " buildcache_tag: str = 'buildcache',"
-            " image_labels: Optional[Mapping[str, str]] = None,"
-            " tags: Optional[List[str]] = None,"
-            " extra_build_args: Optional[List[str]] = None,"
-            " source: Optional[str] = None,"
-            " target_stage: Optional[str] = None,"
-            " instructions: Optional[List[str]] = None,"
-            " repository: Optional[str] = None,"
-            " context_root: Optional[str] = None,"
-            " push_in_pants_ci: bool = True,"
-            " push_latest: bool = False"
-            ") -> int"
-        ),
-        (
-            "(*,"
-            " name: Union[str, NoneType] = None,"
-            " dependencies: Union[List[str], NoneType] = None,"
-            " image_tags: Union[List[str], NoneType] = None,"
-            " git_tag_prefix: Union[str, NoneType] = None,"
-            " latest_tag_prefix: Union[str, NoneType] = None,"
-            " buildcache_tag: str = 'buildcache',"
-            " image_labels: Union[Mapping[str, str], NoneType] = None,"
-            " tags: Union[List[str], NoneType] = None,"
-            " extra_build_args: Union[List[str], NoneType] = None,"
-            " source: Union[str, NoneType] = None,"
-            " target_stage: Union[str, NoneType] = None,"
-            " instructions: Union[List[str], NoneType] = None,"
-            " repository: Union[str, NoneType] = None,"
-            " context_root: Union[str, NoneType] = None,"
-            " push_in_pants_ci: bool = True,"
-            " push_latest: bool = False"
-            ") -> int"
-        ),
+    assert ecr_docker_image.signature == (
+        "(*,"
+        " name: str | None = None,"
+        " dependencies: List[str] | None = None,"
+        " image_tags: List[str] | None = None,"
+        " git_tag_prefix: str | None = None,"
+        " latest_tag_prefix: str | None = None,"
+        " buildcache_tag: str = 'buildcache',"
+        " image_labels: Mapping[str, str] | None = None,"
+        " tags: List[str] | None = None,"
+        " extra_build_args: List[str] | None = None,"
+        " source: str | None = None,"
+        " target_stage: str | None = None,"
+        " instructions: list[str] | None = None,"
+        " repository: str | None = None,"
+        " context_root: str | None = None,"
+        " push_in_pants_ci: bool = True,"
+        " push_latest: bool = False"
+        ") -> int"
     )
     assert 42 == ecr_docker_image.value()
 
@@ -350,6 +390,7 @@ def test_prelude_docstring_on_constant() -> None:
         """
     )
     result = run_prelude_parsing_rule(prelude_content)
+
     assert {"MACRO_CONST", "ANON", "Number", "MULTI_HINTS", "_PRIVATE", "untyped"} == set(
         result.info
     )
@@ -508,12 +549,12 @@ def test_target_adaptor_parsed_correctly(target_adaptor_rule_runner: RuleRunner)
     )
     assert target_adaptor.name is None
     assert target_adaptor.type_alias == "mock_tgt"
-    assert target_adaptor.kwargs["dependencies"] == [
+    assert target_adaptor.kwargs["dependencies"] == (
         ":dir",
         ":sibling",
         "helloworld/util",
         "helloworld/util:tests",
-    ]
+    )
     # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
     # when encountering this, but it's fine at this stage.
     assert target_adaptor.kwargs["fake_field"] == 42
@@ -549,7 +590,7 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
     )
     assert target_adaptor.name is None
     assert target_adaptor.kwargs["resolve"] == "mock"
-    assert target_adaptor.kwargs["tags"] == ["42"]
+    assert target_adaptor.kwargs["tags"] == ("42",)
 
     target_adaptor = target_adaptor_rule_runner.request(
         TargetAdaptor,
@@ -564,7 +605,7 @@ def test_target_adaptor_defaults_applied(target_adaptor_rule_runner: RuleRunner)
 
     # The defaults are not frozen until after the BUILD file have been fully parsed, so this is a
     # list rather than a tuple at this time.
-    assert target_adaptor.kwargs["tags"] == ["24"]
+    assert target_adaptor.kwargs["tags"] == ("24",)
 
 
 def test_generated_target_defaults(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -700,7 +741,7 @@ def test_default_parametrized_groups(target_adaptor_rule_runner: RuleRunner) -> 
     )
     targets = tuple(Parametrize.expand(address, target_adaptor.kwargs))
     assert targets == (
-        (address.parametrize(dict(parametrize="a")), dict(tags=["from target"])),
+        (address.parametrize(dict(parametrize="a")), dict(tags=("from target",))),
         (address.parametrize(dict(parametrize="b")), dict(tags=("from b",))),
     )
 
@@ -787,8 +828,8 @@ def test_augment_target_field_defaults(target_adaptor_rule_runner: RuleRunner) -
         TargetAdaptor,
         [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
     )
-    assert target_adaptor.kwargs["sources"] == ["*.added", "*.mock"]
-    assert target_adaptor.kwargs["tags"] == ["custom-tag", "default-tag"]
+    assert target_adaptor.kwargs["sources"] == ("*.added", "*.mock")
+    assert target_adaptor.kwargs["tags"] == ("custom-tag", "default-tag")
 
 
 def test_target_adaptor_not_found(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -844,39 +885,35 @@ def test_build_files_share_globals() -> None:
             Parser(
                 build_root="",
                 registered_target_types=RegisteredTargetTypes({}),
-                union_membership=UnionMembership({}),
+                union_membership=UnionMembership.empty(),
                 object_aliases=BuildFileAliases(),
                 ignore_unrecognized_symbols=False,
             ),
         ],
-        mock_gets=[
-            MockGet(
-                output_type=DigestContents,
-                input_types=(PathGlobs,),
-                mock=lambda _: DigestContents(
-                    [
-                        FileContent(
-                            path="/dev/null/prelude1",
-                            content=dedent(
-                                """\
+        mock_calls={
+            "pants.engine.intrinsics.get_digest_contents": lambda _: DigestContents(
+                [
+                    FileContent(
+                        path="/dev/null/prelude1",
+                        content=dedent(
+                            """\
                                 def hello():
                                     pass
                                 """
-                            ).encode(),
-                        ),
-                        FileContent(
-                            path="/dev/null/prelude2",
-                            content=dedent(
-                                """\
+                        ).encode(),
+                    ),
+                    FileContent(
+                        path="/dev/null/prelude2",
+                        content=dedent(
+                            """\
                                 def world():
                                     pass
                                 """
-                            ).encode(),
-                        ),
-                    ]
-                ),
+                        ).encode(),
+                    ),
+                ]
             ),
-        ],
+        },
     )
     assert symbols.symbols["hello"].__globals__ is symbols.symbols["world"].__globals__
     assert "world" in symbols.symbols["hello"].__globals__
@@ -995,7 +1032,7 @@ def test_build_file_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
         [TargetAdaptorRequest(Address(""), description_of_origin="tests")],
     )
     assert target_adaptor.kwargs["description"] == "from env"
-    assert target_adaptor.kwargs["tags"] == ["default", "tag"]
+    assert target_adaptor.kwargs["tags"] == ("default", "tag")
 
 
 def test_prelude_env_vars(target_adaptor_rule_runner: RuleRunner) -> None:
@@ -1048,7 +1085,7 @@ def test_invalid_build_file_env_vars(caplog, target_adaptor_rule_runner: RuleRun
         [TargetAdaptorRequest(Address("src/bad"), description_of_origin="tests")],
     )
     assert target_adaptor.kwargs["description"] is None
-    assert target_adaptor.kwargs["tags"] == ["tag-from-env"]
+    assert target_adaptor.kwargs["tags"] == ("tag-from-env",)
     assert_logged(
         caplog,
         [
@@ -1079,7 +1116,7 @@ def test_build_file_parse_error(target_adaptor_rule_runner: RuleRunner) -> None:
             ),
         },
     )
-    with pytest.raises(ExecutionError, match='File "src/bad/BUILD", line 3'):
+    with pytest.raises(ExecutionError, match='File "src/bad/BUILD", line 2'):
         target_adaptor_rule_runner.request(
             TargetAdaptor,
             [
@@ -1142,3 +1179,31 @@ def test_build_file_syntax_error(filename, contents, expect_failure, expected_me
 
     else:
         BUILDFileEnvVarExtractor.get_env_vars(MockFileContent(filename, contents))
+
+
+def test_build_file_duplicate_declared_names() -> None:
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt],
+    )
+    rule_runner.write_files(
+        {
+            "src/BUILD.foo": dedent(
+                """\
+                # Define a target.
+                mock_tgt(name="foo")
+                """
+            ),
+            "src/BUILD.bar": dedent(
+                """\
+                # Define a target..
+                mock_tgt(name="foo")
+                """
+            ),
+        },
+    )
+    with pytest.raises(
+        ExecutionError,
+        match="A target already exists at `src/BUILD.bar` with name `foo` and target type `mock_tgt`",
+    ):
+        _ = rule_runner.request(AddressFamily, [AddressFamilyDir("src")])

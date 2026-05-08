@@ -43,8 +43,12 @@ from pants.backend.nfpm.target_types import (
 )
 from pants.engine.addresses import Address
 from pants.engine.target import DescriptionField
+from pants.util.frozendict import FrozenDict
 
 MTIME = NfpmPackageMtimeField.default
+
+ADDRESS = Address("", target_name="t")
+INJECTED = FrozenDict({NfpmVersionField: NfpmVersionField("9.8.7", ADDRESS)})
 
 
 def test_generate_nfpm_config_for_apk():
@@ -67,7 +71,7 @@ def test_generate_nfpm_config_for_apk():
             NfpmLicenseField.alias: "MIT",
             NfpmApkDependsField.alias: depends,
         },
-        Address("", target_name="t"),
+        ADDRESS,
     )
     expected_nfpm_config = {
         "disable_globbing": True,
@@ -90,8 +94,12 @@ def test_generate_nfpm_config_for_apk():
     }
 
     field_set = NfpmApkPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, default_mtime=MTIME)
+    nfpm_config = field_set.nfpm_config(tgt, FrozenDict({}), default_mtime=MTIME)
     assert nfpm_config == expected_nfpm_config
+
+    nfpm_config_2 = field_set.nfpm_config(tgt, INJECTED, default_mtime=MTIME)
+    assert nfpm_config["version"] != nfpm_config_2["version"]
+    assert nfpm_config_2["version"] == "9.8.7"
 
 
 def test_generate_nfpm_config_for_archlinux():
@@ -114,7 +122,7 @@ def test_generate_nfpm_config_for_archlinux():
             NfpmLicenseField.alias: "MIT",
             NfpmArchlinuxDependsField.alias: depends,
         },
-        Address("", target_name="t"),
+        ADDRESS,
     )
     expected_nfpm_config = {
         "disable_globbing": True,
@@ -137,8 +145,12 @@ def test_generate_nfpm_config_for_archlinux():
     }
 
     field_set = NfpmArchlinuxPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, default_mtime=MTIME)
+    nfpm_config = field_set.nfpm_config(tgt, FrozenDict({}), default_mtime=MTIME)
     assert nfpm_config == expected_nfpm_config
+
+    nfpm_config_2 = field_set.nfpm_config(tgt, INJECTED, default_mtime=MTIME)
+    assert nfpm_config["version"] != nfpm_config_2["version"]
+    assert nfpm_config_2["version"] == "9.8.7"
 
 
 def test_generate_nfpm_config_for_deb():
@@ -164,7 +176,7 @@ def test_generate_nfpm_config_for_deb():
             NfpmDebFieldsField.alias: {"Urgency": "high (critical for landlubbers)"},
             NfpmDebTriggersField.alias: {"interest_noawait": ["some-trigger", "other-trigger"]},
         },
-        Address("", target_name="t"),
+        ADDRESS,
     )
     expected_nfpm_config = {
         "disable_globbing": True,
@@ -193,8 +205,12 @@ def test_generate_nfpm_config_for_deb():
     }
 
     field_set = NfpmDebPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, default_mtime=MTIME)
+    nfpm_config = field_set.nfpm_config(tgt, FrozenDict({}), default_mtime=MTIME)
     assert nfpm_config == expected_nfpm_config
+
+    nfpm_config_2 = field_set.nfpm_config(tgt, INJECTED, default_mtime=MTIME)
+    assert nfpm_config["version"] != nfpm_config_2["version"]
+    assert nfpm_config_2["version"] == "9.8.7"
 
 
 def test_generate_nfpm_config_for_rpm():
@@ -219,7 +235,7 @@ def test_generate_nfpm_config_for_rpm():
             NfpmRpmPrefixesField.alias: ["/", "/usr", "/opt/treasure"],
             NfpmRpmGhostContents.alias: ["/var/log/captains.log"],
         },
-        Address("", target_name="t"),
+        ADDRESS,
     )
     expected_nfpm_config = {
         "disable_globbing": True,
@@ -247,5 +263,9 @@ def test_generate_nfpm_config_for_rpm():
     }
 
     field_set = NfpmRpmPackageFieldSet.create(tgt)
-    nfpm_config = field_set.nfpm_config(tgt, default_mtime=MTIME)
+    nfpm_config = field_set.nfpm_config(tgt, FrozenDict({}), default_mtime=MTIME)
     assert nfpm_config == expected_nfpm_config
+
+    nfpm_config_2 = field_set.nfpm_config(tgt, INJECTED, default_mtime=MTIME)
+    assert nfpm_config["version"] != nfpm_config_2["version"]
+    assert nfpm_config_2["version"] == "9.8.7"

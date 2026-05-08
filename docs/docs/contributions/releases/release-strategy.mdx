@@ -44,6 +44,8 @@ We try our best to write bug-free code, but, like everyone, we sometimes make mi
 If you encounter a bug, please gently let us know by opening a GitHub issue or messaging us on Slack. See [Community](/community/members).
 :::
 
+How many fixes are backported to which stable release will vary over time with community needs and activity.  As a default assumption, there ought not be more than three stable release branches active ("stable", "oldstable", "oldoldstable" to borrow the Debian terms).  If you have a particular need for backports to stable releases, consider engaging with [Service Providers](https://www.pantsbuild.org/spotlight/service-providers).
+
 ### Stable release managers
 
 Our weekly [release process](./release-process.mdx) is executed by a rotating "maintainer of the week" (MOTW). But because the entire stable release process (through `dev`s, to an `a`, past `rc`s, etc) can take 8 to 12 weeks, we additionally assign a release manager per stable release to have an overarching view and drive the manual steps of a release that are not covered by the weekly process.
@@ -94,7 +96,7 @@ Dev releases are named with the major, minor, and patch version, and end in `.de
 Dev releases can include any changes, so long as they comply with the [Deprecation policy](../../releases/deprecation-policy.mdx).
 
 :::note How many dev releases until starting a release candidate?
-Usually, we release 3-4 dev releases before switching to the alpha release `a0`. This means we usually release `dev0`, `dev1`, `dev2`, sometimes `dev3`, and then `a0`.
+Usually, we release about six dev releases (aligning with the desired stable release cadence) before switching to the alpha release `a0`. This means we usually release `dev0`, `dev1`, etc through about `dev5`, and then `a0`.
 
 We try to limit the number of changes in each stable release to make it easier for users to upgrade. If the dev releases have been particularly disruptive, such as making major deprecations, we may start a release candidate sooner, such as after `dev1`.
 :::

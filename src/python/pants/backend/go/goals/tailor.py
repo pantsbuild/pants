@@ -17,7 +17,10 @@ from pants.backend.go.target_types import (
     GoPackageSourcesField,
     GoPackageTarget,
 )
-from pants.backend.go.util_rules.binary import GoBinaryMainPackage, GoBinaryMainPackageRequest
+from pants.backend.go.util_rules.binary import (
+    GoBinaryMainPackageRequest,
+    determine_main_pkg_for_go_binary,
+)
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.core.goals.tailor import (
     AllOwnedSources,
@@ -25,9 +28,10 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import DigestContents, PathGlobs, Paths
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import UnexpandedTargets
+from pants.engine.fs import PathGlobs
+from pants.engine.internals.graph import resolve_unexpanded_targets
+from pants.engine.intrinsics import get_digest_contents, path_globs_to_paths
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
@@ -68,7 +72,7 @@ async def _find_go_mod_targets(
 async def _find_cgo_sources(
     path: str, all_owned_sources: AllOwnedSources
 ) -> tuple[list[str], list[str]]:
-    all_files_in_package = await Get(Paths, PathGlobs([str(PurePath(path, "*"))]))
+    all_files_in_package = await path_globs_to_paths(PathGlobs([str(PurePath(path, "*"))]))
     ext_to_files: dict[str, set[str]] = defaultdict(set)
     for file_path in all_files_in_package.files:
         for ext in GoPackageSourcesField.expected_file_extensions:
@@ -145,16 +149,16 @@ async def _find_go_package_targets(
     all_go_mod_dirs: frozenset[str],
     all_owned_sources: AllOwnedSources,
 ) -> list[PutativeTarget]:
-    all_go_files = await Get(Paths, PathGlobs, request.path_globs("*.go"))
+    all_go_files = await path_globs_to_paths(request.path_globs("*.go"))
     unowned_go_files = set(all_go_files.files) - set(all_owned_sources)
-    candidate_putative_targets = await MultiGet(
-        Get(
-            FindPutativeGoPackageTargetResult,
+    candidate_putative_targets = await concurrently(
+        find_putative_go_package_target(
             FindPutativeGoPackageTargetRequest(
                 dir_path=dirname,
                 files=tuple(filenames),
                 all_go_mod_dirs=all_go_mod_dirs,
             ),
+            **implicitly(),
         )
         for dirname, filenames in group_by_dir(unowned_go_files).items()
     )
@@ -168,7 +172,9 @@ async def _find_go_package_targets(
 async def _find_go_binary_targets(
     request: PutativeGoTargetsRequest, all_go_mod_dirs: frozenset[str]
 ) -> list[PutativeTarget]:
-    all_go_files_digest_contents = await Get(DigestContents, PathGlobs, request.path_globs("*.go"))
+    all_go_files_digest_contents = await get_digest_contents(
+        **implicitly(request.path_globs("*.go"))
+    )
 
     main_package_dirs = []
     for file_content in all_go_files_digest_contents:
@@ -176,15 +182,16 @@ async def _find_go_binary_targets(
         if has_package_main(file_content.content) and has_go_mod_ancestor(dirname, all_go_mod_dirs):
             main_package_dirs.append(dirname)
 
-    existing_targets = await Get(
-        UnexpandedTargets,
-        RawSpecs(
-            ancestor_globs=tuple(AncestorGlobSpec(d) for d in main_package_dirs),
-            description_of_origin="the `go_binary` tailor rule",
-        ),
+    existing_targets = await resolve_unexpanded_targets(
+        **implicitly(
+            RawSpecs(
+                ancestor_globs=tuple(AncestorGlobSpec(d) for d in main_package_dirs),
+                description_of_origin="the `go_binary` tailor rule",
+            ),
+        )
     )
-    owned_main_packages = await MultiGet(
-        Get(GoBinaryMainPackage, GoBinaryMainPackageRequest(t[GoBinaryMainPackageField]))
+    owned_main_packages = await concurrently(
+        determine_main_pkg_for_go_binary(GoBinaryMainPackageRequest(t[GoBinaryMainPackageField]))
         for t in existing_targets
         if t.has_field(GoBinaryMainPackageField)
     )
@@ -212,7 +219,7 @@ async def find_putative_go_targets(
     golang_subsystem: GolangSubsystem,
 ) -> PutativeTargets:
     putative_targets = []
-    _all_go_mod_paths = await Get(Paths, PathGlobs, request.path_globs("go.mod"))
+    _all_go_mod_paths = await path_globs_to_paths(request.path_globs("go.mod"))
     all_go_mod_files = set(_all_go_mod_paths.files)
     all_go_mod_dirs = frozenset(os.path.dirname(fp) for fp in all_go_mod_files)
 

@@ -11,7 +11,7 @@ Use Golang modules from private repositories
 Pants can build go binaries that use modules from private git repositories.
 To do this specify the private repo(s) in `GOPRIVATE` and provide credentials for the git repo in your `$HOME/.netrc`.
 
-Define the `GOPRIVATE` variable in the `subprocess_env_vars` section of your `pants.toml`. The example below shows the `.netrc` file so that git can authentcate. A simple `go.mod` shows the inclusion of the private module, nothing special here.
+Define the `GOPRIVATE` variable in the `subprocess_env_vars` section of your `pants.toml`. The example below shows the `.netrc` file so that git can authenticate. A simple `go.mod` shows the inclusion of the private module, nothing special here.
 
 
 ```toml tab={"label":"pants.toml"}

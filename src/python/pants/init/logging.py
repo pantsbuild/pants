@@ -7,11 +7,11 @@ import http.client
 import locale
 import logging
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
 from logging import Formatter, Handler, LogRecord
 from pathlib import PurePath
-from typing import Iterator
 
 import pants.util.logging as pants_logging
 from pants.engine.internals import native_engine

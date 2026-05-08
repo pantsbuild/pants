@@ -339,6 +339,5 @@ def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
     result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
     assert result.returncode == 0
     assert result.stdout == (
-        b">> Hello world! <<\n"
-        b"Don't communicate by sharing memory, share memory by communicating.\n"
+        b">> Hello world! <<\nDon't communicate by sharing memory, share memory by communicating.\n"
     )

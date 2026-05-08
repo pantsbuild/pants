@@ -7,13 +7,17 @@ import functools
 import inspect
 import re
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterable, Sequence, TypeVar, cast
+from collections.abc import Callable, Iterable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
 
+from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.engine.env_vars import EnvironmentVars, EnvironmentVarsRequest
-from pants.engine.internals.selectors import AwaitableConstraints, Get
+from pants.engine.internals.options_parsing import scope_options
+from pants.engine.internals.selectors import AwaitableConstraints
+from pants.engine.rules import implicitly
 from pants.engine.unions import UnionMembership, UnionRule, distinct_union_type_per_subclass
 from pants.option.errors import OptionsError
-from pants.option.option_types import OptionsInfo, collect_options_info
+from pants.option.option_types import OptionInfo, collect_options_info
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo, normalize_scope
@@ -22,7 +26,7 @@ from pants.util.strutil import softwrap
 
 if TYPE_CHECKING:
     # Needed to avoid an import cycle.
-    from pants.core.util_rules.environments import EnvironmentTarget
+    from pants.core.environments.target_types import EnvironmentTarget
     from pants.engine.rules import Rule
 
 _SubsystemT = TypeVar("_SubsystemT", bound="Subsystem")
@@ -50,6 +54,11 @@ class _SubsystemMeta(ABCMeta):
                     ),
                     {},
                 )
+            # A marker that allows initialization code to check for EnvironmentAware subclasses
+            # without having to import Subsystem.EnvironmentAware and use issubclass(), which
+            # can cause a dependency cycle.
+            self.EnvironmentAware.__subsystem_environment_aware__ = True
+
             self.EnvironmentAware.subsystem = self
 
 
@@ -64,6 +73,10 @@ class Subsystem(metaclass=_SubsystemMeta):
     hard wrapping (`\n`) to separate distinct paragraphs and/or lists.
     """
 
+    # A marker that allows initialization code to check for Subsystem subclasses without
+    # having to import Subsystem and use issubclass(), which can cause a dependency cycle.
+    __subsystem__ = True
+
     options_scope: str
     help: ClassVar[str | Callable[[], str]]
 
@@ -74,7 +87,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     deprecated_options_scope: str | None = None
     deprecated_options_scope_removal_version: str | None = None
 
-    # // Note: must be aligned with the regex in src/rust/engine/options/src/id.rs.
+    # // Note: must be aligned with the regex in src/rust/options/src/id.rs.
     _scope_name_re = re.compile(r"^(?:[a-z0-9_])+(?:-(?:[a-z0-9_])+)*$")
 
     _rules: ClassVar[Sequence[Rule] | None] = None
@@ -103,7 +116,7 @@ class Subsystem(metaclass=_SubsystemMeta):
         _options_env: EnvironmentVars = EnvironmentVars()
 
         def __getattribute__(self, __name: str) -> Any:
-            from pants.core.util_rules.environments import resolve_environment_sensitive_option
+            from pants.core.environments.rules import resolve_environment_sensitive_option
 
             # Will raise an `AttributeError` if the attribute is not defined.
             # MyPy should stop that from ever happening.
@@ -118,12 +131,12 @@ class Subsystem(metaclass=_SubsystemMeta):
                 return default
 
             # Resolving an attribute on the class object will return the underlying descriptor.
-            # If the descriptor is an `OptionsInfo`, we can resolve it against the environment
+            # If the descriptor is an `OptionInfo`, we can resolve it against the environment
             # target.
-            if isinstance(v, OptionsInfo):
+            if isinstance(v, OptionInfo):
                 # If the value is not defined in the `EnvironmentTarget`, return the value
                 # from the options system.
-                override = resolve_environment_sensitive_option(v.flag_names[0], self)
+                override = resolve_environment_sensitive_option(v.args[0], self)
                 return override if override is not None else default
 
             # We should just return the default at this point.
@@ -131,22 +144,22 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         def _is_default(self, __name: str) -> bool:
             """Returns true if the value of the named option is unchanged from the default."""
-            from pants.core.util_rules.environments import resolve_environment_sensitive_option
+            from pants.core.environments.rules import resolve_environment_sensitive_option
 
             v = getattr(type(self), __name)
-            assert isinstance(v, OptionsInfo)
+            assert isinstance(v, OptionInfo)
 
             return (
                 # vars beginning with `_` are exposed as option names with the leading `_` stripped
                 self.options.is_default(__name.lstrip("_"))
-                and resolve_environment_sensitive_option(v.flag_names[0], self) is None
+                and resolve_environment_sensitive_option(v.args[0], self) is None
             )
 
     @classmethod
     def rules(cls: Any) -> Iterable[Rule]:
         # NB: This avoids using `memoized_classmethod` until its interaction with `mypy` can be improved.
         if cls._rules is None:
-            from pants.core.util_rules.environments import add_option_fields_for
+            from pants.core.environments.rules import add_option_fields_for
             from pants.engine.rules import Rule
 
             # nb. `rules` needs to be memoized so that repeated calls to add these rules
@@ -204,11 +217,13 @@ class Subsystem(metaclass=_SubsystemMeta):
             parameters=FrozenDict(),
             awaitables=(
                 AwaitableConstraints(
-                    rule_id=None,
+                    rule_id="pants.engine.internals.options_parsing.scope_options",
                     output_type=ScopedOptions,
-                    explicit_args_arity=0,
-                    input_types=(Scope,),
-                    is_effect=False,
+                    explicit_args_arity=1,
+                    # NB: For a call-by-name, the input_types are the explicit ones provided
+                    # in a map passed to **implicitly(), and our call to this rule uses a
+                    # positional arg and an empty **implicitly(), so input_types are empty here.
+                    input_types=tuple(),
                 ),
             ),
             masked_types=(),
@@ -220,7 +235,7 @@ class Subsystem(metaclass=_SubsystemMeta):
     def _construct_env_aware_rule(cls) -> Rule:
         """Returns a `TaskRule` that will construct the target Subsystem.EnvironmentAware."""
         # Global-level imports are conditional, we need to re-import here for runtime use
-        from pants.core.util_rules.environments import EnvironmentTarget
+        from pants.core.environments.target_types import EnvironmentTarget
         from pants.engine.rules import TaskRule
 
         snake_scope = normalize_scope(cls.options_scope)
@@ -238,11 +253,13 @@ class Subsystem(metaclass=_SubsystemMeta):
             parameters=FrozenDict({"subsystem_instance": cls, "env_tgt": EnvironmentTarget}),
             awaitables=(
                 AwaitableConstraints(
-                    rule_id=None,
+                    rule_id="pants.core.util_rules.env_vars.environment_vars_subset",
                     output_type=EnvironmentVars,
-                    explicit_args_arity=0,
-                    input_types=(EnvironmentVarsRequest,),
-                    is_effect=False,
+                    explicit_args_arity=1,
+                    # NB: For a call-by-name, the input_types are the explicit ones provided
+                    # in a map passed to **implicitly(), and our call to this rule uses a
+                    # positional arg and an empty **implicitly(), so input_types are empty here.
+                    input_types=tuple(),
                 ),
             ),
             masked_types=(),
@@ -288,35 +305,34 @@ class Subsystem(metaclass=_SubsystemMeta):
 
         Subclasses should not generally need to override this method.
         """
-        register = options.registration_function_for_subsystem(cls)
+
+        def register(*args, **kwargs):
+            options.register(cls.options_scope, *args, **kwargs)
+
         plugin_option_containers = union_membership.get(cls.PluginOption)
         for options_info in collect_options_info(cls):
-            register(*options_info.flag_names, **options_info.flag_options)
+            register(*options_info.args, **options_info.kwargs)
         for options_info in collect_options_info(cls.EnvironmentAware):
-            register(*options_info.flag_names, environment_aware=True, **options_info.flag_options)
+            register(*options_info.args, environment_aware=True, **options_info.kwargs)
         for options_info in (
             option
             for container in plugin_option_containers
             for option in collect_options_info(container)
         ):
-            register(*options_info.flag_names, **options_info.flag_options)
-
-        # NB: If the class defined `register_options` we should call it
-        if "register_options" in cls.__dict__:
-            cls.register_options(register)  # type: ignore[attr-defined]
+            register(*options_info.args, **options_info.kwargs)
 
     def __init__(self, options: OptionValueContainer) -> None:
         self.validate_scope()
         self.options = options
 
     def __eq__(self, other: Any) -> bool:
-        if type(self) != type(other):
+        if type(self) != type(other):  # noqa: E721
             return False
         return bool(self.options == other.options)
 
 
 async def _construct_subsystem(subsystem_typ: type[_SubsystemT]) -> _SubsystemT:
-    scoped_options = await Get(ScopedOptions, Scope(str(subsystem_typ.options_scope)))
+    scoped_options = await scope_options(Scope(str(subsystem_typ.options_scope)), **implicitly())
     return subsystem_typ(scoped_options.options)
 
 
@@ -334,8 +350,8 @@ async def _construct_env_aware(
     t.env_tgt = env_tgt
 
     if t.env_vars_used_by_options:
-        t._options_env = await Get(
-            EnvironmentVars, EnvironmentVarsRequest(t.env_vars_used_by_options)
+        t._options_env = await environment_vars_subset(
+            EnvironmentVarsRequest(t.env_vars_used_by_options), **implicitly()
         )
 
     return t

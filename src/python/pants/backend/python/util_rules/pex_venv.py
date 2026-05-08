@@ -11,8 +11,9 @@ from pants.backend.python.util_rules.pex import CompletePlatforms, Pex, PexPlatf
 from pants.backend.python.util_rules.pex_cli import PexCliProcess
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import MergeDigests
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.intrinsics import merge_digests
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 
 
 class PexVenvLayout(Enum):
@@ -59,38 +60,31 @@ async def pex_venv(request: PexVenvRequest) -> PexVenv:
         output_files = []
         output_directories = [str(request.output_path)]
 
-    input_digest = await Get(
-        Digest,
-        MergeDigests(
-            [
-                request.pex.digest,
-                request.complete_platforms.digest,
-            ]
-        ),
+    input_digest = await merge_digests(
+        MergeDigests([request.pex.digest, request.complete_platforms.digest])
     )
-
-    result = await Get(
-        ProcessResult,
-        PexCliProcess(
-            subcommand=("venv", "create"),
-            extra_args=(
-                f"--dest-dir={dest_dir}",
-                f"--pex-repository={request.pex.name}",
-                f"--layout={request.layout.value}",
-                *((f"--prefix={request.prefix}",) if request.prefix is not None else ()),
-                # NB. Specifying more than one of these args doesn't make sense for `venv
-                # create`. Incorrect usage will be surfaced as a subprocess failure.
-                *request.platforms.generate_pex_arg_list(),
-                *request.complete_platforms.generate_pex_arg_list(),
-                *request.extra_args,
-            ),
-            additional_input_digest=input_digest,
-            output_files=output_files,
-            output_directories=output_directories,
-            description=request.description,
-        ),
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            PexCliProcess(
+                subcommand=("venv", "create"),
+                extra_args=(
+                    f"--dest-dir={dest_dir}",
+                    f"--pex-repository={request.pex.name}",
+                    f"--layout={request.layout.value}",
+                    *((f"--prefix={request.prefix}",) if request.prefix is not None else ()),
+                    # NB. Specifying more than one of these args doesn't make sense for `venv
+                    # create`. Incorrect usage will be surfaced as a subprocess failure.
+                    *request.platforms.generate_pex_arg_list(),
+                    *request.complete_platforms.generate_pex_arg_list(),
+                    *request.extra_args,
+                ),
+                additional_input_digest=input_digest,
+                output_files=output_files,
+                output_directories=output_directories,
+                description=request.description,
+            )
+        )
     )
-
     return PexVenv(digest=result.output_digest, path=request.output_path)
 
 

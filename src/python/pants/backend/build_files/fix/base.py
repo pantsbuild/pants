@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.build_files.utils import _get_build_file_partitioner_rules
 from pants.core.goals.fix import FixFilesRequest

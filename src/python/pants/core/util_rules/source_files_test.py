@@ -4,9 +4,10 @@
 from __future__ import annotations
 
 import itertools
+from collections.abc import Iterable
 from functools import partial
 from pathlib import PurePath
-from typing import Iterable, NamedTuple
+from typing import NamedTuple
 
 import pytest
 
@@ -58,7 +59,7 @@ def mock_sources_field(
         sources.source_files if include_sources else [],
         Address(sources.source_root, target_name="lib"),
     )
-    rule_runner.write_files({fp: "" for fp in sources.full_paths})
+    rule_runner.write_files(dict.fromkeys(sources.full_paths, ""))
     return sources_field
 
 

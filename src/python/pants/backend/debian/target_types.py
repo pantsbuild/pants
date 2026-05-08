@@ -1,7 +1,7 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from collections.abc import Sequence
 from pathlib import PurePath
-from typing import Sequence
 
 from pants.core.goals.package import OutputPathField
 from pants.engine.target import (
@@ -120,6 +120,6 @@ class DebianPackage(Target):
         This will not install the package, only create a `.deb` file
         that you can then distribute and install, e.g. via `dpkg`.
 
-        See {doc_url('reference/targets/debian_package')}.
+        See {doc_url("reference/targets/debian_package")}.
         """
     )

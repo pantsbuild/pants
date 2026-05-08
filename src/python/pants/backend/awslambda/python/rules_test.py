@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from io import BytesIO
@@ -55,7 +56,7 @@ from pants.engine.fs import DigestContents
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import FieldSet
 from pants.testutil.python_rule_runner import PythonRuleRunner
-from pants.testutil.rule_runner import MockGet, QueryRule, run_rule_with_mocks
+from pants.testutil.rule_runner import QueryRule, run_rule_with_mocks
 
 
 @pytest.fixture
@@ -92,6 +93,7 @@ def create_python_awslambda(
     rule_runner: PythonRuleRunner,
     addr: Address,
     *,
+    expected_metadata: dict[str, str],
     expected_extra_log_lines: tuple[str, ...],
     extra_args: list[str] | None = None,
     layer: bool = False,
@@ -108,10 +110,16 @@ def create_python_awslambda(
     built_asset = rule_runner.request(BuiltPackage, [field_set.create(target)])
     assert expected_extra_log_lines == built_asset.artifacts[0].extra_log_lines
     digest_contents = rule_runner.request(DigestContents, [built_asset.digest])
-    assert len(digest_contents) == 1
+    assert len(digest_contents) == 2
+    artifact, metadata = digest_contents
+
     relpath = built_asset.artifacts[0].relpath
     assert relpath is not None
-    return relpath, digest_contents[0].content
+
+    assert f"{relpath}.metadata.json" == metadata.path
+    assert expected_metadata == json.loads(metadata.content)
+
+    return relpath, artifact.content
 
 
 @pytest.fixture
@@ -186,6 +194,11 @@ def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
     zip_file_relpath, _ = create_python_awslambda(
         rule_runner,
         Address("src/py/project", target_name="lambda"),
+        expected_metadata={
+            "runtime": "python3.8",
+            "architecture": FaaSArchitecture.X86_64.value,
+            "handler": "lambda_function.handler",
+        },
         expected_extra_log_lines=(
             "    Runtime: python3.8",
             f"    Architecture: {FaaSArchitecture.X86_64.value}",
@@ -274,6 +287,11 @@ def test_create_hello_world_lambda(
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
+        expected_metadata={
+            "runtime": "python3.8",
+            "architecture": architecture.value,
+            "handler": "lambda_function.handler",
+        },
         expected_extra_log_lines=(
             "    Runtime: python3.8",
             f"    Architecture: {architecture.value}",
@@ -293,6 +311,11 @@ def test_create_hello_world_lambda(
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
+        expected_metadata={
+            "runtime": "python3.8",
+            "architecture": architecture.value,
+            "handler": "lambda_function.handler",
+        },
         expected_extra_log_lines=(
             "    Runtime: python3.8",
             f"    Architecture: {architecture.value}",
@@ -353,6 +376,7 @@ def test_create_hello_world_layer(
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="lambda"),
+        expected_metadata={"runtime": "python3.8", "architecture": architecture.value},
         expected_extra_log_lines=(
             "    Runtime: python3.8",
             f"    Architecture: {architecture.value}",
@@ -371,6 +395,7 @@ def test_create_hello_world_layer(
     zip_file_relpath, content = create_python_awslambda(
         rule_runner,
         Address("src/python/foo/bar", target_name="slimlambda"),
+        expected_metadata={"runtime": "python3.8", "architecture": architecture.value},
         expected_extra_log_lines=(
             "    Runtime: python3.8",
             f"    Architecture: {architecture.value}",
@@ -398,6 +423,7 @@ def test_layer_must_have_dependencies(rule_runner: PythonRuleRunner) -> None:
         create_python_awslambda(
             rule_runner,
             Address("", target_name="lambda"),
+            expected_metadata={"runtime": "python3.8"},
             expected_extra_log_lines=("    Runtime: python3.8",),
             layer=True,
         )
@@ -451,11 +477,9 @@ def test_pex3_venv_create_extra_args_are_passed_through(
     run_rule_with_mocks(
         rule,
         rule_args=[field_set],
-        mock_gets=[
-            MockGet(
-                output_type=BuiltPackage, input_types=(BuildPythonFaaSRequest,), mock=mocked_build
-            )
-        ],
+        mock_calls={
+            "pants.backend.python.util_rules.faas.build_python_faas": mocked_build,
+        },
     )
 
     # Verify

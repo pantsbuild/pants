@@ -63,6 +63,7 @@ def run_run_request(
         return mocked_console[1].get_stdout().strip()
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "interpreter_constraints, expected_version_substring",
     [("2.7.*", "2.7"), ("3.9.*", "3.9"), ("3.10.4", "3.10.4")],

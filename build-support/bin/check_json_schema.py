@@ -8,6 +8,7 @@ Live run:
     $ ./pants run build-support/bin/generate_json_schema.py -- --all-help-file=all-help.json
     $ ./pants run build-support/bin/check_json_schema.py -- --schema="pantsbuild-$(./pants version).json"
 """
+
 import argparse
 import getpass
 import json

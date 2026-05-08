@@ -1,0 +1,17 @@
+[package]
+name = "cache"
+version = "0.0.1"
+edition = "2024"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[dependencies]
+bytes = { workspace = true }
+grpc_util = { path = "../grpc_util" }
+hashing = { path = "../hashing" }
+protos = { path = "../protos" }
+sharded_lmdb = { path = "../sharded_lmdb" }
+task_executor = { path = "../task_executor" }
+
+[lints]
+workspace = true

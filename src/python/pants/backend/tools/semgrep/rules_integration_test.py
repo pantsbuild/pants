@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from textwrap import dedent
-from typing import Sequence
 
 import pytest
 
@@ -162,6 +162,7 @@ def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
     )
 
 
+@pytest.mark.platform_specific_behavior
 @pytest.mark.parametrize(
     "files,config_name",
     [

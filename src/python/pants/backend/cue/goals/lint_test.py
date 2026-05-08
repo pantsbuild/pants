@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections import namedtuple
+from collections.abc import Iterable
 from textwrap import dedent
-from typing import Any, Iterable
+from typing import Any
 
 import pytest
 

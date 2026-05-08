@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.engine.environment import EnvironmentName

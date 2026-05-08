@@ -4,8 +4,9 @@
 from __future__ import annotations
 
 import os.path
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Mapping, TypeVar
+from typing import TypeVar
 
 from pants.backend.project_info.filter_targets import FilterSubsystem
 from pants.base.exceptions import MappingError
@@ -22,6 +23,7 @@ from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.target import RegisteredTargetTypes, Tags, Target
 from pants.util.filtering import TargetFilter, and_filters, create_filters
+from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 
 
@@ -32,12 +34,18 @@ class DuplicateNameError(MappingError):
 AddressMapT = TypeVar("AddressMapT", bound="AddressMap")
 
 
+# A pseudo-spec to refer to deleted paths.
+DELETED_SPEC_PATH = "__deleted"
+# A pseudo-target type to refer to deleted paths.
+DELETED_TARGET_TYPE = "__deleted_target"
+
+
 @dataclass(frozen=True)
 class AddressMap:
     """Maps target adaptors from a byte source."""
 
     path: str
-    name_to_target_adaptor: dict[str, TargetAdaptor]
+    name_to_target_adaptor: FrozenDict[str, TargetAdaptor]
 
     @classmethod
     def parse(
@@ -87,7 +95,7 @@ class AddressMap:
                     "cannot use the same name."
                 )
             name_to_target_adaptors[name] = target_adaptor
-        return cls(filepath, dict(sorted(name_to_target_adaptors.items())))
+        return cls(filepath, FrozenDict(sorted(name_to_target_adaptors.items())))
 
 
 class DifferingFamiliesError(MappingError):
@@ -182,6 +190,8 @@ class AddressFamily:
         return tuple(addr.target_name for addr in self.addresses_to_target_adaptors)
 
     def get_target_adaptor(self, address: Address) -> TargetAdaptor | None:
+        if self.namespace == DELETED_SPEC_PATH:
+            return TargetAdaptor(DELETED_TARGET_TYPE, "deleted_files", "deleted files")
         assert address.spec_path == self.namespace
         entry = self.name_to_target_adaptors.get(address.target_name)
         if entry is None:

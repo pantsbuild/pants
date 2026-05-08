@@ -8,12 +8,12 @@ import hashlib
 import io
 import json
 import zipfile
+from collections.abc import Iterable
 from textwrap import dedent  # noqa: PNT20
-from typing import Dict, Iterable, Tuple
 
 
 # Implements hashing algorithm from https://cs.opensource.google/go/x/mod/+/refs/tags/v0.5.0:sumdb/dirhash/hash.go.
-def compute_module_hash(files: Iterable[Tuple[str, str]]) -> str:
+def compute_module_hash(files: Iterable[tuple[str, str]]) -> str:
     """Compute a module hash that can be used in go.sum for an emulated remote package."""
     sorted_files = sorted(files, key=lambda x: x[0])
     summary = ""
@@ -27,8 +27,8 @@ def compute_module_hash(files: Iterable[Tuple[str, str]]) -> str:
 
 
 def gen_module_gomodproxy(
-    version: str, import_path: str, files: Iterable[Tuple[str, str]]
-) -> Dict[str, str | bytes]:
+    version: str, import_path: str, files: Iterable[tuple[str, str]]
+) -> dict[str, str | bytes]:
     go_mod_content = dedent(
         f"""\
         module {import_path}

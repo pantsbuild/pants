@@ -2,15 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from typing import cast
+from typing import Iterable, cast
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
 from pants.base.specs_parser import SpecsParser
-from pants.core.util_rules.environments import determine_bootstrap_environment
+from pants.core.environments.rules import determine_bootstrap_environment
 from pants.core.util_rules.system_binaries import GitBinary
 from pants.engine.addresses import AddressInput
 from pants.engine.environment import EnvironmentName
+from pants.engine.internals.build_files import DELETED_ADDRESS
 from pants.engine.internals.graph import FilesWithSourceBlocks
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
@@ -30,6 +31,7 @@ class InvalidSpecConstraint(Exception):
 
 
 def calculate_specs(
+    specs_strs: Iterable[str],
     options_bootstrapper: OptionsBootstrapper,
     options: Options,
     session: SchedulerSession,
@@ -39,7 +41,7 @@ def calculate_specs(
     global_options = options.for_global_scope()
     unmatched_cli_globs = global_options.unmatched_cli_globs
     specs = SpecsParser(working_dir=working_dir).parse_specs(
-        options.specs,
+        specs_strs,
         description_of_origin="CLI arguments",
         unmatched_glob_behavior=unmatched_cli_globs,
     )
@@ -62,9 +64,9 @@ def calculate_specs(
 
     bootstrap_environment = determine_bootstrap_environment(session)
 
-    (git_binary,) = session.product_request(GitBinary, [Params(bootstrap_environment)])
+    (git_binary,) = session.product_request(GitBinary, Params(bootstrap_environment))
     (maybe_git_worktree,) = session.product_request(
-        MaybeGitWorktree, [Params(GitWorktreeRequest(), git_binary, bootstrap_environment)]
+        MaybeGitWorktree, Params(GitWorktreeRequest(), git_binary, bootstrap_environment)
     )
     if not maybe_git_worktree.git_worktree:
         raise InvalidSpecConstraint(
@@ -72,7 +74,7 @@ def calculate_specs(
         )
 
     (files_with_sources_blocks,) = session.product_request(
-        FilesWithSourceBlocks, [Params(bootstrap_environment)]
+        FilesWithSourceBlocks, Params(bootstrap_environment)
     )
     changed_files = tuple(
         file
@@ -104,21 +106,23 @@ def calculate_specs(
     )
     (changed_addresses,) = session.product_request(
         ChangedAddresses,
-        [Params(changed_request, options_bootstrapper, bootstrap_environment)],
+        Params(changed_request, options_bootstrapper, bootstrap_environment),
     )
     logger.debug("changed addresses: %s", changed_addresses)
 
     address_literal_specs = []
     for address in cast(ChangedAddresses, changed_addresses):
         address_input = AddressInput.parse(address.spec, description_of_origin="`--changed-since`")
-        address_literal_specs.append(
-            AddressLiteralSpec(
-                path_component=address_input.path_component,
-                target_component=address_input.target_component,
-                generated_component=address_input.generated_component,
-                parameters=FrozenDict(address_input.parameters),
+        # The pseudo-target has done its job, but we don't want to actually see it downstream.
+        if address != DELETED_ADDRESS:
+            address_literal_specs.append(
+                AddressLiteralSpec(
+                    path_component=address_input.path_component,
+                    target_component=address_input.target_component,
+                    generated_component=address_input.generated_component,
+                    parameters=FrozenDict(address_input.parameters),
+                )
             )
-        )
 
     return Specs(
         includes=RawSpecs(

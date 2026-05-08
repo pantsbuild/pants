@@ -18,6 +18,8 @@ from pants.option.option_types import ArgsListOption, BoolOption, FileOption, Sk
 from pants.util.docutil import bin_name
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(pydocstyle.lock*)
+
 
 @dataclass(frozen=True)
 class PydocstyleFieldSet(FieldSet):

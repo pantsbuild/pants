@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from random import randrange
 
-from pants.engine.rules import Get, MultiGet, rule
+from pants.engine.rules import concurrently, rule
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -17,7 +17,7 @@ class Deep:
 async def deep(n: int) -> Deep:
     if n < 2:
         return Deep(n)
-    x, y = tuple(await MultiGet([Get(Deep, int(n - 2)), Get(Deep, int(n - 1))]))
+    x, y = tuple(await concurrently([deep(int(n - 2)), deep(int(n - 1))]))
     return Deep(x.val + y.val)
 
 
@@ -29,7 +29,7 @@ class Wide:
 @rule
 async def wide(index: int) -> Wide:
     if index > 0:
-        _ = await MultiGet([Get(Wide, int(randrange(index))) for _ in range(100)])
+        _ = await concurrently([wide(int(randrange(index))) for _ in range(100)])
     return Wide(index)
 
 

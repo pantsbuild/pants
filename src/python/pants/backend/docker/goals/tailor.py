@@ -14,8 +14,7 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import PathGlobs, Paths
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import path_globs_to_paths
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
@@ -33,7 +32,7 @@ async def find_putative_targets(
     if not docker.tailor:
         return PutativeTargets()
 
-    all_dockerfiles = await Get(Paths, PathGlobs, req.path_globs("*Dockerfile*"))
+    all_dockerfiles = await path_globs_to_paths(req.path_globs("*Dockerfile*"))
     unowned_dockerfiles = set(all_dockerfiles.files) - set(all_owned_sources)
     pts = []
     for dockerfile in sorted(unowned_dockerfiles):

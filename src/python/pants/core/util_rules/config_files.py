@@ -5,13 +5,14 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Mapping
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
-from pants.engine.fs import EMPTY_SNAPSHOT, DigestContents, PathGlobs, Snapshot
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
+from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.collections import ensure_str_list
 from pants.util.dirutil import find_nearest_ancestor_file
 from pants.util.frozendict import FrozenDict
@@ -65,24 +66,27 @@ class ConfigFilesRequest:
 async def find_config_file(request: ConfigFilesRequest) -> ConfigFiles:
     config_snapshot = EMPTY_SNAPSHOT
     if request.specified:
-        config_snapshot = await Get(
-            Snapshot,
-            PathGlobs(
-                globs=request.specified,
-                glob_match_error_behavior=GlobMatchErrorBehavior.error,
-                description_of_origin=f"the option `{request.specified_option_name}`",
-            ),
+        config_snapshot = await digest_to_snapshot(
+            **implicitly(
+                PathGlobs(
+                    globs=request.specified,
+                    glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                    description_of_origin=f"the option `{request.specified_option_name}`",
+                )
+            )
         )
         return ConfigFiles(config_snapshot)
     elif request.discovery:
-        check_content_digest_contents = await Get(DigestContents, PathGlobs(request.check_content))
+        check_content_digest_contents = await get_digest_contents(
+            **implicitly(PathGlobs(request.check_content))
+        )
         valid_content_files = tuple(
             file_content.path
             for file_content in check_content_digest_contents
             if request.check_content[file_content.path] in file_content.content
         )
-        config_snapshot = await Get(
-            Snapshot, PathGlobs((*request.check_existence, *valid_content_files))
+        config_snapshot = await digest_to_snapshot(
+            **implicitly(PathGlobs((*request.check_existence, *valid_content_files)))
         )
     return ConfigFiles(config_snapshot)
 
@@ -127,7 +131,7 @@ async def gather_config_files_by_workspace_dir(
     config_file_globs = [
         os.path.join(dir, request.config_filename) for dir in source_dirs_with_ancestors
     ]
-    config_files_snapshot = await Get(Snapshot, PathGlobs(config_file_globs))
+    config_files_snapshot = await digest_to_snapshot(**implicitly(PathGlobs(config_file_globs)))
     config_files_set = set(config_files_snapshot.files)
     source_dir_to_config_file: dict[str, str] = {}
     for source_dir in source_dirs:
