@@ -71,7 +71,7 @@ from pants.engine.intrinsics import (
 )
 from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
-from pants.engine.target import InvalidFieldException, Target, WrappedTargetRequest
+from pants.engine.target import Field, InvalidFieldException, Target, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
 from pants.util.frozendict import FrozenDict
@@ -348,7 +348,7 @@ class DockerInfoV1ImageTag:
 
 
 def _extra_options_flag_names(extra_options: tuple[str, ...]) -> frozenset[str]:
-    """Returns a set of flag names (e.g. --pull, -network, etc)"""
+    """Returns a set of flag names (e.g. --pull, --network, etc)"""
     names: set[str] = set()
     for opt in extra_options:
         if opt.startswith("-"):
@@ -360,10 +360,40 @@ def _filter_global_extra_options(
     global_extra_options: tuple[str, ...], target_flag_names: frozenset[str]
 ) -> tuple[str, ...]:
     """Remove any global extra options that are included in the per-target options."""
-    return tuple(
-        opt
-        for opt in global_extra_options
-        if opt.startswith("-") and opt.split("=")[0] not in target_flag_names
+    result = []
+    for opt in global_extra_options:
+        if opt.startswith("-") and opt.split("=")[0] in target_flag_names:
+            logger.warning(
+                f"Global docker extra option `{opt}` is overridden by a per-target option and will be ignored."
+            )
+        else:
+            result.append(opt)
+    return tuple(result)
+
+
+def _overwriten_flag_warning(
+    target: Target, field_type: type[Field], extra_options: tuple[str, ...]
+) -> None:
+    for opt in extra_options:
+        if opt.startswith(f"--{field_type.alias}"):
+            extra_build_options = opt
+            break
+    logger.warning(
+        f"The individual `--{field_type.alias}={target[field_type].value}` field on the `{target.alias}` target in `{target.address}` is overridden by "
+        f"`extra_build_options` (`{extra_build_options}`). Individual build option fields are deprecated in favor of using `extra_build_options`"
+    )
+
+
+def _overwrite_flag_warning_global_option(
+    target: Target, option_name: str, extra_options: tuple[str, ...]
+) -> None:
+    for opt in extra_options:
+        if opt.startswith(f"{option_name}"):
+            extra_build_options = opt
+            break
+    logger.warning(
+        f"The individual `{option_name}` field on the `{target.alias}` target in `{target.address}` is overridden by "
+        f"`extra_build_options` (`{extra_build_options}`). Individual build option fields are deprecated in favor of using `extra_build_options`"
     )
 
 
@@ -417,6 +447,7 @@ def get_build_options(
                 field_type, "docker_build_option", None
             )  # get the flag name if it exists such as --pull or --network, etc.
             if flag and flag in overridden_flags:
+                _overwriten_flag_warning(target, field_type, extra_options)
                 continue
 
             source = InterpolationContext.TextSource(
@@ -455,11 +486,17 @@ def get_build_options(
                 )
             )
 
-    if target_stage and "--target" not in overridden_flags:
-        extra_options = extra_options + ("--target", target_stage)
+    if target_stage:
+        if "--target" in overridden_flags:
+            _overwrite_flag_warning_global_option(target, "--target", extra_options)
+        else:
+            extra_options = extra_options + ("--target", target_stage)
 
-    if global_build_no_cache_option and "--no-cache" not in overridden_flags:
-        extra_options = extra_options + ("--no-cache",)
+    if global_build_no_cache_option:
+        if "--no-cache" in overridden_flags:
+            _overwrite_flag_warning_global_option(target, "--no-cache", extra_options)
+        else:
+            extra_options = extra_options + ("--no-cache",)
 
     yield from extra_options
 
