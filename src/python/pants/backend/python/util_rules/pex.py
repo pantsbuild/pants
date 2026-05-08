@@ -827,6 +827,9 @@ async def build_pex(
                 *req_strings,
                 "--no-transitive",
                 f"--venv-repository={venv_repo.relpath()}",
+                # If uv decided there should be prereleases in the venv, we
+                # shouldn't refuse to resolve them.
+                "--pre",
             ],
         )
 
