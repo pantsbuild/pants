@@ -188,9 +188,6 @@ class TelemetrySubsystem(Subsystem):
             """
             The key-value pairs to be used as headers for spans associated with gRPC or HTTP requests.
 
-            This option is consumed by both the `{TracingExporterId.HTTP.value}` and `{TracingExporterId.GRPC.value}`
-            exporters.
-
             Corresponds to the `OTEL_EXPORTER_OTLP_TRACES_HEADERS` and `OTEL_EXPORTER_OTLP_HEADERS`
             environment variables.
             """
