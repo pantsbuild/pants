@@ -6,14 +6,23 @@ from pathlib import PurePath
 
 from pants.backend.codegen.protobuf import protoc
 from pants.backend.codegen.protobuf.protoc import Protoc
+from pants.backend.codegen.protobuf.python import buf_rules
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
+from pants.backend.codegen.protobuf.python.buf_rules import (
+    GeneratePythonFromProtobufViaBufRequest,
+    generate_python_from_protobuf_via_buf,
+)
 from pants.backend.codegen.protobuf.python.grpc_python_plugin import GrpcPythonPlugin
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     PythonProtobufGrpclibPlugin,
     PythonProtobufMypyPlugin,
     PythonProtobufSubsystem,
 )
-from pants.backend.codegen.protobuf.target_types import ProtobufGrpcToggleField, ProtobufSourceField
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufGeneratorField,
+    ProtobufGrpcToggleField,
+    ProtobufSourceField,
+)
 from pants.backend.python.target_types import PythonSourceField
 from pants.backend.python.util_rules import pex
 from pants.backend.python.util_rules.pex import (
@@ -56,6 +65,12 @@ async def generate_python_from_protobuf(
     pex_environment: PexEnvironment,
     platform: Platform,
 ) -> GeneratedSources:
+    if request.protocol_target.get(ProtobufGeneratorField).value == "buf":
+        return await generate_python_from_protobuf_via_buf(
+            GeneratePythonFromProtobufViaBufRequest(protocol_target=request.protocol_target),
+            **implicitly(),
+        )
+
     download_protoc_request = download_external_tool(protoc.get_request(platform))
 
     output_dir = "_generated_files"
@@ -239,6 +254,7 @@ def rules():
     return [
         *collect_rules(),
         *pex.rules(),
+        *buf_rules.rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromProtobufRequest),
         *protoc.rules(),
         UnionRule(ExportableTool, GrpcPythonPlugin),
