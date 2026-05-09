@@ -243,9 +243,18 @@ impl PosixFS {
             })
     }
 
-    pub async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, io::Error> {
+    pub async fn path_metadata(
+        &self,
+        path: PathBuf,
+        follow_symlinks: bool,
+    ) -> Result<Option<PathMetadata>, io::Error> {
         let abs_path = self.root.0.join(&path);
-        match tokio::fs::symlink_metadata(&abs_path).await {
+        let raw_metadata = if follow_symlinks {
+            tokio::fs::metadata(&abs_path).await
+        } else {
+            tokio::fs::symlink_metadata(&abs_path).await
+        };
+        match raw_metadata {
             Ok(metadata) => {
                 let (kind, symlink_target) = match metadata.file_type() {
                     ft if ft.is_symlink() => {
@@ -293,8 +302,12 @@ impl Vfs<io::Error> for Arc<PosixFS> {
         Ok(Arc::new(PosixFS::scandir(self, dir).await?))
     }
 
-    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, io::Error> {
-        PosixFS::path_metadata(self, path).await
+    async fn path_metadata(
+        &self,
+        path: PathBuf,
+        follow_symlinks: bool,
+    ) -> Result<Option<PathMetadata>, io::Error> {
+        PosixFS::path_metadata(self, path, follow_symlinks).await
     }
 
     fn is_ignored(&self, stat: &Stat) -> bool {
