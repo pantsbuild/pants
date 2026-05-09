@@ -11,6 +11,7 @@ from pants.engine.target import (
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
+    StringField,
     Target,
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
@@ -33,6 +34,32 @@ class ProtobufGrpcToggleField(BoolField):
     alias = "grpc"
     default = False
     help = "Whether to generate gRPC code or not."
+
+
+class ProtobufGeneratorField(StringField):
+    alias = "protobuf_generator"
+    valid_choices = ("protoc", "buf")
+    default = "protoc"
+    help = help_text(
+        """
+        Which tool to use to generate code from this `.proto`. Applies to every
+        language backend that consumes the target.
+
+        - `protoc` (default): use the `protoc` compiler. Output paths follow Pants's
+          source-root conventions and any per-language overrides
+          (e.g. `python_source_root`).
+        - `buf`: use `buf generate` with a `buf.gen.yaml` template. Plugins, output
+          paths, and managed-mode rewrites come from the template, not from Pants.
+          The template is resolved per-target via `buf_gen_template`, falling back
+          to `[buf].gen_template`, falling back to discovery of `buf.gen.yaml` at
+          the repository root.
+
+        A single `buf.gen.yaml` typically declares plugins for several languages, so
+        this is a target-level choice rather than a per-language one. To get
+        protoc-style behavior for an individual language inside a buf-driven build,
+        declare a `protoc_builtin:` plugin entry in `buf.gen.yaml`.
+        """
+    )
 
 
 class AllProtobufTargets(Targets):
@@ -60,6 +87,7 @@ class ProtobufSourceTarget(Target):
         ProtobufDependenciesField,
         ProtobufSourceField,
         ProtobufGrpcToggleField,
+        ProtobufGeneratorField,
     )
     help = help_text(
         f"""
@@ -123,6 +151,7 @@ class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         ProtobufGrpcToggleField,
+        ProtobufGeneratorField,
         ProtobufDependenciesField,
     )
     settings_request_cls = GeneratorSettingsRequest
