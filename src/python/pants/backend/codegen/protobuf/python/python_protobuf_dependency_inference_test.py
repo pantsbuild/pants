@@ -6,6 +6,7 @@ import pytest
 from pants.backend.codegen.protobuf import (
     protobuf_dependency_inference,
 )
+from pants.backend.codegen.protobuf.buf import fields as buf_fields
 from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
     InferProtobufDependencies,
     ProtobufDependencyInferenceFieldSet,
@@ -30,6 +31,7 @@ def rule_runner_with_python_resolves() -> RuleRunner:
             *protobuf_dependency_inference.rules(),
             *target_types_rules(),
             *additional_fields.rules(),
+            *buf_fields.rules(),
             *python_target_types_rules.rules(),
             QueryRule(ProtobufMapping, []),
             QueryRule(InferredDependencies, [InferProtobufDependencies]),
