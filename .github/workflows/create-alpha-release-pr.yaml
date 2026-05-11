@@ -95,7 +95,8 @@ jobs:
               | sed 's/^/+ /'
           } > CONTRIBUTORS.md
 
-      - name: Create empty release notes for upcoming version
+      - name: Create empty release notes for upcoming version when merging to main
+        if: steps.validate-version.outputs.base-branch == 'main'
         env:
           MAJOR_MINOR_VERSION: ${{ steps.validate-version.outputs.major-minor-version }}
           TEMPLATE_PATH: docs/notes/release-notes-template.md
