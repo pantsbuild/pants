@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: The release version to create (e.g. 2.42.4.dev2).
+        description: The dev release version to create (MAJOR.MINOR.PATCH.devN e.g. 2.42.4.dev2).
         required: true
 
 defaults:
@@ -45,14 +45,14 @@ jobs:
               echo "::error::The input 'version' must be smaller than 14 characters (i.e. allows '2.99.99.dev99')"
               exit 1
 
-          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.dev[0-9]+)?$ ]]; then
-              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCH (1.2.3) with an optional 'dev' specifier (8.9.10.dev99)"
+          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.dev[0-9]+$ ]]; then
+              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCH.devN (8.9.10.dev99)"
               exit 1
           fi
 
           echo "::notice::Release version is: ${version}"
           echo "release-version=${version}" >> $GITHUB_OUTPUT
-      
+
       - name: Update CONTRIBUTORS.md and VERSION files
         env:
           RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
