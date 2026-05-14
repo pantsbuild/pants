@@ -17,7 +17,6 @@ from pants.core.goals.generate_lockfiles import (
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
-    WrappedGenerateLockfile,
 )
 from pants.core.goals.resolves import ExportableTool
 from pants.engine.environment import EnvironmentName
@@ -76,11 +75,6 @@ async def _validate_jvm_artifacts_for_resolve(
     req: ValidateJvmArtifactsForResolveRequest, env_name: EnvironmentName
 ) -> ValidateJvmArtifactsForResolveResult:
     raise NotImplementedError()
-
-
-@rule
-async def wrap_jvm_lockfile_request(request: GenerateJvmLockfile) -> WrappedGenerateLockfile:
-    return WrappedGenerateLockfile(request)
 
 
 @rule(desc="Generate JVM lockfile", level=LogLevel.DEBUG)

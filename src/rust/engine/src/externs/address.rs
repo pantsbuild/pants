@@ -437,7 +437,7 @@ fn split_on_longest_dir_prefix<'a, 'b>(
     matched
 }
 
-#[pyclass(name = "Address")]
+#[pyclass(name = "Address", from_py_object)]
 #[derive(Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Address {
     // NB: Field ordering is deliberate, so that Ord will roughly match `self.spec`.

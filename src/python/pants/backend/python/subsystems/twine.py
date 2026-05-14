@@ -15,6 +15,8 @@ from pants.option.option_types import ArgsListOption, BoolOption, FileOption, Sk
 from pants.util.docutil import doc_url
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(twine.lock*)
+
 
 class TwineSubsystem(PythonToolBase):
     options_scope = "twine"

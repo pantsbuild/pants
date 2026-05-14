@@ -10,7 +10,7 @@ env:
   HONEYCOMB_API_KEY: --DISABLED--
   PANTS_CONFIG_FILES: +['pants.ci.toml']
   PANTS_DISABLE_GETS: '1'
-  PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: 'False'
+  PANTS_OPENTELEMETRY_ENABLED: 'False'
   RUST_BACKTRACE: all
 jobs:
   bootstrap_pants_linux_arm64:
@@ -39,26 +39,26 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: Linux-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.95.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -68,7 +68,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: Linux-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: |-
@@ -78,12 +78,12 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run smoke tests
       run: |
         ./pants list ::
@@ -94,13 +94,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-bootstrap-Linux-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: |-
@@ -136,11 +136,11 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -152,22 +152,22 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.95.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -177,7 +177,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: Linux-x86_64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: |-
@@ -187,12 +187,12 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run smoke tests
       run: |
         ./pants list ::
@@ -203,13 +203,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-bootstrap-Linux-x86_64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: |-
@@ -219,7 +219,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Validate CI config
       run: |
         ./pants run src/python/pants_release/generate_github_workflows.py -- --check
@@ -254,11 +254,11 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.9
@@ -268,22 +268,22 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.95.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
@@ -293,7 +293,7 @@ jobs:
       run: echo "hash=$(./build-support/bin/rust/print_engine_hash.sh)" >> $GITHUB_OUTPUT
       shell: bash
     - name: Cache native engine
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: macOS14-ARM64-engine-${{ steps.get-engine-hash.outputs.hash }}-v1
         path: |-
@@ -303,12 +303,12 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Bootstrap Pants
       run: ./pants version > ${{ runner.temp }}/_pants_version.stdout && [[ -s ${{ runner.temp }}/_pants_version.stdout ]]
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run smoke tests
       run: |
         ./pants list ::
@@ -319,13 +319,13 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-bootstrap-macOS14-ARM64
         overwrite: 'true'
         path: .pants.d/workdir/*.log
     - name: Upload native binaries
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
         path: |-
@@ -371,7 +371,7 @@ jobs:
         rm -rf /mnt/host-root/usr/local/.ghcup || true
         df -h
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -383,7 +383,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.93.1
+        rustup default 1.95.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -396,7 +396,7 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
@@ -404,18 +404,18 @@ jobs:
       run: echo 'no-op'
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-wheels-and-pex-Linux-ARM64
         overwrite: 'true'
@@ -451,7 +451,7 @@ jobs:
         rm -rf /mnt/host-root/usr/local/.ghcup || true
         df -h
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Configure Git
@@ -463,7 +463,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.93.1
+        rustup default 1.95.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -476,34 +476,36 @@ jobs:
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-wheels-and-pex-Linux-x86_64
         overwrite: 'true'
@@ -537,11 +539,11 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.9
@@ -551,57 +553,59 @@ jobs:
           3.13
           3.14
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
     - name: Set rustup profile
       run: rustup set profile default
     - name: Cache Rust toolchain
-      uses: actions/cache@v5
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.93.1-*
+          ~/.rustup/toolchains/1.95.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
-      uses: Swatinem/rust-cache@v2.8.2
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
       with:
         cache-bin: 'false'
         shared-key: engine
         workspaces: src/rust
     - name: Install Protoc
-      uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
         version: 23.x
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - env:
         ARCHFLAGS: -arch arm64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch arm64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-wheels-and-pex-macOS14-ARM64
         overwrite: 'true'
@@ -616,17 +620,17 @@ jobs:
     - windows-2025
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Install MSYS2
-      uses: msys2/setup-msys2@v2
+      uses: msys2/setup-msys2@4f806de0a5a7294ffabaff804b38a9b435a73bda
       with:
         install: base-devel mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-nasm mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-protobuf
         msystem: UCRT64
         update: true
     - name: Set Up Rust Toolchain
-      uses: actions-rust-lang/setup-rust-toolchain@v1
+      uses: actions-rust-lang/setup-rust-toolchain@2b1f5e9b395427c92ee4e3331786ca3c37afe2d7 # v1.16.0
       with:
         rust-src-dir: src/rust
         target: x86_64-pc-windows-gnu
@@ -653,7 +657,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       if: github.event_name == 'pull_request' && !needs.classify_changes.outputs.notes
       name: Ensure appropriate label
-      uses: mheap/github-action-required-labels@v4.0.0
+      uses: mheap/github-action-required-labels@422e4c352ef83db91089e6acfbf09d8725e08abc # v4.0.0
       with:
         count: 1
         labels: release-notes:not-required, category:internal
@@ -686,7 +690,7 @@ jobs:
     - depot-ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - id: classify
@@ -728,7 +732,7 @@ jobs:
     runs-on:
     - depot-ubuntu-22.04
     steps:
-    - uses: coverallsapp/github-action@v2
+    - uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         fail-on-error: false
         parallel-finished: true
@@ -742,7 +746,7 @@ jobs:
     - depot-ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -771,7 +775,7 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -783,7 +787,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -791,14 +795,14 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Lint
       run: |
         ./pants lint check ::
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-lint-Linux-x86_64
         overwrite: 'true'
@@ -882,24 +886,26 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-ARM64
         path: src/python/pants
@@ -907,7 +913,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python tests
       run: |
         ./pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
@@ -916,7 +922,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -926,7 +932,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-Linux-ARM64
         overwrite: 'true'
@@ -934,7 +940,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -965,7 +971,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -994,17 +1000,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1014,7 +1022,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -1026,7 +1034,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1034,7 +1042,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 0/10
       run: |
         ./pants test --shard=0/10 ::
@@ -1043,7 +1051,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -1053,7 +1061,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-0_10-Linux-x86_64
         overwrite: 'true'
@@ -1061,7 +1069,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -1092,7 +1100,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -1121,17 +1129,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1141,7 +1151,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -1153,7 +1163,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1161,7 +1171,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 1/10
       run: |
         ./pants test --shard=1/10 ::
@@ -1170,7 +1180,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -1180,7 +1190,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-1_10-Linux-x86_64
         overwrite: 'true'
@@ -1188,7 +1198,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -1219,7 +1229,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -1248,17 +1258,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1268,7 +1280,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -1280,7 +1292,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1288,7 +1300,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 2/10
       run: |
         ./pants test --shard=2/10 ::
@@ -1297,7 +1309,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -1307,7 +1319,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-2_10-Linux-x86_64
         overwrite: 'true'
@@ -1315,7 +1327,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -1346,7 +1358,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -1375,17 +1387,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1395,7 +1409,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -1407,7 +1421,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1415,7 +1429,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 3/10
       run: |
         ./pants test --shard=3/10 ::
@@ -1424,7 +1438,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -1434,7 +1448,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-3_10-Linux-x86_64
         overwrite: 'true'
@@ -1442,7 +1456,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -1473,7 +1487,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -1502,17 +1516,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1522,7 +1538,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -1534,7 +1550,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1542,7 +1558,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 4/10
       run: |
         ./pants test --shard=4/10 ::
@@ -1551,7 +1567,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -1561,7 +1577,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-4_10-Linux-x86_64
         overwrite: 'true'
@@ -1569,7 +1585,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -1600,7 +1616,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -1629,17 +1645,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1649,7 +1667,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -1661,7 +1679,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1669,7 +1687,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 5/10
       run: |
         ./pants test --shard=5/10 ::
@@ -1678,7 +1696,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -1688,7 +1706,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-5_10-Linux-x86_64
         overwrite: 'true'
@@ -1696,7 +1714,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -1727,7 +1745,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -1756,17 +1774,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1776,7 +1796,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -1788,7 +1808,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1796,7 +1816,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 6/10
       run: |
         ./pants test --shard=6/10 ::
@@ -1805,7 +1825,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -1815,7 +1835,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-6_10-Linux-x86_64
         overwrite: 'true'
@@ -1823,7 +1843,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -1854,7 +1874,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -1883,17 +1903,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -1903,7 +1925,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -1915,7 +1937,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -1923,7 +1945,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 7/10
       run: |
         ./pants test --shard=7/10 ::
@@ -1932,7 +1954,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -1942,7 +1964,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-7_10-Linux-x86_64
         overwrite: 'true'
@@ -1950,7 +1972,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -1981,7 +2003,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -2010,17 +2032,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -2030,7 +2054,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -2042,7 +2066,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2050,7 +2074,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 8/10
       run: |
         ./pants test --shard=8/10 ::
@@ -2059,7 +2083,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -2069,7 +2093,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-8_10-Linux-x86_64
         overwrite: 'true'
@@ -2077,7 +2101,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -2108,7 +2132,7 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - env:
@@ -2137,17 +2161,19 @@ jobs:
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - if: runner.os == 'Linux'
       name: Download Apache `thrift` binary (Linux)
@@ -2157,7 +2183,7 @@ jobs:
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -2169,7 +2195,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.Linux-x86_64
         path: src/python/pants
@@ -2177,7 +2203,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python test shard 9/10
       run: |
         ./pants test --shard=9/10 ::
@@ -2186,7 +2212,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -2196,7 +2222,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-9_10-Linux-x86_64
         overwrite: 'true'
@@ -2204,7 +2230,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false
@@ -2236,24 +2262,26 @@ jobs:
         swap-storage: false
         tool-cache: false
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Install AdoptJDK
-      uses: actions/setup-java@v5
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
       with:
         distribution: adopt
         java-version: '11'
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.25.3
-    - name: Install Go
-      uses: actions/setup-go@v6
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
+        cache: false
         go-version: 1.24.9
     - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.9
@@ -2263,7 +2291,7 @@ jobs:
           3.13
           3.14
     - name: Download native binaries
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
         name: native_binaries.${{ matrix.python-version }}.macOS14-ARM64
         path: src/python/pants
@@ -2271,7 +2299,7 @@ jobs:
       run: chmod +x src/python/pants/bin/native_client
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Run Python tests
       run: |
         ./pants --tag=+platform_specific_behavior test :: -- -m platform_specific_behavior
@@ -2280,7 +2308,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       if: always()
       name: Upload test reports
       run: |
@@ -2290,7 +2318,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Upload pants.log
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:
         name: logs-python-test-macOS14-ARM64
         overwrite: 'true'
@@ -2298,7 +2326,7 @@ jobs:
     - continue-on-error: true
       if: always()
       name: Report coverage to coveralls.io
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2.3.7
       with:
         allow-empty: true
         fail-on-error: false

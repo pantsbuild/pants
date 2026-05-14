@@ -16,8 +16,10 @@ platform=$(uname -mps)
 function venv_dir() {
   # Include the entire version string in order to differentiate e.g. PyPy from CPython.
   # Fingerprinting uname and python output avoids shebang length limits and any odd chars.
+  # Include REPO_ROOT so that different checkouts or worktrees don't clobber each other.
   venv_fingerprint=$( (
     echo "${platform}"
+    echo "${REPO_ROOT}"
     ${PY} --version
   ) | fingerprint_data)
 

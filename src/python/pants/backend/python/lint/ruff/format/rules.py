@@ -58,6 +58,7 @@ async def _run_ruff_fmt(
 ) -> FmtResult:
     run_ruff_request = RunRuffRequest(
         snapshot=request.snapshot,
+        files=request.files,
         mode=RuffMode.FORMAT,
     )
     result = await run_ruff(run_ruff_request, ruff, platform)

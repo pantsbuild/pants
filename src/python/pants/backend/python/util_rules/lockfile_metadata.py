@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum, auto
 from typing import Any, cast
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -21,6 +21,14 @@ from pants.util.pip_requirement import PipRequirement
 _python_lockfile_metadata = lockfile_metadata_registrar(LockfileScope.PYTHON)
 
 
+class LockfileFormat(StrEnum):
+    PEX = auto()
+    UV = auto()
+    # The very old, deprecated constraints-based "lockfile" that should
+    # be removed entirely.
+    CONSTRAINTS_DEPRECATED = auto()
+
+
 class InvalidPythonLockfileReason(Enum):
     INVALIDATION_DIGEST_MISMATCH = "invalidation_digest_mismatch"
     INTERPRETER_CONSTRAINTS_MISMATCH = "interpreter_constraints_mismatch"
@@ -34,6 +42,7 @@ class InvalidPythonLockfileReason(Enum):
     SOURCES_MISMATCH = "sources_mismatch"
     LOCK_STYLE_MISMATCH = "lock_style_mismatch"
     COMPLETE_PLATFORMS_MISMATCH = "complete_platforms_mismatch"
+    UPLOADED_PRIOR_TO_MISMATCH = "uploaded_prior_to_mismatch"
 
 
 @dataclass(frozen=True)
@@ -56,6 +65,9 @@ class PythonLockfileMetadata(LockfileMetadata):
         sources: set[str],
         lock_style: str,
         complete_platforms: tuple[str, ...],
+        uploaded_prior_to: str | None,
+        lockfile_format: LockfileFormat,
+        resolve: str,
     ) -> PythonLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -65,7 +77,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         writing, while still allowing us to support _reading_ older, deprecated metadata versions.
         """
 
-        return PythonLockfileMetadataV6(
+        return PythonLockfileMetadataV8(
             valid_for_interpreter_constraints,
             requirements,
             manylinux=manylinux,
@@ -77,6 +89,9 @@ class PythonLockfileMetadata(LockfileMetadata):
             sources=sources,
             lock_style=lock_style,
             complete_platforms=complete_platforms,
+            uploaded_prior_to=uploaded_prior_to,
+            lockfile_format=lockfile_format,
+            resolve=resolve,
         )
 
     @staticmethod
@@ -108,6 +123,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         sources: Iterable[str],
         lock_style: str | None,
         complete_platforms: Iterable[str],
+        uploaded_prior_to: str | None,
     ) -> LockfileMetadataValidation:
         """Returns Truthy if this `PythonLockfileMetadata` can be used in the current execution
         context."""
@@ -158,6 +174,7 @@ class PythonLockfileMetadataV1(PythonLockfileMetadata):
         sources: Iterable[str],
         lock_style: str | None,
         complete_platforms: Iterable[str],
+        uploaded_prior_to: str | None,
     ) -> LockfileMetadataValidation:
         failure_reasons: set[InvalidPythonLockfileReason] = set()
 
@@ -232,6 +249,7 @@ class PythonLockfileMetadataV2(PythonLockfileMetadata):
         sources: Iterable[str],
         lock_style: str | None,
         complete_platforms: Iterable[str],
+        uploaded_prior_to: str | None,
     ) -> LockfileMetadataValidation:
         failure_reasons = set()
         if not set(user_requirements).issubset(self.requirements):
@@ -311,6 +329,7 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
         sources: Iterable[str],
         lock_style: str | None,
         complete_platforms: Iterable[str],
+        uploaded_prior_to: str | None,
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
@@ -328,6 +347,7 @@ class PythonLockfileMetadataV3(PythonLockfileMetadataV2):
                 sources=sources,
                 lock_style=lock_style,
                 complete_platforms=complete_platforms,
+                uploaded_prior_to=uploaded_prior_to,
             )
             .failure_reasons
         )
@@ -401,6 +421,7 @@ class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
         sources: Iterable[str],
         lock_style: str | None,
         complete_platforms: Iterable[str],
+        uploaded_prior_to: str | None,
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
@@ -418,6 +439,7 @@ class PythonLockfileMetadataV4(PythonLockfileMetadataV3):
                 sources=sources,
                 lock_style=lock_style,
                 complete_platforms=complete_platforms,
+                uploaded_prior_to=uploaded_prior_to,
             )
             .failure_reasons
         )
@@ -486,6 +508,7 @@ class PythonLockfileMetadataV5(PythonLockfileMetadataV4):
         sources: Iterable[str],
         lock_style: str | None,
         complete_platforms: Iterable[str],
+        uploaded_prior_to: str | None,
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
@@ -503,6 +526,7 @@ class PythonLockfileMetadataV5(PythonLockfileMetadataV4):
                 sources=sources,
                 lock_style=lock_style,
                 complete_platforms=complete_platforms,
+                uploaded_prior_to=uploaded_prior_to,
             )
             .failure_reasons
         )
@@ -574,6 +598,7 @@ class PythonLockfileMetadataV6(PythonLockfileMetadataV5):
         sources: Iterable[str],
         lock_style: str | None,
         complete_platforms: Iterable[str],
+        uploaded_prior_to: str | None,
     ) -> LockfileMetadataValidation:
         failure_reasons = (
             super()
@@ -591,6 +616,7 @@ class PythonLockfileMetadataV6(PythonLockfileMetadataV5):
                 sources=sources,
                 lock_style=lock_style,
                 complete_platforms=complete_platforms,
+                uploaded_prior_to=uploaded_prior_to,
             )
             .failure_reasons
         )
@@ -601,3 +627,143 @@ class PythonLockfileMetadataV6(PythonLockfileMetadataV5):
             failure_reasons.add(InvalidPythonLockfileReason.COMPLETE_PLATFORMS_MISMATCH)
 
         return LockfileMetadataValidation(failure_reasons)
+
+
+@_python_lockfile_metadata(7)
+@dataclass(frozen=True)
+class PythonLockfileMetadataV7(PythonLockfileMetadataV6):
+    """Lockfile version with uploaded_prior_to."""
+
+    uploaded_prior_to: str | None
+
+    @classmethod
+    def _from_json_dict(
+        cls: type[PythonLockfileMetadataV7],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> PythonLockfileMetadataV7:
+        v6_metadata = PythonLockfileMetadataV6._from_json_dict(
+            json_dict, lockfile_description, error_suffix
+        )
+        metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
+
+        uploaded_prior_to: str | None = metadata("uploaded_prior_to", str, lambda l: l)
+
+        return PythonLockfileMetadataV7(
+            valid_for_interpreter_constraints=v6_metadata.valid_for_interpreter_constraints,
+            requirements=v6_metadata.requirements,
+            manylinux=v6_metadata.manylinux,
+            requirement_constraints=v6_metadata.requirement_constraints,
+            only_binary=v6_metadata.only_binary,
+            no_binary=v6_metadata.no_binary,
+            excludes=v6_metadata.excludes,
+            overrides=v6_metadata.overrides,
+            sources=v6_metadata.sources,
+            lock_style=v6_metadata.lock_style,
+            complete_platforms=v6_metadata.complete_platforms,
+            uploaded_prior_to=uploaded_prior_to,
+        )
+
+    @classmethod
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadataV7, instance)
+        return {
+            "uploaded_prior_to": instance.uploaded_prior_to,
+        }
+
+    def is_valid_for(
+        self,
+        *,
+        expected_invalidation_digest: str | None,
+        user_interpreter_constraints: InterpreterConstraints,
+        interpreter_universe: Iterable[str],
+        user_requirements: Iterable[PipRequirement],
+        manylinux: str | None,
+        requirement_constraints: Iterable[PipRequirement],
+        only_binary: Iterable[str],
+        no_binary: Iterable[str],
+        excludes: Iterable[str],
+        overrides: Iterable[str],
+        sources: Iterable[str],
+        lock_style: str | None,
+        complete_platforms: Iterable[str],
+        uploaded_prior_to: str | None,
+    ) -> LockfileMetadataValidation:
+        failure_reasons = (
+            super()
+            .is_valid_for(
+                expected_invalidation_digest=expected_invalidation_digest,
+                user_interpreter_constraints=user_interpreter_constraints,
+                interpreter_universe=interpreter_universe,
+                user_requirements=user_requirements,
+                manylinux=manylinux,
+                requirement_constraints=requirement_constraints,
+                only_binary=only_binary,
+                no_binary=no_binary,
+                excludes=excludes,
+                overrides=overrides,
+                sources=sources,
+                lock_style=lock_style,
+                complete_platforms=complete_platforms,
+                uploaded_prior_to=uploaded_prior_to,
+            )
+            .failure_reasons
+        )
+
+        if self.uploaded_prior_to != uploaded_prior_to:
+            failure_reasons.add(InvalidPythonLockfileReason.UPLOADED_PRIOR_TO_MISMATCH)
+
+        return LockfileMetadataValidation(failure_reasons)
+
+
+@_python_lockfile_metadata(8)
+@dataclass(frozen=True)
+class PythonLockfileMetadataV8(PythonLockfileMetadataV7):
+    """Lockfile version that records the lockfile format (pex, uv, etc.) and the resolve name."""
+
+    lockfile_format: LockfileFormat
+    resolve: str
+
+    @classmethod
+    def _from_json_dict(
+        cls: type[PythonLockfileMetadataV8],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> PythonLockfileMetadataV8:
+        v7_metadata = PythonLockfileMetadataV7._from_json_dict(
+            json_dict, lockfile_description, error_suffix
+        )
+        metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
+
+        lockfile_format = metadata("lockfile_format", LockfileFormat, LockfileFormat)
+        resolve = metadata("resolve", str, str)
+
+        return PythonLockfileMetadataV8(
+            valid_for_interpreter_constraints=v7_metadata.valid_for_interpreter_constraints,
+            requirements=v7_metadata.requirements,
+            manylinux=v7_metadata.manylinux,
+            requirement_constraints=v7_metadata.requirement_constraints,
+            only_binary=v7_metadata.only_binary,
+            no_binary=v7_metadata.no_binary,
+            excludes=v7_metadata.excludes,
+            overrides=v7_metadata.overrides,
+            sources=v7_metadata.sources,
+            lock_style=v7_metadata.lock_style,
+            complete_platforms=v7_metadata.complete_platforms,
+            uploaded_prior_to=v7_metadata.uploaded_prior_to,
+            lockfile_format=lockfile_format,
+            resolve=resolve,
+        )
+
+    @classmethod
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadataV8, instance)
+        return {
+            "lockfile_format": instance.lockfile_format,
+            "resolve": instance.resolve,
+        }
+
+    def is_valid_for(self, **kwargs) -> LockfileMetadataValidation:
+        return super().is_valid_for(**kwargs)

@@ -189,8 +189,8 @@ def test_cache_scope_successful(rule_runner: RuleRunner) -> None:
 
 
 def test_cache_scope_per_restart() -> None:
-    success_argv = ("/bin/bash", "-c", "echo $RANDOM")
-    failure_argv = ("/bin/bash", "-c", "echo $RANDOM; exit 1")
+    success_argv = ("/bin/bash", "-c", "echo $RANDOM$RANDOM")
+    failure_argv = ("/bin/bash", "-c", "echo $RANDOM$RANDOM; exit 1")
 
     always_cache_success = Process(
         success_argv, cache_scope=ProcessCacheScope.PER_RESTART_ALWAYS, description="foo"

@@ -56,7 +56,7 @@ pub fn possible_store_missing_digest(e: store::StoreError) -> PyErr {
     failure.into()
 }
 
-#[pyclass(name = "Digest")]
+#[pyclass(name = "Digest", from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyDigest(pub DirectoryDigest);
 
@@ -114,7 +114,7 @@ impl PyDigest {
     }
 }
 
-#[pyclass(name = "FileDigest")]
+#[pyclass(name = "FileDigest", from_py_object)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PyFileDigest(pub Digest);
 
@@ -501,7 +501,12 @@ impl PyFilespecMatcher {
 // -----------------------------------------------------------------------------
 
 /// The kind of path (e.g., file, directory, symlink) as identified in `PathMetadata`
-#[pyclass(name = "PathMetadataKind", rename_all = "UPPERCASE", eq)]
+#[pyclass(
+    name = "PathMetadataKind",
+    rename_all = "UPPERCASE",
+    eq,
+    from_py_object
+)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PyPathMetadataKind {
     File,
@@ -530,7 +535,7 @@ impl From<PyPathMetadataKind> for fs::PathMetadataKind {
 }
 
 /// Expanded version of `Stat` when access to additional filesystem attributes is necessary.
-#[pyclass(name = "PathMetadata")]
+#[pyclass(name = "PathMetadata", from_py_object)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PyPathMetadata(pub fs::PathMetadata);
 
@@ -652,7 +657,14 @@ impl PyPathMetadata {
 }
 
 /// The path's namespace (to separate buildroot and system paths)
-#[pyclass(name = "PathNamespace", rename_all = "UPPERCASE", frozen, eq, hash)]
+#[pyclass(
+    name = "PathNamespace",
+    rename_all = "UPPERCASE",
+    frozen,
+    eq,
+    hash,
+    from_py_object
+)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum PyPathNamespace {
     Workspace,

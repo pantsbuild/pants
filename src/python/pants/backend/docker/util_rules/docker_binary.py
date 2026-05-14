@@ -74,6 +74,8 @@ class DockerBinary(BinaryPath):
         env: Mapping[str, str],
         use_buildx: bool,
         extra_args: tuple[str, ...] = (),
+        output_files: tuple[str, ...] = (),
+        output_directories: tuple[str, ...] = (),
     ) -> Process:
         if use_buildx:
             build_commands = ["buildx", "build"]
@@ -102,6 +104,8 @@ class DockerBinary(BinaryPath):
             env=self._get_process_environment(env),
             input_digest=digest,
             immutable_input_digests=self.extra_input_digests,
+            output_files=output_files,
+            output_directories=output_directories,
             # We must run the docker build commands every time, even if nothing has changed,
             # in case the user ran `docker image rm` outside of Pants.
             cache_scope=ProcessCacheScope.PER_SESSION,

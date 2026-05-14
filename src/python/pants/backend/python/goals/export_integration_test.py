@@ -117,9 +117,9 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
             with script_path.open() as script_file:
                 shebang = script_file.readline().strip()
                 if py_hermetic_scripts:
-                    assert shebang.endswith(" -sE")
+                    assert shebang.endswith((" -sE", " -I"))
                 else:
-                    assert not shebang.endswith(" -sE")
+                    assert not shebang.endswith((" -sE", " -I"))
 
             expected_foo_dir = lib_dir / "foo_dist-1.2.3.dist-info"
             if resolve == "b":

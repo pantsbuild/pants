@@ -20,9 +20,10 @@ impl OptionId {
     ) -> Result<OptionId, String>
     where
         Component: AsRef<str>,
-        Name: Iterator<Item = Component>,
+        Name: IntoIterator<Item = Component>,
     {
         let name_components = name
+            .into_iter()
             .map(|component| component.as_ref().to_string())
             .collect::<Vec<_>>();
         if name_components.is_empty() {

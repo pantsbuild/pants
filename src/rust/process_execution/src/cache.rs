@@ -94,14 +94,14 @@ impl crate::CommandRunner for CommandRunner {
         };
 
         workunit.update_metadata(|initial| {
-            initial.map(|(initial, _)| {
+            initial.map(|(initial, level)| {
                 (
                     WorkunitMetadata {
                         local_command: Some(command_digest),
                         local_action: Some(action_digest),
                         ..initial
                     },
-                    Level::Info,
+                    level,
                 )
             })
         });

@@ -9,7 +9,7 @@ use crate::scope::Scope;
 fn test_option_id_global_switch() {
     let option_id = option_id!(-'x', "bar", "baz");
     assert_eq!(
-        OptionId::new(Scope::Global, ["bar", "baz"].iter(), Some('x')).unwrap(),
+        OptionId::new(Scope::Global, ["bar", "baz"], Some('x')).unwrap(),
         option_id
     );
     assert_eq!("GLOBAL", option_id.scope.name());
@@ -19,7 +19,7 @@ fn test_option_id_global_switch() {
 fn test_option_id_global() {
     let option_id = option_id!("bar", "baz");
     assert_eq!(
-        OptionId::new(Scope::Global, ["bar", "baz"].iter(), None).unwrap(),
+        OptionId::new(Scope::Global, ["bar", "baz"], None).unwrap(),
         option_id
     );
     assert_eq!("GLOBAL", option_id.scope.name());
@@ -31,7 +31,7 @@ fn test_option_id_scope_switch() {
     assert_eq!(
         OptionId::new(
             Scope::Scope("foo-bar".to_owned()),
-            ["baz", "spam"].iter(),
+            ["baz", "spam"],
             Some('f')
         )
         .unwrap(),
@@ -44,12 +44,7 @@ fn test_option_id_scope_switch() {
 fn test_option_id_scope() {
     let option_id = option_id!(["foo-bar"], "baz", "spam");
     assert_eq!(
-        OptionId::new(
-            Scope::Scope("foo-bar".to_owned()),
-            ["baz", "spam"].iter(),
-            None
-        )
-        .unwrap(),
+        OptionId::new(Scope::Scope("foo-bar".to_owned()), ["baz", "spam"], None).unwrap(),
         option_id
     );
     assert_eq!("foo-bar", option_id.scope.name());

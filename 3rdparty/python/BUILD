@@ -29,12 +29,6 @@ python_requirements(
 )
 
 python_requirements(
-    name="pbs-script",
-    source="pbs-script-requirements.txt",
-    resolve="pbs-script",
-)
-
-python_requirements(
     name="external-tool-upgrade",
     source="external-tool-upgrade-requirements.txt",
     resolve="external-tool-upgrade",

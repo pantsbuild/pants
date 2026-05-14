@@ -58,7 +58,7 @@ def test_export_node_modules(rule_runner: RuleRunner) -> None:
         {
             "BUILD": "package_json(name='root')",
             "package-lock.json": (
-                Path(__file__).parent / "jest_resources/package-lock.json"
+                Path(__file__).parent / "test_resources/jest_project/package-lock.json"
             ).read_text(),
             "package.json": given_package_with_name("ham"),
         }

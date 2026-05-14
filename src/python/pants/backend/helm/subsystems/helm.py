@@ -91,8 +91,12 @@ class HelmSubsystem(TemplatedExternalTool):
     options_scope = "helm"
     help = "The Helm command line (https://helm.sh)"
 
-    default_version = "3.14.3"
+    default_version = "3.19.5"
     default_known_versions = [
+        "3.19.5|linux_arm64 |ce02147ffee6d993bf8ae97a44a22e9e1daf0b69d2d5b69a0c8cf6706445ccf5|16236301",
+        "3.19.5|linux_x86_64|a0a5e8c592ed3f376ac110715eff214730c7422f9a44d96cf98117d2b8b0e6c0|18014445",
+        "3.19.5|macos_arm64 |195e24e587f423f15a78feebab04583ceee68323598575a0e8b3b11b43fd26fe|17061257",
+        "3.19.5|macos_x86_64|57f4a847c349382b7cc742a6434ef25f88f0928a113d8cf49084b464878ef0b9|18369542",
         "3.14.3|linux_arm64 |85e1573e76fa60af14ba7e9ec75db2129b6884203be866893fa0b3f7e41ccd5e|14558415",
         "3.14.3|linux_x86_64|3c90f24e180f8c207b8a18e5ec82cb0fa49858a7a0a86e4ed52a98398681e00b|16134525",
         "3.14.3|macos_arm64 |dff794152b62b7c1a9ff615d510f8657bcd7a3727c668e0d9d4955f70d5f7573|16104367",

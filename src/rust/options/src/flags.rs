@@ -4,9 +4,9 @@
 use super::id::{NameTransform, OptionId};
 use super::scope::Scope;
 use super::{DictEdit, OptionsSource};
-use crate::ListEdit;
 use crate::fromfile::FromfileExpander;
-use crate::parse::{ParseError, Parseable};
+use crate::parse::ParseError;
+use crate::{FromVal, ListEdit};
 use itertools::{Itertools, chain};
 use parking_lot::Mutex;
 use std::any::Any;
@@ -155,19 +155,32 @@ impl FlagsReader {
         ret
     }
 
+    fn get_scalar<T: FromVal>(&self, id: &OptionId) -> Result<Option<T>, String> {
+        // We iterate in reverse so that the rightmost flag wins in case an option
+        // is specified multiple times.
+        for flag in self.flags.iter().rev() {
+            if self.matches(flag, id) {
+                return self
+                    .fromfile_expander
+                    .expand::<T>(flag.value.clone().ok_or_else(|| {
+                        format!("Expected option {} to have a value.", self.display(id))
+                    })?)
+                    .map_err(|e| e.render(&flag.key));
+            };
+        }
+        Ok(None)
+    }
+
     fn to_bool(&self, arg: &Flag) -> Result<Option<bool>, ParseError> {
         // An arg can represent a bool either by having an explicit value parseable as a bool,
         // or by having no value (in which case it represents true).
         match &arg.value {
-            Some(value) => match self.fromfile_expander.expand(value.to_string())? {
-                Some(s) => bool::parse(&s).map(Some),
-                _ => Ok(None),
-            },
+            Some(value) => self.fromfile_expander.expand::<bool>(value.to_string()),
             None => Ok(Some(true)),
         }
     }
 
-    fn get_list<T: Parseable>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
+    fn get_list<T: FromVal>(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<T>>>, String> {
         let mut edits = vec![];
         for flag in &self.flags {
             if self.matches(flag, id) {
@@ -208,22 +221,7 @@ impl OptionsSource for FlagsReader {
     }
 
     fn get_string(&self, id: &OptionId) -> Result<Option<String>, String> {
-        // We iterate in reverse so that the rightmost flag wins in case an option
-        // is specified multiple times.
-        for flag in self.flags.iter().rev() {
-            if self.matches(flag, id) {
-                return self
-                    .fromfile_expander
-                    .expand(flag.value.clone().ok_or_else(|| {
-                        format!(
-                            "Expected string option {} to have a value.",
-                            self.display(id)
-                        )
-                    })?)
-                    .map_err(|e| e.render(&flag.key));
-            };
-        }
-        Ok(None)
+        self.get_scalar::<String>(id)
     }
 
     fn get_bool(&self, id: &OptionId) -> Result<Option<bool>, String> {
@@ -240,6 +238,14 @@ impl OptionsSource for FlagsReader {
             }
         }
         Ok(None)
+    }
+
+    fn get_int(&self, id: &OptionId) -> Result<Option<i64>, String> {
+        self.get_scalar::<i64>(id)
+    }
+
+    fn get_float(&self, id: &OptionId) -> Result<Option<f64>, String> {
+        self.get_scalar::<f64>(id)
     }
 
     fn get_bool_list(&self, id: &OptionId) -> Result<Option<Vec<ListEdit<bool>>>, String> {

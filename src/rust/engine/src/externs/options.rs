@@ -170,8 +170,7 @@ impl PyOptionId {
                 )));
             }
         };
-        let option_id =
-            OptionId::new(scope, components.into_iter(), switch).map_err(ParseError::new_err)?;
+        let option_id = OptionId::new(scope, components, switch).map_err(ParseError::new_err)?;
         Ok(Self(option_id))
     }
 }

@@ -134,8 +134,9 @@ fn test_float() {
         ("PANTS_BAD", "swallow"),
     ]);
 
-    let assert_float =
-        |expected: f64, id: OptionId| assert_eq!(expected, env.get_float(&id).unwrap().unwrap());
+    let assert_float = |expected: f64, id: OptionId| {
+        assert_eq!(expected, env.get_float_loose(&id).unwrap().unwrap())
+    };
 
     assert_float(4_f64, option_id!("foo"));
     assert_float(3.14, option_id!("bar", "baz"));

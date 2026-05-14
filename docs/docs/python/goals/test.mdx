@@ -578,6 +578,76 @@ branch = true
 
 When generating HTML, XML, and JSON reports, you can automatically open the reports through the option `--test-open-coverage`.
 
+### Coverage with test sharding
+
+When using the `--shard` flag to split tests across CI runners, each shard only exercises a fraction of your test targets. The per-shard coverage report will be artificially low. To get accurate coverage you need to combine the binary `.coverage` files from all shards.
+
+#### Configuration
+
+Add `"raw"` to your coverage reports so Pants writes the `.coverage` binary, and set `relative_files = true` so that `coverage combine` can match paths across different sandbox directories:
+
+```toml title="pants.ci.toml"
+[coverage-py]
+report = ["raw", "xml", "console"]
+output_dir = "coverage-report"
+```
+
+```ini title=".coveragerc"
+[run]
+relative_files = true
+branch = true
+```
+
+:::caution Don't set `fail_under` in `[coverage-py]` when sharding
+Each shard only runs a fraction of your targets, so per-shard coverage is intentionally incomplete. Setting `fail_under` in `pants.toml` or `pants.ci.toml` will cause every shard to fail. Enforce the threshold after combining all shards instead.
+:::
+
+#### Merging coverage reports
+
+After all shards complete, collect their `.coverage` binaries, combine them with `coverage combine`, and generate the final report. The following example uses GitHub Actions, but the same approach applies to any CI system:
+
+```yaml title=".github/workflows/ci.yml"
+# In each shard job: upload the coverage output
+- name: Upload coverage
+  uses: actions/upload-artifact@v4
+  with:
+    name: coverage-shard-${{ matrix.shard }}
+    include-hidden-files: true  # .coverage is a dotfile
+    path: coverage-report/
+
+# Post-shard job: combine and enforce threshold
+coverage-report:
+  needs: [test]
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+
+    - name: Download all shard coverage
+      uses: actions/download-artifact@v4
+      with:
+        pattern: coverage-shard-*
+        path: all-coverage/
+        merge-multiple: false
+
+    - name: Combine and report
+      run: |
+        pip install coverage
+
+        idx=0
+        for f in $(find all-coverage/ -name ".coverage" -not -name ".coverage.*"); do
+          cp "$f" ".coverage.shard${idx}"
+          idx=$((idx + 1))
+        done
+
+        coverage combine --rcfile=.coveragerc .coverage.shard*
+        coverage xml   --rcfile=.coveragerc -o coverage-report/coverage.xml
+        coverage report --rcfile=.coveragerc --fail-under=80
+```
+
+:::note `global_report` and sharding
+With `[coverage-py] global_report = true`, per-shard reports show 0% for untouched files. Consider applying this setting only in the post-merge step rather than in `pants.ci.toml`.
+:::
+
 ## JUnit XML results
 
 Pytest can generate [JUnit XML result files](https://docs.pytest.org/en/6.2.x/usage.html#creating-junitxml-format-files). This allows you to hook up your results, for example, to dashboards.

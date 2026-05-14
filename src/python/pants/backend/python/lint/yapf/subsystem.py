@@ -15,6 +15,8 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(yapf.lock*)
+
 
 class Yapf(PythonToolBase):
     options_scope = "yapf"

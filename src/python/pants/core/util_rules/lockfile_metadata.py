@@ -155,6 +155,11 @@ class LockfileMetadata:
         error_suffix: str,
     ) -> _LockfileMetadataSubclass:
         version = json_dict.get("version", 1)
+        if (cls.scope, version) not in _concrete_metadata_classes:
+            raise InvalidLockfileError(
+                f"Unknown lockfile metadata version {version} in {lockfile_description}. "
+                f"{error_suffix}"
+            )
         concrete_class = _concrete_metadata_classes[(cls.scope, version)]
 
         assert issubclass(concrete_class, cls)

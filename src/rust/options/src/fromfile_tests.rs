@@ -2,9 +2,10 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::fromfile::test_util::write_fromfile;
-use crate::fromfile::*;
-use crate::parse::{ParseError, Parseable};
-use crate::{BuildRoot, DictEdit, DictEditAction, ListEdit, ListEditAction, Val};
+use crate::fromfile::{FromfileExpander, follow_the_trail};
+use crate::parse::ParseError;
+use crate::{BuildRoot, DictEdit, DictEditAction, FromVal, ListEdit, ListEditAction, Val};
+use indoc::indoc;
 use maplit::hashmap;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -13,7 +14,7 @@ macro_rules! check_err {
     ($res:expr, $expected_suffix:expr $(,)?) => {
         let actual_msg = $res.unwrap_err().render("XXX");
         assert!(
-            actual_msg.ends_with($expected_suffix),
+            actual_msg.trim_end().ends_with($expected_suffix.trim_end()),
             "Error message does not have expected suffix:\n{actual_msg}\nvs\n{:>width$}",
             $expected_suffix,
             width = actual_msg.len(),
@@ -25,7 +26,7 @@ fn expand(value: String) -> Result<Option<String>, ParseError> {
     FromfileExpander::relative_to_cwd().expand(value)
 }
 
-fn expand_to_list<T: Parseable>(value: String) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
+fn expand_to_list<T: FromVal>(value: String) -> Result<Option<Vec<ListEdit<T>>>, ParseError> {
     FromfileExpander::relative_to_cwd().expand_to_list(value)
 }
 
@@ -68,7 +69,7 @@ fn test_fromfile_relative_to_buildroot() {
 
 #[test]
 fn test_expand_fromfile_to_list() {
-    fn expand_fromfile<T: Parseable + Clone + Debug + PartialEq>(
+    fn expand_fromfile<T: FromVal + Clone + Debug + PartialEq>(
         content: &str,
         prefix: &str,
         filename: &str,
@@ -80,7 +81,7 @@ fn test_expand_fromfile_to_list() {
         ))
     }
 
-    fn do_test<T: Parseable + Clone + Debug + PartialEq>(
+    fn do_test<T: FromVal + Clone + Debug + PartialEq>(
         content: &str,
         expected: &[ListEdit<T>],
         filename: &str,
@@ -271,7 +272,7 @@ fn test_expand_fromfile_to_dict() {
         "fromfile.json",
     );
     do_test(
-        r#"
+        indoc! {"
         FOO:
           BAR: 3.14
           BAZ:
@@ -279,9 +280,22 @@ fn test_expand_fromfile_to_dict() {
             QUUX:
               - 1
               - 2
-        "#,
+        "},
         &complex_obj,
         "fromfile.yaml",
+    );
+
+    do_test(
+        indoc! {"
+        [FOO]
+        BAR = 3.14
+        
+        [FOO.BAZ]
+        QUX= true
+        QUUX = [1, 2]
+        "},
+        &complex_obj,
+        "fromfile.toml",
     );
 
     check_err!(
@@ -305,6 +319,17 @@ fn test_expand_fromfile_to_dict() {
     );
 
     check_err!(
+        expand_fromfile("THIS IS NOT TOML", "@", "invalid.toml"),
+        indoc! {"
+        TOML parse error at line 1, column 6
+          |
+        1 | THIS IS NOT TOML
+          |      ^
+        expected `.`, `=`
+        "},
+    );
+
+    check_err!(
         expand_to_dict("@/does/not/exist".to_string()),
         "Problem reading /does/not/exist for XXX: No such file or directory (os error 2)",
     );
@@ -316,5 +341,230 @@ fn test_expand_fromfile_to_dict() {
     assert_eq!(
         replace(hashmap! {"FOO".to_string() => Val::Int(42),}),
         res.unwrap().unwrap()
+    );
+}
+
+#[test]
+fn test_get_value_at_path() {
+    let dict = hashmap! {
+        "A".to_string() => Val::Bool(true),
+        "B".to_string() => Val::Int(42),
+        "C".to_string() => Val::Float(3.14),
+        "D".to_string() => Val::String("foo".to_string()),
+        "E".to_string() => Val::List(vec![Val::Int(11), Val::Int(22), Val::Int(33)]),
+        "F".to_string() => Val::Dict(hashmap! {
+            "FA".to_string() => Val::Int(99),
+            "FB".to_string() => Val::String("bar".to_string()),
+            "FC".to_string() => Val::Dict(hashmap! {
+                "FCA".to_string() => Val::String("baz".to_string())
+            }),
+        })
+    };
+
+    assert_eq!(
+        "No value for `Z` in object".to_string(),
+        follow_the_trail(Val::Dict(dict.clone()), vec!["Z".to_string()]).unwrap_err()
+    );
+
+    assert_eq!(
+        "No value for `Z` in object".to_string(),
+        follow_the_trail(
+            Val::Dict(dict.clone()),
+            vec!["Z".to_string(), "F".to_string()]
+        )
+        .unwrap_err()
+    );
+
+    assert_eq!(
+        Val::Bool(true),
+        follow_the_trail(Val::Dict(dict.clone()), vec!["A".to_string()]).unwrap()
+    );
+
+    assert_eq!(
+        Val::Int(42),
+        follow_the_trail(Val::Dict(dict.clone()), vec!["B".to_string()]).unwrap()
+    );
+
+    assert_eq!(
+        Val::Float(3.14),
+        follow_the_trail(Val::Dict(dict.clone()), vec!["C".to_string()]).unwrap()
+    );
+
+    assert_eq!(
+        Val::String("foo".to_string()),
+        follow_the_trail(Val::Dict(dict.clone()), vec!["D".to_string()]).unwrap()
+    );
+
+    assert_eq!(
+        Val::List(vec![Val::Int(11), Val::Int(22), Val::Int(33)]),
+        follow_the_trail(Val::Dict(dict.clone()), vec!["E".to_string()]).unwrap()
+    );
+
+    assert_eq!(
+        Val::Dict(hashmap! {
+            "FCA".to_string() => Val::String("baz".to_string())
+        }),
+        follow_the_trail(
+            Val::Dict(dict.clone()),
+            vec!["FC".to_string(), "F".to_string()]
+        )
+        .unwrap()
+    );
+
+    assert_eq!(
+        Val::String("baz".to_string()),
+        follow_the_trail(
+            Val::Dict(dict.clone()),
+            vec!["FCA".to_string(), "FC".to_string(), "F".to_string()]
+        )
+        .unwrap()
+    );
+}
+
+#[test]
+fn test_expand_fromfile_with_trail() {
+    fn do_test<T: FromVal + PartialEq + Debug>(
+        content: &str,
+        expected: T,
+        filename: &str,
+        trail: &str,
+    ) {
+        let (_tmpdir, _) = write_fromfile(filename, content);
+        let value = format!("@{}:{}", _tmpdir.path().join(filename).display(), trail);
+        let expanded = FromfileExpander::relative_to_cwd()
+            .expand::<T>(value)
+            .unwrap();
+        assert_eq!(expected, expanded.unwrap())
+    }
+
+    do_test("{ \"FOO\": 42 }", 42, "test.json", "FOO");
+    do_test(
+        "{ \"FOO\": { \"BAR\": 3.14 } }",
+        3.14,
+        "test.json",
+        "FOO.BAR",
+    );
+    do_test(
+        indoc! {"
+        FOO:
+          BAR: 3.14
+          BAZ:
+            QUX: true
+            QUUX:
+              - 1
+              - 2
+        "},
+        true,
+        "test.yaml",
+        "FOO.BAZ.QUX",
+    );
+
+    do_test(
+        indoc! {"
+        [FOO]
+        BAR = \"hello\"
+        "},
+        "hello".to_string(),
+        "test.toml",
+        "FOO.BAR",
+    );
+}
+
+#[test]
+fn test_expand_list_fromfile_with_trail() {
+    fn do_test<T: FromVal + PartialEq + Debug>(
+        content: &str,
+        expected: Vec<T>,
+        filename: &str,
+        trail: &str,
+    ) {
+        let (_tmpdir, _) = write_fromfile(filename, content);
+        let value = format!("@{}:{}", _tmpdir.path().join(filename).display(), trail);
+        let expanded = FromfileExpander::relative_to_cwd()
+            .expand_to_list::<T>(value)
+            .unwrap()
+            .unwrap();
+        assert_eq!(expanded.len(), 1);
+        let expanded_items = &expanded[0].items;
+        assert_eq!(&expected, expanded_items);
+    }
+
+    do_test(
+        indoc! {"
+        FOO:
+          BAR: 3.14
+          BAZ:
+            QUX: true
+            QUUX:
+              - 1
+              - 2
+        "},
+        vec![1, 2],
+        "test.yaml",
+        "FOO.BAZ.QUUX",
+    );
+
+    do_test(
+        "{ \"FOO\": {\"BAR\": [\"hello\", \"world\"]} }",
+        vec!["hello".to_string(), "world".to_string()],
+        "test.json",
+        "FOO.BAR",
+    );
+
+    do_test::<i64>(
+        indoc! {"
+        [FOO]
+        BAR = []
+        "},
+        vec![],
+        "test.toml",
+        "FOO.BAR",
+    );
+}
+
+#[test]
+fn test_expand_dict_fromfile_with_trail() {
+    fn do_test(content: &str, expected: HashMap<String, Val>, filename: &str, trail: &str) {
+        let (_tmpdir, _) = write_fromfile(filename, content);
+        let value = format!("@{}:{}", _tmpdir.path().join(filename).display(), trail);
+        let expanded = FromfileExpander::relative_to_cwd()
+            .expand_to_dict(value)
+            .unwrap()
+            .unwrap();
+        assert_eq!(expanded.len(), 1);
+        let expanded_items = &expanded[0].items;
+        assert_eq!(&expected, expanded_items);
+    }
+
+    do_test(
+        indoc! {"
+        FOO:
+          BAR: 3.14
+          BAZ:
+            QUX: true
+            QUUX:
+              - 1
+              - 2
+        "},
+        hashmap! {"QUX".to_string() => Val::Bool(true), "QUUX".to_string() => Val::List(vec![Val::Int(1), Val::Int(2)])},
+        "test.yaml",
+        "FOO.BAZ",
+    );
+
+    do_test(
+        "{ \"FOO\": {\"BAR\": [\"hello\", \"world\"]} }",
+        hashmap! { "BAR".to_string() => Val::List(vec![Val::String("hello".to_string()), Val::String("world".to_string())]) },
+        "test.json",
+        "FOO",
+    );
+
+    do_test(
+        indoc! {"
+        [FOO.BAR]
+        BAZ = 3.14
+        "},
+        hashmap! { "BAZ".to_string() => Val::Float(3.14)},
+        "test.toml",
+        "FOO.BAR",
     );
 }

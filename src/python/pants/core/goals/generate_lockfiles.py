@@ -49,8 +49,7 @@ class GenerateLockfile:
     """A union base for generating ecosystem-specific lockfiles.
 
     Each language ecosystem should set up a subclass of `GenerateLockfile`, like
-    `GeneratePythonLockfile` and `GenerateJVMLockfile`, and register a union rule. They should
-    also set up a simple rule that goes from that class -> `WrappedGenerateLockfile`.
+    `GeneratePexLockfile` and `GenerateJVMLockfile`, and register a union rule.
 
     Subclasses will usually want to add additional properties, such as what requirements to
     install and Python interpreter constraints.
@@ -76,18 +75,13 @@ class GenerateLockfileWithEnvironments(GenerateLockfile):
     environments: tuple[EnvironmentName, ...]
 
 
-@dataclass(frozen=True)
-class WrappedGenerateLockfile:
-    request: GenerateLockfile
-
-
 class UserGenerateLockfiles(Collection[GenerateLockfile]):
     """All user resolves for a particular language ecosystem to build.
 
     Each language ecosystem should set up a subclass of `RequestedUserResolveNames` (see its
     docstring), and implement a rule going from that subclass -> UserGenerateLockfiles. Each element
     in the returned `UserGenerateLockfiles` should be a subclass of `GenerateLockfile`, like
-    `GeneratePythonLockfile`.
+    `GeneratePexLockfile`.
     """
 
 
@@ -482,6 +476,24 @@ class GenerateLockfilesSubsystem(GoalSubsystem):
             possible values.
 
             If not specified, Pants will generate lockfiles for all resolves.
+            """
+        ),
+    )
+    sync = BoolOption(
+        advanced=False,
+        default=False,
+        help=softwrap(
+            """
+            Attempt a minimal update of the lockfile, preserving existing dependency versions
+            wherever possible. The resulting lockfile will be a valid solution for the requested
+            dependency versions, but it may not include the latest versions available.
+
+            If a backend does not support syncing it will fall back to full regeneration of
+            the lockfile, and this option will have no effect.
+
+            Note that there may be edge cases where syncing will fail the next time it's run after
+            options that affect lockfile generation are changed. In this case you may need to
+            temporarily turn off `sync` and trigger a full regeneration of the lockfile.
             """
         ),
     )

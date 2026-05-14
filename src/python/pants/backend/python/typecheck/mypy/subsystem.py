@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+from enum import StrEnum
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -37,6 +38,7 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
     BoolOption,
+    EnumOption,
     FileOption,
     SkipOption,
     TargetListOption,
@@ -47,6 +49,11 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class MyPyCacheMode(StrEnum):
+    sqlite = "sqlite"
+    none = "none"
 
 
 @dataclass(frozen=True)
@@ -119,6 +126,19 @@ class MyPy(PythonToolBase):
             To instead load third-party plugins, set the option `[mypy].install_from_resolve`
             to a resolve whose lockfile includes those plugins, and set the `plugins` option
             in `mypy.ini`.  See {doc_url("docs/python/goals/check")}.
+            """
+        ),
+    )
+    cache_mode = EnumOption(
+        default=MyPyCacheMode.sqlite,
+        advanced=True,
+        help=softwrap(
+            """
+            `sqlite`: Default. Uses mypy's SQLite cache.
+
+            `none`: Disables caching entirely (--cache-dir=/dev/null). Much
+            slower.  Intended as an "escape valve" if you believe you are
+            encountering a Pants or mypy related bug.
             """
         ),
     )

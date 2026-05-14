@@ -29,6 +29,8 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption, StrOption
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(pytest.lock*)
+
 
 @dataclass(frozen=True)
 class PythonTestFieldSet(TestFieldSet):

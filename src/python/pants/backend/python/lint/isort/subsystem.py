@@ -15,6 +15,8 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileListOption, SkipOption
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(isort.lock*)
+
 
 class Isort(PythonToolBase):
     options_scope = "isort"

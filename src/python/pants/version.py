@@ -6,9 +6,11 @@ from typing import Any
 
 from packaging.version import Version as _Version
 
+# pants: infer-dep(/src/python/pants/_version/__init__.py)
+# pants: infer-dep(/src/python/pants/_version/VERSION)
 import pants._version
 
-# Generate an inferable dependency on the `pants._version` package and its associated resources.
+# Generate an OG inferable dependency on the `pants._version` package and its associated resources.
 from pants.util.resources import read_resource
 
 

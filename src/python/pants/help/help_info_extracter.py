@@ -201,8 +201,11 @@ class TargetFieldHelpInfo:
 
     @classmethod
     def create(cls, field: type[Field], *, provider: str) -> TargetFieldHelpInfo:
-        raw_value_type = get_type_hints(field.compute_value)["raw_value"]
-        type_hint = pretty_print_type_hint(raw_value_type)
+        hints = get_type_hints(field.compute_value)
+        if "raw_value" in hints:
+            type_hint = pretty_print_type_hint(hints["raw_value"])
+        else:
+            type_hint = field._raw_value_type
 
         # Check if the field only allows for certain choices.
         if issubclass(field, StringField) and field.valid_choices is not None:

@@ -33,6 +33,7 @@ from pants.backend.python.target_types import (
     PythonTestTarget,
 )
 from pants.backend.python.util_rules import pex_from_targets, pex_test_utils
+from pants.backend.python.util_rules.lockfile_metadata import LockfileFormat
 from pants.backend.python.util_rules.pex import (
     OptionalPex,
     OptionalPexRequest,
@@ -172,10 +173,12 @@ def test_determine_requirements_for_pex_from_targets() -> None:
     global_requirement_constraints = ["constraint1", "constraint2"]
 
     resolve__pex = Resolve("pex", False)
-    loaded_lockfile__pex = Mock(is_pex_native=True, as_constraints_strings=None)
+    loaded_lockfile__pex = Mock(lockfile_format=LockfileFormat.PEX, as_constraints_strings=None)
     chosen_resolve__pex = Mock(lockfile=Mock())
     chosen_resolve__pex.name = "pex"  # name has special meaning in Mock(), so must set it here.
-    loaded_lockfile__not_pex = Mock(is_pex_native=False, as_constraints_strings=req_strings)
+    loaded_lockfile__not_pex = Mock(
+        lockfile_format=LockfileFormat.CONSTRAINTS_DEPRECATED, as_constraints_strings=req_strings
+    )
     chosen_resolve__not_pex = Mock(lockfile=Mock())
     chosen_resolve__not_pex.name = "not_pex"  # ditto.
 
@@ -923,6 +926,11 @@ def test_lockfile_requirements_selection(
             importlib.resources.files("pants.backend.python.subsystems") / "setuptools.lock"
         ).read_bytes()
         mode_files.update({"3rdparty/python/default.lock": lock_content})
+        lock_metadata_content = (
+            importlib.resources.files("pants.backend.python.subsystems")
+            / "setuptools.lock.metadata"
+        ).read_bytes()
+        mode_files.update({"3rdparty/python/default.lock.metadata": lock_metadata_content})
 
     rule_runner.write_files(mode_files)
 

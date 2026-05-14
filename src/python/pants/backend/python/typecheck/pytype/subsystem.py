@@ -9,6 +9,8 @@ from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.option_types import ArgsListOption, FileOption, SkipOption
 from pants.util.strutil import help_text, softwrap
 
+# pants: infer-dep(pytype.lock*)
+
 
 class Pytype(PythonToolBase):
     options_scope = "pytype"

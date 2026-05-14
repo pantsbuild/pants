@@ -614,13 +614,11 @@ impl fuser::Filesystem for BuildResultFS {
                     // 0 is a magic offset which means no offset, whereas a non-zero offset means start
                     // _after_ that entry. Inconsistency is fun.
                     let to_skip = if offset == 0 { 0 } else { offset + 1 } as usize;
-                    let mut i = offset;
-                    for entry in entries.into_iter().skip(to_skip) {
+                    for (i, entry) in (offset..).zip(entries.into_iter().skip(to_skip)) {
                         if reply.add(entry.inode, i, entry.kind, entry.name) {
                             // Buffer is full, don't add more entries.
                             break;
                         }
-                        i += 1;
                     }
                     reply.ok();
                 }

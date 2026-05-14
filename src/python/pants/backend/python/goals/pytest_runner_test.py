@@ -11,9 +11,15 @@ from pants.backend.python.goals.pytest_runner import (
 )
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
-from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
+from pants.backend.python.util_rules.lockfile_metadata import (
+    LockfileFormat,
+    PythonLockfileMetadataV3,
+)
 from pants.backend.python.util_rules.pex import PexRequirementsInfo
-from pants.backend.python.util_rules.pex_requirements import LoadedLockfile, Lockfile
+from pants.backend.python.util_rules.pex_requirements import (
+    LoadedLockfile,
+    Lockfile,
+)
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
@@ -98,7 +104,9 @@ def test_validate_pytest_cov_included(entire_lockfile: bool) -> None:
             only_binary=set(),
             no_binary=set(),
         )
-        loaded_lockfile = LoadedLockfile(EMPTY_DIGEST, "", metadata, 0, True, None, lockfile)
+        loaded_lockfile = LoadedLockfile(
+            EMPTY_DIGEST, "", metadata, 0, LockfileFormat.PEX, None, lockfile
+        )
         run_rule_with_mocks(
             validate_pytest_cov_included,
             rule_args=[tool],

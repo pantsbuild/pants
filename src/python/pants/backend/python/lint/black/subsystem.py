@@ -23,6 +23,8 @@ from pants.engine.unions import UnionRule
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(black.lock*)
+
 
 @dataclass(frozen=True)
 class BlackFieldSet(FieldSet):

@@ -28,6 +28,9 @@ from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.docutil import doc_url
 from pants.util.strutil import help_text, softwrap
 
+# pants: infer-dep(grpclib.lock*)
+# pants: infer-dep(mypy_protobuf.lock*)
+
 
 class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"

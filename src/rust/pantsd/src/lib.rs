@@ -352,5 +352,6 @@ pub fn fingerprinted_options(build_root: &BuildRoot) -> Result<Vec<Fingerprinted
         FingerprintedOption::new(option_id!("pantsd"), true),
         FingerprintedOption::new(option_id!("pantsd", "pailgun", "port"), 0),
         FingerprintedOption::new(option_id!("pantsd", "invalidation", "globs"), vec![]),
+        FingerprintedOption::new(option_id!("enable", "stack", "trampoline"), "<none>"),
     ])
 }

@@ -13,6 +13,8 @@ from functools import cache
 from typing import ClassVar
 from urllib.parse import urlparse
 
+import toml
+
 from pants.backend.python.target_types import ConsoleScript, EntryPoint, MainSpecification
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
@@ -237,19 +239,51 @@ class PythonToolRequirementsBase(Subsystem, ExportableTool):
                 f"(origin: {lockfile.url_description_of_origin})"
             )
 
-        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
-        lockfile_contents = json.loads(stripped_lock_bytes)
-        # The first requirement must contain the primary package for this tool, otherwise
-        # this will pick up the wrong requirement.
+        # Note that this code relies on knowing the internal structure of uv and pex lockfiles,
+        # neither of which are guaranteed. If parsing fails we'll return None and the calling
+        # code will deal with it (by omitting some information from help strings).
         first_default_requirement = PipRequirement.parse(cls.default_requirements[0])
-        return next(
-            _PackageNameAndVersion(
-                name=first_default_requirement.name, version=requirement["version"]
+        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
+
+        try:  # Is it uv.lock?
+            lockfile_contents = toml.loads(lock_bytes.decode())
+            # The first requirement must contain the primary package for this tool, otherwise
+            # this will pick up the wrong requirement.
+            return next(
+                _PackageNameAndVersion(name=first_default_requirement.name, version=pkg["version"])
+                for pkg in lockfile_contents["package"]
+                if pkg["name"] == first_default_requirement.name
             )
-            for resolve in lockfile_contents["locked_resolves"]
-            for requirement in resolve["locked_requirements"]
-            if requirement["project_name"] == first_default_requirement.name
-        )
+        except KeyError:
+            # It's toml, but the schema is off.
+            logger.warning(f"File at {lockfile.url} was not of expected uv.lock schema.")
+            return None
+        except toml.TomlDecodeError:
+            # It's not toml, so it's not uv.lock format. Fall through to try pex lockfile format.
+            # TODO: This is only used internally, for generating help, based on the *default*
+            #  lockfiles. Once those are all uv, and we are confident they will remain so,
+            #  we can remove the JSON handling here.
+            pass
+
+        try:
+            lockfile_contents = json.loads(stripped_lock_bytes)
+            # The first requirement must contain the primary package for this tool, otherwise
+            # this will pick up the wrong requirement.
+            return next(
+                _PackageNameAndVersion(
+                    name=first_default_requirement.name, version=requirement["version"]
+                )
+                for resolve in lockfile_contents["locked_resolves"]
+                for requirement in resolve["locked_requirements"]
+                if requirement["project_name"] == first_default_requirement.name
+            )
+        except KeyError:
+            # It's json, but the schema is off.
+            logger.warning(f"File at {lockfile.url} was not of expected pex lock schema.")
+            return None
+        except json.JSONDecodeError:
+            # It's not json, so it's not pex lock format.
+            raise Exception(f"File at {lockfile.url} was not of any recognized lockfile format")
 
     def pex_requirements(
         self,

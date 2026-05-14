@@ -36,6 +36,8 @@ from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(flake8.lock*)
+
 
 @dataclass(frozen=True)
 class Flake8FieldSet(FieldSet):

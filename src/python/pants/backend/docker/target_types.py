@@ -8,6 +8,7 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from enum import Enum
 from typing import ClassVar, cast, final
 
 from pants.backend.docker.registries import ALL_DEFAULT_REGISTRIES
@@ -18,7 +19,7 @@ from pants.core.goals.run import RestartableField
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import GlobMatchErrorBehavior
+from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -432,6 +433,99 @@ class DockerImageBuildImageOutputField(
     docker_build_option = "--output"
 
 
+class DockerImageOutputFilesField(StringSequenceField):
+    alias = "output_files"
+    default = ()
+    help = help_text(
+        """
+        Files to capture from a BuildKit local output export, relative to the build root.
+
+        When this field or `output_directories` is set, Pants overrides the default Docker build
+        output with `--output=type=local,dest=.` and captures only the requested files and
+        directories as the package digest.
+
+        Use `target_stage` to capture output from a specific Dockerfile stage.
+        """
+    )
+
+
+class DockerImageOutputDirectoriesField(StringSequenceField):
+    alias = "output_directories"
+    default = ()
+    help = help_text(
+        """
+        Directories to capture from a BuildKit local output export, relative to the build root.
+
+        When this field or `output_files` is set, Pants overrides the default Docker build output
+        with `--output=type=local,dest=.` and captures only the requested files and directories as
+        the package digest.
+
+        Use `target_stage` to capture output from a specific Dockerfile stage.
+        """
+    )
+
+
+class DockerImageOutputsMatchModeValue(Enum):
+    ALL = "all"
+    ALL_WARN = "all_warn"
+    AT_LEAST_ONE = "at_least_one"
+    AT_LEAST_ONE_WARN = "at_least_one_warn"
+    ALLOW_EMPTY = "allow_empty"
+
+    @property
+    def glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
+        if self in (
+            DockerImageOutputsMatchModeValue.ALL,
+            DockerImageOutputsMatchModeValue.AT_LEAST_ONE,
+        ):
+            return GlobMatchErrorBehavior.error
+        return GlobMatchErrorBehavior.warn
+
+    @property
+    def glob_expansion_conjunction(self) -> GlobExpansionConjunction | None:
+        if self in (
+            DockerImageOutputsMatchModeValue.ALL,
+            DockerImageOutputsMatchModeValue.ALL_WARN,
+        ):
+            return GlobExpansionConjunction.all_match
+        if self in (
+            DockerImageOutputsMatchModeValue.AT_LEAST_ONE,
+            DockerImageOutputsMatchModeValue.AT_LEAST_ONE_WARN,
+        ):
+            return GlobExpansionConjunction.any_match
+        return None
+
+
+class DockerImageOutputsMatchModeField(StringField):
+    alias = "outputs_match_mode"
+    default = DockerImageOutputsMatchModeValue.ALL_WARN.value
+    help = help_text(
+        """
+        Configure whether all, or some, of the values in the `output_files` and
+        `output_directories` fields must actually match outputs from the Docker build.
+
+        Valid values are:
+
+        - `all_warn`: Log a warning if any glob fails to match an output. (In other words, all
+        globs must match to avoid a warning.) This is the default value.
+
+        - `all`: Ensure all globs match an output or else raise an error.
+
+        - `at_least_one_warn`: Log a warning if none of the globs match an output.
+
+        - `at_least_one`: Ensure at least one glob matches an output or else raise an error.
+
+        - `allow_empty`: Allow empty digests (which means nothing was captured). This disables
+        checking that globs match outputs.
+        """
+    )
+    valid_choices = DockerImageOutputsMatchModeValue
+
+    @property
+    def enum_value(self) -> DockerImageOutputsMatchModeValue:
+        return DockerImageOutputsMatchModeValue(self.value)
+
+
 class DockerImageBuildSecretsOptionField(
     AsyncFieldMixin, DockerBuildOptionFieldMixin, DictStringToStringField
 ):
@@ -621,6 +715,9 @@ class DockerImageTarget(Target):
         DockerImageBuildImageCacheToField,
         DockerImageBuildImageCacheFromField,
         DockerImageBuildImageOutputField,
+        DockerImageOutputFilesField,
+        DockerImageOutputDirectoriesField,
+        DockerImageOutputsMatchModeField,
         DockerImageRunExtraArgsField,
         OutputPathField,
         RestartableField,

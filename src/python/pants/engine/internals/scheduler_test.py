@@ -474,12 +474,6 @@ def test_trace_includes_nested_exception_traceback() -> None:
           File LOCATION-INFO, in catch_and_reraise
             return await raise_an_exception(SomeInput(outer_input.s))
                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-          File LOCATION-INFO, in wrapper
-            return await call
-                   ^^^^^^^^^^
-          File LOCATION-INFO, in __await__
-            result = yield self
-                     ^^^^^^^^^^
           File LOCATION-INFO, in raise_an_exception
             raise Exception(some_input.s)
         Exception: asdf

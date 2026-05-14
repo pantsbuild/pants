@@ -1,13 +1,17 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# pants: infer-dep(native_engine.so)
+# pants: infer-dep(native_engine.so.metadata)
+
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Coroutine, Generator, Iterable, Iterator, Mapping, Sequence
 from datetime import datetime
+from enum import Enum
 from io import RawIOBase
 from pathlib import Path
-from typing import Any, ClassVar, Protocol, Self, TextIO, TypeVar, overload
+from typing import Any, ClassVar, Generic, Protocol, Self, TextIO, TypeVar, overload
 
 from pants.engine.fs import (
     CreateDigest,
@@ -45,6 +49,38 @@ from pants.engine.process import (
 
 class PyFailure:
     def get_error(self) -> Exception | None: ...
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+class FrozenDict(Mapping[K, V]):
+    """A wrapper around a normal `dict` that removes all methods to mutate the instance and that
+    implements __hash__.
+
+    This should be used instead of normal dicts when working with the engine because normal dicts
+    are not safe to use.
+    """
+
+    @overload
+    def __new__(cls, __items: Iterable[tuple[K, V]], **kwargs: V) -> Self: ...
+    @overload
+    def __new__(cls, __other: Mapping[K, V], **kwargs: V) -> Self: ...
+    @overload
+    def __new__(cls, **kwargs: V) -> Self: ...
+    @classmethod
+    def deep_freeze(cls, data: Mapping[K, V]) -> Self: ...
+    @staticmethod
+    def frozen(to_freeze: Mapping[K, V]) -> FrozenDict[K, V]: ...
+    def __getitem__(self, k: K) -> V: ...
+    def __len__(self) -> int: ...
+    def __iter__(self) -> Iterator[K]: ...
+    def __reversed__(self) -> Iterator[K]: ...
+    def __eq__(self, other: Any) -> Any: ...
+    def __lt__(self, other: Any) -> bool: ...
+    def __or__(self, other: Any) -> FrozenDict[K, V]: ...
+    def __ror__(self, other: Any) -> FrozenDict[K, V]: ...
+    def __hash__(self) -> int: ...
+    def __repr__(self) -> str: ...
 
 # ------------------------------------------------------------------------------
 # Address
@@ -399,6 +435,8 @@ class Field:
 
     value: ImmutableValue | None
 
+    _raw_value_type: ClassVar[str]
+
     def __init__(self, raw_value: Any | None, address: Address) -> None: ...
     @classmethod
     def compute_value(cls, raw_value: Any | None, address: Address) -> ImmutableValue:
@@ -410,6 +448,128 @@ class Field:
         The resulting value must be hashable (and should be immutable).
         """
         ...
+
+_ST = TypeVar("_ST")
+
+class ScalarField(Field, Generic[_ST]):
+    expected_type: ClassVar[type[_ST]]
+    expected_type_description: ClassVar[str]
+    value: _ST | None
+    default: ClassVar[_ST | None] = None
+
+    @classmethod
+    def compute_value(cls, raw_value: Any | None, address: Address) -> _ST | None: ...
+
+class BoolField(ScalarField[bool]):
+    """A field whose value is a boolean.
+
+    Subclasses must either set `default: bool` or `required = True` so that the value is always
+    defined.
+    """
+
+    expected_type: ClassVar[type[bool]]
+    expected_type_description: ClassVar[str]
+    value: bool
+    default: ClassVar[bool]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool, address: Address) -> bool: ...  # type: ignore[override]
+
+class TriBoolField(ScalarField[bool]):
+    """A field whose value is a boolean or None, which is meant to represent a tri-state."""
+
+    expected_type: ClassVar[type[bool]]
+    expected_type_description: ClassVar[str]
+
+    @classmethod
+    def compute_value(cls, raw_value: bool | None, address: Address) -> bool | None: ...
+
+class StringField(ScalarField[str]):
+    expected_type: ClassVar[type[str]]
+    expected_type_description: ClassVar[str]
+    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None]
+
+    @classmethod
+    def compute_value(cls, raw_value: str | None, address: Address) -> str | None: ...
+
+_ET = TypeVar("_ET")
+
+class SequenceField(Field, Generic[_ET]):
+    expected_element_type: ClassVar[type]
+    expected_type_description: ClassVar[str]
+    value: tuple[_ET, ...] | None
+    default: ClassVar[tuple[_ET, ...] | None] = None
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[Any] | None, address: Address
+    ) -> tuple[_ET, ...] | None: ...
+
+class StringSequenceField(SequenceField[str]):
+    expected_element_type: ClassVar[type[str]]
+    expected_type_description: ClassVar[str]
+    valid_choices: ClassVar[type[Enum] | tuple[str, ...] | None]
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Iterable[str] | None, address: Address
+    ) -> tuple[str, ...] | None: ...
+
+# NB: By subclassing `Field`, MyPy understands our type hints, and it means it doesn't matter
+# which order you use for inheriting the field template vs. the mixin.
+class AsyncFieldMixin(Field):
+    """A mixin to store the field's original `Address` for use during hydration by the engine.
+
+    Typically, you should also create a dataclass representing the hydrated value and another for
+    the request, then a rule to go from the request to the hydrated value. The request class should
+    store the async field as a property.
+
+    (Why use the request class as the rule input, rather than the field itself? It's a wrapper so
+    that subclasses of the async field work properly, given that the engine uses exact type IDs.
+    This is like WrappedTarget.)
+
+    For example:
+
+        class Sources(StringSequenceField, AsyncFieldMixin):
+            alias = "sources"
+
+            # Often, async fields will want to define entry points like this to allow subclasses to
+            # change behavior.
+            def validate_resolved_files(self, files: Sequence[str]) -> None:
+                pass
+
+
+        @dataclass(frozen=True)
+        class HydrateSourcesRequest:
+            field: Sources
+
+
+        @dataclass(frozen=True)
+        class HydratedSources:
+            snapshot: Snapshot
+
+
+        @rule
+        async def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
+            digest = await path_globs_to_digest(PathGlobs(request.field.value))
+            result = await digest_to_snapshot(digest)
+            request.field.validate_resolved_files(result.files)
+            ...
+            return HydratedSources(result)
+
+    Then, call sites can `await` if they need to hydrate the field, even if they subclassed
+    the original async field to have custom behavior:
+
+        sources1 = hydrate_sources(HydrateSourcesRequest(my_tgt.get(Sources)))
+        sources2 = hydrate_sources(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
+    """
+
+    address: Address
+
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: Any) -> bool: ...
+    def __ne__(self, other: Any) -> bool: ...
+    def __repr__(self) -> str: ...
 
 # ------------------------------------------------------------------------------
 # FS
@@ -681,6 +841,16 @@ class PyOptionId:
         self, *components: str, scope: str | None = None, switch: str | None = None
     ) -> None: ...
 
+class PyNgInvocation:
+    @staticmethod
+    def empty() -> PyNgInvocation: ...
+    @staticmethod
+    def from_args(args: tuple[str, ...]) -> PyNgInvocation: ...
+    def global_flag_strings(self) -> tuple[str, ...]: ...
+    def specs(self) -> tuple[str, ...]: ...
+    def goals(self) -> tuple[str, ...]: ...
+    def passthru(self) -> tuple[str, ...]: ...
+
 class PyPantsCommand:
     def builtin_or_auxiliary_goal(self) -> str | None: ...
     def goals(self) -> list[str]: ...
@@ -719,19 +889,62 @@ class PyOptionParser:
     def get_float(self, option_id: PyOptionId, default: float | None) -> OptionValue[float]: ...
     def get_string(self, option_id: PyOptionId, default: str | None) -> OptionValue[str]: ...
     def get_bool_list(
-        self, option_id: PyOptionId, default: list[bool]
+        self, option_id: PyOptionId, default: Iterable[bool]
     ) -> OptionValue[list[bool]]: ...
-    def get_int_list(self, option_id: PyOptionId, default: list[int]) -> OptionValue[list[int]]: ...
+    def get_int_list(
+        self, option_id: PyOptionId, default: Iterable[int]
+    ) -> OptionValue[list[int]]: ...
     def get_float_list(
-        self, option_id: PyOptionId, default: list[float]
+        self, option_id: PyOptionId, default: Iterable[float]
     ) -> OptionValue[list[float]]: ...
     def get_string_list(
-        self, option_id: PyOptionId, default: list[str]
+        self, option_id: PyOptionId, default: Iterable[str]
     ) -> OptionValue[list[str]]: ...
     def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionValue[dict]: ...
     def get_command(self) -> PyPantsCommand: ...
     def get_unconsumed_flags(self) -> dict[str, list[str]]: ...
     def validate_config(self, valid_keys: dict[str, set[str]]) -> list[str]: ...
+
+class PyNgOptionsReader:
+    # Useful in tests.
+    def __init__(
+        self,
+        buildroot: Path,
+        flags: dict[str, dict[str, tuple[str | None, ...]]],
+        env: dict[str, str],
+        configs: Sequence[PyConfigSource],
+    ) -> None: ...
+    def get_bool(self, option_id: PyOptionId, default: bool | None) -> OptionValue[bool]: ...
+    def get_int(self, option_id: PyOptionId, default: int | None) -> OptionValue[int]: ...
+    def get_float(self, option_id: PyOptionId, default: float | None) -> OptionValue[float]: ...
+    def get_string(self, option_id: PyOptionId, default: str | None) -> OptionValue[str]: ...
+    def get_bool_list(
+        self, option_id: PyOptionId, default: list[bool] | tuple[bool]
+    ) -> OptionValue[list[bool]]: ...
+    def get_int_list(
+        self, option_id: PyOptionId, default: list[int] | tuple[int]
+    ) -> OptionValue[list[int]]: ...
+    def get_float_list(
+        self, option_id: PyOptionId, default: list[float] | tuple[float]
+    ) -> OptionValue[list[float]]: ...
+    def get_string_list(
+        self, option_id: PyOptionId, default: list[str] | tuple[str]
+    ) -> OptionValue[list[str]]: ...
+    def get_dict(self, option_id: PyOptionId, default: dict[str, Any]) -> OptionValue[dict]: ...
+
+class PyNgSourcePartition:
+    def paths(self) -> tuple[str, ...]: ...
+    def options_reader(self) -> PyNgOptionsReader: ...
+
+class PyNgOptions:
+    def __init__(
+        self,
+        pants_invocation: PyNgInvocation,
+        env: dict[str, str],
+        include_derivation: bool,
+    ) -> None: ...
+    def get_options_reader_for_dir(self, dir: str) -> PyNgOptionsReader: ...
+    def partition_sources(self, paths: tuple[str, ...]) -> tuple[PyNgSourcePartition, ...]: ...
 
 # ------------------------------------------------------------------------------
 # Testutil
@@ -942,12 +1155,14 @@ def hash_prefix_zero_bits(item: str) -> int: ...
 # ------------------------------------------------------------------------------
 
 _Output = TypeVar("_Output")
+_Output_co = TypeVar("_Output_co", covariant=True)
 _Input = TypeVar("_Input")
 
-class PyGeneratorResponseCall:
+class Call(Generic[_Output_co]):
     rule_id: str
     output_type: type
-    inputs: Sequence[Any]
+    args: tuple[Any, ...]
+    implicit_args: dict[Any, type]
 
     @overload
     def __init__(
@@ -979,6 +1194,40 @@ class PyGeneratorResponseCall:
         input_arg0: type[_Input] | _Input,
         input_arg1: _Input | None = None,
     ) -> None: ...
+    def __await__(self) -> Generator[Any, None, _Output_co]: ...
+    def __repr__(self) -> str: ...
+
+class _Concurrently(Generic[_Output_co]):
+    def __init__(
+        self, calls: tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]
+    ) -> None: ...
+    def __await__(self) -> Generator[_Concurrently[_Output_co], None, _Output_co]: ...
+    @property
+    def calls(
+        self,
+    ) -> tuple[Coroutine[Any, Any, Any] | Call[Any] | _Concurrently[Any], ...]: ...
+
+class RuleCallTrampoline(Generic[_Output]):
+    """The callable `@rule` returns. Captures `rule_id` and `output_type` at decoration time so
+    each invocation constructs the already-awaitable `Call` directly.
+    `__getattribute__` forwards `__doc__` and other introspection attrs to the wrapped function.
+    """
+
+    rule_id: str
+    output_type: type[_Output]
+    rule: Any
+    __wrapped__: Callable[..., Any]
+
+    def __init__(
+        self,
+        rule_id: str,
+        output_type: type[_Output],
+        wrapped: Callable[..., Any],
+        rule: Any,
+    ) -> None: ...
+    def __call__(
+        self, *args: Any, __implicitly: Sequence[Any] = (), **kwargs: Any
+    ) -> Call[_Output]: ...
 
 # ------------------------------------------------------------------------------
 # (uncategorized)

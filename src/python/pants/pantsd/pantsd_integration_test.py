@@ -289,8 +289,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             for line_pair in zip(non_daemon_stdout.splitlines(), daemon_stdout.splitlines()):
                 assert line_pair[0] == line_pair[1]
 
-    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7622")
-    @pytest.mark.no_error_if_skipped
     def test_pantsd_filesystem_invalidation(self):
         """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
         with self.pantsd_successful_run_context() as ctx:
@@ -299,7 +297,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             ctx.checker.assert_started()
 
             # Launch a separate thread to poke files in 3rdparty.
-            join = launch_file_toucher("3rdparty/jvm/com/google/auto/value/BUILD")
+            join = launch_file_toucher("testprojects/src/python/hello/BUILD")
 
             # Repeatedly re-list 3rdparty while the file is being invalidated.
             for _ in range(0, 16):

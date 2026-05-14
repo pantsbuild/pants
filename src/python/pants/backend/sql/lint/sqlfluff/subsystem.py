@@ -18,6 +18,8 @@ from pants.engine.target import FieldSet, Target
 from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.strutil import softwrap
 
+# pants: infer-dep(sqlfluff.lock*)
+
 
 @dataclass(frozen=True)
 class SqlfluffFieldSet(FieldSet):
