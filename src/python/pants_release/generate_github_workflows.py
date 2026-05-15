@@ -347,7 +347,7 @@ def global_env() -> Env:
         # Default to disabling OpenTelemetry so GHA steps not using Pants directly do not try
         # to use Honeycomb if they do invoke Pants indirectly (e.g., Rust integration tests).
         # Needed because pants.ci.toml refers to `env.HONEYCOMB_API_KEY`.
-        "PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED": "False",
+        "PANTS_OPENTELEMETRY_ENABLED": "False",
         "HONEYCOMB_API_KEY": "--DISABLED--",
     }
 
@@ -1846,7 +1846,7 @@ def add_telemetry_secret_env(workflow: dict[str, Any]) -> dict[str, Any]:
                     step_config["env"] = {}
 
                 # Derive the enable flag based on the repository `OPENTELEMETRY_ENABLED` variable.
-                step_config["env"]["PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED"] = gha_expr(
+                step_config["env"]["PANTS_OPENTELEMETRY_ENABLED"] = gha_expr(
                     "vars.OPENTELEMETRY_ENABLED || 'False'"
                 )
                 step_config["env"]["HONEYCOMB_API_KEY"] = gha_expr(

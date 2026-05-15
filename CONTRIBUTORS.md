@@ -51,6 +51,7 @@ Created as part of the release process.
 + Caitie McCaffrey
 + Caleb Lloyd
 + Carina C. Zona
++ Casey
 + Caspar Krieger
 + Chiara
 + Chris Aniszczyk
@@ -318,8 +319,10 @@ Created as part of the release process.
 + Roger Jiang
 + Roman Andriadi
 + Rushal Verma
++ Rutger de Knijf
 + Ryan Despain
 + Ryan King
++ Ryan Loader
 + Ryan Scott Brown
 + Ryan Williams
 + Sameer Arora
@@ -409,6 +412,7 @@ Created as part of the release process.
 + hephex
 + jgartdele/del
 + lukevmorris
++ mattalbr
 + nikhila-dwarakanath-zocdoc
 + offsetcyan
 + okcleary

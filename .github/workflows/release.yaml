@@ -69,12 +69,12 @@ jobs:
       run: echo 'no-op'
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -204,14 +204,14 @@ jobs:
         go-version: 1.24.9
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
     - continue-on-error: true
@@ -365,14 +365,14 @@ jobs:
     - env:
         ARCHFLAGS: -arch arm64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build wheels
       run: ./pants run src/python/pants_release/release.py -- build-wheels
     - env:
         ARCHFLAGS: -arch arm64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
       run: ./pants package src/python/pants:pants-pex
@@ -497,7 +497,7 @@ jobs:
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Generate announcement
       run: |
         ./pants run src/python/pants_release/generate_release_announcement.py                         -- --output-dir=${{ runner.temp }}
@@ -521,7 +521,7 @@ jobs:
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Get release notes
       run: |
         ./pants run src/python/pants_release/changelog.py -- "${{ needs.release_info.outputs.build-ref }}" > notes.txt
