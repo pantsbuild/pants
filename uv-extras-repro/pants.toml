@@ -10,6 +10,10 @@ resolver = "uv"
 
 [python.resolves]
 test = "src/test.lock"
+bug2 = "bug2/src/bug2.lock"
+
+[python-repos]
+find_links = ["%(buildroot)s/bug2/wheels"]
 
 [source]
-root_patterns = ["/src"]
+root_patterns = ["/src", "/bug2/src"]
