@@ -440,7 +440,11 @@ impl Vfs<String> for DigestTrie {
         )))
     }
 
-    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, String> {
+    async fn path_metadata(
+        &self,
+        path: PathBuf,
+        _follow_symlinks: bool,
+    ) -> Result<Option<PathMetadata>, String> {
         let entry = match self.entry(&path)? {
             Some(e) => e,
             None => return Ok(None),
@@ -499,7 +503,11 @@ impl Vfs<String> for DigestTrie {
 pub trait Vfs<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     async fn read_link(&self, link: &Link) -> Result<PathBuf, E>;
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, E>;
-    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, E>;
+    async fn path_metadata(
+        &self,
+        path: PathBuf,
+        follow_symlinks: bool,
+    ) -> Result<Option<PathMetadata>, E>;
     fn is_ignored(&self, stat: &Stat) -> bool;
     fn mk_error(msg: &str) -> E;
 }
