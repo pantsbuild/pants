@@ -1,0 +1,15 @@
+[GLOBAL]
+pants_version = "2.32.0rc0"
+
+backend_packages = ["pants.backend.python"]
+
+[python]
+interpreter_constraints = ["CPython>=3.10"]
+enable_resolves = true
+resolver = "uv"
+
+[python.resolves]
+test = "src/test.lock"
+
+[source]
+root_patterns = ["/src"]

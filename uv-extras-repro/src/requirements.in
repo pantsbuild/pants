@@ -1,0 +1,11 @@
+# google-cloud-speech==2.21.0 depends on google-api-core[grpc] (with extras).
+# google-cloud-storage (new) depends on google-api-core (without extras).
+#
+# When both are present, Pants sees google-api-core required from two paths:
+#   - google-cloud-speech -> google-api-core[grpc]  (extras path)
+#   - google-cloud-storage -> google-api-core        (non-extras path)
+#
+# Bug hypothesis: Pants resolves google-api-core as the non-extras version
+# and skips optional-dependencies.grpc, leaving grpcio out of the PEX.
+google-cloud-speech==2.21.0
+google-cloud-storage
