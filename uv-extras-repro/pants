@@ -1,0 +1,11 @@
+#!/bin/bash
+
+set -e
+
+export PATH="$PATH:$HOME/.local/bin"
+if ! command -v pants >/dev/null 2>&1; then
+  # Install Pants
+  $(git rev-parse --show-toplevel)/mlpbr/pants_init/get-pants.sh
+fi
+
+pants "$@"
