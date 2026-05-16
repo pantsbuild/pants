@@ -105,10 +105,6 @@ make_wheel(
 )
 
 # pkg-e: SEPARATE direct dep that pulls in pkg-c WITHOUT extras.
-# This simulates the m2 scenario where another package in req_strings also
-# transitively depends on nflx-bdp-tracing but without the [grpc] extra.
-# When PEX satisfies pkg-c from this path first (no extras), the [myextra]
-# activation from pkg-b is skipped → pkg-d is never added.
 make_wheel(
     "pkg-e", "0.1.0",
     [
