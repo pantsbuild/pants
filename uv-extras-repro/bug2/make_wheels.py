@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-Generate minimal fake wheels for the Pants + uv extras bug repro.
+Generate fake wheels for the bug2 repro.
 
 Chain under test:
-  pkg-a (BUILD dep) → pkg-b (no extras)
-                       └─ pkg-b → pkg-c[myextra]
-                                   └─ pkg-c[myextra] → pkg-d (ONLY via extra)
+  pkg-f (BUILD dep) → pkg-g (no extras)
+                       └─ pkg-g → pkg-h[myextra]
+                                   └─ pkg-h[myextra] → pkg-i (ONLY via extra)
 
-If PEX/Pants drops the [myextra] specifier when following pkg-b's Requires-Dist,
-pkg-d will be absent from requirements.pex and the test will fail with:
-  Failed to resolve requirements ... pkg-d; extra == "myextra" ... had no 'pkg-d' distributions.
+  pkg-j → pkg-h (no extras) ← competing path; also a BUILD dep
+
+If PEX satisfies pkg-h from pkg-j first (without extras), the [myextra]
+activation from pkg-g is skipped → pkg-i is never added to the PEX.
 """
 import hashlib
 import io
@@ -25,7 +26,6 @@ def _sha256(data: bytes) -> str:
 
 
 def make_wheel(name: str, version: str, metadata_lines: list[str], modules: dict[str, str]) -> None:
-    """Create a minimal valid wheel file."""
     dist_name = name.replace("-", "_")
     dist_info = f"{dist_name}-{version}.dist-info"
     whl_name = f"{dist_name}-{version}-py3-none-any.whl"
@@ -39,14 +39,12 @@ def make_wheel(name: str, version: str, metadata_lines: list[str], modules: dict
     files[f"{dist_info}/METADATA"] = metadata_body.encode()
     files[f"{dist_info}/WHEEL"] = wheel_body.encode()
 
-    # RECORD: sha256=<hash>,<size> for each file; blank entry for RECORD itself
     record_lines = []
     for path, data in files.items():
         h = _sha256(data)
         record_lines.append(f"{path},sha256={h},{len(data)}")
     record_lines.append(f"{dist_info}/RECORD,,")
-    record_body = "\n".join(record_lines) + "\n"
-    files[f"{dist_info}/RECORD"] = record_body.encode()
+    files[f"{dist_info}/RECORD"] = ("\n".join(record_lines) + "\n").encode()
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
@@ -56,64 +54,64 @@ def make_wheel(name: str, version: str, metadata_lines: list[str], modules: dict
     print(f"wrote {whl_name}")
 
 
-# pkg-a: plain package, depends on pkg-b (NO extras)
+# pkg-f: BUILD dep, depends on pkg-g (no extras)
 make_wheel(
-    "pkg-a", "0.1.0",
+    "pkg-f", "0.1.0",
     [
         "Metadata-Version: 2.1",
-        "Name: pkg-a",
+        "Name: pkg-f",
         "Version: 0.1.0",
-        "Requires-Dist: pkg-b>=0.1.0",
+        "Requires-Dist: pkg-g>=0.1.0",
     ],
-    {"pkg_a/__init__.py": '__version__ = "0.1.0"\n'},
+    {"pkg_f/__init__.py": '__version__ = "0.1.0"\n'},
 )
 
-# pkg-b: depends on pkg-c WITH [myextra] extras
+# pkg-g: depends on pkg-h WITH [myextra]
 make_wheel(
-    "pkg-b", "0.1.0",
+    "pkg-g", "0.1.0",
     [
         "Metadata-Version: 2.1",
-        "Name: pkg-b",
+        "Name: pkg-g",
         "Version: 0.1.0",
-        "Requires-Dist: pkg-c[myextra]>=0.1.0",
+        "Requires-Dist: pkg-h[myextra]>=0.1.0",
     ],
-    {"pkg_b/__init__.py": '__version__ = "0.1.0"\n'},
+    {"pkg_g/__init__.py": '__version__ = "0.1.0"\n'},
 )
 
-# pkg-c: exposes pkg-d ONLY when [myextra] is activated
+# pkg-h: exposes pkg-i ONLY when [myextra] is activated
 make_wheel(
-    "pkg-c", "0.1.0",
+    "pkg-h", "0.1.0",
     [
         "Metadata-Version: 2.1",
-        "Name: pkg-c",
+        "Name: pkg-h",
         "Version: 0.1.0",
-        'Provides-Extra: myextra',
-        'Requires-Dist: pkg-d>=0.1.0; extra == "myextra"',
+        "Provides-Extra: myextra",
+        'Requires-Dist: pkg-i>=0.1.0; extra == "myextra"',
     ],
-    {"pkg_c/__init__.py": '__version__ = "0.1.0"\n'},
+    {"pkg_h/__init__.py": '__version__ = "0.1.0"\n'},
 )
 
-# pkg-d: leaf package, only reachable via pkg-c[myextra]
+# pkg-i: leaf, only reachable via pkg-h[myextra]
 make_wheel(
-    "pkg-d", "0.1.0",
+    "pkg-i", "0.1.0",
     [
         "Metadata-Version: 2.1",
-        "Name: pkg-d",
+        "Name: pkg-i",
         "Version: 0.1.0",
     ],
-    {"pkg_d/__init__.py": '__version__ = "0.1.0"\n'},
+    {"pkg_i/__init__.py": '__version__ = "0.1.0"\n'},
 )
 
-# pkg-e: SEPARATE direct dep that pulls in pkg-c WITHOUT extras.
+# pkg-j: BUILD dep, depends on pkg-h WITHOUT extras (competing path)
 make_wheel(
-    "pkg-e", "0.1.0",
+    "pkg-j", "0.1.0",
     [
         "Metadata-Version: 2.1",
-        "Name: pkg-e",
+        "Name: pkg-j",
         "Version: 0.1.0",
-        "Requires-Dist: pkg-c>=0.1.0",
+        "Requires-Dist: pkg-h>=0.1.0",
     ],
-    {"pkg_e/__init__.py": '__version__ = "0.1.0"\n'},
+    {"pkg_j/__init__.py": '__version__ = "0.1.0"\n'},
 )
 
 print("Done.")
