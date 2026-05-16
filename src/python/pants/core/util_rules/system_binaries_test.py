@@ -97,7 +97,7 @@ def test_find_binary_file_path(rule_runner: RuleRunner, tmp_path: Path) -> None:
 def test_find_binary_symlink_to_dir_on_path(rule_runner: RuleRunner, tmp_path: Path) -> None:
     # A symlink-to-directory on PATH should be followed and the binary found inside it.
     target_dir = tmp_path / "real_bin_dir"
-    binary_path_abs = MyBin.create(target_dir)
+    MyBin.create(target_dir)
     symlink = tmp_path / "link_to_bin_dir"
     symlink.symlink_to(target_dir)
 
@@ -106,7 +106,7 @@ def test_find_binary_symlink_to_dir_on_path(rule_runner: RuleRunner, tmp_path: P
         [BinaryPathRequest(binary_name=MyBin.binary_name, search_path=[str(symlink)])],
     )
     assert binary_paths.first_path is not None
-    assert binary_paths.first_path.path == str(binary_path_abs)
+    assert binary_paths.first_path.path == str(symlink / MyBin.binary_name)
 
 
 def test_find_binary_symlink_to_file_on_path(rule_runner: RuleRunner, tmp_path: Path) -> None:
