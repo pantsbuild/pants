@@ -3407,13 +3407,10 @@ def test_extra_build_options_overrides_pull_field_and_global_field(
     warning_messages = [
         record.message for record in caplog.records if record.levelno == logging.WARNING
     ]
+
     assert (
         warning_messages[0]
-        == "Global docker extra option `--pull=missing` is overridden by a per-target option and will be ignored."
-    )
-    assert (
-        warning_messages[1]
-        == "The individual `--pull=True` field on the `docker_image` target in `docker/test:img1` is overridden by `extra_build_options` (`--pull=always`). Individual build option fields are deprecated in favor of using `extra_build_options`"
+        == "The individual `pull=True` field on the `docker_image` target in `docker/test:img1` is overridden by `extra_build_options` (`--pull=always`). Consider using `extra_build_options` instead of specifying individual build option fields."
     )
 
 
@@ -3458,5 +3455,5 @@ def test_warning_on_deprecated_target_stage_field(
     ]
     assert (
         warning_messages[0]
-        == "The individual `--target=dev` field on the `docker_image` target in `docker/test:img1` is overridden by `extra_build_options` (`--target=test`). Individual build option fields are deprecated in favor of using `extra_build_options`"
+        == "The individual `--target=dev` field on the `docker_image` target in `docker/test:img1` is overridden by `extra_build_options` (`--target=test`). Consider using `extra_build_options` instead of specifying individual build option fields."
     )
