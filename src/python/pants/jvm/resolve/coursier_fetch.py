@@ -247,12 +247,17 @@ class CoursierResolvedLockfile:
         return (
             entry,
             tuple(
-                entries[(d.group, d.artifact, d.classifier)]
+                dependency_entry
                 for d in entry.dependencies
-                # Coursier will pass "pom" coords through to us. These coords don't have
-                # a coords entry, but all of their relevant dependencies have already been taken into account
-                # and will appear in the dependencies list
-                if d.classifier != "pom"
+                # Coursier sometimes reports transitive dependencies that don't have a
+                # coord entry of their own — parent POMs with classifier "pom", and
+                # other entries that are dropped by coursier bugs such as
+                # https://github.com/coursier/coursier/issues/2884 (which is still
+                # observable as of v2.1.25-M19, e.g. ("org.apache.curator",
+                # "apache-curator", None) when resolving hive-exec). Skip any such
+                # missing entry rather than raising KeyError.
+                if (dependency_entry := entries.get((d.group, d.artifact, d.classifier)))
+                is not None
             ),
         )
 
