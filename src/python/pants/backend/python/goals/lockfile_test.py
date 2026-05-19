@@ -657,7 +657,7 @@ def test_uv_lockfile_generation(
     assert metadata["valid_for_interpreter_constraints"] == ["CPython<3.15,>=3.9"]
     assert metadata["generated_with_requirements"] == [
         "ansicolors==1.1.8",
-        "cowsay @ git+https://github.com/VaasuDevanS/cowsay-python@dcf7236f0b5ece9ed56e91271486e560526049cf",
+        "cowsay@ git+https://github.com/VaasuDevanS/cowsay-python@dcf7236f0b5ece9ed56e91271486e560526049cf",
     ]
     expected_no_binary = ["ansicolors"] if no_binary else []
     expected_only_binary = ["ansicolors"] if only_binary else []
