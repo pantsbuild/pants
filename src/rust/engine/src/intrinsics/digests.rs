@@ -375,7 +375,7 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
 #[pyfunction]
 fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
     PyGeneratorResponseNativeCall::new(async move {
-        let subject_path = Python::attach(|py| -> Result<_, String> {
+        let (subject_path, follow_symlinks) = Python::attach(|py| -> Result<_, String> {
             let arg = single_path.bind(py);
             let path = externs::getattr_as_optional_string(arg, "path")
                 .map_err(|e| format!("Failed to get `path` for field: {e}"))?;
@@ -383,7 +383,10 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
 
             let namespace: PyPathNamespace = externs::getattr(arg, "namespace")
                 .map_err(|e| format!("Failed to get `namespace` for field: {e}"))?;
-            match namespace {
+            let follow_symlinks: bool = externs::getattr(arg, "follow_symlinks")
+                .map_err(|e| format!("Failed to get `follow_symlinks` for field: {e}"))?;
+
+            let subject_path = match namespace {
                 PyPathNamespace::Workspace => SubjectPath::new_workspace(&path).map_err(|_| {
                     format!("path_metadata_request error: path for PathNamespace.WORKSPACE must be a relative path. Instead, got `{path}`")
                 }),
@@ -392,12 +395,13 @@ fn path_metadata_request(single_path: Value) -> PyGeneratorResponseNativeCall {
                         "path_metadata_request error: path for PathNamespace.SYSTEM must be an absolute path. Instead, got `{path}`"
                     )
                 }),
-            }
+            }?;
+            Ok((subject_path, follow_symlinks))
         })?;
 
         let context = task_get_context();
         let metadata_opt = context
-            .get(PathMetadataNode::new(subject_path)?)
+            .get(PathMetadataNode::new(subject_path, follow_symlinks)?)
             .await?
             .map(PyPathMetadata);
 

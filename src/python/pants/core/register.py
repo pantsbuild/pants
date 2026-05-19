@@ -36,6 +36,7 @@ from pants.core.goals import (
 )
 from pants.core.target_types import (
     ArchiveTarget,
+    DeletedTarget,
     FilesGeneratorTarget,
     FileTarget,
     GenericTarget,
@@ -125,6 +126,7 @@ def target_types():
         FilesGeneratorTarget,
         FileTarget,
         GenericTarget,
+        DeletedTarget,
         LocalEnvironmentTarget,
         LocalWorkspaceEnvironmentTarget,
         LockfilesGeneratorTarget,

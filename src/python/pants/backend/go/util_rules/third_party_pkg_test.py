@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os.path
-import re
 from textwrap import dedent
 
 import pytest
@@ -30,10 +29,11 @@ from pants.backend.go.util_rules.third_party_pkg import (
     ModuleDescriptorsRequest,
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
+    _extract_go_sum_entries_for_module,
+    _parse_go_sum,
 )
 from pants.build_graph.address import Address
 from pants.engine.fs import Digest, Snapshot
-from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import ProcessExecutionFailure
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner, engine_error
@@ -582,37 +582,6 @@ def test_ambiguous_package(rule_runner: RuleRunner) -> None:
     assert "encode.go" in pkg_info.go_files
 
 
-def test_go_sum_with_missing_entries_triggers_error(rule_runner: RuleRunner) -> None:
-    digest = set_up_go_mod(
-        rule_runner,
-        dedent(
-            """\
-            module example.com/third-party-module
-            go 1.16
-            require github.com/google/uuid v1.3.0
-            """
-        ),
-        "",
-    )
-    msg = (
-        "For `go_mod` target `fake_addr_for_test:mod`, the go.sum file is incomplete because "
-        "it was updated while processing third-party dependency `github.com/google/uuid`."
-    )
-    with pytest.raises(ExecutionError, match=re.escape(msg)):
-        _ = rule_runner.request(
-            ThirdPartyPkgAnalysis,
-            [
-                ThirdPartyPkgAnalysisRequest(
-                    "github.com/ugorji/go/codec",
-                    Address("fake_addr_for_test", target_name="mod"),
-                    digest,
-                    "go.mod",
-                    build_opts=GoBuildOptions(),
-                )
-            ],
-        )
-
-
 def test_local_path_replace_statement_is_not_considered_third_party(
     rule_runner: RuleRunner,
 ) -> None:
@@ -638,3 +607,134 @@ def test_local_path_replace_statement_is_not_considered_third_party(
     )
     # The module replaced to a local path should not be considered for third party analysis.
     assert len(module_analysis.modules) == 0
+
+
+UUID_GO_SUM = dedent(
+    """\
+    github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+    github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+    """
+)
+
+
+def test_cross_go_mod_dedup_produces_identical_results(rule_runner: RuleRunner) -> None:
+    """Two go.mods depending on the same module@version produce byte-identical analyses.
+
+    The dedup path is keyed on (name, version, minimum_go_version, build_opts,
+    go_sum_entries). go.sum entries are content-addressable, so two well-formed
+    go.mods sharing a dep produce equal ModuleDownloadRequests -- the engine
+    memoizes and both requests share a single download. The observable property
+    is that the per-module analysis (including the sources digest) is identical.
+    """
+    go_mod_a = dedent(
+        """\
+        module example.com/mod-a
+        go 1.16
+        require github.com/google/uuid v1.3.0
+        """
+    )
+    go_mod_b = dedent(
+        """\
+        module example.com/mod-b
+        go 1.16
+        require github.com/google/uuid v1.3.0
+        """
+    )
+
+    digest_a = set_up_go_mod(rule_runner, go_mod_a, UUID_GO_SUM)
+    digest_b = set_up_go_mod(rule_runner, go_mod_b, UUID_GO_SUM)
+
+    result_a = rule_runner.request(
+        AllThirdPartyPackages,
+        [
+            AllThirdPartyPackagesRequest(
+                Address("mod-a", target_name="mod"),
+                digest_a,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
+    )
+    result_b = rule_runner.request(
+        AllThirdPartyPackages,
+        [
+            AllThirdPartyPackagesRequest(
+                Address("mod-b", target_name="mod"),
+                digest_b,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
+    )
+
+    uuid_a = result_a.import_paths_to_pkg_info["github.com/google/uuid"]
+    uuid_b = result_b.import_paths_to_pkg_info["github.com/google/uuid"]
+
+    assert uuid_a.import_path == uuid_b.import_path
+    assert uuid_a.dir_path == uuid_b.dir_path
+    assert uuid_a.go_files == uuid_b.go_files
+    # digest equality is the strongest signal: same bytes, which implies the
+    # dedup path produced identical AnalyzedThirdPartyModule results from the
+    # same engine-memoized ModuleDownloadRequest.
+    assert uuid_a.digest == uuid_b.digest
+
+
+def test_extract_go_sum_entries_for_module() -> None:
+    go_sum = (
+        b"github.com/google/uuid v1.3.0 h1:AAA=\n"
+        b"github.com/google/uuid v1.3.0/go.mod h1:BBB=\n"
+        b"github.com/google/uuid v1.2.0 h1:CCC=\n"
+        b"github.com/google/uuid v1.2.0/go.mod h1:DDD=\n"
+        b"rsc.io/quote v1.5.2 h1:EEE=\n"
+        b"rsc.io/quote v1.5.2/go.mod h1:FFF=\n"
+    )
+
+    assert _extract_go_sum_entries_for_module(go_sum, "github.com/google/uuid", "v1.3.0") == (
+        "github.com/google/uuid v1.3.0 h1:AAA=",
+        "github.com/google/uuid v1.3.0/go.mod h1:BBB=",
+    )
+    assert _extract_go_sum_entries_for_module(go_sum, "rsc.io/quote", "v1.5.2") == (
+        "rsc.io/quote v1.5.2 h1:EEE=",
+        "rsc.io/quote v1.5.2/go.mod h1:FFF=",
+    )
+    # Non-matching module returns empty.
+    assert _extract_go_sum_entries_for_module(go_sum, "example.com/missing", "v1.0.0") == ()
+    # Prefix safety: querying "v1.3" must not match "v1.3.0".
+    assert _extract_go_sum_entries_for_module(go_sum, "github.com/google/uuid", "v1.3") == ()
+
+
+def test_parse_go_sum() -> None:
+    """Verify _parse_go_sum groups entries by (name, version) correctly."""
+    go_sum = (
+        b"github.com/google/uuid v1.3.0 h1:AAA=\n"
+        b"github.com/google/uuid v1.3.0/go.mod h1:BBB=\n"
+        b"github.com/google/uuid v1.2.0 h1:CCC=\n"
+        b"rsc.io/quote v1.5.2 h1:EEE=\n"
+        b"rsc.io/quote v1.5.2/go.mod h1:FFF=\n"
+        b"\n"  # blank line should be skipped
+    )
+    parsed = _parse_go_sum(go_sum)
+
+    assert parsed[("github.com/google/uuid", "v1.3.0")] == (
+        "github.com/google/uuid v1.3.0 h1:AAA=",
+        "github.com/google/uuid v1.3.0/go.mod h1:BBB=",
+    )
+    # Module with only a content hash (no /go.mod line).
+    assert parsed[("github.com/google/uuid", "v1.2.0")] == (
+        "github.com/google/uuid v1.2.0 h1:CCC=",
+    )
+    assert parsed[("rsc.io/quote", "v1.5.2")] == (
+        "rsc.io/quote v1.5.2 h1:EEE=",
+        "rsc.io/quote v1.5.2/go.mod h1:FFF=",
+    )
+    # Non-existent module returns None via dict.get.
+    assert parsed.get(("example.com/missing", "v1.0.0")) is None
+    # Prefix safety: "v1.3" is a different key from "v1.3.0".
+    assert parsed.get(("github.com/google/uuid", "v1.3")) is None
+    # Empty go.sum produces empty dict.
+    assert _parse_go_sum(b"") == {}
+    # CRLF line endings are handled correctly.
+    crlf_sum = b"mod v1.0.0 h1:X=\r\nmod v1.0.0/go.mod h1:Y=\r\n"
+    crlf_parsed = _parse_go_sum(crlf_sum)
+    assert ("mod", "v1.0.0") in crlf_parsed
+    assert len(crlf_parsed[("mod", "v1.0.0")]) == 2

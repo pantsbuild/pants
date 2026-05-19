@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: AlexTereshenkov/cheeseshop-query
     - name: Set up Python 3.9
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.9'
     - name: Pants on
@@ -94,12 +94,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: Ars-Linguistica/mlconjug3
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Pants on
@@ -145,12 +145,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: OpenSaMD/OpenSaMD
     - name: Set up Python 3.9.15
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: 3.9.15
     - name: Pants on
@@ -226,13 +226,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: StackStorm/st2
         submodules: recursive
     - name: Set up Python 3.8
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.8'
     - name: Pants on
@@ -315,12 +315,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: fucina/treb
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Pants on
@@ -386,12 +386,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: ghandic/jsf
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Pants on
@@ -447,12 +447,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: komprenilo/liga
     - name: Set up Python 3.9
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.9'
     - name: Pants on
@@ -498,12 +498,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: lablup/backend.ai
     - name: Set up Python 3.11.4
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: 3.11.4
     - name: Pants on
@@ -581,12 +581,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: mitodl/ol-django
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Pants on
@@ -634,12 +634,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: mitodl/ol-infrastructure
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Pants on
@@ -685,12 +685,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: naccdata/flywheel-gear-extensions
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Pants on
@@ -746,16 +746,16 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/example-adhoc
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Set up Node 20
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
       with:
         node-version: '20'
     - name: Pants on
@@ -811,12 +811,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/example-codegen
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - if: runner.os == 'Linux'
@@ -899,12 +899,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/example-django
     - name: Set up Python 3.9
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.9'
     - name: Pants on
@@ -981,12 +981,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/example-docker
     - name: Set up Python 3.8
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.8'
     - name: Pants on
@@ -1062,21 +1062,21 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/example-golang
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Install Go 1.25.3
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
         cache: false
         go-version: 1.25.3
     - name: Install Go 1.24.9
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
       with:
         cache: false
         go-version: 1.24.9
@@ -1153,12 +1153,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/example-jvm
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Pants on
@@ -1234,12 +1234,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/example-kotlin
     - name: Set up Python 3.10
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.10'
     - name: Pants on
@@ -1315,12 +1315,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/example-python
     - name: Set up Python 3.9
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.9'
     - name: Pants on
@@ -1396,12 +1396,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/example-visibility
     - name: Set up Python 3.9
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.9'
     - name: Pants on
@@ -1467,12 +1467,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
         repository: pantsbuild/scie-pants
     - name: Set up Python 3.9
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.9'
     - name: Pants on

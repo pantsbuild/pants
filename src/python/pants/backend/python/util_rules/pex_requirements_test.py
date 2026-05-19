@@ -6,6 +6,7 @@ from __future__ import annotations
 import itertools
 import json
 import textwrap
+import tomllib
 
 import pytest
 
@@ -13,10 +14,8 @@ from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, Pytho
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadataV3
 from pants.backend.python.util_rules.pex_requirements import (
-    LoadedLockfile,
-    LoadedLockfileRequest,
     Lockfile,
-    ResolvePexConfig,
+    ResolveConfig,
     ResolvePexConstraintsFile,
     _pex_lockfile_requirement_count,
     get_metadata,
@@ -24,7 +23,6 @@ from pants.backend.python.util_rules.pex_requirements import (
     strip_comments_from_pex_json_lockfile,
     validate_metadata,
 )
-from pants.backend.python.util_rules.pex_requirements import rules as pex_requirements_rules
 from pants.core.util_rules.lockfile_metadata import (
     BEGIN_LOCKFILE_HEADER,
     END_LOCKFILE_HEADER,
@@ -32,7 +30,6 @@ from pants.core.util_rules.lockfile_metadata import (
 )
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import comma_separated_list
@@ -172,7 +169,7 @@ def test_validate_lockfiles(
         req_strings,
         validate_consumed_req_strings=True,
         python_setup=create_python_setup(InvalidLockfileBehavior.warn),
-        resolve_config=ResolvePexConfig(
+        resolve_config=ResolveConfig(
             indexes=(),
             find_links=(),
             manylinux="not-manylinux" if invalid_manylinux else None,
@@ -359,10 +356,10 @@ def test_pex_lockfile_requirement_count() -> None:
     )
 
 
-class TestResolvePexConfigPexArgs:
+class TestResolveConfigPexArgs:
     def simple_config_args(self, manylinux=None, only_binary=None, no_binary=None):
         return tuple(
-            ResolvePexConfig(
+            ResolveConfig(
                 indexes=[],
                 find_links=[],
                 manylinux=manylinux,
@@ -437,7 +434,7 @@ class TestResolvePexConfigPexArgs:
         assert "--uploaded-prior-to" not in " ".join(args)
 
         args = tuple(
-            ResolvePexConfig(
+            ResolveConfig(
                 indexes=[],
                 find_links=[],
                 manylinux=None,
@@ -456,21 +453,130 @@ class TestResolvePexConfigPexArgs:
         assert "--uploaded-prior-to=2023-09-20" in args
 
 
-def test_load_lockfile_ignores_unknown_sidecar_metadata_version() -> None:
-    rule_runner = RuleRunner(
-        rules=[
-            *pex_requirements_rules(),
-            QueryRule(LoadedLockfile, [LoadedLockfileRequest]),
-        ],
+def _uv_config(
+    indexes=None,
+    find_links=None,
+    extra_find_links=(),
+    sources=None,
+    only_binary=None,
+    no_binary=None,
+    uploaded_prior_to=None,
+):
+    cfg = ResolveConfig(
+        indexes=indexes if indexes is not None else ["https://pypi.org/simple"],
+        find_links=find_links or [],
+        manylinux=None,
+        constraints_file=None,
+        no_binary=FrozenOrderedSet(no_binary or []),
+        only_binary=FrozenOrderedSet(only_binary or []),
+        excludes=FrozenOrderedSet(),
+        overrides=FrozenOrderedSet(),
+        sources=FrozenOrderedSet(sources or []),
+        path_mappings=[],
+        lock_style="universal",
+        complete_platforms=(),
+        uploaded_prior_to=uploaded_prior_to,
     )
-    rule_runner.set_options(["--python-invalid-lockfile-behavior=ignore"])
-    rule_runner.write_files(
-        {
-            "lock.json": "{}",
-            "lock.json.metadata": json.dumps({"version": 9999}),
-        }
-    )
+    return tomllib.loads(cfg.uv_config(extra_find_links=extra_find_links))
 
-    lockfile = Lockfile(url="lock.json", url_description_of_origin="test", resolve_name="a")
-    result = rule_runner.request(LoadedLockfile, [LoadedLockfileRequest(lockfile)])
-    assert result.metadata is None
+
+def test_uv_config_indexes():
+    parsed = _uv_config(indexes=[])
+    assert parsed.get("no-index") is True
+    assert "index" not in parsed
+
+    parsed = _uv_config(indexes=["https://example.com/simple"])
+    assert len(parsed["index"]) == 1
+    assert parsed["index"][0]["url"] == "https://example.com/simple"
+    assert parsed["index"][0]["default"] is True
+
+    parsed = _uv_config(
+        indexes=[
+            "https://primary.example.com/simple",
+            "fallback=https://secondary.example.com/simple",
+        ]
+    )
+    indexes = parsed["index"]
+    assert len(indexes) == 2
+    assert indexes[0]["url"] == "https://primary.example.com/simple"
+    assert "name" not in indexes[0]
+    assert "default" not in indexes[0]
+    assert indexes[1]["url"] == "https://secondary.example.com/simple"
+    assert indexes[1].get("name") == "fallback"
+    assert indexes[1]["default"] is True
+
+
+def test_uv_config_find_links():
+    parsed = _uv_config(find_links=["https://example.com/wheels"])
+    assert parsed["find-links"] == ["https://example.com/wheels"]
+
+    parsed = _uv_config(
+        find_links=["https://a.example.com/wheels"],
+        extra_find_links=("https://b.example.com/wheels",),
+    )
+    assert parsed["find-links"] == [
+        "https://a.example.com/wheels",
+        "https://b.example.com/wheels",
+    ]
+
+
+def test_uv_config_sources():
+    parsed = _uv_config(sources=[])
+    assert "sources" not in parsed
+
+    parsed = _uv_config(sources=["myindex=requests>=2.0"])
+    assert parsed["sources"] == {"requests": {"index": "myindex"}}
+
+    parsed = _uv_config(sources=['myindex=requests>=2.0; python_version > "3.8"'])
+    assert parsed["sources"]["requests"]["index"] == "myindex"
+    assert "python_version" in parsed["sources"]["requests"]["marker"]
+
+    parsed = _uv_config(sources=["indexa=requests>=2.0", "indexb=boto3>=1.0"])
+    assert parsed["sources"]["requests"] == {"index": "indexa"}
+    assert parsed["sources"]["boto3"] == {"index": "indexb"}
+
+
+def test_uv_config_no_binary():
+    parsed = _uv_config(no_binary=["foo", "bar"])
+    assert parsed["no-binary-package"] == ["foo", "bar"]
+    assert "no-binary" not in parsed
+
+    parsed = _uv_config(no_binary=[":all:"])
+    assert parsed.get("no-binary") is True
+    assert "no-binary-package" not in parsed
+
+    # :all: wins even when combined with package names
+    parsed = _uv_config(no_binary=["foo", ":all:"])
+    assert parsed.get("no-binary") is True
+    assert "no-binary-package" not in parsed
+
+    # :none: means "no restriction" — no key emitted
+    parsed = _uv_config(no_binary=[":none:"])
+    assert "no-binary" not in parsed
+    assert "no-binary-package" not in parsed
+
+
+def test_uv_config_only_binary():
+    parsed = _uv_config(only_binary=["foo", "bar"])
+    assert parsed["no-build-package"] == ["foo", "bar"]
+    assert "no-build" not in parsed
+
+    parsed = _uv_config(only_binary=[":all:"])
+    assert parsed.get("no-build") is True
+    assert "no-build-package" not in parsed
+
+    parsed = _uv_config(only_binary=["foo", ":all:"])
+    assert parsed.get("no-build") is True
+    assert "no-build-package" not in parsed
+
+    parsed = _uv_config(only_binary=[":none:"])
+    assert "no-build" not in parsed
+    assert "no-build-package" not in parsed
+
+
+def test_uv_config_exclude_newer():
+    parsed = _uv_config(uploaded_prior_to="2023-09-20")
+    assert parsed["exclude-newer"] == "2023-09-20"
+
+    parsed = _uv_config()
+    assert "exclude-newer" not in parsed

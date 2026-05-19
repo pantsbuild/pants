@@ -183,6 +183,8 @@ def plugin_resolution(
     requirements: Iterable[str] = (),
     sdist: bool = True,
     existing_distributions: Sequence[MockDistribution] = (),
+    available_distributions: Sequence[Plugin] = (),
+    inherit_existing_constraints: bool = False,
     use_pypi: bool = False,
 ):
     @contextmanager
@@ -245,6 +247,11 @@ def plugin_resolution(
                 _create_artifact(plugin.name, version, plugin.install_requires)
             env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
 
+            for distribution in available_distributions:
+                _create_artifact(
+                    distribution.name, distribution.version, distribution.install_requires
+                )
+
             for requirement in tuple(requirements):
                 r = Requirement(requirement)
                 assert len(r.specifier) == 1, (
@@ -270,22 +277,21 @@ def plugin_resolution(
         cache_dir = options_bootstrapper.bootstrap_options.for_global_scope().named_caches_dir
 
         site_packages_path = Path(root_dir, "site-packages")
-        expected_distribution_names: set[str] = set()
         for dist in existing_distributions:
             dist.create(site_packages_path)
-            expected_distribution_names.add(dist.name)
+            _create_artifact(dist.name, str(dist.version), [])
+        if existing_distributions:
+            sys.path.insert(0, str(site_packages_path))
 
         plugin_resolver = PluginResolver(
-            bootstrap_scheduler, interpreter_constraints, inherit_existing_constraints=False
+            bootstrap_scheduler,
+            interpreter_constraints,
+            inherit_existing_constraints=inherit_existing_constraints,
         )
         plugin_paths = plugin_resolver.resolve(options_bootstrapper, complete_env, requirements)
 
-        for found_dist in importlib.metadata.distributions():
-            if found_dist.name in expected_distribution_names:
-                assert (
-                    Path(os.path.realpath(cache_dir))
-                    in Path(os.path.realpath(str(found_dist.locate_file("")))).parents
-                )
+        for plugin_path in plugin_paths:
+            assert Path(os.path.realpath(cache_dir)) in Path(os.path.realpath(plugin_path)).parents
 
         yield plugin_paths, root_dir, repo_dir, saved_sys_path
 
@@ -341,23 +347,25 @@ def test_exact_requirements(rule_runner: RuleRunner, sdist: bool) -> None:
 
 
 def test_range_deps(rule_runner: RuleRunner) -> None:
-    # Test that when a plugin has a range dependency, specifying a working set constrains
-    # to a particular version, where otherwise we would get the highest released (2.27.1 in
-    # this case).
+    # Test that when a plugin has a range dependency, the active sys.path constrains the
+    # resolve to the already-loaded version rather than the highest available version.
     with plugin_resolution(
         rule_runner,
-        plugins=[Plugin("jane", "3.4.5", ["requests>=2.25.1,<2.28.0"])],
-        existing_distributions=[MockDistribution(name="requests", version=Version("2.26.0"))],
-        # Because we're resolving real distributions, we enable access to pypi.
-        use_pypi=True,
+        plugins=[Plugin("jane", "3.4.5", ["testdep>=1,<3"])],
+        existing_distributions=[MockDistribution(name="testdep", version=Version("2.0.0"))],
+        available_distributions=[Plugin("testdep", "2.1.0")],
+        inherit_existing_constraints=True,
     ) as (
-        _,
+        plugin_paths,
         _,
         _,
         _,
     ):
-        dist = importlib.metadata.distribution("requests")
-        assert "2.27.1" == dist.version
+        dists = {
+            canonicalize_name(dist.name): dist.version
+            for dist in importlib.metadata.distributions(path=plugin_paths)
+        }
+        assert dists[canonicalize_name("testdep")] == "2.0.0"
 
 
 @skip_unless_python38_and_python39_present

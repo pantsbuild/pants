@@ -61,6 +61,7 @@ def _initialize_build_configuration(
     return load_backends_and_plugins(
         bootstrap_options.plugins,
         bootstrap_options.backend_packages,
+        BuildConfiguration.Builder(_pants_ng=bootstrap_options.pants_ng),
     )
 
 

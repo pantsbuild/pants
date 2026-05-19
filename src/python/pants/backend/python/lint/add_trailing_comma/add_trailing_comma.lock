@@ -1,77 +1,35 @@
-{
-  "allow_builds": true,
-  "allow_prereleases": false,
-  "allow_wheels": true,
-  "build_isolation": true,
-  "constraints": [],
-  "elide_unused_requires_dist": false,
-  "excluded": [],
-  "locked_resolves": [
-    {
-      "locked_requirements": [
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "603b4b55f76f85237f4c848e93e56a4c84ebf8c9e329daf44ce3e8111d68557b",
-              "url": "https://files.pythonhosted.org/packages/97/69/e9a4ce91e0e712c54cdd1ce8849b0efa03953461f5f7ede5fddc9ecbd63e/add_trailing_comma-2.5.1-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "f2a4afd41b96d6d34840455752c320c608942757ec6df3aa13b0b3c7effdd49e",
-              "url": "https://files.pythonhosted.org/packages/a7/eb/fec8a2855d59a1ec4eec5bdfc511f5b1db63a32b3d33ed205b4cd94e8a1f/add_trailing_comma-2.5.1.tar.gz"
-            }
-          ],
-          "project_name": "add-trailing-comma",
-          "requires_dists": [
-            "tokenize-rt>=3.0.1"
-          ],
-          "requires_python": ">=3.8",
-          "version": "2.5.1"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "a152bf4f249c847a66497a4a95f63376ed68ac6abf092a2f7cfb29d044ecff44",
-              "url": "https://files.pythonhosted.org/packages/33/f0/3fe8c6e69135a845f4106f2ff8b6805638d4e85c264e70114e8126689587/tokenize_rt-6.2.0-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "8439c042b330c553fdbe1758e4a05c0ed460dbbbb24a606f11f0dee75da4cad6",
-              "url": "https://files.pythonhosted.org/packages/69/ed/8f07e893132d5051d86a553e749d5c89b2a4776eb3a579b72ed61f8559ca/tokenize_rt-6.2.0.tar.gz"
-            }
-          ],
-          "project_name": "tokenize-rt",
-          "requires_dists": [],
-          "requires_python": ">=3.9",
-          "version": "6.2.0"
-        }
-      ],
-      "marker": null,
-      "platform_tag": null
-    }
-  ],
-  "only_builds": [],
-  "only_wheels": [],
-  "overridden": [],
-  "path_mappings": {},
-  "pex_version": "2.69.1",
-  "pip_version": "25.3",
-  "prefer_older_binary": false,
-  "requirements": [
-    "add-trailing-comma<3,>=2.2.3"
-  ],
-  "requires_python": [
-    "CPython<3.15,>=3.9"
-  ],
-  "resolver_version": "pip-2020-resolver",
-  "style": "universal",
-  "target_systems": [
-    "linux",
-    "mac"
-  ],
-  "transitive": true,
-  "use_pep517": null,
-  "use_system_time": false
-}
+version = 1
+revision = 3
+requires-python = ">=3.9, <3.15"
+
+[[package]]
+name = "add-trailing-comma"
+version = "2.5.1"
+source = { registry = "https://pypi.org/simple/" }
+dependencies = [
+    { name = "tokenize-rt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a7/eb/fec8a2855d59a1ec4eec5bdfc511f5b1db63a32b3d33ed205b4cd94e8a1f/add_trailing_comma-2.5.1.tar.gz", hash = "sha256:f2a4afd41b96d6d34840455752c320c608942757ec6df3aa13b0b3c7effdd49e", size = 11335, upload-time = "2023-06-10T21:05:14.733Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/97/69/e9a4ce91e0e712c54cdd1ce8849b0efa03953461f5f7ede5fddc9ecbd63e/add_trailing_comma-2.5.1-py2.py3-none-any.whl", hash = "sha256:603b4b55f76f85237f4c848e93e56a4c84ebf8c9e329daf44ce3e8111d68557b", size = 15023, upload-time = "2023-06-10T21:05:12.979Z" },
+]
+
+[[package]]
+name = "pants-lockfile-for-add-trailing-comma"
+version = "0.0.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "add-trailing-comma" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "add-trailing-comma", specifier = ">=2.2.3,<3" }]
+
+[[package]]
+name = "tokenize-rt"
+version = "6.2.0"
+source = { registry = "https://pypi.org/simple/" }
+sdist = { url = "https://files.pythonhosted.org/packages/69/ed/8f07e893132d5051d86a553e749d5c89b2a4776eb3a579b72ed61f8559ca/tokenize_rt-6.2.0.tar.gz", hash = "sha256:8439c042b330c553fdbe1758e4a05c0ed460dbbbb24a606f11f0dee75da4cad6", size = 5476, upload-time = "2025-05-23T23:48:00.035Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/f0/3fe8c6e69135a845f4106f2ff8b6805638d4e85c264e70114e8126689587/tokenize_rt-6.2.0-py2.py3-none-any.whl", hash = "sha256:a152bf4f249c847a66497a4a95f63376ed68ac6abf092a2f7cfb29d044ecff44", size = 6004, upload-time = "2025-05-23T23:47:58.812Z" },
+]

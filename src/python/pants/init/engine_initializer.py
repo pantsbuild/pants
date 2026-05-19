@@ -37,12 +37,13 @@ from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import SessionValues
-from pants.engine.rules import QueryRule, collect_rules, rule
+from pants.engine.rules import QueryRule, Rule, collect_rules, rule
 from pants.engine.streaming_workunit_handler import rules as streaming_workunit_handler_rules
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.init import specs_calculator
 from pants.init.bootstrap_scheduler import BootstrapStatus
+from pants.ng.goal import GoalNg, GoalSubsystemNg
 from pants.option.bootstrap_options import (
     DEFAULT_EXECUTION_OPTIONS,
     DynamicRemoteOptions,
@@ -141,8 +142,13 @@ class GraphSession:
         env_name = determine_bootstrap_environment(self.scheduler_session)
 
         for goal in goals:
-            goal_product = self.goal_map[goal]
-            if not goal_product.subsystem_cls.activated(union_membership):
+            goal_product = self.goal_map.get(goal)
+            if goal_product is None:
+                # This must be an ng command, since the og goals have already
+                # been validated by the options parser.
+                raise UnknownCommand(goal)
+            pants_ng = issubclass(goal_product.subsystem_cls, GoalSubsystemNg)
+            if not pants_ng and not goal_product.subsystem_cls.activated(union_membership):
                 raise GoalNotActivatedException(goal)
             # NB: Keep this in sync with the property `goal_param_types`.
             params = Params(specs, self.console, workspace, env_name)
@@ -167,15 +173,21 @@ class EngineInitializer:
         """Raised when a goal cannot be mapped to an @rule."""
 
     @staticmethod
-    def _make_goal_map_from_rules(rules) -> Mapping[str, type[Goal]]:
+    def _make_goal_map_from_rules(rules, pants_ng: bool) -> Mapping[str, type[Goal]]:
         goal_map: dict[str, type[Goal]] = {}
         for r in rules:
             output_type = getattr(r, "output_type", None)
-            if not output_type or not issubclass(output_type, Goal):
+            if (
+                not output_type
+                or not issubclass(output_type, Goal)
+                or issubclass(output_type, GoalNg) != pants_ng
+            ):
                 continue
 
             goal = r.output_type.name
-            deprecated_goal = r.output_type.subsystem_cls.deprecated_options_scope
+            deprecated_goal = (
+                None if pants_ng else r.output_type.subsystem_cls.deprecated_options_scope
+            )
             for goal_name in [goal, deprecated_goal] if deprecated_goal else [goal]:
                 if goal_name in goal_map:
                     raise EngineInitializer.GoalMappingError(
@@ -220,6 +232,7 @@ class EngineInitializer:
             engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
             is_bootstrap=is_bootstrap,
+            pants_ng=bootstrap_options.pants_ng,
         )
 
     @staticmethod
@@ -240,6 +253,7 @@ class EngineInitializer:
         engine_visualize_to: str | None = None,
         watch_filesystem: bool = True,
         is_bootstrap: bool = False,
+        pants_ng: bool = False,
     ) -> GraphScheduler:
         build_root_path = build_root or get_buildroot()
 
@@ -309,7 +323,19 @@ class EngineInitializer:
             )
         )
 
-        goal_map = EngineInitializer._make_goal_map_from_rules(rules)
+        def is_pertinent_rule(rule: Rule | UnionRule, ng: bool) -> bool:
+            output_type = getattr(rule, "output_type", None)
+            if not output_type:  # This is a UnionRule, so keep it.
+                return True
+            if issubclass(output_type, Goal) and issubclass(output_type, GoalNg) != ng:
+                return False
+            return True
+
+        # Strip out all the goal_rules that don't pertain to our current ng/og state. This allows
+        # ng commands to use the same names as og goals, without collision.
+        rules = FrozenOrderedSet(rule for rule in rules if is_pertinent_rule(rule, pants_ng))
+
+        goal_map = EngineInitializer._make_goal_map_from_rules(rules, pants_ng)
 
         union_membership = UnionMembership.from_rules(
             (
@@ -368,6 +394,11 @@ class EngineInitializer:
         )
 
         return GraphScheduler(scheduler, goal_map)
+
+
+class UnknownCommand(Exception):
+    def __init__(self, goal: str) -> None:
+        super().__init__(f"Unknown command `{goal.replace('.', ' ')}`")
 
 
 class GoalNotActivatedException(Exception):

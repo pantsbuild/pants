@@ -22,6 +22,7 @@ from pants.util.strutil import pluralize
 @dataclass(frozen=True)
 class RunRuffRequest:
     snapshot: Snapshot
+    files: tuple[str, ...]
     mode: RuffMode
 
 
@@ -71,12 +72,12 @@ async def run_ruff(
 
     result = await execute_process(
         Process(
-            argv=(exe_path, *initial_args, *conf_args, *ruff.args, *request.snapshot.files),
+            argv=(exe_path, *initial_args, *conf_args, *ruff.args, *request.files),
             input_digest=input_digest,
             immutable_input_digests={immutable_input_key: ruff_tool.digest},
-            output_files=request.snapshot.files,
+            output_files=request.files,
             output_directories=(REPORT_DIR,) if request.mode is RuffMode.LINT else (),
-            description=f"Run ruff {' '.join(initial_args)} on {pluralize(len(request.snapshot.files), 'file')}.",
+            description=f"Run ruff {' '.join(initial_args)} on {pluralize(len(request.files), 'file')}.",
             level=LogLevel.DEBUG,
         ),
         **implicitly(),

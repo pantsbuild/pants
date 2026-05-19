@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: The release version to create (e.g. 2.42.4a0).
+        description: The alpha release version to create (MAJOR.MINOR.PATCHaN e.g. 2.42.4a0).
         required: true
 
 defaults:
@@ -29,10 +29,6 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0  # Required for contributors file
-
       - name: Determine release version
         id: validate-version
         run: |
@@ -46,20 +42,40 @@ jobs:
               echo "::error::The input 'version' must be smaller than 11 characters (i.e. allows '2.99.99a99')"
               exit 1
 
-          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(a[0-9]+)?$ ]]; then
-              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCH (1.2.3) with an optional 'a' specifier (8.9.10a99)"
+          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+a[0-9]+$ ]]; then
+              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCHaN (8.9.10a99)"
               exit 1
           fi
 
-          echo "::notice::Release version is: ${version}"
+          major_minor=$(echo "$version" | grep -oE '^[0-9]+\.[0-9]+')
+
+          # Use `main` branch for 0a0 (patch 0 + first alpha), otherwise use `MAJOR.MINOR.x` branch
+          # TODO: Currently this expects the `MAJOR.MINOR.x` branch to already be created
+          # NOTE: This falls over on something like 2.32.10a0 - but, I haven't seen more than 3 patch releases in a while
+          if [[ "$version" =~ 0a0$ ]]; then
+            base_branch="main"
+          else
+            base_branch="${major_minor}.x"
+          fi
+
+          echo "::notice::Release version is: ${version}, with major-minor: ${major_minor}"
           echo "release-version=${version}" >> $GITHUB_OUTPUT
+          echo "major-minor-version=${major_minor}" >> $GITHUB_OUTPUT
+
+          echo "::notice::Base branch is: ${base_branch}"
+          echo "base-branch=${base_branch}" >> "$GITHUB_OUTPUT"
       
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.validate-version.outputs.base-branch }}
+          fetch-depth: 0  # Required for contributors file
+
       - name: Update CONTRIBUTORS.md and VERSION files
         env:
           RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
         run: |
           if [[ -z "$RELEASE_VERSION" ]]; then
-              echo "::error::The 'release_version' was empty"
+              echo "::error::The 'RELEASE_VERSION' was empty"
               exit 1
           fi
 
@@ -71,34 +87,34 @@ jobs:
             printf "Created as part of the release process.\n\n"
             
             git log --use-mailmap --format=format:%aN HEAD \
-                | sort -u \
-                | grep -vxF \
-                    -e "dependabot[bot]" \
-                    -e "github-actions[bot]" \
-                    -e "Worker Pants (Pantsbuild GitHub Automation Bot)" \
-                | sed 's/^/+ /'
+              | sort -u \
+              | grep -vxF \
+                -e "dependabot[bot]" \
+                -e "github-actions[bot]" \
+                -e "Worker Pants (Pantsbuild GitHub Automation Bot)" \
+              | sed 's/^/+ /'
           } > CONTRIBUTORS.md
 
-      - name: Create empty release notes for upcoming version
+      - name: Create empty release notes for upcoming version when merging to main
+        if: steps.validate-version.outputs.base-branch == 'main'
         env:
-          RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
+          MAJOR_MINOR_VERSION: ${{ steps.validate-version.outputs.major-minor-version }}
           TEMPLATE_PATH: docs/notes/release-notes-template.md
         run: |
-          if [[ -z "$RELEASE_VERSION" ]]; then
-              echo "::error::The 'release_version' was empty"
+          if [[ -z "$MAJOR_MINOR_VERSION" ]]; then
+              echo "::error::The 'MAJOR_MINOR_VERSION' was empty"
               exit 1
           fi
-          
-          MAJOR_MINOR=$(echo "$RELEASE_VERSION" | grep -oE '^[0-9]+\.[0-9]+')
-          MAJOR=$(echo "$MAJOR_MINOR" | grep -oE '^[0-9]+')
-          MINOR=$(echo "$MAJOR_MINOR" | grep -oE '[0-9]+$')
+
+          MAJOR=$(echo "$MAJOR_MINOR_VERSION" | grep -oE '^[0-9]+')
+          MINOR=$(echo "$MAJOR_MINOR_VERSION" | grep -oE '[0-9]+$')
 
           if [[ -z "$MAJOR" || -z "$MINOR" ]]; then
-              echo "::error::Failed to extract major/minor version components from $RELEASE_VERSION"
+              echo "::error::Failed to extract major/minor version components from $MAJOR_MINOR_VERSION"
               exit 1
           fi
 
-          INCREMENTED_MINOR=$((MINOR + 1))
+          INCREMENTED_MINOR=$((10#${MINOR} + 1))
           NEXT_NOTES_PATH="docs/notes/${MAJOR}.${INCREMENTED_MINOR}.x.md"
 
           if [[ -f "$NEXT_NOTES_PATH" ]]; then
@@ -112,10 +128,11 @@ jobs:
       - name: Commit changes and create pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ steps.validate-version.outputs.base-branch }}
           RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
         run: |
           if [[ -z $(git status --porcelain) ]]; then
-            echo "::error::No changes detected in VERSION or CONTRIBUTORS.md - skipping PR creation"
+            echo "::error::No changes detected - skipping PR creation"
             exit 1
           fi
 
@@ -129,15 +146,15 @@ jobs:
 
           # Commit and push to the release branch
           TITLE="Prepare $RELEASE_VERSION"
-          git add src/python/pants/VERSION CONTRIBUTORS.md
+          git add src/python/pants/VERSION CONTRIBUTORS.md docs/notes/
           git commit -m "$TITLE"
           git push -u origin "$BRANCH_NAME"
 
-          # Create PR from the release branch to main
+          # Create PR from the release branch to main, or stable release branch
           gh pr create \
             --title "$TITLE" \
             --body "" \
-            --base main \
+            --base "$BASE_BRANCH" \
             --head "$BRANCH_NAME" \
             --label "automation:release-prep,category:internal" \
             --assignee "${{ github.actor }}"

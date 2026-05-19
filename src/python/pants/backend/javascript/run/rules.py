@@ -82,6 +82,7 @@ async def run_node_script(
         args=process.argv,
         extra_env=process.env,
         immutable_input_digests=process.immutable_input_digests,
+        append_only_caches=process.append_only_caches,
     )
 
 
@@ -118,6 +119,7 @@ async def run_node_build_script(
         args=process.argv,
         extra_env=process.env,
         immutable_input_digests=process.immutable_input_digests,
+        append_only_caches=process.append_only_caches,
     )
 
 
