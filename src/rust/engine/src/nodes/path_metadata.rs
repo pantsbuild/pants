@@ -16,11 +16,15 @@ use crate::python::throw;
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct PathMetadata {
     pub(super) subject_path: SubjectPath,
+    pub(super) follow_symlinks: bool,
 }
 
 impl PathMetadata {
-    pub fn new(subject_path: SubjectPath) -> Result<Self, String> {
-        Ok(Self { subject_path })
+    pub fn new(subject_path: SubjectPath, follow_symlinks: bool) -> Result<Self, String> {
+        Ok(Self {
+            subject_path,
+            follow_symlinks,
+        })
     }
 
     pub fn path(&self) -> &Path {
@@ -36,7 +40,7 @@ impl PathMetadata {
             SubjectPath::LocalSystem(path) => (&context.core.vfs_system, path.as_path()),
         };
 
-        vfs.path_metadata(path.to_path_buf())
+        vfs.path_metadata(path.to_path_buf(), self.follow_symlinks)
             .await
             .map_err(|e| throw(format!("{e}")))
     }

@@ -331,11 +331,14 @@ class SnapshotDiff:
 class PathMetadataRequest:
     """Request the full metadata of a single path in the filesystem.
 
-    Note: This API is symlink-aware and will distinguish between symlinks and regular files.
+    Note: By default this API is symlink-aware and will distinguish between symlinks and regular
+    files/directories. Set `follow_symlinks=True` to follow symlinks and report the metadata of
+    the symlink target instead.
     """
 
     path: str
     namespace: PathNamespace = PathNamespace.WORKSPACE
+    follow_symlinks: bool = False
 
 
 @dataclass(frozen=True)
