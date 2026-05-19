@@ -363,7 +363,7 @@ def _filter_global_extra_options(
     result = []
     for opt in global_extra_options:
         if opt.startswith("-") and opt.split("=")[0] in target_flag_names:
-            logger.warning(
+            logger.info(
                 f"Global docker extra option `{opt}` is overridden by a per-target option and will be ignored."
             )
         else:
@@ -371,7 +371,7 @@ def _filter_global_extra_options(
     return tuple(result)
 
 
-def _overwriten_flag_warning(
+def _overwrite_flag_warning(
     target: Target, field_type: type[Field], extra_options: tuple[str, ...]
 ) -> None:
     for opt in extra_options:
@@ -379,8 +379,8 @@ def _overwriten_flag_warning(
             extra_build_options = opt
             break
     logger.warning(
-        f"The individual `--{field_type.alias}={target[field_type].value}` field on the `{target.alias}` target in `{target.address}` is overridden by "
-        f"`extra_build_options` (`{extra_build_options}`). Individual build option fields are deprecated in favor of using `extra_build_options`"
+        f"The individual `{field_type.alias}={target[field_type].value}` field on the `{target.alias}` target in `{target.address}` is overridden by "
+        f"`extra_build_options` (`{extra_build_options}`). Consider using `extra_build_options` instead of specifying individual build option fields."
     )
 
 
@@ -393,7 +393,7 @@ def _overwrite_flag_warning_global_option(
             break
     logger.warning(
         f"The individual `{option_name}` field on the `{target.alias}` target in `{target.address}` is overridden by "
-        f"`extra_build_options` (`{extra_build_options}`). Individual build option fields are deprecated in favor of using `extra_build_options`"
+        f"`extra_build_options` (`{extra_build_options}`). Consider using `extra_build_options` instead of specifying individual build option fields."
     )
 
 
@@ -447,7 +447,7 @@ def get_build_options(
                 field_type, "docker_build_option", None
             )  # get the flag name if it exists such as --pull or --network, etc.
             if flag and flag in overridden_flags:
-                _overwriten_flag_warning(target, field_type, extra_options)
+                _overwrite_flag_warning(target, field_type, extra_options)
                 continue
 
             source = InterpolationContext.TextSource(
