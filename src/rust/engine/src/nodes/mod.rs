@@ -113,12 +113,17 @@ impl Vfs<Failure> for Context {
         self.get(Scandir { dir, subject_path }).await
     }
 
-    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, Failure> {
+    async fn path_metadata(
+        &self,
+        path: PathBuf,
+        follow_symlinks: bool,
+    ) -> Result<Option<PathMetadata>, Failure> {
         let subject_path = {
             let relpath = RelativePath::new(&path).map_err(|e| Self::mk_error(&e))?;
             SubjectPath::Workspace(relpath)
         };
-        self.get(PathMetadataNode::new(subject_path)?).await
+        self.get(PathMetadataNode::new(subject_path, follow_symlinks)?)
+            .await
     }
 
     fn is_ignored(&self, stat: &fs::Stat) -> bool {

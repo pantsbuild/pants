@@ -11,10 +11,12 @@ from pants.backend.java.target_types import JavaSourcesGeneratorTarget
 from pants.backend.java.target_types import rules as target_types_rules
 from pants.core.util_rules import config_files, source_files
 from pants.engine.addresses import Address, Addresses
+from pants.engine.fs import EMPTY_DIGEST
 from pants.jvm.resolve.coordinate import Coordinate
-from pants.jvm.resolve.coursier_fetch import NoCompatibleResolve
+from pants.jvm.resolve.coursier_fetch import CoursierResolvedLockfile, NoCompatibleResolve
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.key import CoursierResolveKey
+from pants.jvm.resolve.lockfile_metadata import JVMLockfileMetadata
 from pants.jvm.target_types import DeployJarTarget, JvmArtifactTarget
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.jvm.util_rules import rules as util_rules
@@ -124,3 +126,94 @@ def test_no_matching_for_leaf(rule_runner: RuleRunner) -> None:
 )
 def test_from_coord_str(coord_str: str, expected: Coordinate) -> None:
     assert Coordinate.from_coord_str(coord_str) == expected
+
+
+def test_dependencies_skips_transitive_entries_missing_from_lockfile() -> None:
+    # Regression test for the v2.31 KeyError that surfaced after #22906 removed the
+    # `entries.get(...)` guard. Coursier (still as of 2.1.25-M19) sometimes emits
+    # transitive dependencies that have no top-level coord entry of their own — see
+    # https://github.com/coursier/coursier/issues/2884 — so `dependencies()` must
+    # tolerate the missing entry rather than raising KeyError. This fixture is the
+    # one from the original bug report: hive-exec lists arrow-memory as a transitive
+    # dependency, but no arrow-memory entry exists.
+    metadata = JVMLockfileMetadata.new([])
+    lockfile = CoursierResolvedLockfile.from_serialized(
+        metadata.add_header_to_lockfile(
+            dedent(
+                """\
+                [[entries]]
+                file_name = "org.apache.hive_hive-exec_3.1.3.jar"
+
+                [[entries.directDependencies]]
+                group = "commons-codec"
+                artifact = "commons-codec"
+                version = "1.17.0"
+                packaging = "jar"
+
+                [[entries.dependencies]]
+                group = "commons-codec"
+                artifact = "commons-codec"
+                version = "1.17.0"
+                packaging = "jar"
+
+                [[entries.dependencies]]
+                group = "org.apache.arrow"
+                artifact = "arrow-memory"
+                version = "0.8.0"
+                packaging = "jar"
+
+                [entries.coord]
+                group = "org.apache.hive"
+                artifact = "hive-exec"
+                version = "3.1.3"
+                packaging = "jar"
+
+                [entries.file_digest]
+                fingerprint = "a39058a6028ad36a74f97639663c94d9d4c52d9d32fab31032270565d01424af"
+                serialized_bytes_length = 492916
+
+                [[entries]]
+                directDependencies = []
+                dependencies = []
+                file_name = "commons-codec_commons-codec_1.17.0.jar"
+
+                [entries.coord]
+                group = "commons-codec"
+                artifact = "commons-codec"
+                version = "1.17.0"
+                packaging = "jar"
+
+                [entries.file_digest]
+                fingerprint = "0000000000000000000000000000000000000000000000000000000000000000"
+                serialized_bytes_length = 1
+                """
+            ).encode(),
+            regenerate_command="N/A - regression fixture",
+            delimeter="#",
+        )
+    )
+
+    root_entry, transitive_entries = lockfile.dependencies(
+        CoursierResolveKey(
+            name="forge-jvm-spark-3-5",
+            path="lockfiles/jvm-spark-3-5.lock",
+            digest=EMPTY_DIGEST,
+        ),
+        Coordinate(group="org.apache.hive", artifact="hive-exec", version="3.1.3"),
+    )
+
+    assert root_entry.coord == Coordinate(
+        group="org.apache.hive",
+        artifact="hive-exec",
+        version="3.1.3",
+        strict=True,
+    )
+    # arrow-memory has no entry of its own, so it is silently skipped here.
+    assert {(entry.coord.group, entry.coord.artifact) for entry in transitive_entries} == {
+        ("commons-codec", "commons-codec"),
+    }
+    # ...but it still appears in the raw dependency list of hive-exec.
+    assert {(dep.group, dep.artifact) for dep in root_entry.dependencies} == {
+        ("commons-codec", "commons-codec"),
+        ("org.apache.arrow", "arrow-memory"),
+    }

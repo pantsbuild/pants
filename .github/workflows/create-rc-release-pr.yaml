@@ -1,9 +1,10 @@
-name: Create Dev Release PR
+name: Create RC Release PR
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: The dev release version to create (MAJOR.MINOR.PATCH.devN e.g. 2.42.4.dev2).
+        description: The rc release version to create (MAJOR.MINOR.PATCHrcN e.g. 2.42.4rc0).
         required: true
 
 defaults:
@@ -20,7 +21,7 @@ jobs:
         run: "true"
 
   github-pr:
-    name: Create a dev release pull request
+    name: Create an rc release pull request
     needs: org-check
     runs-on: ubuntu-latest
     permissions:
@@ -28,10 +29,6 @@ jobs:
       pull-requests: write
 
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0  # Required for contributors file
-
       - name: Determine release version
         id: validate-version
         run: |
@@ -41,24 +38,36 @@ jobs:
               echo "::error::An input 'version' must be specified"
               exit 1
 
-          elif (( ${#version} > 13 )); then
-              echo "::error::The input 'version' must be smaller than 14 characters (i.e. allows '2.99.99.dev99')"
+          elif (( ${#version} > 11 )); then
+              echo "::error::The input 'version' must be smaller than 12 characters (i.e. allows '2.99.99rc99')"
               exit 1
 
-          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.dev[0-9]+$ ]]; then
-              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCH.devN (8.9.10.dev99)"
+          elif [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+rc[0-9]+$ ]]; then
+              echo "::error::The input version '${version}' must be of the form MAJOR.MINOR.PATCHrcN (8.9.10rc99)"
               exit 1
           fi
 
-          echo "::notice::Release version is: ${version}"
+          major_minor=$(echo "$version" | grep -oE '^[0-9]+\.[0-9]+')
+          base_branch="${major_minor}.x"
+
+          echo "::notice::Release version is: ${version}, with major-minor: ${major_minor}"
           echo "release-version=${version}" >> $GITHUB_OUTPUT
+          echo "major-minor-version=${major_minor}" >> $GITHUB_OUTPUT
+
+          echo "::notice::Base branch is: ${base_branch}"
+          echo "base-branch=${base_branch}" >> "$GITHUB_OUTPUT"
+      
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.validate-version.outputs.base-branch }}
+          fetch-depth: 0  # Required for contributors file
 
       - name: Update CONTRIBUTORS.md and VERSION files
         env:
           RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
         run: |
           if [[ -z "$RELEASE_VERSION" ]]; then
-              echo "::error::The 'release_version' was empty"
+              echo "::error::The 'RELEASE_VERSION' was empty"
               exit 1
           fi
 
@@ -70,21 +79,22 @@ jobs:
             printf "Created as part of the release process.\n\n"
             
             git log --use-mailmap --format=format:%aN HEAD \
-                | sort -u \
-                | grep -vxF \
-                    -e "dependabot[bot]" \
-                    -e "github-actions[bot]" \
-                    -e "Worker Pants (Pantsbuild GitHub Automation Bot)" \
-                | sed 's/^/+ /'
+              | sort -u \
+              | grep -vxF \
+                -e "dependabot[bot]" \
+                -e "github-actions[bot]" \
+                -e "Worker Pants (Pantsbuild GitHub Automation Bot)" \
+              | sed 's/^/+ /'
           } > CONTRIBUTORS.md
 
       - name: Commit changes and create pull request
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_BRANCH: ${{ steps.validate-version.outputs.base-branch }}
           RELEASE_VERSION: ${{ steps.validate-version.outputs.release-version }}
         run: |
           if [[ -z $(git status --porcelain) ]]; then
-            echo "::error::No changes detected in VERSION or CONTRIBUTORS.md - skipping PR creation"
+            echo "::error::No changes detected - skipping PR creation"
             exit 1
           fi
 
@@ -92,7 +102,7 @@ jobs:
           git config --local user.email "pantsbuild+github-automation@gmail.com"
           git config --local user.name "Worker Pants (Pantsbuild GitHub Automation Bot)"
 
-          # Create and checkout a new release branch
+          # Create and checkout a new release automation branch
           BRANCH_NAME="automation/release/$RELEASE_VERSION"
           git checkout -b "$BRANCH_NAME"
 
@@ -102,11 +112,11 @@ jobs:
           git commit -m "$TITLE"
           git push -u origin "$BRANCH_NAME"
 
-          # Create PR from the release branch to main
+          # Create PR from the release automation branch to stable release branch
           gh pr create \
             --title "$TITLE" \
             --body "" \
-            --base main \
+            --base "$BASE_BRANCH" \
             --head "$BRANCH_NAME" \
             --label "automation:release-prep,category:internal" \
             --assignee "${{ github.actor }}"
