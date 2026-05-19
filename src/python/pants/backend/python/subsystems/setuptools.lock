@@ -1,131 +1,48 @@
-{
-  "allow_builds": true,
-  "allow_prereleases": false,
-  "allow_wheels": true,
-  "build_isolation": true,
-  "constraints": [],
-  "elide_unused_requires_dist": false,
-  "excluded": [],
-  "locked_resolves": [
-    {
-      "locked_requirements": [
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922",
-              "url": "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c",
-              "url": "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz"
-            }
-          ],
-          "project_name": "setuptools",
-          "requires_dists": [
-            "build[virtualenv]>=1.0.3; extra == \"test\"",
-            "filelock>=3.4.0; extra == \"test\"",
-            "furo; extra == \"doc\"",
-            "importlib_metadata>=6; python_version < \"3.10\" and extra == \"core\"",
-            "importlib_metadata>=7.0.2; python_version < \"3.10\" and extra == \"type\"",
-            "ini2toml[lite]>=0.14; extra == \"test\"",
-            "jaraco.develop>=7.21; (python_version >= \"3.9\" and sys_platform != \"cygwin\") and extra == \"test\"",
-            "jaraco.develop>=7.21; sys_platform != \"cygwin\" and extra == \"type\"",
-            "jaraco.envs>=2.2; extra == \"test\"",
-            "jaraco.functools>=4; extra == \"core\"",
-            "jaraco.packaging>=9.3; extra == \"doc\"",
-            "jaraco.path>=3.7.2; extra == \"test\"",
-            "jaraco.test>=5.5; extra == \"test\"",
-            "jaraco.text>=3.7; extra == \"core\"",
-            "jaraco.tidelift>=1.4; extra == \"doc\"",
-            "more_itertools; extra == \"core\"",
-            "more_itertools>=8.8; extra == \"core\"",
-            "mypy==1.14.*; extra == \"type\"",
-            "packaging>=24.2; extra == \"core\"",
-            "packaging>=24.2; extra == \"test\"",
-            "pip>=19.1; extra == \"test\"",
-            "platformdirs>=4.2.2; extra == \"core\"",
-            "pygments-github-lexers==0.0.5; extra == \"doc\"",
-            "pyproject-hooks!=1.1; extra == \"doc\"",
-            "pyproject-hooks!=1.1; extra == \"test\"",
-            "pytest!=8.1.*,>=6; extra == \"test\"",
-            "pytest-checkdocs>=2.4; extra == \"check\"",
-            "pytest-cov; extra == \"cover\"",
-            "pytest-enabler>=2.2; extra == \"enabler\"",
-            "pytest-home>=0.5; extra == \"test\"",
-            "pytest-mypy; extra == \"type\"",
-            "pytest-perf; sys_platform != \"cygwin\" and extra == \"test\"",
-            "pytest-ruff>=0.2.1; sys_platform != \"cygwin\" and extra == \"check\"",
-            "pytest-subprocess; extra == \"test\"",
-            "pytest-timeout; extra == \"test\"",
-            "pytest-xdist>=3; extra == \"test\"",
-            "rst.linker>=1.9; extra == \"doc\"",
-            "ruff>=0.8.0; sys_platform != \"cygwin\" and extra == \"check\"",
-            "sphinx-favicon; extra == \"doc\"",
-            "sphinx-inline-tabs; extra == \"doc\"",
-            "sphinx-lint; extra == \"doc\"",
-            "sphinx-notfound-page<2,>=1; extra == \"doc\"",
-            "sphinx-reredirects; extra == \"doc\"",
-            "sphinx>=3.5; extra == \"doc\"",
-            "sphinxcontrib-towncrier; extra == \"doc\"",
-            "tomli-w>=1.0.0; extra == \"test\"",
-            "tomli>=2.0.1; python_version < \"3.11\" and extra == \"core\"",
-            "towncrier<24.7; extra == \"doc\"",
-            "virtualenv>=13.0.0; extra == \"test\"",
-            "wheel>=0.43.0; extra == \"core\"",
-            "wheel>=0.44.0; extra == \"test\""
-          ],
-          "requires_python": ">=3.9",
-          "version": "80.9.0"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248",
-              "url": "https://files.pythonhosted.org/packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "661e1abd9198507b1409a20c02106d9670b2576e916d58f520316666abca6729",
-              "url": "https://files.pythonhosted.org/packages/8a/98/2d9906746cdc6a6ef809ae6338005b3f21bb568bea3165cfc6a243fdc25c/wheel-0.45.1.tar.gz"
-            }
-          ],
-          "project_name": "wheel",
-          "requires_dists": [
-            "pytest>=6.0.0; extra == \"test\"",
-            "setuptools>=65; extra == \"test\""
-          ],
-          "requires_python": ">=3.8",
-          "version": "0.45.1"
-        }
-      ],
-      "marker": null,
-      "platform_tag": null
-    }
-  ],
-  "only_builds": [],
-  "only_wheels": [],
-  "overridden": [],
-  "path_mappings": {},
-  "pex_version": "2.69.1",
-  "pip_version": "25.3",
-  "prefer_older_binary": false,
-  "requirements": [
-    "setuptools>=70.0",
-    "wheel>=0.40"
-  ],
-  "requires_python": [
-    "CPython<3.15,>=3.9"
-  ],
-  "resolver_version": "pip-2020-resolver",
-  "style": "universal",
-  "target_systems": [
-    "linux",
-    "mac"
-  ],
-  "transitive": true,
-  "use_pep517": null,
-  "use_system_time": false
-}
+version = 1
+revision = 3
+requires-python = ">=3.9, <3.15"
+
+[[package]]
+name = "packaging"
+version = "26.2"
+source = { registry = "https://pypi.org/simple/" }
+sdist = { url = "https://files.pythonhosted.org/packages/d7/f1/e7a6dd94a8d4a5626c03e4e99c87f241ba9e350cd9e6d75123f992427270/packaging-26.2.tar.gz", hash = "sha256:ff452ff5a3e828ce110190feff1178bb1f2ea2281fa2075aadb987c2fb221661", size = 228134, upload-time = "2026-04-24T20:15:23.917Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/b2/87e62e8c3e2f4b32e5fe99e0b86d576da1312593b39f47d8ceef365e95ed/packaging-26.2-py3-none-any.whl", hash = "sha256:5fc45236b9446107ff2415ce77c807cee2862cb6fac22b8a73826d0693b0980e", size = 100195, upload-time = "2026-04-24T20:15:22.081Z" },
+]
+
+[[package]]
+name = "pants-lockfile-for-setuptools"
+version = "0.0.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "setuptools" },
+    { name = "wheel" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "setuptools", specifier = ">=70.0" },
+    { name = "wheel", specifier = ">=0.40" },
+]
+
+[[package]]
+name = "setuptools"
+version = "82.0.1"
+source = { registry = "https://pypi.org/simple/" }
+sdist = { url = "https://files.pythonhosted.org/packages/4f/db/cfac1baf10650ab4d1c111714410d2fbb77ac5a616db26775db562c8fab2/setuptools-82.0.1.tar.gz", hash = "sha256:7d872682c5d01cfde07da7bccc7b65469d3dca203318515ada1de5eda35efbf9", size = 1152316, upload-time = "2026-03-09T12:47:17.221Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9d/76/f789f7a86709c6b087c5a2f52f911838cad707cc613162401badc665acfe/setuptools-82.0.1-py3-none-any.whl", hash = "sha256:a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb", size = 1006223, upload-time = "2026-03-09T12:47:15.026Z" },
+]
+
+[[package]]
+name = "wheel"
+version = "0.47.0"
+source = { registry = "https://pypi.org/simple/" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/39/62/75f18a0f03b4219c456652c7780e4d749b929eb605c098ce3a5b6b6bc081/wheel-0.47.0.tar.gz", hash = "sha256:cc72bd1009ba0cf63922e28f94d9d83b920aa2bb28f798a31d0691b02fa3c9b3", size = 63854, upload-time = "2026-04-22T15:51:27.727Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/1b/9e33c09813d65e248f7f773119148a612516a4bea93e9c6f545f78455b7c/wheel-0.47.0-py3-none-any.whl", hash = "sha256:212281cab4dff978f6cedd499cd893e1f620791ca6ff7107cf270781e587eced", size = 32218, upload-time = "2026-04-22T15:51:26.296Z" },
+]
