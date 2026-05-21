@@ -41,26 +41,20 @@ def _process_defns(defns: list[Statement]) -> None:
                 _process_defns(defn.func.body.body)
 
 
+_SUBSYSTEM_NG = "pants.ng.subsystem.SubsystemNg"
+
+
 def _process_subclass_hook(ctx: ClassDefContext) -> None:
+    if not any(base.fullname == _SUBSYSTEM_NG for base in ctx.cls.info.mro):
+        return
     _process_defns(ctx.cls.defs.body)
-
-
-# NB: If we create more intermediate subclasses, they must be added here.
-_SUBSYSTEM_BASE_CLASSES = frozenset(
-    {
-        "pants.ng.subsystem.SubsystemNg",
-        "pants.ng.subsystem.UniversalSubsystem",
-        "pants.ng.subsystem.ContextualSubsystem",
-        "pants.ng.goal.GoalSubsystemNg",
-    }
-)
 
 
 class SubsystemPlugin(Plugin):
     """Mypy plugin that processes SubsystemNg subclasses to find methods decorated with @option."""
 
     def get_base_class_hook(self, fullname: str):
-        if fullname in _SUBSYSTEM_BASE_CLASSES:
+        if fullname.startswith("pants."):
             return _process_subclass_hook
         return None
 

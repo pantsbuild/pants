@@ -67,7 +67,7 @@ def _run_mypy(source: str, *, with_plugin: bool) -> tuple[str, str]:
     return stdout, stderr
 
 
-def test_plugin_suppresses_empty_body_on_lint_subsystem() -> None:
+def test_plugin_suppresses_empty_body_on_goal_subsystem() -> None:
     stdout_noplugin, stderr_noplugin = _run_mypy(_FOO_GOAL_SUBSYSTEM_SOURCE, with_plugin=False)
     assert "empty-body" in stdout_noplugin, (
         f"Expected [empty-body] error without plugin:\n{stdout_noplugin} (err: {stderr_noplugin})"
