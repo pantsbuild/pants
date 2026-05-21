@@ -7,7 +7,7 @@ import pytest
 from packaging.version import Version
 
 from pants.util import docutil
-from pants.util.docutil import doc_url, git_url
+from pants.util.docutil import doc_url, git_url, terminal_width
 
 
 @pytest.mark.parametrize(
@@ -49,3 +49,12 @@ def test_git_url(monkeypatch) -> None:
         git_url("some_file.ext")
         == "https://github.com/pantsbuild/pants/blob/release_1.29.0/some_file.ext"
     )
+
+
+def test_terminal_width_falls_back_when_columns_are_zero(monkeypatch) -> None:
+    class TerminalSize:
+        columns = 0
+
+    monkeypatch.setattr(docutil.shutil, "get_terminal_size", lambda fallback: TerminalSize())
+
+    assert terminal_width() == 94
