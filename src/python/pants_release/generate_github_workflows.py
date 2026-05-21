@@ -494,7 +494,7 @@ class Helper:
                 "run-id=${{ github.run_id }}",
             ]
         elif self.platform == Platform.WINDOWS11_X86_64:
-            ret += ["windows-2025"]
+            ret += ["windows-2025-vs2026"]
         else:
             raise ValueError(f"Unsupported platform: {self.platform_name()}")
         return ret
