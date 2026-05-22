@@ -536,6 +536,48 @@ def test_build_pex_from_uv_lockfile(rule_runner: RuleRunner) -> None:
     assert b"ok" in res.stdout
 
 
+def test_build_pex_from_uv_lockfile_pex_requirements(rule_runner: RuleRunner) -> None:
+    """PexRequirements with a uv lockfile should install only the needed subset."""
+    ic = InterpreterConstraints(["CPython==3.14.*"])
+    gen_result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GenerateUvLockfile(
+                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=ic,
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+            )
+        ],
+    )
+    digest_contents = rule_runner.request(DigestContents, [gen_result.digest])
+    rule_runner.write_files({fc.path: fc.content for fc in digest_contents})
+
+    pex_data = create_pex_and_get_all_data(
+        rule_runner,
+        requirements=PexRequirements(
+            req_strings_or_addrs=["ansicolors==1.1.8"],
+            from_superset=Resolve("test", use_entire_lockfile=False),
+        ),
+        interpreter_constraints=ic,
+        layout=PexLayout.ZIPAPP,
+        additional_pants_args=(
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-resolver=uv",
+            "--python-invalid-lockfile-behavior=error",
+        ),
+    )
+
+    res = subprocess.run(
+        [pex_data.local_path, "-c", "import colors; print('ok')"],
+        capture_output=True,
+    )
+    assert res.returncode == 0, res.stderr
+    assert b"ok" in res.stdout
+
+
 def test_entry_point(rule_runner: RuleRunner) -> None:
     entry_point = "pydoc"
     pex_info = create_pex_and_get_pex_info(rule_runner, main=EntryPoint(entry_point))
