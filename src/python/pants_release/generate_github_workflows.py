@@ -75,7 +75,7 @@ class Platform(Enum):
 
 
 GITHUB_HOSTED = {Platform.LINUX_X86_64, Platform.MACOS14_ARM64}
-SELF_HOSTED = {Platform.MACOS13_X86_64, Platform.LINUX_ARM64}
+SELF_HOSTED = {Platform.MACOS13_X86_64}
 CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
     "RUSTSEC-2020-0128",  # returns a false positive on the cache crate, which is a local crate not a 3rd party crate
 )
@@ -85,13 +85,16 @@ CARGO_AUDIT_IGNORED_ADVISORY_IDS = (
 # NOTE: The last entry becomes the default
 _BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.12", "3.13", "3.11"]
 
-PYTHON_VERSIONS_PER_PLATFORM = {
+PYTHON_VERSIONS_PER_PLATFORM: dict[Platform, list[str]] = {
     Platform.LINUX_X86_64: _BASE_PYTHON_VERSIONS,
+    # Python 3.7 isn't installable by setup-python on ARM64 Ubuntu 24.04.
+    # TODO: Update any tests still relying on 3.7 and 3.8, which have been long EOL'd,
+    #  and then stop requiring them on any platform.
+    Platform.LINUX_ARM64: [v for v in _BASE_PYTHON_VERSIONS if v != "3.7"],
     # Python 3.7 or 3.8 aren't supported directly on arm64 macOS
     Platform.MACOS14_ARM64: [v for v in _BASE_PYTHON_VERSIONS if v not in ("3.7", "3.8")],
     # These runners have Python already installed
     Platform.MACOS13_X86_64: None,
-    Platform.LINUX_ARM64: None,
 }
 
 
@@ -455,16 +458,11 @@ class Helper:
         if self.platform == Platform.MACOS13_X86_64:
             ret += ["macos-13"]
         elif self.platform == Platform.MACOS14_ARM64:
-            ret += ["macos-14"]
+            ret += ["depot-macos-14"]
         elif self.platform == Platform.LINUX_X86_64:
-            ret += ["ubuntu-22.04"]
+            ret += ["depot-ubuntu-22.04-8"]
         elif self.platform == Platform.LINUX_ARM64:
-            ret += [
-                "runs-on",
-                "runner=4cpu-linux-arm64",
-                "image=ubuntu22-full-arm64-python3.7-3.13",
-                "run-id=${{ github.run_id }}",
-            ]
+            ret += ["depot-ubuntu-24.04-arm-8"]
         elif self.platform == Platform.WINDOWS11_X86_64:
             ret += ["windows-2025"]
         else:
