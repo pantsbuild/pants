@@ -11,10 +11,9 @@ from mypy.nodes import (
     ClassDef,
     Decorator,
     FuncDef,
-    MypyFile,
     Statement,
 )
-from mypy.plugin import Plugin
+from mypy.plugin import ClassDefContext, Plugin
 
 
 def _has_option_decorator(node: Decorator) -> bool:
@@ -42,13 +41,22 @@ def _process_defns(defns: list[Statement]) -> None:
                 _process_defns(defn.func.body.body)
 
 
-class SubsystemPlugin(Plugin):
-    """Mypy plugin that processes files to find methods decorated with @option."""
+_SUBSYSTEM_NG = "pants.ng.subsystem.SubsystemNg"
 
-    def get_additional_deps(self, file: MypyFile) -> list[tuple[int, str, int]]:
-        """A file-level hook that we piggyback on to process the parsed file."""
-        _process_defns(file.defs)
-        return []
+
+def _process_subclass_hook(ctx: ClassDefContext) -> None:
+    if not any(base.fullname == _SUBSYSTEM_NG for base in ctx.cls.info.mro):
+        return
+    _process_defns(ctx.cls.defs.body)
+
+
+class SubsystemPlugin(Plugin):
+    """Mypy plugin that processes SubsystemNg subclasses to find methods decorated with @option."""
+
+    def get_base_class_hook(self, fullname: str):
+        if fullname.startswith("pants."):
+            return _process_subclass_hook
+        return None
 
 
 def plugin(version: str) -> Type[Plugin]:
