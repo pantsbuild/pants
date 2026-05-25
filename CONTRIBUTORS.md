@@ -195,6 +195,7 @@ Created as part of the release process.
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
++ Joseph Bylund
 + Joseph Tilahun
 + Josh Reed
 + Josh Soref
@@ -264,6 +265,7 @@ Created as part of the release process.
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty
++ Michael Fairley
 + Michael Glass
 + Michal Bryc
 + Mikael Souza
