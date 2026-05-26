@@ -38,17 +38,16 @@ jobs:
       uses: actions/checkout@v6
       with:
         fetch-depth: 10
-    - name: Set up Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+    - name: Set up Python 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.8
           3.9
           3.10
-          3.11
           3.12
           3.13
-          3.14
+          3.11
     - name: Install Protoc
       uses: arduino/setup-protoc@3ea1d70ac22caff0b66ed6cb37d5b7aadebd4623
       with:
@@ -130,11 +129,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -251,7 +246,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - macos-14
+    - depot-macos-14
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -444,11 +439,7 @@ jobs:
       contents: write
       id-token: write
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       run: |-
@@ -531,7 +522,7 @@ jobs:
       contents: write
       id-token: write
     runs-on:
-    - macos-14
+    - depot-macos-14
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -653,11 +644,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -693,11 +680,7 @@ jobs:
       release: ${{ steps.classify.outputs.release }}
       rust: ${{ steps.classify.outputs.rust }}
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Check out code
       uses: actions/checkout@v6
@@ -740,11 +723,7 @@ jobs:
     - test_python_macos14_arm64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - uses: coverallsapp/github-action@v2
       with:
@@ -757,11 +736,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Check out code
       uses: actions/checkout@v6
@@ -831,11 +806,7 @@ jobs:
     needs:
     - set_merge_ok
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - run: |
         merge_ok="${{ needs.set_merge_ok.outputs.merge_ok }}"
@@ -878,11 +849,7 @@ jobs:
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
@@ -923,17 +890,16 @@ jobs:
       uses: actions/setup-go@v6
       with:
         go-version: 1.24.9
-    - name: Set up Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+    - name: Set up Python 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v6
       with:
         python-version: |-
           3.8
           3.9
           3.10
-          3.11
           3.12
           3.13
-          3.14
+          3.11
     - name: Download native binaries
       uses: actions/download-artifact@v7
       with:
@@ -988,11 +954,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1118,11 +1080,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1248,11 +1206,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1378,11 +1332,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1508,11 +1458,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1638,11 +1584,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1768,11 +1710,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1898,11 +1836,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -2028,11 +1962,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -2158,11 +2088,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-<<<<<<< HEAD
-    - ubuntu-22.04
-=======
     - depot-ubuntu-22.04-8
->>>>>>> b2edb60735 (Run Linux ARM CI on Depot runners (#23363))
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -2289,7 +2215,7 @@ jobs:
     - bootstrap_pants_macos14_arm64
     - classify_changes
     runs-on:
-    - macos-14
+    - depot-macos-14
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
