@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 from packaging.version import Version
 
@@ -52,9 +54,9 @@ def test_git_url(monkeypatch) -> None:
 
 
 def test_terminal_width_falls_back_when_columns_are_zero(monkeypatch) -> None:
-    class TerminalSize:
-        columns = 0
-
-    monkeypatch.setattr(docutil.shutil, "get_terminal_size", lambda fallback: TerminalSize())
+    monkeypatch.setattr(
+        "pants.util.docutil.shutil.get_terminal_size",
+        lambda *args, **kwargs: os.terminal_size((0, 24)),
+    )
 
     assert terminal_width() == 94
