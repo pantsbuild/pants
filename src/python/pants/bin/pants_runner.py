@@ -26,10 +26,9 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-# First version with working Python 3.11 support:
-# https://github.com/pantsbuild/scie-pants/releases/tag/v0.12.2
-# TODO: Likely still need to update scie-pants
-MINIMUM_SCIE_PANTS_VERSION = Version("0.12.2")
+# First version with working Python 3.14 support:
+# https://github.com/pantsbuild/scie-pants/releases/tag/v0.13.2
+MINIMUM_SCIE_PANTS_VERSION = Version("0.13.2")
 
 
 @dataclass(frozen=True)
