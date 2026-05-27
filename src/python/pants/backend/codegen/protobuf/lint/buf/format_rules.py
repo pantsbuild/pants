@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from dataclasses import dataclass
 
-from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufFormatField
-from pants.backend.codegen.protobuf.lint.buf.subsystem import BufSubsystem
+from pants.backend.codegen.protobuf.buf.skip_field import SkipBufFormatField
+from pants.backend.codegen.protobuf.buf.subsystem import BufSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourceField,
