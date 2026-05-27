@@ -21,11 +21,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - self-hosted
-    - runs-on
-    - runner=4cpu-linux-arm64
-    - image=ubuntu22-full-arm64-python3.7-3.13
-    - run-id=${{ github.run_id }}
+    - depot-ubuntu-24.04-arm-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -41,6 +37,16 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 10
+    - name: Set up Python 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: |-
+          3.8
+          3.9
+          3.10
+          3.12
+          3.13
+          3.11
     - name: Install Protoc
       uses: arduino/setup-protoc@9b1ee5b22b0a3f1feb8c2ff99b32c89b3c3191e9
       with:
@@ -122,7 +128,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -338,7 +344,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - macos-14
+    - depot-macos-14
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -452,11 +458,7 @@ jobs:
       contents: write
       id-token: write
     runs-on:
-    - self-hosted
-    - runs-on
-    - runner=4cpu-linux-arm64
-    - image=ubuntu22-full-arm64-python3.7-3.13
-    - run-id=${{ github.run_id }}
+    - depot-ubuntu-24.04-arm-8
     steps:
     - name: Free up disk space
       run: |-
@@ -535,7 +537,7 @@ jobs:
       contents: write
       id-token: write
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       run: |-
@@ -707,7 +709,7 @@ jobs:
       contents: write
       id-token: write
     runs-on:
-    - macos-14
+    - depot-macos-14
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -828,7 +830,7 @@ jobs:
     needs:
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -864,7 +866,7 @@ jobs:
       release: ${{ steps.classify.outputs.release }}
       rust: ${{ steps.classify.outputs.rust }}
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -908,7 +910,7 @@ jobs:
     - test_python_macos14_arm64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - uses: coverallsapp/github-action@v2
       with:
@@ -921,7 +923,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Check out code
       uses: actions/checkout@v4
@@ -991,7 +993,7 @@ jobs:
     needs:
     - set_merge_ok
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - run: |
         merge_ok="${{ needs.set_merge_ok.outputs.merge_ok }}"
@@ -1037,7 +1039,7 @@ jobs:
     outputs:
       merge_ok: ${{ steps.set_merge_ok.outputs.merge_ok }}
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - id: set_merge_ok
       run: echo 'merge_ok=true' >> ${GITHUB_OUTPUT}
@@ -1049,11 +1051,7 @@ jobs:
     - bootstrap_pants_linux_arm64
     - classify_changes
     runs-on:
-    - self-hosted
-    - runs-on
-    - runner=4cpu-linux-arm64
-    - image=ubuntu22-full-arm64-python3.7-3.13
-    - run-id=${{ github.run_id }}
+    - depot-ubuntu-24.04-arm-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1082,6 +1080,16 @@ jobs:
       uses: actions/setup-go@7bc60db215a8b16959b0b5cccfdc95950d697b25
       with:
         go-version: 1.24.9
+    - name: Set up Python 3.8, 3.9, 3.10, 3.12, 3.13, 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: |-
+          3.8
+          3.9
+          3.10
+          3.12
+          3.13
+          3.11
     - name: Download native binaries
       uses: actions/download-artifact@v4
       with:
@@ -1136,7 +1144,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1262,7 +1270,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1388,7 +1396,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1514,7 +1522,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1640,7 +1648,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1766,7 +1774,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -1892,7 +1900,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -2018,7 +2026,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -2144,7 +2152,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -2270,7 +2278,7 @@ jobs:
     - bootstrap_pants_linux_x86_64
     - classify_changes
     runs-on:
-    - ubuntu-22.04
+    - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
@@ -2482,7 +2490,7 @@ jobs:
     - bootstrap_pants_macos14_arm64
     - classify_changes
     runs-on:
-    - macos-14
+    - depot-macos-14
     steps:
     - name: Free up disk space
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
