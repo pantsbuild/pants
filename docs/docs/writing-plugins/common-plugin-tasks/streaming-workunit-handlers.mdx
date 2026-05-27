@@ -113,7 +113,7 @@ Workunits are untyped Python dictionaries and have the following structure:
         <td><code>counters</code></td>
         <td>object</td>
         <td>{}</td>
-        <td><b>DEPRECATED</b>. This used to store the counters which were incremented during the execution of this partcular workunit. For various reasons, Pants does not track counter increments to workunuits any more here. Use the global counters for a session instead which can be obtaind from the <a href="https://github.com/pantsbuild/pants/blob/fecc16585d40e51cb42469ece320462d22ea25e2/src/python/pants/engine/streaming_workunit_handler.py#L92"><code>StreamingWorkunitContext.get_metrics</code</a> method.</td>
+        <td><b>DEPRECATED</b>. This used to store the counters which were incremented during the execution of this partcular workunit. For various reasons, Pants does not track counter increments to workunuits any more here. Use the global counters for a session instead which can be obtaind from the <a href="https://github.com/pantsbuild/pants/blob/fecc16585d40e51cb42469ece320462d22ea25e2/src/python/pants/engine/streaming_workunit_handler.py#L92"><code>StreamingWorkunitContext.get_metrics</code></a> method.</td>
     </tr>
 </table>
 
