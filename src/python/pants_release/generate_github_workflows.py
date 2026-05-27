@@ -94,7 +94,7 @@ PYTHON_VERSIONS_PER_PLATFORM: dict[Platform, list[str]] = {
     # Python 3.7 or 3.8 aren't supported directly on arm64 macOS
     Platform.MACOS14_ARM64: [v for v in _BASE_PYTHON_VERSIONS if v not in ("3.7", "3.8")],
     # These runners have Python already installed
-    Platform.MACOS13_X86_64: None,
+    Platform.MACOS13_X86_64: [],
 }
 
 
@@ -584,7 +584,7 @@ class Helper:
     def setup_pythons(self) -> Sequence[Step]:
         ret = []
         versions = PYTHON_VERSIONS_PER_PLATFORM[self.platform]
-        if versions is not None:
+        if versions:
             ret.append(install_pythons(versions))
         return ret
 
