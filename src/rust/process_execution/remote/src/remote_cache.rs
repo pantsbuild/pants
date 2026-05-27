@@ -133,22 +133,33 @@ impl CommandRunner {
         root_trie: &DigestTrie,
         directory_path: RelativePath,
     ) -> Result<Option<(Tree, Vec<Digest>)>, String> {
-        let sub_trie = match root_trie.entry(&directory_path)? {
-            None => return Ok(None),
-            Some(directory::Entry::Directory(d)) => d.tree(),
-            Some(directory::Entry::Symlink(_)) => {
-                return Err(format!(
-                    "Declared output directory path {directory_path:?} in output \
+        // REv2.0 allows `output_directories=[""]` to mean "capture the entire working
+        // directory as a Tree". `root_trie.entry("")` returns None because the root has
+        // no entry with name "", so without this special case the caller `continue`s
+        // and the output is silently dropped from the ActionResult written to the AC.
+        // This produces a cache entry that looks "successful" but has no outputs, which
+        // then poisons downstream cache hits. Detect the root-capture case explicitly
+        // and use the entire root trie as the sub-trie.
+        let sub_trie = if directory_path.as_os_str().is_empty() {
+            root_trie
+        } else {
+            match root_trie.entry(&directory_path)? {
+                None => return Ok(None),
+                Some(directory::Entry::Directory(d)) => d.tree(),
+                Some(directory::Entry::Symlink(_)) => {
+                    return Err(format!(
+                        "Declared output directory path {directory_path:?} in output \
            digest {trie_digest:?} contained a symlink instead.",
-                    trie_digest = root_trie.compute_root_digest(),
-                ));
-            }
-            Some(directory::Entry::File(_)) => {
-                return Err(format!(
-                    "Declared output directory path {directory_path:?} in output \
+                        trie_digest = root_trie.compute_root_digest(),
+                    ));
+                }
+                Some(directory::Entry::File(_)) => {
+                    return Err(format!(
+                        "Declared output directory path {directory_path:?} in output \
            digest {trie_digest:?} contained a file instead.",
-                    trie_digest = root_trie.compute_root_digest(),
-                ));
+                        trie_digest = root_trie.compute_root_digest(),
+                    ));
+                }
             }
         };
 
