@@ -363,7 +363,7 @@ def _filter_global_extra_options(
     result = []
     for opt in global_extra_options:
         if opt.startswith("-") and opt.split("=")[0] in target_flag_names:
-            logger.info(
+            logger.debug(
                 f"Global docker extra option `{opt}` is overridden by a per-target option and will be ignored."
             )
         else:
