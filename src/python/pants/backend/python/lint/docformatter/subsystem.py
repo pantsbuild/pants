@@ -17,10 +17,8 @@ class Docformatter(PythonToolBase):
     name = "docformatter"
     help_short = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
-    # As of 4/2026 docformatter doesn't work on python 3.14 due to an issue with its untokenize dep.
-    default_interpreter_constraints = ["CPython>=3.9,<3.14"]
     default_main = ConsoleScript("docformatter")
-    default_requirements = ["docformatter>=1.7.0,<1.8"]
+    default_requirements = ["docformatter>=1.4,<1.5"]
 
     register_interpreter_constraints = True
 

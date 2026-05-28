@@ -238,7 +238,7 @@ pub fn unmatched_globs_additional_context() -> Option<String> {
     let url = Python::attach(|py| {
         externs::doc_url(
             py,
-            "troubleshooting#pants-cannot-find-a-file-in-your-project",
+            "docs/using-pants/troubleshooting-common-issues#pants-cannot-find-a-file-in-your-project",
         )
     });
     Some(format!(
