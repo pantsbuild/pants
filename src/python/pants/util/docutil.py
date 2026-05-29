@@ -13,7 +13,14 @@ from pants.version import MAJOR_MINOR, PANTS_SEMVER
 # NB: This is not memoized because that would cause Pants to not pick up terminal resizing when
 # using pantsd.
 def terminal_width(*, fallback: int = 96, padding: int = 2) -> int:
-    return shutil.get_terminal_size(fallback=(fallback, 24)).columns - padding
+    columns = shutil.get_terminal_size(fallback=(fallback, 24)).columns
+    # Some limited terminals may report a width of 0 even when a fallback is provided
+    # (for example, certain non-interactive environments or misbehaving terminal emulators).
+    # Treat a reported width of 0 as if the fallback was returned to avoid returning
+    # an invalid or negative width after applying padding.
+    if columns == 0:
+        columns = fallback
+    return columns - padding
 
 
 _VERSIONED_PREFIXES = ("docs/", "reference/")
