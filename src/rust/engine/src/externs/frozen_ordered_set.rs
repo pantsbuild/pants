@@ -77,11 +77,7 @@ impl FrozenOrderedSet {
         if self_dict.len() != other_dict.len() {
             return false.into_bound_py_any(py);
         }
-        for (a, b) in self_dict
-            .keys()
-            .into_iter()
-            .zip(other_dict.keys().into_iter())
-        {
+        for (a, b) in self_dict.keys().into_iter().zip(other_dict.keys()) {
             if !a.eq(&b)? {
                 return false.into_bound_py_any(py);
             }
