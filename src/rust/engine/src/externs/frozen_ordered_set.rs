@@ -128,7 +128,12 @@ impl FrozenOrderedSet {
             .map(|o| to_pyset(&o))
             .collect::<PyResult<Vec<_>>>()?;
         filter_keys(self, py, |key| {
-            Ok(sets.iter().all(|s| s.contains(key).unwrap_or(false)))
+            for s in &sets {
+                if !s.contains(key)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
         })
     }
 
