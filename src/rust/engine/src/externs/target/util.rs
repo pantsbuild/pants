@@ -3,6 +3,7 @@
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::path::Path;
 use std::sync::OnceLock;
 
 use fnv::FnvHasher;
@@ -28,12 +29,12 @@ pub fn import_target_attr<'py>(
     cache: &OnceLock<Py<PyAny>>,
     name: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
-    if let Some(exc) = cache.get() {
-        return Ok(exc.bind(py).clone());
+    if let Some(attr) = cache.get() {
+        return Ok(attr.bind(py).clone());
     }
-    let exc = py.import("pants.engine.target")?.getattr(name)?;
-    let _ = cache.set(exc.clone().unbind());
-    Ok(exc)
+    let attr = py.import("pants.engine.target")?.getattr(name)?;
+    let _ = cache.set(attr.clone().unbind());
+    Ok(attr)
 }
 
 pub fn raise_invalid_field_type(
@@ -124,26 +125,17 @@ impl<T: AsRef<str>> fmt::Display for PyReprList<'_, T> {
 /// Joins a directory path and name, mimicking Python's `os.path.join` semantics
 /// where an absolute `name` resets the path.
 pub fn join_path(dirpath: &str, name: &str) -> String {
-    if name.starts_with('/') || dirpath.is_empty() {
-        name.to_string()
-    } else {
-        format!("{dirpath}/{name}")
-    }
+    Path::new(dirpath)
+        .join(name)
+        .into_os_string()
+        .into_string()
+        .expect("joined path of UTF-8 components is UTF-8")
 }
 
 /// Prefixes a glob pattern with a directory path. Handles `!` exclusion globs.
 pub fn prefix_glob(dirpath: &str, glob: &str) -> String {
     match glob.strip_prefix('!') {
-        Some(rest) => {
-            let mut s = String::with_capacity(1 + dirpath.len() + 1 + rest.len());
-            s.push('!');
-            s.push_str(dirpath);
-            if !dirpath.is_empty() {
-                s.push('/');
-            }
-            s.push_str(rest);
-            s
-        }
+        Some(rest) => format!("!{}", join_path(dirpath, rest)),
         None => join_path(dirpath, glob),
     }
 }
@@ -170,5 +162,68 @@ impl NoFieldValue {
 
     fn __repr__(&self) -> &'static str {
         "<NO_VALUE>"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{join_path, prefix_glob};
+
+    #[test]
+    fn join_path_prefixes_relative_name() {
+        assert_eq!(join_path("src/python", "foo.py"), "src/python/foo.py");
+        assert_eq!(
+            join_path("src/python", "a/b/foo.py"),
+            "src/python/a/b/foo.py"
+        );
+    }
+
+    #[test]
+    fn join_path_empty_dirpath_returns_name() {
+        assert_eq!(join_path("", "foo.py"), "foo.py");
+        assert_eq!(join_path("", "a/b.py"), "a/b.py");
+    }
+
+    #[test]
+    fn join_path_absolute_name_resets() {
+        assert_eq!(join_path("src/python", "/abs/foo.py"), "/abs/foo.py");
+        assert_eq!(join_path("", "/abs/foo.py"), "/abs/foo.py");
+    }
+
+    #[test]
+    fn join_path_preserves_glob_syntax() {
+        assert_eq!(join_path("src", "**/*.py"), "src/**/*.py");
+        assert_eq!(join_path("src", "*.py"), "src/*.py");
+    }
+
+    #[test]
+    fn prefix_glob_include() {
+        assert_eq!(prefix_glob("src/python", "*.py"), "src/python/*.py");
+        assert_eq!(prefix_glob("", "*.py"), "*.py");
+    }
+
+    #[test]
+    fn prefix_glob_exclusion_keeps_bang_prefix() {
+        assert_eq!(
+            prefix_glob("src/python", "!ignore.py"),
+            "!src/python/ignore.py"
+        );
+        assert_eq!(
+            prefix_glob("src/python", "!**/*_test.py"),
+            "!src/python/**/*_test.py"
+        );
+    }
+
+    #[test]
+    fn prefix_glob_exclusion_empty_dirpath() {
+        assert_eq!(prefix_glob("", "!ignore.py"), "!ignore.py");
+    }
+
+    #[test]
+    fn prefix_glob_exclusion_absolute_resets() {
+        assert_eq!(
+            prefix_glob("src/python", "!/abs/ignore.py"),
+            "!/abs/ignore.py"
+        );
     }
 }
