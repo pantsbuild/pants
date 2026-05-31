@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import functools
 from textwrap import dedent
 
@@ -44,6 +45,7 @@ def parse_address_map(build_file: str, *, ignore_unrecognized_symbols: bool = Fa
     address_map = AddressMap.parse(
         path,
         build_file,
+        ast.parse(build_file),
         parser,
         BuildFilePreludeSymbols(FrozenDict(), ()),
         EnvironmentVars({}),
