@@ -80,6 +80,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::dep_inference::register(m)?;
     externs::unions::register(py, m)?;
     externs::frozendict::register(py, m)?;
+    externs::frozen_ordered_set::register(py, m)?;
 
     m.add("PollTimeout", py.get_type::<PollTimeout>())?;
 
