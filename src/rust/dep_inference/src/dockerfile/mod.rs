@@ -131,15 +131,15 @@ impl Visitor for DockerFileInfoCollector<'_> {
         let mut cursor = node.walk();
         let mut tag_collector = TagCollector::new(self.code);
         tag_collector.walk(&mut cursor);
+        if let Some(arg) = tag_collector.image_arg {
+            self.from_image_build_args.extend(
+                self.get_build_arg_reference(arg)
+                    .map(|val| format!("{arg}={val}")),
+            );
+        }
         let tag = match tag_collector.tag {
             Tag::Default => Some("latest".to_string()),
-            Tag::BuildArg(arg) => {
-                self.from_image_build_args.extend(
-                    self.get_build_arg_reference(arg)
-                        .map(|val| format!("{arg}={val}")),
-                );
-                Some(format!("build-arg:{arg}"))
-            }
+            Tag::BuildArg(arg) => Some(format!("build-arg:{arg}")),
             Tag::Explicit(e) => Some(e.to_string()),
             Tag::None => None,
         };
