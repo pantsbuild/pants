@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.bsp.context import BSPContext
@@ -17,7 +17,6 @@ from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix, create_digest, get_digest_entries
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import CoarsenedTarget
 from pants.jvm import classpath
 from pants.jvm.compile import (
     ClasspathEntryRequest,
@@ -27,13 +26,8 @@ from pants.jvm.compile import (
     get_fallible_classpath_entry,
 )
 from pants.jvm.resolve.coursier_fetch import select_coursier_resolve_for_targets
-from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.target_types import JvmArtifactFieldSet
 from pants.util.strutil import path_safe
-
-CompileRequestForTargetFn = Callable[
-    [CoarsenedTarget, CoursierResolveKey], "ClasspathEntryRequest | None"
-]
 
 
 def jvm_classes_directory(target_id: BuildTargetIdentifier) -> str:
@@ -123,10 +117,7 @@ async def _dedupe_loose_classfiles(loose_classfiles: tuple[classpath.LooseClassf
 
 
 async def _jvm_bsp_compile(
-    request: BSPCompileRequest,
-    classpath_entry_request: ClasspathEntryRequestFactory,
-    *,
-    request_for_target: CompileRequestForTargetFn | None = None,
+    request: BSPCompileRequest, classpath_entry_request: ClasspathEntryRequestFactory
 ) -> BSPCompileResult:
     """Generically handles a BSPCompileRequest (subclass).
 
@@ -135,15 +126,6 @@ async def _jvm_bsp_compile(
     `BSPCompileRequest` @union member for all JVM because their FieldSets are also declared via
     @unions, and we can't forward the implementation of a @union to another the way we might with
     an abstract class.
-
-    `request_for_target` is an optional callback giving the caller a chance to
-    supply a non-default `ClasspathEntryRequest` for a given coarsened target
-    in the closure. Returning `None` falls back to the default
-    `classpath_entry_request.for_targets(...)` union dispatch. The Scala BSP
-    code path uses this hook to dispatch Scala targets to its own BSP-specific
-    compile rule (which preserves workspace-relative source paths for
-    SemanticDB output) while leaving Java / non-Scala targets on the default
-    path.
     """
     coarsened_targets = await resolve_coarsened_targets(
         **implicitly(Addresses([fs.address for fs in request.field_sets]))
@@ -157,17 +139,12 @@ async def _jvm_bsp_compile(
     #
     # To resolve #15051, this will no longer be transitive, and so `resources` will need to be
     # attached-to/referenced-by nearby BuildTarget(s) instead (most likely: direct dependent(s)).
-    def _entry_request_for(coarsened_target: CoarsenedTarget) -> ClasspathEntryRequest:
-        if request_for_target is not None:
-            custom = request_for_target(coarsened_target, resolve)
-            if custom is not None:
-                return custom
-        return classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve)
-
     results = await concurrently(
         notify_for_classpath_entry(
             BSPClasspathEntryRequest(
-                _entry_request_for(coarsened_target),
+                classpath_entry_request.for_targets(
+                    component=coarsened_target, resolve=resolve
+                ),
                 task_id=request.task_id,
             ),
             **implicitly(),

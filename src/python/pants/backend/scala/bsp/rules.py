@@ -355,7 +355,12 @@ def _jdk_request_sort_key(
             return (-1,)
 
         version_str = request.version if isinstance(request.version, str) else jvm.jdk
-        _, version = version_str.split(":")
+        # `jvm.jdk` can be `"system"` (or a user-supplied bare label) instead
+        # of the conventional `vendor:version`. Treat that the same as
+        # JdkRequest.SYSTEM here so workspace metadata setup doesn't crash.
+        if ":" not in version_str:
+            return (-1,)
+        _, version = version_str.split(":", 1)
 
         return tuple(int(i) for i in version.split("."))
 
@@ -744,36 +749,12 @@ class ScalaBSPCompileRequest(BSPCompileRequest):
     field_set_type = ScalaFieldSet
 
 
-def _is_scala_coarsened_target(coarsened_target: CoarsenedTarget) -> bool:
-    return any(t.has_field(ScalaSourceField) for t in coarsened_target.members)
-
-
 @rule
 async def bsp_scala_compile_request(
     request: ScalaBSPCompileRequest,
     classpath_entry_request: ClasspathEntryRequestFactory,
 ) -> BSPCompileResult:
-    # Route Scala members of the BSP target's coarsened closure through our
-    # BSP-specific scalac rule (which preserves workspace-relative source
-    # paths for SemanticDB output). Non-Scala members continue through the
-    # default union dispatch.
-    from pants.backend.scala.bsp.compile import CompileScalaSourceBSPRequest
-
-    def request_for_target(
-        coarsened_target: CoarsenedTarget, resolve: CoursierResolveKey
-    ) -> ClasspathEntryRequest | None:
-        if not _is_scala_coarsened_target(coarsened_target):
-            return None
-        return CompileScalaSourceBSPRequest(
-            component=coarsened_target,
-            resolve=resolve,
-        )
-
-    return await _jvm_bsp_compile(
-        request,
-        classpath_entry_request,
-        request_for_target=request_for_target,
-    )
+    return await _jvm_bsp_compile(request, classpath_entry_request)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -796,13 +777,10 @@ async def bsp_scala_resources_request(
 
 
 def rules():
-    from pants.backend.scala.bsp import compile as bsp_compile
-
     base_rules = (
         *collect_rules(),
         *jvm_compile_rules(),
         *jvm_resources_rules(),
-        *bsp_compile.rules(),
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
         UnionRule(BSPBuildTargetsMetadataRequest, ScalaBSPBuildTargetsMetadataRequest),
         UnionRule(BSPHandlerMapping, ScalacOptionsHandlerMapping),

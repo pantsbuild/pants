@@ -23,13 +23,9 @@ from pants.core.util_rules.config_files import (
     gather_config_files_by_workspace_dir,
 )
 from pants.core.util_rules.partitions import Partition
-from pants.core.util_rules.source_files import SourceFiles
-from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
-from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.intrinsics import (
-    add_prefix,
-    digest_subset_to_digest,
     digest_to_snapshot,
     execute_process,
     merge_digests,
@@ -48,7 +44,6 @@ from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
 from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
 from pants.jvm.target_types import JvmResolveField
-from pants.source.source_root import SourceRootsRequest, SourceRootsResult, get_source_roots
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -274,23 +269,6 @@ async def _scalafix_lint_partitions(
     return ret
 
 
-async def _restore_source_roots(source_roots_result: SourceRootsResult, digest: Digest) -> Snapshot:
-    source_roots_to_files = defaultdict(set)
-    for file, root in source_roots_result.path_to_root.items():
-        source_roots_to_files[root.path].add(str(file.relative_to(root.path)))
-
-    digest_subsets = await concurrently(
-        digest_subset_to_digest(DigestSubset(digest, PathGlobs(files)))
-        for files in source_roots_to_files.values()
-    )
-
-    restored_digests = await concurrently(
-        add_prefix(AddPrefix(digest, source_root))
-        for digest, source_root in zip(digest_subsets, source_roots_to_files.keys())
-    )
-    return await digest_to_snapshot(**implicitly(MergeDigests(restored_digests)))
-
-
 @dataclass(frozen=True)
 class _ScalafixProcess:
     snapshot: Snapshot
@@ -349,22 +327,19 @@ async def _run_scalafix_process(
 
 @rule
 async def scalafix_fix(request: ScalafixFixRequest.Batch) -> FixResult:
-    source_roots = await get_source_roots(SourceRootsRequest.for_files(request.snapshot.files))
-
-    # We need to strip the source files to get semantic rules find SemanticDB metadata in the classpath
-    stripped_source_files = await strip_source_roots(SourceFiles(request.snapshot, ()))
-
+    # scalafix CLI is given workspace-relative source paths; the compile
+    # classpath embeds SemanticDB at matching workspace-relative paths
+    # (see `compile_scala_source`), so scalafix's lookup resolves naturally.
     process_result = await _run_scalafix_process(
         _ScalafixProcess(
-            snapshot=stripped_source_files.snapshot,
+            snapshot=request.snapshot,
             partition_info=cast(ScalafixPartitionInfo, request.partition_metadata),
             check_only=False,
         ),
         **implicitly(),
     )
 
-    # We need now to restore the source roots
-    result_snapshot = await _restore_source_roots(source_roots, process_result.output_digest)
+    result_snapshot = await digest_to_snapshot(**implicitly(process_result.output_digest))
     output_simplifier = Simplifier()
 
     return FixResult(
@@ -378,13 +353,11 @@ async def scalafix_fix(request: ScalafixFixRequest.Batch) -> FixResult:
 
 @rule
 async def scalafix_lint(request: ScalafixLintRequest.Batch) -> LintResult:
-    # We need to strip the source files to get semantic rules find SemanticDB metadata in the classpath
     source_snapshot = await digest_to_snapshot(**implicitly(PathGlobs(request.elements)))
-    stripped_source_files = await strip_source_roots(SourceFiles(source_snapshot, ()))
 
     process_result = await _run_scalafix_process(
         _ScalafixProcess(
-            snapshot=stripped_source_files.snapshot,
+            snapshot=source_snapshot,
             partition_info=cast(ScalafixPartitionInfo, request.partition_metadata),
             check_only=True,
         ),
