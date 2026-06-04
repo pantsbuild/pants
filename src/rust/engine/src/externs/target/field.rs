@@ -324,10 +324,10 @@ impl Field {
         }
 
         let Some(removal_hint) = Self::cls_removal_hint(cls)? else {
-            return Err(PyValueError::new_err(
-                "You specified `removal_version` for {cls:?}, but not the class \
-             property `removal_hint`.",
-            ));
+            return Err(PyValueError::new_err(format!(
+                "You specified `removal_version` for {cls}, but not the class \
+                 property `removal_hint`."
+            )));
         };
 
         let alias = Self::cls_alias(cls)?;
