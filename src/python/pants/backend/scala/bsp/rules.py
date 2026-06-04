@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
-import dataclasses
-import json
 import logging
 import textwrap
 from collections.abc import Callable
@@ -38,7 +36,6 @@ from pants.backend.scala.util_rules.versions import (
 from pants.base.build_root import BuildRoot
 from pants.bsp.protocol import BSPHandlerMapping
 from pants.bsp.spec.base import BuildTargetIdentifier
-from pants.bsp.spec.targets import DependencyModule
 from pants.bsp.util_rules.lifecycle import BSPLanguageSupport
 from pants.bsp.util_rules.queries import compute_handler_query_rules
 from pants.bsp.util_rules.targets import (
@@ -56,64 +53,40 @@ from pants.bsp.util_rules.targets import (
 )
 from pants.core.util_rules.system_binaries import BashBinary, ReadlinkBinary
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    CreateDigest,
-    Digest,
-    DigestSubset,
-    FileContent,
-    MergeDigests,
-    PathGlobs,
-    RemovePrefix,
-    Workspace,
-)
-from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
+from pants.engine.fs import AddPrefix, CreateDigest, FileContent, MergeDigests, Workspace
 from pants.engine.internals.native_engine import Snapshot
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
     add_prefix,
     create_digest,
-    digest_subset_to_digest,
     digest_to_snapshot,
-    execute_process,
-    get_digest_contents,
     merge_digests,
-    remove_prefix,
 )
 from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import _uncacheable_rule, collect_rules, implicitly, rule
-from pants.engine.target import CoarsenedTarget, FieldSet
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.jvm.bsp.compile import _jvm_bsp_compile, jvm_classes_directory
 from pants.jvm.bsp.compile import rules as jvm_compile_rules
+from pants.jvm.bsp.dependencies import (
+    ThirdpartyModulesRequest,
+    _jvm_bsp_dependency_modules,
+    _jvm_bsp_dependency_sources,
+    collect_thirdparty_modules,
+)
+from pants.jvm.bsp.dependencies import rules as jvm_dependencies_rules
 from pants.jvm.bsp.resources import _jvm_bsp_resources
 from pants.jvm.bsp.resources import rules as jvm_resources_rules
-from pants.jvm.bsp.spec import JvmBuildTarget, MavenDependencyModule, MavenDependencyModuleArtifact
-from pants.jvm.compile import (
-    ClasspathEntry,
-    ClasspathEntryRequest,
-    ClasspathEntryRequestFactory,
-    get_fallible_classpath_entry,
-    required_classfiles,
-)
+from pants.jvm.bsp.spec import JvmBuildTarget
+from pants.jvm.compile import ClasspathEntryRequestFactory
 from pants.jvm.jdk_rules import DefaultJdk, JdkRequest, prepare_jdk_environment
-from pants.jvm.resolve.common import ArtifactRequirement, ArtifactRequirements
-from pants.jvm.resolve.coordinate import Coordinate
+from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import (
-    CoursierLockfileEntry,
-    CoursierResolvedLockfile,
     ToolClasspathRequest,
-    classpath_dest_filename,
-    get_coursier_lockfile_for_resolve,
     materialize_classpath_for_tool,
-    prepare_coursier_resolve_info,
-    select_coursier_resolve_for_targets,
 )
-from pants.jvm.resolve.coursier_setup import CoursierFetchProcess
-from pants.jvm.resolve.key import CoursierResolveKey
 from pants.jvm.subsystems import JvmSubsystem
-from pants.jvm.target_types import JvmArtifactFieldSet, JvmJdkField, JvmResolveField
+from pants.jvm.target_types import JvmJdkField, JvmResolveField
 from pants.util.logging import LogLevel
 
 LANGUAGE_ID = "scala"
@@ -143,67 +116,6 @@ class ScalaBSPBuildTargetsMetadataRequest(BSPBuildTargetsMetadataRequest):
 
     resolve_prefix = "jvm"
     resolve_field = JvmResolveField
-
-
-@dataclass(frozen=True)
-class ThirdpartyModulesRequest:
-    addresses: Addresses
-
-
-@dataclass(frozen=True)
-class ThirdpartyModules:
-    resolve: CoursierResolveKey
-    entries: dict[CoursierLockfileEntry, ClasspathEntry]
-    merged_digest: Digest
-
-
-@rule
-async def collect_thirdparty_modules(
-    request: ThirdpartyModulesRequest,
-    classpath_entry_request: ClasspathEntryRequestFactory,
-) -> ThirdpartyModules:
-    coarsened_targets = await coarsened_targets_get(**implicitly(request.addresses))
-    resolve = await select_coursier_resolve_for_targets(coarsened_targets, **implicitly())
-    lockfile = await get_coursier_lockfile_for_resolve(resolve)
-
-    applicable_lockfile_entries: dict[CoursierLockfileEntry, CoarsenedTarget] = {}
-    for ct in coarsened_targets.coarsened_closure():
-        for tgt in ct.members:
-            if not JvmArtifactFieldSet.is_applicable(tgt):
-                continue
-
-            artifact_requirement = ArtifactRequirement.from_jvm_artifact_target(tgt)
-            entry = get_entry_for_coord(lockfile, artifact_requirement.coordinate)
-            if not entry:
-                _logger.warning(
-                    f"No lockfile entry for {artifact_requirement.coordinate} in resolve {resolve.name}."
-                )
-                continue
-            applicable_lockfile_entries[entry] = ct
-
-    fallible_classpath_entries = await concurrently(
-        get_fallible_classpath_entry(
-            **implicitly(
-                {
-                    classpath_entry_request.for_targets(
-                        component=target, resolve=resolve
-                    ): ClasspathEntryRequest
-                }
-            )
-        )
-        for target in applicable_lockfile_entries.values()
-    )
-    classpath_entries = await concurrently(
-        required_classfiles(fce) for fce in fallible_classpath_entries
-    )
-
-    resolve_digest = await merge_digests(MergeDigests(cpe.digest for cpe in classpath_entries))
-
-    return ThirdpartyModules(
-        resolve,
-        dict(zip(applicable_lockfile_entries, classpath_entries)),
-        resolve_digest,
-    )
 
 
 async def _materialize_scala_runtime_jars(scala_version: ScalaVersion) -> Snapshot:
@@ -497,8 +409,13 @@ async def bsp_scala_test_classes_request(request: ScalaTestClassesParams) -> Sca
 
 
 # -----------------------------------------------------------------------------------------------
-# Dependency Modules
+# Dependency Modules / Sources
 # -----------------------------------------------------------------------------------------------
+# The bodies live in `pants.jvm.bsp.dependencies` so that any JVM language
+# backend (Java, Scala, ...) can register a `BSPDependencyModulesRequest` /
+# `BSPDependencySourcesRequest` union member that delegates here. The Scala-
+# specific request types below just bind `field_set_type` to the Scala field
+# set; the @rule body is a one-liner.
 
 
 @dataclass(frozen=True)
@@ -506,210 +423,12 @@ class ScalaBSPDependencyModulesRequest(BSPDependencyModulesRequest):
     field_set_type = ScalaMetadataFieldSet
 
 
-def get_entry_for_coord(
-    lockfile: CoursierResolvedLockfile, coord: Coordinate
-) -> CoursierLockfileEntry | None:
-    # Match on (group, artifact, classifier) only — Coursier resolves a single
-    # version per (group, artifact, classifier) and may coerce upward from the
-    # BUILD-declared version when a transitive dep requires a newer version
-    # (e.g. BUILD pins commons-codec:1.18.0 but a sibling artifact transitively
-    # requires 1.19.0, so the lockfile records 1.19.0). The lockfile is the
-    # source of truth for what's on the classpath, so we want to find the
-    # entry regardless of the BUILD-declared version. Mirrors the dedup key
-    # used by `CoursierResolvedLockfile.{direct_dependencies,dependencies}`
-    # in pants/jvm/resolve/coursier_fetch.py.
-    for entry in lockfile.entries:
-        if (
-            entry.coord.group == coord.group
-            and entry.coord.artifact == coord.artifact
-            and entry.coord.classifier == coord.classifier
-        ):
-            return entry
-    return None
-
-
 @rule
 async def scala_bsp_dependency_modules(
     request: ScalaBSPDependencyModulesRequest,
     build_root: BuildRoot,
 ) -> BSPDependencyModulesResult:
-    thirdparty_modules = await collect_thirdparty_modules(
-        ThirdpartyModulesRequest(Addresses(fs.address for fs in request.field_sets)), **implicitly()
-    )
-    resolve = thirdparty_modules.resolve
-
-    resolve_digest = await add_prefix(
-        AddPrefix(thirdparty_modules.merged_digest, f"jvm/resolves/{resolve.name}/lib")
-    )
-
-    modules = [
-        DependencyModule(
-            name=f"{entry.coord.group}:{entry.coord.artifact}",
-            version=entry.coord.version,
-            data=MavenDependencyModule(
-                organization=entry.coord.group,
-                name=entry.coord.artifact,
-                version=entry.coord.version,
-                scope=None,
-                artifacts=tuple(
-                    MavenDependencyModuleArtifact(
-                        uri=build_root.pathlib_path.joinpath(
-                            f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{filename}"
-                        ).as_uri()
-                    )
-                    for filename in cp_entry.filenames
-                ),
-            ),
-        )
-        for entry, cp_entry in thirdparty_modules.entries.items()
-    ]
-
-    return BSPDependencyModulesResult(
-        modules=tuple(modules),
-        digest=resolve_digest,
-    )
-
-
-# -----------------------------------------------------------------------------------------------
-# Dependency Sources
-# -----------------------------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class FetchOneCoordRequest:
-    """Fetch a single Maven coord intransitively (no lockfile verification).
-
-    Unlike `pants.jvm.resolve.coursier_fetch.coursier_fetch_one_coord`, this
-    does NOT require a pre-existing `CoursierLockfileEntry` — the file digest
-    is captured from the live coursier fetch rather than verified against a
-    known-good one. Designed for one-off artifacts (e.g. source jars) that
-    callers fetch outside the resolve's lockfile pipeline, where the lockfile
-    does not record file digests for the sources counterpart.
-    """
-
-    coord: Coordinate
-
-
-@dataclass(frozen=True)
-class FetchOneCoordResult:
-    coord: Coordinate
-    # `None` when the artifact isn't published or the fetch fails (e.g. a
-    # third-party lib that doesn't ship a `-sources.jar`). Callers should
-    # treat a `None` here as "no sources available" rather than an error.
-    classpath_entry: ClasspathEntry | None
-
-
-@rule
-async def fetch_one_coord(request: FetchOneCoordRequest) -> FetchOneCoordResult:
-    req = ArtifactRequirement(request.coord)
-    coursier_resolve_info = await prepare_coursier_resolve_info(ArtifactRequirements([req]))
-
-    coursier_report_file_name = "coursier_report.json"
-
-    process_result = await execute_process(
-        **implicitly(
-            CoursierFetchProcess(
-                args=(
-                    coursier_report_file_name,
-                    "--intransitive",
-                    *coursier_resolve_info.argv,
-                ),
-                input_digest=coursier_resolve_info.digest,
-                output_directories=("classpath",),
-                output_files=(coursier_report_file_name,),
-                description=f"Fetching with coursier: {request.coord.to_coord_str()}",
-            )
-        )
-    )
-    if process_result.exit_code != 0:
-        _logger.debug(
-            "fetch_one_coord(%s): exit=%d stderr=%r",
-            request.coord.to_coord_arg_str(),
-            process_result.exit_code,
-            process_result.stderr.decode("utf-8", "replace")[:500],
-        )
-        return FetchOneCoordResult(coord=request.coord, classpath_entry=None)
-
-    report_digest = await digest_subset_to_digest(
-        DigestSubset(process_result.output_digest, PathGlobs([coursier_report_file_name]))
-    )
-    report_contents = await get_digest_contents(report_digest)
-    report = json.loads(report_contents[0].content)
-
-    report_deps = report.get("dependencies") or []
-    if len(report_deps) == 0:
-        return FetchOneCoordResult(coord=request.coord, classpath_entry=None)
-    dep = report_deps[0]
-    file_path = dep.get("file")
-    if not file_path:
-        return FetchOneCoordResult(coord=request.coord, classpath_entry=None)
-
-    classpath_dest_name = classpath_dest_filename(dep["coord"], file_path)
-    classpath_dest = f"classpath/{classpath_dest_name}"
-
-    resolved_file_digest = await digest_subset_to_digest(
-        DigestSubset(process_result.output_digest, PathGlobs([classpath_dest]))
-    )
-    stripped_digest = await remove_prefix(RemovePrefix(resolved_file_digest, "classpath"))
-
-    return FetchOneCoordResult(
-        coord=request.coord,
-        classpath_entry=ClasspathEntry(digest=stripped_digest, filenames=(classpath_dest_name,)),
-    )
-
-
-@dataclass(frozen=True)
-class ThirdpartySourceJarsRequest:
-    """Companion to `ThirdpartyModulesRequest`, fetches `*-sources.jar` artifacts.
-
-    Sources are fetched out-of-band (not through the resolve lockfile), so
-    callers should treat missing entries as "no source jar published" rather
-    than an error.
-    """
-
-    addresses: Addresses
-
-
-@dataclass(frozen=True)
-class ThirdpartySourceJars:
-    resolve: CoursierResolveKey
-    # Map: lockfile entry of the binary jar -> sources ClasspathEntry, or None
-    # when the artifact has no `-sources.jar` published.
-    entries: dict[CoursierLockfileEntry, ClasspathEntry | None]
-    merged_digest: Digest
-
-
-@rule
-async def collect_thirdparty_source_jars(
-    request: ThirdpartySourceJarsRequest,
-) -> ThirdpartySourceJars:
-    thirdparty_modules = await collect_thirdparty_modules(
-        ThirdpartyModulesRequest(request.addresses), **implicitly()
-    )
-
-    # For each binary jar's coord, rewrite the classifier to "sources" and fetch.
-    sources_coords = [
-        dataclasses.replace(entry.coord, classifier="sources")
-        for entry in thirdparty_modules.entries
-    ]
-    results = await concurrently(
-        fetch_one_coord(FetchOneCoordRequest(coord=coord)) for coord in sources_coords
-    )
-
-    entries: dict[CoursierLockfileEntry, ClasspathEntry | None] = {}
-    digests: list[Digest] = []
-    for lockfile_entry, result in zip(thirdparty_modules.entries, results):
-        entries[lockfile_entry] = result.classpath_entry
-        if result.classpath_entry is not None:
-            digests.append(result.classpath_entry.digest)
-
-    merged = await merge_digests(MergeDigests(digests)) if digests else EMPTY_DIGEST
-
-    return ThirdpartySourceJars(
-        resolve=thirdparty_modules.resolve,
-        entries=entries,
-        merged_digest=merged,
-    )
+    return await _jvm_bsp_dependency_modules(request, build_root)
 
 
 @dataclass(frozen=True)
@@ -722,21 +441,7 @@ async def scala_bsp_dependency_sources(
     request: ScalaBSPDependencySourcesRequest,
     build_root: BuildRoot,
 ) -> BSPDependencySourcesResult:
-    addresses = Addresses(fs.address for fs in request.field_sets)
-    source_jars = await collect_thirdparty_source_jars(ThirdpartySourceJarsRequest(addresses))
-    resolve = source_jars.resolve
-    sources_prefix = f"jvm/resolves/{resolve.name}/sources"
-
-    digest = await add_prefix(AddPrefix(source_jars.merged_digest, sources_prefix))
-
-    source_uris = tuple(
-        build_root.pathlib_path.joinpath(f".pants.d/bsp/{sources_prefix}/{filename}").as_uri()
-        for cp_entry in source_jars.entries.values()
-        if cp_entry is not None
-        for filename in cp_entry.filenames
-    )
-
-    return BSPDependencySourcesResult(sources=source_uris, digest=digest)
+    return await _jvm_bsp_dependency_sources(request, build_root)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -780,6 +485,7 @@ def rules():
     base_rules = (
         *collect_rules(),
         *jvm_compile_rules(),
+        *jvm_dependencies_rules(),
         *jvm_resources_rules(),
         UnionRule(BSPLanguageSupport, ScalaBSPLanguageSupport),
         UnionRule(BSPBuildTargetsMetadataRequest, ScalaBSPBuildTargetsMetadataRequest),

@@ -75,15 +75,12 @@ async def notify_for_classpath_entry(
 def _first_occurrence_file_entries(
     per_classpath_entries: Iterable[Iterable[object]],
 ) -> list[FileEntry]:
-    """Pure-logic helper: walk per-classpath-entry digest contents (each a
+    """Walk per-classpath-entry digest contents (each a
     sequence of ``FileEntry`` / ``SymlinkEntry`` / ``Directory``) and return a
     flat list of ``FileEntry`` values keeping the first occurrence per path.
     Non-``FileEntry`` items are dropped — they're either implicit directory
     parents (re-created by ``CreateDigest``) or symlinks not produced by the
     JVM compile path.
-
-    Split out so we can unit-test the dedup decision without spinning up a
-    RuleRunner.
     """
     seen_paths: set[str] = set()
     kept: list[FileEntry] = []

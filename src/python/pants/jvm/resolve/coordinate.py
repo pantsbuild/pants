@@ -7,6 +7,12 @@ from dataclasses import dataclass
 
 from pants.engine.collection import DeduplicatedCollection
 
+# Well-known Coursier classifiers. Use these constants instead of bare string
+# literals when constructing coords for non-default artifacts (sources jars
+# etc.) so the wiring is greppable and a future javadoc classifier slots in
+# next to it.
+SOURCES_CLASSIFIER = "sources"
+
 
 class InvalidCoordinateString(Exception):
     """The coordinate string being passed is invalid or malformed."""
