@@ -164,16 +164,21 @@ def parse_jre_major_version(version_lines: str) -> int | None:
 
 
 @rule
-async def fetch_nailgun() -> Nailgun:
+async def fetch_nailgun(jvm: JvmSubsystem) -> Nailgun:
+    group = jvm.nailgun_group
+    artifact = jvm.nailgun_artifact
+    version = jvm.nailgun_version
+    coord_str = f"{group}:{artifact}:{version}"
+    file_name = f"{group}_{artifact}_{version}.jar"
     nailgun = await coursier_fetch_one_coord(
         CoursierLockfileEntry(
-            coord=Coordinate.from_coord_str("com.martiansoftware:nailgun-server:0.9.1"),
-            file_name="com.martiansoftware_nailgun-server_0.9.1.jar",
+            coord=Coordinate.from_coord_str(coord_str),
+            file_name=file_name,
             direct_dependencies=Coordinates(),
             dependencies=Coordinates(),
             file_digest=FileDigest(
-                fingerprint="4518faa6bf4bd26fccdc4d85e1625dc679381a08d56872d8ad12151dda9cef25",
-                serialized_bytes_length=32927,
+                fingerprint=jvm.nailgun_sha256,
+                serialized_bytes_length=jvm.nailgun_size,
             ),
         )
     )
@@ -437,6 +442,9 @@ async def jvm_process(
     use_nailgun = []
     if request.use_nailgun:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
+        if jvm.nailgun_enable_agent:
+            jvm_options.append(f"-javaagent:{request.jdk.nailgun_jar}")
+        env["PANTS_NAILGUN_MAIN_CLASS"] = jvm.nailgun_main_class
 
     remote_cache_speculation_delay_millis = 0
     if request.remote_cache_speculation_delay is not None:

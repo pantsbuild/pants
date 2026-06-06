@@ -175,3 +175,45 @@ class JvmSubsystem(Subsystem):
         if eligible and self.intermediate_jars_remote_cache:
             return ProcessCacheScope.SUCCESSFUL
         return ProcessCacheScope.LOCAL_SUCCESSFUL
+
+    nailgun_group = StrOption(
+        default="com.martiansoftware",
+        help="The Maven group ID for the Nailgun server.",
+        advanced=True,
+    )
+
+    nailgun_artifact = StrOption(
+        default="nailgun-server",
+        help="The Maven artifact ID for the Nailgun server.",
+        advanced=True,
+    )
+
+    nailgun_version = StrOption(
+        default="0.9.1",
+        help="The Maven version for the Nailgun server.",
+        advanced=True,
+    )
+
+    nailgun_main_class = StrOption(
+        default="com.martiansoftware.nailgun.NGServer",
+        help="The main class entry point for the Nailgun server.",
+        advanced=True,
+    )
+
+    nailgun_enable_agent = BoolOption(
+        default=False,
+        help="If enabled, start the Nailgun server with itself as a Java Agent.",
+        advanced=True,
+    )
+
+    nailgun_sha256 = StrOption(
+        default="4518faa6bf4bd26fccdc4d85e1625dc679381a08d56872d8ad12151dda9cef25",
+        help="The SHA256 fingerprint of the Nailgun server JAR.",
+        advanced=True,
+    )
+
+    nailgun_size = IntOption(
+        default=32927,
+        help="The size in bytes of the Nailgun server JAR.",
+        advanced=True,
+    )
