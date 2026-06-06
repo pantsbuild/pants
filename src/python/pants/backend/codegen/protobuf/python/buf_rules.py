@@ -178,6 +178,16 @@ async def generate_python_from_protobuf_via_buf(
     template_path = resolved_template_path(target, buf)
     template_arg = ["--template", template_path] if template_path else []
 
+    # Read the same switch that shapes the sandbox so the two can't disagree.
+    # Inference on: the sandbox holds only this target's declared imports, so
+    # `--path` scopes generation to its files. Inference off: every sandbox holds
+    # the full proto tree, so we drop `--path` and let each invocation emit the
+    # whole package — identical bytes that `MergeDigests` can dedupe (e.g.
+    # betterproto2's one `__init__.py` per package).
+    path_arg = (
+        ["--path", ",".join(target_sources.snapshot.files)] if protoc.dependency_inference else []
+    )
+
     argv = [
         downloaded_buf.exe,
         "generate",
@@ -186,8 +196,7 @@ async def generate_python_from_protobuf_via_buf(
         "--output",
         output_dir,
         *buf.gen_args,
-        "--path",
-        ",".join(target_sources.snapshot.files),
+        *path_arg,
     ]
 
     # Expose `protoc` (and any plugin binaries co-located with it) on PATH so
