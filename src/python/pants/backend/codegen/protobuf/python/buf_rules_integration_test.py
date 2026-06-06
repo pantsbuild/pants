@@ -357,6 +357,62 @@ def test_buf_isolates_per_proto_within_one_build_file(rule_runner: RuleRunner) -
 
 
 @pytest.mark.platform_specific_behavior
+def test_buf_generates_full_tree_when_dependency_inference_off(rule_runner: RuleRunner) -> None:
+    """With `[protoc].dependency_inference` off, `buf generate` drops `--path` and
+    runs against the full proto tree, so every per-target invocation produces the
+    same complete output set.
+
+    This is what lets plugins that emit package-level files (e.g. betterproto2's
+    one `__init__.py` per package) generate identical, dedupeable bytes regardless
+    of which sibling target triggered the run. Here we verify the general
+    mechanism: generating for a single proto yields *both* siblings' outputs
+    because `--path` is no longer scoping the run."""
+    address_proto = dedent(
+        """\
+        syntax = "proto3";
+        package foo;
+        message Address {
+          string street = 1;
+        }
+        """
+    )
+    rule_runner.write_files(
+        {
+            "buf.yaml": BUF_YAML,
+            "buf.gen.yaml": BUF_GEN_YAML,
+            "idl/proto/foo/person.proto": SIMPLE_PROTO,
+            "idl/proto/foo/address.proto": address_proto,
+            "idl/proto/foo/BUILD": "protobuf_sources(protobuf_generator='buf')",
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['idl/proto', 'src/proto']",
+            "--no-python-protobuf-infer-runtime-dependency",
+            # Inference off -> `add_dependencies_on_all_siblings` on -> full tree in
+            # each sandbox -> buf rule drops `--path`.
+            "--no-protoc-dependency-inference",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    person_tgt = rule_runner.get_target(Address("idl/proto/foo", relative_file_path="person.proto"))
+    person_hydrated = rule_runner.request(
+        HydratedSources, [HydrateSourcesRequest(person_tgt[ProtobufSourceField])]
+    )
+    generated = rule_runner.request(
+        GeneratedSources,
+        [GeneratePythonFromProtobufRequest(person_hydrated.snapshot, person_tgt)],
+    )
+    # No `--path`, so generating for `person` emits the whole package, not just
+    # `person_pb2.py`.
+    assert set(generated.snapshot.files) == {
+        "src/proto/foo/person_pb2.py",
+        "src/proto/foo/address_pb2.py",
+    }
+
+
+@pytest.mark.platform_specific_behavior
 def test_buf_codegen_fails_without_buf_lock_when_deps_declared(
     rule_runner: RuleRunner,
 ) -> None:

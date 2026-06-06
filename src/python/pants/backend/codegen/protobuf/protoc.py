@@ -5,6 +5,7 @@ from pants.core.util_rules.external_tool import TemplatedExternalTool
 from pants.engine.platform import Platform
 from pants.engine.unions import UnionRule
 from pants.option.option_types import BoolOption
+from pants.util.strutil import softwrap
 
 
 class Protoc(TemplatedExternalTool):
@@ -45,7 +46,16 @@ class Protoc(TemplatedExternalTool):
 
     dependency_inference = BoolOption(
         default=True,
-        help="Infer Protobuf dependencies on other Protobuf files by analyzing import statements.",
+        help=softwrap(
+            """
+            Infer Protobuf dependencies on other Protobuf files by analyzing import
+            statements.
+
+            For buf-based code generation (`protobuf_generator='buf'`), this also
+            scopes `buf generate` to each target's own files when enabled, or runs
+            it against the full proto tree when disabled.
+            """
+        ),
     )
     tailor = BoolOption(
         default=True,
