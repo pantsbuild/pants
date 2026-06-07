@@ -813,6 +813,9 @@ async def build_pex(
             VenvFromUvLockfileRequest(
                 lockfile=requirements_setup.uv_lockfile,
                 python=pex_python_setup.python,
+                # For PexRequirements, install only the needed subset rather than the full resolve.
+                # req_strings is empty for the EntireLockfile case.
+                req_strings=req_strings,
             ),
             **implicitly(),
         )

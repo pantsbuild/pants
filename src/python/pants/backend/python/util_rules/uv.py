@@ -58,10 +58,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class VenvFromUvLockfileRequest:
-    """Request to install all packages from a uv lockfile into a virtualenv."""
+    """Request to install packages from a uv lockfile into a virtualenv.
+
+    If req_strings is non-empty, only those packages and their transitive deps are installed
+    via a dependency group, avoiding materializing the full resolve on cold caches.
+    If req_strings is empty, all packages in the resolve are installed.
+    """
 
     lockfile: LoadedLockfile
     python: PythonExecutable
+    req_strings: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -118,14 +124,19 @@ async def get_uv_environment(
 # The synthetic project name (pants-lockfile-for-*) must not collide with any real requirement.
 # uv will include this project as a virtual package in the lockfile, and we set package = false,
 # so it won't try to install it.
-def generate_pyproject_toml(resolve: str, ics: InterpreterConstraints, reqs: Iterable[str]) -> str:
+def generate_pyproject_toml(
+    resolve: str,
+    ics: InterpreterConstraints,
+    reqs: Iterable[str],
+    subset_group: Iterable[str] | None = None,
+) -> str:
     def escape_double_quotes(s: str) -> str:
         return s.replace('"', '\\"')
 
     requires_python = ",".join(str(constraint.specifier) for constraint in ics)
     deps_lines = "\n".join(f'    "{escape_double_quotes(r)}",' for r in sorted(reqs))
 
-    return dedent(
+    result = dedent(
         """
         [project]
         name = "pants-lockfile-for-{resolve}"
@@ -139,6 +150,21 @@ def generate_pyproject_toml(resolve: str, ics: InterpreterConstraints, reqs: Ite
         package = false
         """
     ).format(resolve=resolve, requires_python=requires_python, deps_lines=deps_lines)
+
+    if subset_group is not None:
+        group_lines = "\n".join(
+            f'    "{escape_double_quotes(r)}",' for r in sorted(subset_group)
+        )
+        result += dedent(
+            """
+            [dependency-groups]
+            pants-subset = [
+            {group_lines}
+            ]
+            """
+        ).format(group_lines=group_lines)
+
+    return result
 
 
 @rule
@@ -165,10 +191,12 @@ async def create_venv_repository_from_uv_lockfile(
         )
     metadata: PythonLockfileMetadataV8 = cast(PythonLockfileMetadataV8, request.lockfile.metadata)
 
+    is_subset = bool(request.req_strings)
     pyproject_content = generate_pyproject_toml(
         metadata.resolve,
         metadata.valid_for_interpreter_constraints,
         tuple(str(req) for req in metadata.requirements),
+        subset_group=request.req_strings if is_subset else None,
     )
 
     uv_config_digest, uv_lock_contents = await concurrently(
@@ -198,28 +226,60 @@ async def create_venv_repository_from_uv_lockfile(
     )
 
     buildroot_entropy = hashlib.sha256(buildroot.path.encode()).hexdigest()
-    venv_repository = VenvRepository(
-        # We maintain one cached venv per buildroot+interpreter+resolve. uv will efficiently incrementally
-        # update the venv as the lockfile changes, and will handle concurrency of `uv sync` with
-        # appropriate locking.
-        venv_path_suffix=os.path.join(
+    if is_subset:
+        # One venv per buildroot+interpreter+resolve+subset so different targets don't collide.
+        subset_hash = hashlib.sha256(
+            "|".join(sorted(request.req_strings)).encode()
+        ).hexdigest()[:16]
+        venv_path_suffix = os.path.join(
+            buildroot_entropy, metadata.resolve, request.python.fingerprint, subset_hash
+        )
+        # uv requires the dependency group to be present in the lock before --only-group can be
+        # used. We run `uv lock` first (fast: just adds group metadata, no network downloads
+        # needed since the packages are already resolved) then sync only the group.
+        uv_lock_cmd = shlex.join(
+            (*downloaded_uv.args(), "lock", "--no-progress")
+        )
+        uv_sync_cmd = shlex.join(
+            (
+                *downloaded_uv.args(),
+                "sync",
+                "--only-group",
+                "pants-subset",
+                "--frozen",
+                "--no-install-project",
+                "--no-progress",
+                "--python",
+                request.python.path,
+            )
+        )
+        sync_script = f"{uv_lock_cmd} && {uv_sync_cmd}"
+        description = f"Create subset venv for {sorted(request.req_strings)} from uv lockfile at {request.lockfile.lockfile_path}"
+    else:
+        venv_path_suffix = os.path.join(
             buildroot_entropy, metadata.resolve, request.python.fingerprint
         )
+        sync_script = shlex.join(
+            (
+                *downloaded_uv.args(),
+                "sync",
+                "--frozen",
+                "--no-install-project",
+                # TODO: extras can conflict, so we might need to be more selective.
+                "--all-extras",
+                "--no-progress",
+                "--python",
+                request.python.path,
+            )
+        )
+        description = f"Create venv from uv lockfile at {request.lockfile.lockfile_path}"
+
+    venv_repository = VenvRepository(
+        # uv will efficiently incrementally update the venv as the lockfile changes, and will
+        # handle concurrency of `uv sync` with appropriate locking.
+        venv_path_suffix=venv_path_suffix
     )
 
-    uv_cmd = shlex.join(
-        (
-            *downloaded_uv.args(),
-            "sync",
-            "--frozen",
-            "--no-install-project",
-            # TODO: extras can conflict, so we might need to be more selective.
-            "--all-extras",
-            "--no-progress",
-            "--python",
-            request.python.path,
-        )
-    )
     # We use `realpath` to resolve the named cache symlink to an absolute path in whatever
     # environment this process runs in. This gives uv a stable absolute path for the venv
     # so that any entry point scripts it creates exec a valid path that doesn't reference
@@ -227,7 +287,8 @@ async def create_venv_repository_from_uv_lockfile(
     script = dedent(
         f"""\
         cache_root="$({realpath_binary.path} {shlex.quote(venv_repository.cache_dir)})"
-        UV_PROJECT_ENVIRONMENT="${{cache_root}}/{venv_repository.venv_path_suffix}" {uv_cmd}
+        export UV_PROJECT_ENVIRONMENT="${{cache_root}}/{venv_repository.venv_path_suffix}"
+        {sync_script}
         """
     )
     await execute_process_or_raise(
@@ -241,7 +302,7 @@ async def create_venv_repository_from_uv_lockfile(
                     **venv_repository.append_only_caches(),
                 },
                 level=LogLevel.INFO,
-                description=f"Create venv from uv lockfile at {request.lockfile.lockfile_path}",
+                description=description,
                 # TODO: We might need to set cache_scope=ProcessCacheScope.PER_SESSION if
                 #  running in a non-local environment (e.g., a docker environment), as we're
                 #  less sure that a venv created by a previous run still exists. For example
