@@ -236,33 +236,6 @@ async def create_venv_repository_from_uv_lockfile(
         ),
     )
 
-    # await execute_process_or_raise(
-    #     **implicitly(
-    #         Process(
-    #             argv=(bash_binary.path, "-c", script),
-    #             input_digest=input_digest,
-    #             env=uv_env.env,
-    #             append_only_caches={
-    #                 **downloaded_uv.append_only_caches(),
-    #                 **venv_repository.append_only_caches(),
-    #             },
-    #             level=LogLevel.INFO,
-    #             description=f"Create venv from uv lockfile at {request.lockfile.lockfile_path}",
-    #             # TODO: We might need to set cache_scope=ProcessCacheScope.PER_SESSION if
-    #             #  running in a non-local environment (e.g., a docker environment), as we're
-    #             #  less sure that a venv created by a previous run still exists. For example
-    #             #  the docker container might have been recreated. However this impacts performance
-    #             #  in the overwhelmingly common local run case. Alternatively we can look at
-    #             #  creating the uv venv in the same Process as whatever is consuming it, which
-    #             #  would ensure availability even in a completely ephemeral remote environment
-    #             #  where we can't guarantee that the venv exists even in the same Pants run.
-    #             #  But that is a more general issue and a much bigger change.
-    #         )
-    #     )
-    # )
-
-    # return venv_repository
-
 
 def rules():
     return [
