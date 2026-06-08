@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from pants.engine.process import ProcessCacheScope
 from pants.option.option_types import BoolOption, DictOption, IntOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import help_text, softwrap
@@ -137,3 +138,40 @@ class JvmSubsystem(Subsystem):
         ),
         advanced=True,
     )
+
+    intermediate_jars_remote_cache = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            If intermediate jars produced by compiling jvm targets should be remote cached.
+
+            This is a trade off between forking short-lived processes for each compiled target
+            and remote cache overhead.
+            """
+        ),
+        advanced=True,
+    )
+
+    intermediate_jars_remote_cache_speculation_delay = IntOption(
+        default=100,
+        help=softwrap(
+            """
+            The time in milliseconds to delay speculation of creating intermediate jars while
+            reading from the remote cache.
+
+            Tuning this can allow for reducing the amount of short-lived processes forked for
+            each compiled target when they are cached remotely.
+            """
+        ),
+        advanced=True,
+    )
+
+    @property
+    def intermediate_jar_cache_scope(self) -> ProcessCacheScope:
+        return self.intermediate_jar_cache_scope_for(eligible=True)
+
+    def intermediate_jar_cache_scope_for(self, *, eligible: bool) -> ProcessCacheScope:
+        """Derives the correct cache scope based on global config and local eligibility."""
+        if eligible and self.intermediate_jars_remote_cache:
+            return ProcessCacheScope.SUCCESSFUL
+        return ProcessCacheScope.LOCAL_SUCCESSFUL
