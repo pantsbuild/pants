@@ -28,8 +28,10 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
+    CreateDigest,
     Digest,
     DigestSubset,
+    FileContent,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
@@ -38,6 +40,7 @@ from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import (
     add_prefix,
+    create_digest,
     digest_subset_to_digest,
     execute_process,
     get_digest_contents,
@@ -271,6 +274,46 @@ class ThirdpartySourceJars:
     merged_digest: Digest
 
 
+def _sources_jar_basename(coord: Coordinate) -> str:
+    """Source-jar filename in a format the IntelliJ-Scala BSP plugin pairs with the
+    binary jar.
+
+    `bsp-builtin/.../BspResolverLogic.scala` matches source jars to binaries via
+    `libraryPrefix(path)` — full canonical path, with `.jar`, `-sources`/`-src`,
+    `-javadoc` stripped — then finds the source jar via
+    `sourcesSuffixes.exists(fileName.contains)`. So the source jar must (a)
+    contain literal `-sources` in its basename and (b) share the binary's path
+    prefix once `-sources.jar` is stripped. We mirror the binary's underscore-
+    coord scheme (`classpath_dest_filename` in `pants/jvm/resolve/coursier_fetch.py`)
+    and append `-sources`.
+    """
+    return f"{coord.group}_{coord.artifact}_{coord.version}-sources.jar"
+
+
+async def _rename_single_file_in_classpath_entry(
+    entry: ClasspathEntry, new_basename: str
+) -> ClasspathEntry:
+    """Return a new ClasspathEntry whose single file is renamed to `new_basename`.
+
+    Used to relabel source jars emitted by `fetch_one_coord` (which names them
+    after Coursier's JSON-report coord — `{group}_{artifact}_jar_sources_{version}.jar`)
+    to the `-sources.jar` suffix IntelliJ-Scala BSP recognises.
+    """
+    contents = await get_digest_contents(entry.digest)
+    if len(contents) != 1:
+        raise AssertionError(
+            f"Expected exactly one file in source-jar ClasspathEntry, got {len(contents)}: "
+            f"{[fc.path for fc in contents]}"
+        )
+    (file_content,) = contents
+    if file_content.path == new_basename:
+        return entry
+    renamed_digest = await create_digest(
+        CreateDigest([FileContent(new_basename, file_content.content)])
+    )
+    return ClasspathEntry(digest=renamed_digest, filenames=(new_basename,))
+
+
 @rule
 async def collect_thirdparty_source_jars(
     request: ThirdpartySourceJarsRequest,
@@ -288,12 +331,32 @@ async def collect_thirdparty_source_jars(
         fetch_one_coord(FetchOneCoordRequest(coord=coord)) for coord in sources_coords
     )
 
+    # Rename each fetched source jar to `{group}_{artifact}_{version}-sources.jar`
+    # so IntelliJ-Scala pairs it with the binary jar. Done concurrently.
+    rename_targets: list[tuple[CoursierLockfileEntry, ClasspathEntry]] = []
+    for lockfile_entry, result in zip(thirdparty_modules.entries, results):
+        if result.classpath_entry is not None:
+            rename_targets.append((lockfile_entry, result.classpath_entry))
+
+    renamed_entries = await concurrently(
+        _rename_single_file_in_classpath_entry(
+            cp_entry, _sources_jar_basename(lockfile_entry.coord)
+        )
+        for lockfile_entry, cp_entry in rename_targets
+    )
+    renamed_by_lockfile_entry = dict(
+        zip((lfe for lfe, _ in rename_targets), renamed_entries)
+    )
+
     entries: dict[CoursierLockfileEntry, ClasspathEntry | None] = {}
     digests: list[Digest] = []
     for lockfile_entry, result in zip(thirdparty_modules.entries, results):
-        entries[lockfile_entry] = result.classpath_entry
-        if result.classpath_entry is not None:
-            digests.append(result.classpath_entry.digest)
+        if result.classpath_entry is None:
+            entries[lockfile_entry] = None
+            continue
+        renamed = renamed_by_lockfile_entry[lockfile_entry]
+        entries[lockfile_entry] = renamed
+        digests.append(renamed.digest)
 
     merged = await merge_digests(MergeDigests(digests)) if digests else EMPTY_DIGEST
 
@@ -365,7 +428,10 @@ async def _jvm_bsp_dependency_sources(
     addresses = Addresses(fs.address for fs in request.field_sets)
     source_jars = await collect_thirdparty_source_jars(ThirdpartySourceJarsRequest(addresses))
     resolve = source_jars.resolve
-    sources_prefix = f"jvm/resolves/{resolve.name}/sources"
+    # Co-locate source jars under `lib/` next to the binary jars emitted by
+    # `_jvm_bsp_dependency_modules`. The IntelliJ-Scala BSP plugin pairs source
+    # and binary by full canonical path prefix, so they must share a directory.
+    sources_prefix = f"jvm/resolves/{resolve.name}/lib"
 
     digest = await add_prefix(AddPrefix(source_jars.merged_digest, sources_prefix))
 

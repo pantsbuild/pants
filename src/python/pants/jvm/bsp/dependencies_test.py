@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pants.engine.internals.native_engine import FileDigest
-from pants.jvm.bsp.dependencies import get_entry_for_coord
+from pants.jvm.bsp.dependencies import _sources_jar_basename, get_entry_for_coord
 from pants.jvm.resolve.coordinate import SOURCES_CLASSIFIER, Coordinate, Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, CoursierResolvedLockfile
 
@@ -71,3 +71,29 @@ def test_get_entry_for_coord_distinguishes_classifier() -> None:
     )
     binary_coord = Coordinate(group="org.scala-lang", artifact="scala-library", version="2.13.18")
     assert get_entry_for_coord(lockfile, binary_coord) is None
+
+
+def test_sources_jar_basename_pairs_with_binary_via_libraryPrefix() -> None:
+    """The IntelliJ-Scala BSP plugin (`bsp-builtin/.../BspResolverLogic.scala`)
+    pairs source jars to binaries by stripping `.jar`, `-sources`/`-src`,
+    `-javadoc` from the full canonical path and grouping by the result, with
+    `sourcesSuffixes.exists(fileName.contains)` selecting the source jar.
+
+    For the pairing to succeed:
+      1. the source basename must contain literal `-sources` (not `_sources_`);
+      2. after stripping `-sources.jar`, the source's full path must equal the
+         binary's full path with `.jar` stripped.
+
+    `classpath_dest_filename` produces the binary as
+    `{group}_{artifact}_{version}.jar`; this function produces the matching
+    source name.
+    """
+    coord = Coordinate(group="dev.zio", artifact="zio_2.13", version="2.1.14")
+    basename = _sources_jar_basename(coord)
+
+    assert basename == "dev.zio_zio_2.13_2.1.14-sources.jar"
+    # Property 1: contains literal `-sources`.
+    assert "-sources" in basename
+    # Property 2: stripping `-sources.jar` yields the binary basename minus `.jar`.
+    binary_stem = f"{coord.group}_{coord.artifact}_{coord.version}"
+    assert basename.removesuffix("-sources.jar") == binary_stem
