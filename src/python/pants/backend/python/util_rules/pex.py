@@ -34,7 +34,12 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_metadata import (
     LockfileFormat,
 )
-from pants.backend.python.util_rules.pex_cli import PexCliProcess, PexPEX, maybe_log_pex_stderr
+from pants.backend.python.util_rules.pex_cli import (
+    PexCliProcess,
+    PexPEX,
+    maybe_log_pex_stderr,
+    setup_pex_cli_process,
+)
 from pants.backend.python.util_rules.pex_environment import (
     CompletePexEnvironment,
     PexEnvironment,
@@ -73,6 +78,7 @@ from pants.core.util_rules.stripped_source_files import rules as stripped_source
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.collection import Collection, DeduplicatedCollection
+from pants.engine.composite_process import CompositeProcess, composite_process_to_process
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import (
@@ -913,22 +919,29 @@ async def build_pex(
 
     argv.extend(["--layout", request.layout.value])
 
-    result = await fallible_to_exec_result_or_raise(
-        **implicitly(
-            PexCliProcess(
-                interpreter=interpreter,
-                subcommand=(),
-                extra_args=argv,
-                additional_input_digest=merged_digest,
-                description=_build_pex_description(request, req_strings, python_setup.resolves),
-                append_only_caches=venv_repo.append_only_caches() if venv_repo else None,
-                output_files=None,
-                output_directories=[output_chroot],
-                concurrency_available=requirements_setup.concurrency_available,
-                cache_scope=request.cache_scope,
-            )
-        )
+    pex_process = await setup_pex_cli_process(
+        PexCliProcess(
+            interpreter=interpreter,
+            subcommand=(),
+            extra_args=argv,
+            additional_input_digest=merged_digest,
+            description=_build_pex_description(request, req_strings, python_setup.resolves),
+            append_only_caches=venv_repo.append_only_caches() if venv_repo else None,
+            output_files=None,
+            output_directories=[output_chroot],
+            concurrency_available=requirements_setup.concurrency_available,
+            cache_scope=request.cache_scope,
+        ),
+        **implicitly(),
     )
+
+    if venv_repo:
+        composite_process = CompositeProcess.from_process(pex_process).prepend_subprocesses(
+            [venv_repo.creation_subprocess]
+        )
+        pex_process = await composite_process_to_process(composite_process, **implicitly())
+
+    result = await fallible_to_exec_result_or_raise(**implicitly(pex_process))
 
     maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 

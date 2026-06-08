@@ -31,7 +31,8 @@ from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
-from pants.core.util_rules.system_binaries import BashBinary, RealpathBinary
+from pants.core.util_rules.system_binaries import RealpathBinary
+from pants.engine.composite_process import Subprocess
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import (
     CreateDigest,
@@ -43,14 +44,9 @@ from pants.engine.intrinsics import (
     get_digest_contents,
     merge_digests,
 )
-from pants.engine.process import (
-    Process,
-    execute_process_or_raise,
-)
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
-from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -72,6 +68,7 @@ class VenvRepository:
     cache_dir: ClassVar[str] = f".cache/{cache_name}/"
 
     venv_path_suffix: str
+    creation_subprocess: Subprocess
 
     def relpath(self) -> str:
         # The path to the venv in any sandbox that has the venv_cache append-only cache.
@@ -146,7 +143,6 @@ async def create_venv_repository_from_uv_lockfile(
     request: VenvFromUvLockfileRequest,
     downloaded_uv: DownloadedUv,
     uv_env: UvEnvironment,
-    bash_binary: BashBinary,
     realpath_binary: RealpathBinary,
     buildroot: BuildRoot,
 ) -> VenvRepository:
@@ -197,15 +193,11 @@ async def create_venv_repository_from_uv_lockfile(
         )
     )
 
+    # We maintain one cached venv per buildroot+interpreter+resolve. uv will efficiently
+    # incrementally update the venv as the lockfile changes, and will handle concurrency of
+    # `uv sync` with appropriate locking.
     buildroot_entropy = hashlib.sha256(buildroot.path.encode()).hexdigest()
-    venv_repository = VenvRepository(
-        # We maintain one cached venv per buildroot+interpreter+resolve. uv will efficiently incrementally
-        # update the venv as the lockfile changes, and will handle concurrency of `uv sync` with
-        # appropriate locking.
-        venv_path_suffix=os.path.join(
-            buildroot_entropy, metadata.resolve, request.python.fingerprint
-        )
-    )
+    venv_path_suffix = os.path.join(buildroot_entropy, metadata.resolve, request.python.fingerprint)
 
     uv_cmd = shlex.join(
         (
@@ -224,38 +216,25 @@ async def create_venv_repository_from_uv_lockfile(
     # environment this process runs in. This gives uv a stable absolute path for the venv
     # so that any entry point scripts it creates exec a valid path that doesn't reference
     # the sandbox.
-    script = dedent(
+    command = dedent(
         f"""\
-        cache_root="$({realpath_binary.path} {shlex.quote(venv_repository.cache_dir)})"
-        UV_PROJECT_ENVIRONMENT="${{cache_root}}/{venv_repository.venv_path_suffix}" {uv_cmd}
+        cache_root="$({realpath_binary.path} {shlex.quote(VenvRepository.cache_dir)})"
+        UV_PROJECT_ENVIRONMENT="${{cache_root}}/{venv_path_suffix}" {uv_cmd}
         """
     )
-    await execute_process_or_raise(
-        **implicitly(
-            Process(
-                argv=(bash_binary.path, "-c", script),
-                input_digest=input_digest,
-                env=uv_env.env,
-                append_only_caches={
-                    **downloaded_uv.append_only_caches(),
-                    **venv_repository.append_only_caches(),
-                },
-                level=LogLevel.INFO,
-                description=f"Create venv from uv lockfile at {request.lockfile.lockfile_path}",
-                # TODO: We might need to set cache_scope=ProcessCacheScope.PER_SESSION if
-                #  running in a non-local environment (e.g., a docker environment), as we're
-                #  less sure that a venv created by a previous run still exists. For example
-                #  the docker container might have been recreated. However this impacts performance
-                #  in the overwhelmingly common local run case. Alternatively we can look at
-                #  creating the uv venv in the same Process as whatever is consuming it, which
-                #  would ensure availability even in a completely ephemeral remote environment
-                #  where we can't guarantee that the venv exists even in the same Pants run.
-                #  But that is a more general issue and a much bigger change.
-            )
-        )
-    )
 
-    return venv_repository
+    return VenvRepository(
+        venv_path_suffix=venv_path_suffix,
+        creation_subprocess=Subprocess(
+            command=command,
+            input_digest=input_digest,
+            env=uv_env.env,
+            append_only_caches={
+                **downloaded_uv.append_only_caches(),
+                **VenvRepository.append_only_caches(),
+            },
+        ),
+    )
 
 
 def rules():
