@@ -7,6 +7,7 @@ import json
 import logging
 import posixpath
 import re
+import shlex
 import textwrap
 import urllib
 import uuid
@@ -37,6 +38,7 @@ from pants.core.util_rules.system_binaries import (
     CpBinary,
     MkdirBinary,
     MvBinary,
+    RealpathBinary,
     RmBinary,
     ShBinary,
     TestBinary,
@@ -48,7 +50,6 @@ from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_re
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.option.errors import OptionsError
-from pants.option.global_options import NamedCachesDirOption
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.docutil import bin_name
@@ -519,13 +520,13 @@ async def get_python(
     python_setup: PythonSetup,
     pbs_subsystem: PBSPythonProviderSubsystem,
     platform: Platform,
-    named_caches_dir: NamedCachesDirOption,
     sh: ShBinary,
     mkdir: MkdirBinary,
     cp: CpBinary,
     mv: MvBinary,
     rm: RmBinary,
     test: TestBinary,
+    realpath: RealpathBinary,
 ) -> PythonExecutable:
     versions_info = pbs_subsystem.get_all_pbs_pythons()
 
@@ -560,13 +561,17 @@ async def get_python(
     temp_dir = sandbox_cache_dir / "tmp" / f"pbs-copier-{uuid.uuid4()}"
     copy_target = temp_dir / python_version
 
-    await fallible_to_exec_result_or_raise(
+    python3_path_echo = (
+        f'echo "$({realpath.path} {shlex.quote(str(persisted_destination))})/bin/python3"'
+    )
+
+    install_result = await fallible_to_exec_result_or_raise(
         **implicitly(
             Process(
                 [
                     sh.path,
                     "-euc",
-                    # Atomically-copy the downloaded files into the named cache, in 5 steps:
+                    # Atomically-copy the downloaded files into the named cache, in 6 steps:
                     #
                     # 1. Check if the target directory already exists, skipping all the work if it does
                     #    (the atomic creation means this will be fully created by an earlier execution,
@@ -596,11 +601,16 @@ async def get_python(
                     #    place, and downstream code won't have the Python it needs. So, we check that the
                     #    final destination exists and fail if it doesn't, surfacing any errors to the user.
                     #
-                    # 5. Clean-up the temporary files
+                    # 5. Clean-up the temporary files.
+                    #
+                    # 6. Echo the resolved interpreter path on stdout for the caller to read; the path is
+                    #    resolved with `realpath` so the caller gets a path that exists in whatever
+                    #    environment the process actually ran in (local host or docker container).
                     f"""
                     # Step 1: check and skip
                     if {test.path} -d {persisted_destination}; then
                         echo "{persisted_destination} already exists, fully created by earlier execution" >&2
+                        {python3_path_echo}
                         exit 0
                     fi
 
@@ -619,6 +629,8 @@ async def get_python(
 
                     # Step 5: remove the temporary directory
                     {rm.path} -rf "{temp_dir}"
+
+                    {python3_path_echo}
                     """,
                 ],
                 level=LogLevel.DEBUG,
@@ -633,9 +645,9 @@ async def get_python(
         ),
     )
 
-    python_path = named_caches_dir.val / PBS_NAMED_CACHE_NAME / python_version / "bin" / "python3"
+    python_path = install_result.stdout.decode().splitlines()[-1].strip()
     return PythonExecutable(
-        path=str(python_path),
+        path=python_path,
         fingerprint=None,
         # One would normally set append_only_caches=PBS_APPEND_ONLY_CACHES
         # here, but it is already going to be injected into the pex
