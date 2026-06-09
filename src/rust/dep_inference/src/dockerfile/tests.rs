@@ -78,6 +78,26 @@ fn from_instructions() {
         "FROM gcr.io/tekton-releases/github.com/tektoncd/operator/cmd/kubernetes/operator:v0.54.0@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d",
         [("stage0", Some("v0.54.0"))],
     );
+    assert_from_tags(
+        "ARG MIRROR=docker.io\nFROM $MIRROR/dperson/samba@sha256:e1d2a7366690749a7be06f72bdbf6a5a7d15726fc84e4e4f41e967214516edfd",
+        [("stage0", None)],
+    );
+    assert_from_tags(
+        "ARG MIRROR=docker.io\nFROM ${MIRROR}/python:3.10",
+        [("stage0", Some("3.10"))],
+    );
+    assert_from_tags(
+        "FROM $REGISTRY/$IMAGE",
+        [("stage0", Some("build-arg:IMAGE"))],
+    );
+    assert_from_tags(
+        "FROM registry/$IMAGE",
+        [("stage0", Some("build-arg:IMAGE"))],
+    );
+    assert_from_tags(
+        "FROM $IMAGE@sha256:d1f0463b35135852308ea815c2ae54c1734b876d90288ce35828aeeff9899f9d",
+        [("stage0", None)],
+    );
 }
 
 #[test]
@@ -157,4 +177,6 @@ FROM $DECOY
             "BASE_IMAGE_5=should/allow/default-target-name",
         ],
     );
+    assert_from_image_build_args("ARG IMAGE=some/image\nFROM registry/$IMAGE", []);
+    assert_from_image_build_args("ARG IMAGE=some/image\nFROM $IMAGE:latest", []);
 }
