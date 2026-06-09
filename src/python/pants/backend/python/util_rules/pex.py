@@ -819,6 +819,7 @@ async def build_pex(
             VenvFromUvLockfileRequest(
                 lockfile=requirements_setup.uv_lockfile,
                 python=pex_python_setup.python,
+                subset_req_strings=req_strings if req_strings else None,
             ),
             **implicitly(),
         )

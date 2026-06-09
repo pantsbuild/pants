@@ -12,6 +12,9 @@ from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 from typing import ClassVar, cast
 
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name as canonicalize_project_name
+
 from pants.backend.python.subsystems import uv as uv_subsystem
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.uv import (
@@ -54,10 +57,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class VenvFromUvLockfileRequest:
-    """Request to install all packages from a uv lockfile into a virtualenv."""
+    """Request to install packages from a uv lockfile into a virtualenv.
+
+    If subset_req_strings is set, only those requirements (and their transitive deps)
+    will be installed via per-requirement dependency groups. If None, the entire lockfile
+    is synced.
+    """
 
     lockfile: LoadedLockfile
     python: PythonExecutable
+    subset_req_strings: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -115,12 +124,33 @@ async def get_uv_environment(
 # The synthetic project name (pants-lockfile-for-*) must not collide with any real requirement.
 # uv will include this project as a virtual package in the lockfile, and we set package = false,
 # so it won't try to install it.
+#
+# Per-requirement dependency groups are generated so that `uv sync --only-group <name>` can
+# install a subset of requirements during PEX builds, avoiding downloading the entire resolve.
 def generate_pyproject_toml(resolve: str, ics: InterpreterConstraints, reqs: Iterable[str]) -> str:
     def escape_double_quotes(s: str) -> str:
         return s.replace('"', '\\"')
 
     requires_python = ",".join(str(constraint.specifier) for constraint in ics)
-    deps_lines = "\n".join(f'    "{escape_double_quotes(r)}",' for r in sorted(reqs))
+    sorted_reqs = sorted(reqs)
+    deps_lines = "\n".join(f'    "{escape_double_quotes(r)}",' for r in sorted_reqs)
+
+    # Build per-requirement dependency groups. Each top-level requirement gets its own
+    # group named after the canonicalized package name (PEP 503). This allows selective
+    # install via `uv sync --only-group <name>` during PEX builds.
+    groups: dict[str, str] = {}
+    for r in sorted_reqs:
+        try:
+            parsed = Requirement(r)
+            group_name = canonicalize_project_name(parsed.name)
+            groups[group_name] = f'"{escape_double_quotes(r)}"'
+        except Exception:
+            logger.debug(f"Could not parse requirement {r!r} for dependency group generation")
+
+    groups_section = ""
+    if groups:
+        group_lines = "\n".join(f'{name} = [{dep}]' for name, dep in sorted(groups.items()))
+        groups_section = f"\n[dependency-groups]\n{group_lines}\n"
 
     return dedent(
         """
@@ -135,7 +165,7 @@ def generate_pyproject_toml(resolve: str, ics: InterpreterConstraints, reqs: Ite
         [tool.uv]
         package = false
         """
-    ).format(resolve=resolve, requires_python=requires_python, deps_lines=deps_lines)
+    ).format(resolve=resolve, requires_python=requires_python, deps_lines=deps_lines) + groups_section
 
 
 @rule
@@ -146,7 +176,13 @@ async def create_venv_repository_from_uv_lockfile(
     realpath_binary: RealpathBinary,
     buildroot: BuildRoot,
 ) -> VenvRepository:
-    """Install all packages from a uv lockfile into a virtualenv."""
+    """Install packages from a uv lockfile into a virtualenv.
+
+    When subset_req_strings is provided, only those packages (and their transitive deps)
+    are installed using per-requirement dependency groups and --only-group. The --inexact
+    flag prevents removal of previously-installed packages, allowing the shared venv to
+    accumulate packages across builds.
+    """
     if request.lockfile.lockfile_format != LockfileFormat.UV:
         raise ValueError(f"Expected a uv lockfile, got {request.lockfile.lockfile_format}")
     if request.lockfile.metadata is None:
@@ -193,11 +229,45 @@ async def create_venv_repository_from_uv_lockfile(
         )
     )
 
-    # We maintain one cached venv per buildroot+interpreter+resolve. uv will efficiently
-    # incrementally update the venv as the lockfile changes, and will handle concurrency of
-    # `uv sync` with appropriate locking.
+    # Build the uv sync arguments depending on whether we're doing a full or subset sync.
+    subset_group_args: list[str] = []
+    if request.subset_req_strings:
+        for req_str in request.subset_req_strings:
+            try:
+                parsed = Requirement(req_str)
+                group_name = canonicalize_project_name(parsed.name)
+                subset_group_args.extend(["--only-group", group_name])
+            except Exception:
+                logger.warning(
+                    f"Could not parse requirement {req_str!r} for selective sync; "
+                    "falling back to full sync."
+                )
+                subset_group_args = []
+                break
+
+    if subset_group_args:
+        # Selective sync: install only the requested packages and their transitive deps.
+        # --inexact prevents removal of previously-installed packages, allowing the shared
+        # venv to accumulate packages across different PEX builds.
+        sync_mode_args = ("--inexact", *subset_group_args)
+    else:
+        # Full sync: install everything in the lockfile.
+        # TODO: extras can conflict, so we might need to be more selective.
+        sync_mode_args = ("--all-extras",)
+
+    # When using --inexact, we include a lockfile content hash in the venv path so that
+    # stale packages from old lockfile versions are not visible to Pex.
     buildroot_entropy = hashlib.sha256(buildroot.path.encode()).hexdigest()
-    venv_path_suffix = os.path.join(buildroot_entropy, metadata.resolve, request.python.fingerprint)
+    if subset_group_args:
+        lock_hash = hashlib.sha256(uv_lock_contents[0].content).hexdigest()[:12]
+        venv_path_suffix = os.path.join(
+            buildroot_entropy, metadata.resolve, request.python.fingerprint, lock_hash
+        )
+    else:
+        # Full sync: uv manages the venv contents exactly, so no hash needed.
+        venv_path_suffix = os.path.join(
+            buildroot_entropy, metadata.resolve, request.python.fingerprint
+        )
 
     uv_cmd = shlex.join(
         (
@@ -205,8 +275,7 @@ async def create_venv_repository_from_uv_lockfile(
             "sync",
             "--frozen",
             "--no-install-project",
-            # TODO: extras can conflict, so we might need to be more selective.
-            "--all-extras",
+            *sync_mode_args,
             "--no-progress",
             "--python",
             request.python.path,

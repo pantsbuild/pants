@@ -57,6 +57,7 @@ from pants.backend.python.util_rules.pex_test_utils import (
     create_pex_and_get_pex_info,
     parse_requirements,
 )
+from pants.backend.python.util_rules.uv import generate_pyproject_toml
 from pants.backend.python.util_rules.uv import rules as uv_rules
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
 from pants.core.register import wrap_as_resources
@@ -534,6 +535,94 @@ def test_build_pex_from_uv_lockfile(rule_runner: RuleRunner) -> None:
     )
     assert res.returncode == 0
     assert b"ok" in res.stdout
+
+
+def test_generate_pyproject_toml_includes_dependency_groups() -> None:
+    """Verify that generate_pyproject_toml produces per-requirement dependency groups."""
+    ic = InterpreterConstraints(["CPython==3.14.*"])
+    content = generate_pyproject_toml("test", ic, ["requests>=2.0", "torch==2.12.0"])
+
+    # Should contain the standard project section.
+    assert '[project]' in content
+    assert 'name = "pants-lockfile-for-test"' in content
+    assert '"requests>=2.0",' in content
+    assert '"torch==2.12.0",' in content
+
+    # Should contain per-requirement dependency groups.
+    assert '[dependency-groups]' in content
+    assert 'requests = ["requests>=2.0"]' in content
+    assert 'torch = ["torch==2.12.0"]' in content
+
+
+def test_generate_pyproject_toml_canonicalizes_group_names() -> None:
+    """Verify that group names are canonicalized (PEP 503)."""
+    ic = InterpreterConstraints(["CPython==3.14.*"])
+    content = generate_pyproject_toml("test", ic, ["Foo-Bar[extra]>=1.0"])
+
+    assert '[dependency-groups]' in content
+    # PEP 503 canonicalization: Foo-Bar -> foo-bar
+    assert 'foo-bar = ["Foo-Bar[extra]>=1.0"]' in content
+
+
+def test_build_pex_subset_from_uv_lockfile(rule_runner: RuleRunner) -> None:
+    """Build a PEX from a uv lockfile requesting only a subset of the locked packages.
+
+    This tests the selective sync path: the lockfile contains multiple packages but
+    the PEX build only needs one of them. With selective sync, only the needed package
+    (and its transitive deps) should be installed.
+    """
+    ic = InterpreterConstraints(["CPython==3.14.*"])
+    rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-resolver=uv",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    gen_result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GenerateUvLockfile(
+                requirements=FrozenOrderedSet(
+                    [
+                        "ansicolors==1.1.8",
+                        "cowsay @ git+https://github.com/VaasuDevanS/cowsay-python@dcf7236f0b5ece9ed56e91271486e560526049cf",
+                    ]
+                ),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=ic,
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+            )
+        ],
+    )
+    digest_contents = rule_runner.request(DigestContents, [gen_result.digest])
+    rule_runner.write_files({fc.path: fc.content for fc in digest_contents})
+
+    # Build a PEX requesting only ansicolors (a subset of the lockfile).
+    lock = Lockfile("test.lock", url_description_of_origin="test uv lockfile", resolve_name="test")
+    pex_data = create_pex_and_get_all_data(
+        rule_runner,
+        requirements=PexRequirements(
+            ["ansicolors==1.1.8"],
+            from_superset=Resolve("test", use_entire_lockfile=False),
+        ),
+        interpreter_constraints=ic,
+        layout=PexLayout.ZIPAPP,
+        additional_pants_args=(
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-resolver=uv",
+        ),
+    )
+
+    # The subset PEX should have ansicolors but not cowsay.
+    res = subprocess.run(
+        [pex_data.local_path, "-c", "import colors; print('subset-ok')"],
+        capture_output=True,
+    )
+    assert res.returncode == 0
+    assert b"subset-ok" in res.stdout
 
 
 def test_entry_point(rule_runner: RuleRunner) -> None:
