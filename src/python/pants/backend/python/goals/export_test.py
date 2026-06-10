@@ -266,7 +266,11 @@ def test_export_venv_filtered_by_targets(rule_runner: RuleRunner) -> None:
             Targets,
             [
                 RawSpecs(
-                    address_literals=tuple(AddressLiteralSpec(*s.rsplit(":", 1)) for s in specs),
+                    address_literals=tuple(
+                        AddressLiteralSpec(path_component=p, target_component=t)
+                        for s in specs
+                        for p, t in [s.rsplit(":", 1)]
+                    ),
                     description_of_origin="test",
                 )
             ],
