@@ -15,14 +15,14 @@ from pants.backend.python.lint.isort import subsystem as isort_subsystem
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     PythonDistribution,
-    PythonRequirementTarget,
     PythonRequirementsField,
+    PythonRequirementTarget,
     PythonResolveField,
     PythonSourceField,
     PythonSourcesGeneratorTarget,
 )
-from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
 from pants.base.specs import AddressLiteralSpec, RawSpecs
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
@@ -266,9 +266,7 @@ def test_export_venv_filtered_by_targets(rule_runner: RuleRunner) -> None:
             Targets,
             [
                 RawSpecs(
-                    address_literals=tuple(
-                        AddressLiteralSpec(*s.rsplit(":", 1)) for s in specs
-                    ),
+                    address_literals=tuple(AddressLiteralSpec(*s.rsplit(":", 1)) for s in specs),
                     description_of_origin="test",
                 )
             ],

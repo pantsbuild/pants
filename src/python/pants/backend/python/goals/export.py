@@ -51,6 +51,7 @@ from pants.core.goals.export import (
 from pants.core.goals.resolves import ExportableTool
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import strip_source_roots
+from pants.engine.addresses import Addresses
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.graph import hydrate_sources, transitive_targets
@@ -59,12 +60,10 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
 from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.addresses import Addresses
 from pants.engine.target import (
     AllTargets,
     HydrateSourcesRequest,
     SourcesField,
-    TransitiveTargets,
     TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
