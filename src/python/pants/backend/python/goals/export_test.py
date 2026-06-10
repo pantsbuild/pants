@@ -294,6 +294,11 @@ def test_export_venv_filtered_by_targets(rule_runner: RuleRunner) -> None:
     assert req_strings_for(targets_B) == {"x==1.0", "y==1.0"}
     assert req_strings_for(targets_C) == {"z==1.0"}
 
+    # Combining B and C covers the full set of requirements — same as what no-target filtering
+    # would export (the union of all transitive deps across the resolve).
+    targets_B_and_C = get_targets("src/b:B", "src/c:C")
+    assert req_strings_for(targets_B_and_C) == {"x==1.0", "y==1.0", "z==1.0"}
+
     # Verify the export plumbing: target D has no transitive python_requirement deps so
     # req_strings is empty and the early-return path is taken (no PEX JSON lockfile needed).
     targets_D = get_targets("src/d:D")
