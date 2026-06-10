@@ -244,12 +244,12 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
         items = dep_sources_raw["items"]
         assert len(items) == 1
         all_sources = items[0]["sources"]
-        assert any(
-            "scala-library" in s and "sources" in s for s in all_sources
-        ), f"Expected a scala-library sources jar URI; got {list(all_sources)}"
-        assert any(
-            "scalatest" in s and "sources" in s for s in all_sources
-        ), f"Expected a scalatest sources jar URI; got {list(all_sources)}"
+        assert any("scala-library" in s and "sources" in s for s in all_sources), (
+            f"Expected a scala-library sources jar URI; got {list(all_sources)}"
+        )
+        assert any("scalatest" in s and "sources" in s for s in all_sources), (
+            f"Expected a scalatest sources jar URI; got {list(all_sources)}"
+        )
 
         # buildTarget/resources - (NB: used only to index resources)
         _ = endpoint.request(

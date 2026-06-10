@@ -95,7 +95,9 @@ def _first_occurrence_file_entries(
     return kept
 
 
-async def _dedupe_loose_classfiles(loose_classfiles: tuple[classpath.LooseClassfiles, ...]) -> Digest:
+async def _dedupe_loose_classfiles(
+    loose_classfiles: tuple[classpath.LooseClassfiles, ...],
+) -> Digest:
     """Merge the loose-classfile digests from a BSP compile closure, keeping the
     first-occurrence entry per file path on path collisions.
 
@@ -139,9 +141,7 @@ async def _jvm_bsp_compile(
     results = await concurrently(
         notify_for_classpath_entry(
             BSPClasspathEntryRequest(
-                classpath_entry_request.for_targets(
-                    component=coarsened_target, resolve=resolve
-                ),
+                classpath_entry_request.for_targets(component=coarsened_target, resolve=resolve),
                 task_id=request.task_id,
             ),
             **implicitly(),

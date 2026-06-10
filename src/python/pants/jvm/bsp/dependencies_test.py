@@ -13,9 +13,7 @@ def _entry(
     group: str, artifact: str, version: str, classifier: str | None = None
 ) -> CoursierLockfileEntry:
     return CoursierLockfileEntry(
-        coord=Coordinate(
-            group=group, artifact=artifact, version=version, classifier=classifier
-        ),
+        coord=Coordinate(group=group, artifact=artifact, version=version, classifier=classifier),
         file_name=f"{group}_{artifact}_{version}.jar",
         direct_dependencies=Coordinates(()),
         dependencies=Coordinates(()),

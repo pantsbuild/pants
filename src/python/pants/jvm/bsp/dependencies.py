@@ -344,9 +344,7 @@ async def collect_thirdparty_source_jars(
         )
         for lockfile_entry, cp_entry in rename_targets
     )
-    renamed_by_lockfile_entry = dict(
-        zip((lfe for lfe, _ in rename_targets), renamed_entries)
-    )
+    renamed_by_lockfile_entry = dict(zip((lfe for lfe, _ in rename_targets), renamed_entries))
 
     entries: dict[CoursierLockfileEntry, ClasspathEntry | None] = {}
     digests: list[Digest] = []

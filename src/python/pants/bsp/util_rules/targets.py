@@ -619,17 +619,13 @@ async def bsp_dependency_sources(
     request: DependencySourcesParams, workspace: Workspace
 ) -> DependencySourcesResult:
     responses = await concurrently(
-        resolve_one_dependency_sources(
-            ResolveOneDependencySourcesRequest(btgt), **implicitly()
-        )
+        resolve_one_dependency_sources(ResolveOneDependencySourcesRequest(btgt), **implicitly())
         for btgt in request.targets
     )
     output_digest = await merge_digests(MergeDigests([r.digest for r in responses]))
     workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
     return DependencySourcesResult(
-        tuple(
-            DependencySourcesItem(target=r.bsp_target_id, sources=r.sources) for r in responses
-        )
+        tuple(DependencySourcesItem(target=r.bsp_target_id, sources=r.sources) for r in responses)
     )
 
 

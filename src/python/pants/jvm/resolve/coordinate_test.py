@@ -16,9 +16,7 @@ from pants.jvm.resolve.coordinate import Coordinate
             "org.scala-lang:scala-library:2.13.18",
         ),
         (
-            Coordinate(
-                group="com.example", artifact="foo", version="1.0", packaging="pom"
-            ),
+            Coordinate(group="com.example", artifact="foo", version="1.0", packaging="pom"),
             "com.example:foo:1.0,type=pom",
         ),
     ],
@@ -53,9 +51,7 @@ def test_to_coord_arg_str_emits_type_jar_when_classifier_set() -> None:
 def test_to_coord_arg_str_emits_only_type_for_non_default_packaging() -> None:
     """A non-jar packaging with no classifier produces only `type=<packaging>` —
     no spurious `classifier=` attribute."""
-    coord = Coordinate(
-        group="com.example", artifact="foo", version="1.0", packaging="aar"
-    )
+    coord = Coordinate(group="com.example", artifact="foo", version="1.0", packaging="aar")
     arg = coord.to_coord_arg_str()
     assert "type=aar" in arg
     assert "classifier" not in arg
@@ -64,9 +60,7 @@ def test_to_coord_arg_str_emits_only_type_for_non_default_packaging() -> None:
 def test_to_coord_arg_str_respects_extra_attrs() -> None:
     """Extra attrs are emitted alongside packaging/classifier without dropping
     either."""
-    coord = Coordinate(
-        group="com.example", artifact="foo", version="1.0", classifier="sources"
-    )
+    coord = Coordinate(group="com.example", artifact="foo", version="1.0", classifier="sources")
     arg = coord.to_coord_arg_str(extra_attrs={"url": "file:/tmp/foo.jar"})
     assert "url=file:/tmp/foo.jar" in arg
     assert "type=jar" in arg
