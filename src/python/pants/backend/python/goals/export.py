@@ -14,7 +14,12 @@ from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
-from pants.backend.python.target_types import PexLayout, PythonResolveField, PythonSourceField
+from pants.backend.python.target_types import (
+    PexLayout,
+    PythonRequirementsField,
+    PythonResolveField,
+    PythonSourceField,
+)
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists_pep660 import (
     EditableLocalDistsRequest,
@@ -28,7 +33,12 @@ from pants.backend.python.util_rules.pex import (
 )
 from pants.backend.python.util_rules.pex_cli import PexPEX
 from pants.backend.python.util_rules.pex_environment import PexEnvironment, PythonExecutable
-from pants.backend.python.util_rules.pex_requirements import EntireLockfile, Lockfile
+from pants.backend.python.util_rules.pex_requirements import (
+    EntireLockfile,
+    Lockfile,
+    PexRequirements,
+    Resolve,
+)
 from pants.core.goals.export import (
     Export,
     ExportError,
@@ -43,13 +53,20 @@ from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import CreateDigest, FileContent
-from pants.engine.internals.graph import hydrate_sources
+from pants.engine.internals.graph import hydrate_sources, transitive_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests
 from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix, create_digest, digest_to_snapshot, merge_digests
 from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import AllTargets, HydrateSourcesRequest, SourcesField
+from pants.engine.addresses import Addresses
+from pants.engine.target import (
+    AllTargets,
+    HydrateSourcesRequest,
+    SourcesField,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.option_types import EnumOption, StrListOption
 from pants.util.strutil import path_safe, softwrap
@@ -65,6 +82,7 @@ class ExportVenvsRequest(ExportRequest):
 @dataclass(frozen=True)
 class _ExportVenvForResolveRequest(EngineAwareParameter):
     resolve: str
+    addresses: Addresses = dataclasses.field(default_factory=Addresses)
 
 
 class PythonResolveExportFormat(Enum):
@@ -537,11 +555,28 @@ async def export_virtualenv_for_resolve(
     else:
         editable_local_dists_digest = None
 
+    if request.addresses:
+        transitive_tgts = await transitive_targets(
+            TransitiveTargetsRequest(request.addresses), **implicitly()
+        )
+        req_strings = PexRequirements.req_strings_from_requirement_fields(
+            tgt[PythonRequirementsField]
+            for tgt in transitive_tgts.closure
+            if tgt.has_field(PythonRequirementsField)
+        )
+        requirements: PexRequirements | EntireLockfile = PexRequirements(
+            req_strings,
+            from_superset=Resolve(resolve, use_entire_lockfile=False),
+            description_of_origin=f"the export of resolve `{resolve}`",
+        )
+    else:
+        requirements = EntireLockfile(lockfile)
+
     pex_request = PexRequest(
         description=f"Build pex for resolve `{resolve}`",
         output_filename=f"{path_safe(resolve)}.pex",
         internal_only=True,
-        requirements=EntireLockfile(lockfile),
+        requirements=requirements,
         sources=editable_local_dists_digest,
         python=python,
         # Packed layout should lead to the best performance in this use case.
@@ -578,8 +613,11 @@ async def export_virtualenvs(
     request: ExportVenvsRequest,
     export_subsys: ExportSubsystem,
 ) -> ExportResults:
+    addresses = Addresses(tgt.address for tgt in request.targets)
     maybe_venvs = await concurrently(
-        export_virtualenv_for_resolve(_ExportVenvForResolveRequest(resolve), **implicitly())
+        export_virtualenv_for_resolve(
+            _ExportVenvForResolveRequest(resolve, addresses), **implicitly()
+        )
         for resolve in export_subsys.options.resolve
     )
     return ExportResults(mv.result for mv in maybe_venvs if mv.result is not None)

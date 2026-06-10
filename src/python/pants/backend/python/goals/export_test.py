@@ -21,7 +21,7 @@ from pants.backend.python.target_types import (
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
-from pants.base.specs import RawSpecs
+from pants.base.specs import AddressLiteralSpec, RawSpecs
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
 from pants.engine.fs import CreateDigest
@@ -188,6 +188,59 @@ def test_export_tool(rule_runner: RuleRunner) -> None:
     result = results[0]
     assert result.resolve == isort_subsystem.Isort.options_scope
     assert "isort" in result.description
+
+
+def test_export_venv_filtered_by_targets(rule_runner: RuleRunner) -> None:
+    """When target specs are provided, only their transitive requirements should be exported.
+
+    This test verifies the structural plumbing: targets flow through the rule chain and the
+    transitive-closure branch is taken.  The source target here has no python_requirement deps
+    so req_strings is empty, which exercises the early-return path in _setup_pex_requirements
+    without needing a PEX-native JSON lockfile.
+    """
+    vinfo = sys.version_info
+    current_interpreter = f"{vinfo.major}.{vinfo.minor}.{vinfo.micro}"
+    rule_runner.write_files(
+        {
+            # foo has no python_requirement deps — its transitive closure has no 3rd-party reqs.
+            "src/foo/BUILD": dedent(
+                """\
+                python_sources(name='foo', resolve='a')
+                python_requirement(name='req_unrelated', requirements=['ansicolors==1.1.8'], resolve='a')
+                """
+            ),
+            "src/foo/__init__.py": "",
+            "lock.txt": "ansicolors==1.1.8",
+        }
+    )
+    rule_runner.set_options(
+        [
+            *pants_args_for_python_lockfiles,
+            f"--python-interpreter-constraints=['=={current_interpreter}']",
+            "--python-resolves={'a': 'lock.txt'}",
+            "--export-resolve=a",
+            "--source-root-patterns=['src']",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT"},
+    )
+
+    # Fetch only the source target (not the unrelated requirement).
+    targets = rule_runner.request(
+        Targets,
+        [
+            RawSpecs(
+                address_literals=(AddressLiteralSpec("src/foo", "foo"),),
+                description_of_origin="test",
+            )
+        ],
+    )
+    assert len(targets) == 1
+
+    all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets=targets)])
+    assert len(all_results) == 1
+    result = all_results[0]
+    assert result.resolve == "a"
+    assert result.reldir == f"python/virtualenvs/a/{current_interpreter}"
 
 
 def test_export_codegen_outputs():
