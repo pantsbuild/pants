@@ -310,6 +310,40 @@ def test_export_venv_filtered_by_targets(rule_runner: RuleRunner) -> None:
     assert result.reldir == f"python/virtualenvs/r/{current_interpreter}"
 
 
+def test_export_venv_filtered_wrong_resolve(rule_runner: RuleRunner) -> None:
+    """Passing a target from the wrong resolve should raise a clear error."""
+    vinfo = sys.version_info
+    current_interpreter = f"{vinfo.major}.{vinfo.minor}.{vinfo.micro}"
+    rule_runner.write_files(
+        {
+            "src/a/__init__.py": "",
+            "src/a/BUILD": "python_sources(name='A', resolve='r1')",
+            "lock.txt": "",
+        }
+    )
+    rule_runner.set_options(
+        [
+            *pants_args_for_python_lockfiles,
+            f"--python-interpreter-constraints=['=={current_interpreter}']",
+            "--python-resolves={'r1': 'lock.txt', 'r2': 'lock.txt'}",
+            "--export-resolve=r2",
+            "--source-root-patterns=['src']",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT"},
+    )
+    targets = rule_runner.request(
+        Targets,
+        [
+            RawSpecs(
+                address_literals=(AddressLiteralSpec("src/a", "A"),),
+                description_of_origin="test",
+            )
+        ],
+    )
+    with pytest.raises(Exception, match="do not belong to the resolve `r2`"):
+        rule_runner.request(ExportResults, [ExportVenvsRequest(targets=targets)])
+
+
 def test_export_codegen_outputs():
     class CodegenSourcesField(SingleSourceField):
         pass

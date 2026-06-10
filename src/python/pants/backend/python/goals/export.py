@@ -558,10 +558,24 @@ async def export_virtualenv_for_resolve(
         transitive_tgts = await transitive_targets(
             TransitiveTargetsRequest(request.addresses), **implicitly()
         )
+        wrong_resolve = [
+            tgt.address
+            for tgt in transitive_tgts.roots
+            if tgt.has_field(PythonResolveField)
+            and tgt[PythonResolveField].normalized_value(python_setup) != resolve
+        ]
+        if wrong_resolve:
+            raise ExportError(
+                f"The following targets do not belong to the resolve `{resolve}` "
+                f"and cannot be used to filter its export:\n"
+                + "\n".join(f"  {addr}" for addr in wrong_resolve)
+                + f"\nEnsure all targets belong to the `{resolve}` resolve."
+            )
         req_strings = PexRequirements.req_strings_from_requirement_fields(
             tgt[PythonRequirementsField]
             for tgt in transitive_tgts.closure
             if tgt.has_field(PythonRequirementsField)
+            and tgt[PythonResolveField].normalized_value(python_setup) == resolve
         )
         requirements: PexRequirements | EntireLockfile = PexRequirements(
             req_strings,
