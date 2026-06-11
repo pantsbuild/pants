@@ -163,7 +163,8 @@ def _python_dependency_validation_rule_runner(*, options: Iterable[str] = ()) ->
             *target_types_rules.rules(),
             QueryRule(ValidatedDependencies, [PythonValidateDependenciesRequest]),
         ],
-        target_types=[PythonSourceTarget],
+        target_types=[PythonDistribution, PythonSourceTarget],
+        objects={"python_artifact": PythonArtifact},
     )
     if options:
         rule_runner.set_options(list(options))
@@ -330,6 +331,39 @@ def test_validate_python_dependencies_with_resolve_interpreter_constraints_defau
                     name="dep",
                     source="dep.py",
                     resolve="myresolve",
+                )
+                """
+            ),
+        }
+    )
+
+    assert _validate_python_dependencies(rule_runner) == ValidatedDependencies()
+
+
+def test_validate_python_dependencies_without_python_resolve_field() -> None:
+    rule_runner = _python_dependency_validation_rule_runner(
+        options=[
+            "--python-enable-resolves",
+            "--python-default-to-resolve-interpreter-constraints",
+            "--python-resolves={'a': 'a.lock', 'b': 'b.lock'}",
+            "--python-resolves-to-interpreter-constraints={'a': ['==3.10.*'], 'b': ['==3.11.*']}",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "project/dep.py": "",
+            "project/BUILD": dedent(
+                """\
+                python_distribution(
+                    name="app",
+                    dependencies=[":dep"],
+                    provides=python_artifact(name="demo"),
+                )
+                python_source(
+                    name="dep",
+                    source="dep.py",
+                    resolve="a",
+                    interpreter_constraints=[">=3.8,<4"],
                 )
                 """
             ),

@@ -623,7 +623,6 @@ class DependencyValidationFieldSet(FieldSet):
     required_fields = (InterpreterConstraintsField,)
 
     interpreter_constraints: InterpreterConstraintsField
-    resolve: PythonResolveField
 
 
 class PythonValidateDependenciesRequest(ValidateDependenciesRequest):
@@ -635,19 +634,31 @@ async def validate_python_dependencies(
     request: PythonValidateDependenciesRequest,
     python_setup: PythonSetup,
 ) -> ValidatedDependencies:
-    dependencies = await concurrently(
+    root_target, dependencies = await concurrently(
         resolve_target(
             WrappedTargetRequest(
-                d, description_of_origin=f"the dependencies of {request.field_set.address}"
+                request.field_set.address,
+                description_of_origin=f"the target {request.field_set.address}",
             ),
             **implicitly(),
-        )
-        for d in request.dependencies
+        ),
+        concurrently(
+            resolve_target(
+                WrappedTargetRequest(
+                    d, description_of_origin=f"the dependencies of {request.field_set.address}"
+                ),
+                **implicitly(),
+            )
+            for d in request.dependencies
+        ),
     )
 
     # Validate that the ICs for dependencies are all compatible with our own.
     target_ics = request.field_set.interpreter_constraints.value_or_configured_default(
-        python_setup, request.field_set.resolve
+        python_setup,
+        root_target.target[PythonResolveField]
+        if root_target.target.has_field(PythonResolveField)
+        else None,
     )
     non_subset_items = []
     for dep in dependencies:
