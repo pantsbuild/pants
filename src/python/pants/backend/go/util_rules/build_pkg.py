@@ -546,7 +546,7 @@ async def _gather_transitive_prebuilt_object_files(
     seen: set[BuildGoPackageRequest] = {build_request}
     while queue:
         pkg = queue.popleft()
-        unseen = [dd for dd in build_request.direct_dependencies if dd not in seen]
+        unseen = [dd for dd in pkg.direct_dependencies if dd not in seen]
         queue.extend(unseen)
         seen.update(unseen)
         if pkg.prebuilt_object_files:
