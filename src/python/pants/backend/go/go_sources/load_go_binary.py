@@ -8,7 +8,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
-from pants.backend.go.util_rules.build_pkg import BuildGoPackageRequest, required_built_go_package
+from pants.backend.go.util_rules.build_pkg import (
+    BuildGoPackageRequest,
+    MergeBuiltGoPackageArchivesRequest,
+    merge_built_go_package_archives,
+    required_built_go_package,
+)
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import (
     GoStdLibPackagesRequest,
@@ -140,14 +145,14 @@ async def setup_go_binary(request: LoadedGoBinaryRequest, goroot: GoRoot) -> Loa
         ),
     )
 
-    main_pkg_a_file_path = built_pkg.import_paths_to_pkg_a_files["main"]
+    merged = await merge_built_go_package_archives(MergeBuiltGoPackageArchivesRequest((built_pkg,)))
 
     binary = await link_go_binary(
         LinkGoBinaryRequest(
-            input_digest=built_pkg.digest,
-            archives=(main_pkg_a_file_path,),
+            input_digest=merged.digest,
+            archives=(built_pkg.pkg_archive_path,),
             build_opts=build_opts,
-            import_paths_to_pkg_a_files=built_pkg.import_paths_to_pkg_a_files,
+            import_paths_to_pkg_a_files=merged.import_paths_to_pkg_a_files,
             output_filename=request.output_name,
             description=f"Link internal Go binary `{request.output_name}`",
         ),

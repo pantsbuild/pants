@@ -294,14 +294,51 @@ class FallibleBuiltGoPackage(EngineAwareReturnType):
 
 @dataclass(frozen=True)
 class BuiltGoPackage:
-    """A package and its dependencies compiled as `__pkg__.a` files.
+    """A compiled Go package as a `__pkg__.a` file, plus handles to its transitive closure.
 
-    The packages are arranged into `__pkgs__/{path_safe(import_path)}/__pkg__.a`.
+    `archive_digest` contains ONLY this package's own files, laid out as
+    `__pkgs__/{path_safe(import_path)}/__pkg__.a` (plus this package's module sources when
+    the cgo rules detected a `${SRCDIR}` reference that the linker will need).
+
+    `transitive_pkg_archives` maps import path -> (archive path, digest-containing-that-archive)
+    for this package AND all of its transitive dependencies. The digests are NOT merged;
+    top-level consumers (link/test binary) merge them exactly once via
+    `merge_built_go_package_archives`.
     """
 
+    import_path: str
+    pkg_archive_path: str
+    archive_digest: Digest
+    transitive_pkg_archives: FrozenDict[str, tuple[str, Digest]]
+    coverage_metadata: BuiltGoPackageCodeCoverageMetadata | None = None
+
+
+@dataclass(frozen=True)
+class MergeBuiltGoPackageArchivesRequest:
+    """Request a single merged digest of the full transitive archive closure of `packages`."""
+
+    packages: tuple[BuiltGoPackage, ...]
+
+
+@dataclass(frozen=True)
+class MergedGoPackageArchives:
     digest: Digest
     import_paths_to_pkg_a_files: FrozenDict[str, str]
-    coverage_metadata: BuiltGoPackageCodeCoverageMetadata | None = None
+
+
+@rule
+async def merge_built_go_package_archives(
+    request: MergeBuiltGoPackageArchivesRequest,
+) -> MergedGoPackageArchives:
+    import_paths_to_pkg_a_files: dict[str, str] = {}
+    digests: list[Digest] = []
+    for pkg in request.packages:
+        for import_path, (archive_path, digest) in pkg.transitive_pkg_archives.items():
+            if import_path not in import_paths_to_pkg_a_files:
+                import_paths_to_pkg_a_files[import_path] = archive_path
+                digests.append(digest)
+    merged = await merge_digests(MergeDigests(digests))
+    return MergedGoPackageArchives(merged, FrozenDict(import_paths_to_pkg_a_files))
 
 
 @dataclass(frozen=True)
@@ -578,24 +615,27 @@ async def build_go_package(
         build_go_package(build_request, go_root) for build_request in request.direct_dependencies
     )
 
-    import_paths_to_pkg_a_files: dict[str, str] = {}
-    dep_digests = []
+    direct_dep_archives: dict[str, str] = {}  # importcfg entries: DIRECT deps only
+    direct_dep_digests: list[Digest] = []
+    transitive_pkg_archives: dict[str, tuple[str, Digest]] = {}
     for maybe_dep in maybe_built_deps:
         if maybe_dep.output is None:
             return dataclasses.replace(
                 maybe_dep, import_path=request.import_path, dependency_failed=True
             )
         dep = maybe_dep.output
-        for dep_import_path, pkg_archive_path in dep.import_paths_to_pkg_a_files.items():
-            if dep_import_path not in import_paths_to_pkg_a_files:
-                import_paths_to_pkg_a_files[dep_import_path] = pkg_archive_path
-                dep_digests.append(dep.digest)
+        if dep.import_path not in direct_dep_archives:
+            direct_dep_archives[dep.import_path] = dep.pkg_archive_path
+            direct_dep_digests.append(dep.archive_digest)
+        for ip, handle in dep.transitive_pkg_archives.items():
+            if ip not in transitive_pkg_archives:
+                transitive_pkg_archives[ip] = handle
 
     merged_deps_digest, import_config, embedcfg, action_id_result = await concurrently(
-        merge_digests(MergeDigests(dep_digests)),
+        merge_digests(MergeDigests(direct_dep_digests)),
         generate_import_config(
             ImportConfigRequest(
-                FrozenDict(import_paths_to_pkg_a_files),
+                FrozenDict(direct_dep_archives),
                 build_opts=request.build_opts,
                 import_map=request.import_map,
             )
@@ -966,17 +1006,16 @@ async def build_go_package(
         compilation_digest = assembly_link_result.output_digest
 
     path_prefix = os.path.join("__pkgs__", path_safe(request.import_path))
-    import_paths_to_pkg_a_files[request.import_path] = os.path.join(path_prefix, "__pkg__.a")
+    pkg_archive_path = os.path.join(path_prefix, "__pkg__.a")
     output_digest = await add_prefix(AddPrefix(compilation_digest, path_prefix))
-    merged_result_digest = await merge_digests(MergeDigests([*dep_digests, output_digest]))
 
-    # Include the modules sources in the output `Digest` alongside the package archive if the Cgo rules
-    # detected a potential attempt to link against a static archive (or other reference to `${SRCDIR}` in
-    # options) which necessitates the linker needing access to module sources.
+    # Include the module sources alongside the package archive if the cgo rules detected a
+    # potential attempt to link against a static archive (`${SRCDIR}` reference): the LINK step
+    # needs those sources, and they propagate to it via `transitive_pkg_archives`.
     if cgo_compile_result and cgo_compile_result.include_module_sources_with_output:
-        merged_result_digest = await merge_digests(
-            MergeDigests([merged_result_digest, request.digest])
-        )
+        output_digest = await merge_digests(MergeDigests([output_digest, request.digest]))
+
+    transitive_pkg_archives[request.import_path] = (pkg_archive_path, output_digest)
 
     coverage_metadata = (
         BuiltGoPackageCodeCoverageMetadata(
@@ -990,8 +1029,10 @@ async def build_go_package(
     )
 
     output = BuiltGoPackage(
-        digest=merged_result_digest,
-        import_paths_to_pkg_a_files=FrozenDict(import_paths_to_pkg_a_files),
+        import_path=request.import_path,
+        pkg_archive_path=pkg_archive_path,
+        archive_digest=output_digest,
+        transitive_pkg_archives=FrozenDict(transitive_pkg_archives),
         coverage_metadata=coverage_metadata,
     )
     return FallibleBuiltGoPackage(output, request.import_path)

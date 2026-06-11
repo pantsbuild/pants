@@ -40,6 +40,7 @@ from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
     setup_build_go_package_target_request,
+    setup_build_go_package_target_request_for_stdlib,
 )
 from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
 from pants.backend.go.util_rules.import_analysis import (
@@ -143,6 +144,14 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBui
     )
     assert thirdparty_dep.request is not None
 
+    # The generated code imports `fmt` directly, so it must be declared as a direct
+    # dependency: the compile sandbox/importcfg contains only direct deps' export data.
+    fmt_dep = await setup_build_go_package_target_request_for_stdlib(
+        BuildGoPackageRequestForStdlibRequest("fmt", build_opts=GoBuildOptions()),
+        **implicitly(),
+    )
+    assert fmt_dep.request is not None
+
     return FallibleBuildGoPackageRequest(
         request=BuildGoPackageRequest(
             import_path="codegen.com/gen",
@@ -152,7 +161,7 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBui
             build_opts=GoBuildOptions(),
             go_files=("f.go",),
             s_files=(),
-            direct_dependencies=(thirdparty_dep.request,),
+            direct_dependencies=(fmt_dep.request, thirdparty_dep.request),
             minimum_go_version=None,
         ),
         import_path="codegen.com/gen",
@@ -200,18 +209,22 @@ def assert_built(
     rule_runner: RuleRunner, request: BuildGoPackageRequest, *, expected_import_paths: list[str]
 ) -> None:
     built_package = rule_runner.request(BuiltGoPackage, [request])
-    result_files = rule_runner.request(Snapshot, [built_package.digest]).files
+    own_files = rule_runner.request(Snapshot, [built_package.archive_digest]).files
+    assert built_package.pkg_archive_path == os.path.join(
+        "__pkgs__", path_safe(built_package.import_path), "__pkg__.a"
+    )
+    assert built_package.pkg_archive_path in own_files
     expected = {
         import_path: os.path.join("__pkgs__", path_safe(import_path), "__pkg__.a")
         for import_path in expected_import_paths
     }
-    actual = dict(built_package.import_paths_to_pkg_a_files)
+    actual = {
+        import_path: archive_path
+        for import_path, (archive_path, _) in built_package.transitive_pkg_archives.items()
+    }
     for import_path, pkg_archive_path in expected.items():
         assert import_path in actual, f"expected {import_path} to be in build output"
-        assert actual[import_path] == expected[import_path], (
-            "expected package archive paths to match"
-        )
-    assert set(expected.values()).issubset(set(result_files))
+        assert actual[import_path] == pkg_archive_path, "expected package archive paths to match"
 
 
 def assert_pkg_target_built(
@@ -579,7 +592,7 @@ def test_build_codegen_target(rule_runner: RuleRunner) -> None:
         expected_import_path="codegen.com/gen",
         expected_dir_path="codegen",
         expected_go_file_names=["f.go"],
-        expected_direct_dependency_import_paths=["github.com/google/uuid"],
+        expected_direct_dependency_import_paths=["fmt", "github.com/google/uuid"],
         expected_transitive_dependency_import_paths=[],
     )
 
