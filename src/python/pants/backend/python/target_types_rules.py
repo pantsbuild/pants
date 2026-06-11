@@ -623,7 +623,7 @@ class DependencyValidationFieldSet(FieldSet):
     required_fields = (InterpreterConstraintsField,)
 
     interpreter_constraints: InterpreterConstraintsField
-    resolve: PythonResolveField | None = None
+    resolve: PythonResolveField
 
 
 class PythonValidateDependenciesRequest(ValidateDependenciesRequest):
