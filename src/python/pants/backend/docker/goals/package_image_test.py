@@ -13,7 +13,7 @@ from typing import Any, ContextManager, cast
 
 import pytest
 
-from pants.backend.docker.engine_types import DockerBuildEngine, DockerEngines
+from pants.backend.docker.engine_types import DockerBuildEngine, DockerPushEngine, DockerRunEngine
 from pants.backend.docker.goals.package_image import (
     DockerImageBuildProcess,
     DockerImageRefs,
@@ -156,13 +156,41 @@ def _setup_docker_options(rule_runner: RuleRunner, options: dict | None) -> Dock
         opts.setdefault("build_hosts", None)
         opts.setdefault("build_verbose", False)
         opts.setdefault("build_no_cache", False)
-        opts.setdefault("engine", DockerEngines())
+        opts.setdefault("build_engine", DockerBuildEngine.DOCKER)
         opts.setdefault("env_vars", [])
         opts.setdefault("suggest_renames", True)
         opts.setdefault("push_on_package", DockerPushOnPackageBehavior.WARN)
         return create_subsystem(DockerOptions, **opts)
     else:
         return rule_runner.request(DockerOptions, [])
+
+
+def test_docker_engine_options() -> None:
+    docker_options = create_subsystem(
+        DockerOptions,
+        build_engine=DockerBuildEngine.BUILDCTL,
+        push_engine=DockerPushEngine.PODMAN,
+        run_engine=DockerRunEngine.PODMAN,
+    )
+
+    assert docker_options.build_engine == DockerBuildEngine.BUILDCTL
+    assert docker_options.push_engine == DockerPushEngine.PODMAN
+    assert docker_options.run_engine == DockerRunEngine.PODMAN
+
+
+def test_deprecated_docker_engine_options(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.WARNING)
+
+    docker_options = create_subsystem(DockerOptions, use_buildx=False)
+    assert docker_options.build_engine == DockerBuildEngine.DOCKER
+    assert "`[docker].use_buildx` is deprecated" in caplog.text
+
+    caplog.clear()
+    docker_options = create_subsystem(DockerOptions, experimental_enable_podman=True)
+    assert docker_options.build_engine == DockerBuildEngine.PODMAN
+    assert docker_options.push_engine == DockerPushEngine.PODMAN
+    assert docker_options.run_engine == DockerRunEngine.PODMAN
+    assert "`[docker].experimental_enable_podman` is deprecated" in caplog.text
 
 
 def _create_union_membership() -> UnionMembership:
@@ -1099,7 +1127,6 @@ def test_build_docker_image_packages_local_output_digest(rule_runner: RuleRunner
             under_test_fs,
             _setup_docker_options(rule_runner, dict(use_buildx=True)),
             rule_runner.request(GlobalOptions, []),
-            DockerBinary("/dummy/docker"),
             KeepSandboxes.never,
         ],
         mock_calls={
@@ -1237,7 +1264,6 @@ def test_docker_output_capture_checks_outputs_match_mode(
         under_test_fs,
         _setup_docker_options(rule_runner, dict(use_buildx=True)),
         rule_runner.request(GlobalOptions, []),
-        DockerBinary("/dummy/docker"),
         KeepSandboxes.never,
     ]
 
@@ -1812,10 +1838,10 @@ def test_docker_output_capture_fields_override_default_output(
     def check_build_process(result: DockerImageBuildProcess) -> None:
         assert result.process.argv == (
             "/dummy/docker",
-            "buildx",
             "build",
-            "--output=type=local,dest=.",
             "--pull=False",
+            "--output",
+            "type=local,dest=.",
             "--tag",
             "img1:latest",
             "--file",
@@ -3352,7 +3378,7 @@ def test_docker_build_process_buildctl_engine(rule_runner: RuleRunner) -> None:
     assert_build_process(
         rule_runner,
         Address("docker/test", target_name="img1"),
-        options=dict(engine=DockerEngines(build=DockerBuildEngine.BUILDCTL)),
+        options=dict(build_engine=DockerBuildEngine.BUILDCTL),
         binary=BuildctlBinary("/dummy/buildctl"),
         build_process_assertions=check_build_process,
     )

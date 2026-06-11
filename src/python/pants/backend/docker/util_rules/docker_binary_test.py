@@ -81,6 +81,8 @@ def test_binary_build_image(binary_path: str, binary: DockerBinary | PodmanBinar
         env=env,
         extra_args=("--pull", "--squash"),
         output={"type": "docker"},
+        output_files=("dist/app",),
+        output_directories=("reports",),
     )
 
     assert build_request == Process(
@@ -103,6 +105,8 @@ def test_binary_build_image(binary_path: str, binary: DockerBinary | PodmanBinar
         ),
         env=env,
         input_digest=digest,
+        output_files=("dist/app",),
+        output_directories=("reports",),
         cache_scope=ProcessCacheScope.PER_SESSION,
         description="",  # The description field is marked `compare=False`
     )
@@ -254,6 +258,46 @@ def test_buildctl_binary_build_image_custom_output(
             "type=image,name=custom:tag,push=true",
         ),
         input_digest=digest,
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description="",
+    )
+
+
+def test_buildctl_binary_build_image_local_output(
+    buildctl_path: str, buildctl: BuildctlBinary
+) -> None:
+    dockerfile = "src/test/repo/Dockerfile"
+    digest = Digest(sha256().hexdigest(), 123)
+    build_request = buildctl.build_image(
+        tags=("test:0.1.0",),
+        digest=digest,
+        dockerfile=dockerfile,
+        build_args=DockerBuildArgs(()),
+        context_root=".",
+        env={},
+        output={"type": "local", "dest": "."},
+        output_files=("bin/app",),
+        output_directories=("share",),
+    )
+
+    assert build_request == Process(
+        argv=(
+            buildctl_path,
+            "build",
+            "--frontend",
+            "dockerfile.v0",
+            "--local",
+            "context=.",
+            "--local",
+            "dockerfile=src/test/repo",
+            "--opt",
+            "filename=Dockerfile",
+            "--output",
+            "type=local,dest=.",
+        ),
+        input_digest=digest,
+        output_files=("bin/app",),
+        output_directories=("share",),
         cache_scope=ProcessCacheScope.PER_SESSION,
         description="",
     )
