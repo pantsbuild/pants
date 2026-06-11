@@ -25,22 +25,25 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
+    PythonSourceTarget,
     ResolvedPexEntryPoint,
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
     normalize_module_mapping,
 )
 from pants.backend.python.target_types_rules import (
+    DependencyValidationFieldSet,
     InferPexBinaryEntryPointDependency,
     InferPythonDistributionDependencies,
     PexBinaryEntryPointDependencyInferenceFieldSet,
     PythonDistributionDependenciesInferenceFieldSet,
+    PythonValidateDependenciesRequest,
     resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import python_sources
 from pants.core.goals.generate_lockfiles import UnrecognizedResolveNamesError
 from pants.core.util_rules.unowned_dependency_behavior import UnownedDependencyError
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import (
@@ -49,6 +52,7 @@ from pants.engine.target import (
     InvalidFieldTypeException,
     InvalidTargetException,
     Tags,
+    ValidatedDependencies,
 )
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
@@ -151,6 +155,188 @@ def test_resolve_pex_binary_entry_point() -> None:
     # Resolving >1 file is an error.
     with pytest.raises(ExecutionError):
         assert_resolved(entry_point="*.py", expected=EntryPoint("doesnt matter"), is_file=True)
+
+
+def _python_dependency_validation_rule_runner(*, options: Iterable[str] = ()) -> RuleRunner:
+    rule_runner = RuleRunner(
+        rules=[
+            *target_types_rules.rules(),
+            QueryRule(ValidatedDependencies, [PythonValidateDependenciesRequest]),
+        ],
+        target_types=[PythonSourceTarget],
+    )
+    if options:
+        rule_runner.set_options(list(options))
+    return rule_runner
+
+
+def _validate_python_dependencies(rule_runner: RuleRunner) -> ValidatedDependencies:
+    tgt = rule_runner.get_target(Address("project", target_name="app"))
+    return rule_runner.request(
+        ValidatedDependencies,
+        [
+            PythonValidateDependenciesRequest(
+                DependencyValidationFieldSet.create(tgt),
+                Addresses([Address("project", target_name="dep")]),
+            )
+        ],
+    )
+
+
+def test_validate_python_dependencies_with_manual_interpreter_constraints() -> None:
+    rule_runner = _python_dependency_validation_rule_runner()
+    rule_runner.write_files(
+        {
+            "project/app.py": "",
+            "project/dep.py": "",
+            "project/BUILD": dedent(
+                """\
+                python_source(
+                    name="app",
+                    source="app.py",
+                    dependencies=[":dep"],
+                    interpreter_constraints=["==3.10.*"],
+                )
+                python_source(
+                    name="dep",
+                    source="dep.py",
+                    interpreter_constraints=[">=3.8,<4"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert _validate_python_dependencies(rule_runner) == ValidatedDependencies()
+
+
+def test_validate_python_dependencies_with_matching_manual_interpreter_constraints() -> None:
+    rule_runner = _python_dependency_validation_rule_runner()
+    rule_runner.write_files(
+        {
+            "project/app.py": "",
+            "project/dep.py": "",
+            "project/BUILD": dedent(
+                """\
+                python_source(
+                    name="app",
+                    source="app.py",
+                    dependencies=[":dep"],
+                    interpreter_constraints=["==3.10.*"],
+                )
+                python_source(
+                    name="dep",
+                    source="dep.py",
+                    interpreter_constraints=["==3.10.*"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert _validate_python_dependencies(rule_runner) == ValidatedDependencies()
+
+
+def test_validate_python_dependencies_with_incompatible_manual_interpreter_constraints() -> None:
+    rule_runner = _python_dependency_validation_rule_runner()
+    rule_runner.write_files(
+        {
+            "project/app.py": "",
+            "project/dep.py": "",
+            "project/BUILD": dedent(
+                """\
+                python_source(
+                    name="app",
+                    source="app.py",
+                    dependencies=[":dep"],
+                    interpreter_constraints=[">=3.8,<4"],
+                )
+                python_source(
+                    name="dep",
+                    source="dep.py",
+                    interpreter_constraints=["==3.10.*"],
+                )
+                """
+            ),
+        }
+    )
+
+    with pytest.raises(ExecutionError) as exc:
+        _validate_python_dependencies(rule_runner)
+    assert isinstance(exc.value.wrapped_exceptions[0], InvalidFieldException)
+
+
+def test_validate_python_dependencies_explicit_interpreter_constraints_ignore_resolve_default() -> (
+    None
+):
+    rule_runner = _python_dependency_validation_rule_runner(
+        options=[
+            "--python-enable-resolves",
+            "--python-default-to-resolve-interpreter-constraints",
+            "--python-default-resolve=myresolve",
+            "--python-resolves={'myresolve': 'myresolve.lock'}",
+            "--python-resolves-to-interpreter-constraints={'myresolve': ['==3.11.*']}",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "project/app.py": "",
+            "project/dep.py": "",
+            "project/BUILD": dedent(
+                """\
+                python_source(
+                    name="app",
+                    source="app.py",
+                    dependencies=[":dep"],
+                    resolve="myresolve",
+                    interpreter_constraints=["==3.10.*"],
+                )
+                python_source(
+                    name="dep",
+                    source="dep.py",
+                    interpreter_constraints=[">=3.8,<4"],
+                )
+                """
+            ),
+        }
+    )
+
+    assert _validate_python_dependencies(rule_runner) == ValidatedDependencies()
+
+
+def test_validate_python_dependencies_with_resolve_interpreter_constraints_default() -> None:
+    rule_runner = _python_dependency_validation_rule_runner(
+        options=[
+            "--python-enable-resolves",
+            "--python-default-to-resolve-interpreter-constraints",
+            "--python-default-resolve=myresolve",
+            "--python-resolves={'myresolve': 'myresolve.lock'}",
+            "--python-resolves-to-interpreter-constraints={'myresolve': ['==3.10.*']}",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "project/app.py": "",
+            "project/dep.py": "",
+            "project/BUILD": dedent(
+                """\
+                python_source(
+                    name="app",
+                    source="app.py",
+                    dependencies=[":dep"],
+                    resolve="myresolve",
+                )
+                python_source(
+                    name="dep",
+                    source="dep.py",
+                    resolve="myresolve",
+                )
+                """
+            ),
+        }
+    )
+
+    assert _validate_python_dependencies(rule_runner) == ValidatedDependencies()
 
 
 @pytest.mark.parametrize(
