@@ -1,0 +1,10 @@
+{
+  "name": "pnpm-member-dep-member",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "22.15.21"
+  }
+}

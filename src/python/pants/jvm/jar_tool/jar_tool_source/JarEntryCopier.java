@@ -99,6 +99,11 @@ final class JarEntryCopier {
   private static final FieldAccessor<ZipEntry, String> ZE_NAME =
       FieldAccessor.create(ZipEntry.class, String.class, "name");
 
+  private static final FieldReader<ZipEntry, Integer> ZE_FLAG =
+      FieldReader.create(ZipEntry.class, int.class, "flag");
+
+  private static final int DATA_DESCRIPTOR_FLAG = 1 << 3;
+
   /**
    * Copy a jar entry to an output file without decompressing and re-compressing the entry when it
    * is {@link ZipEntry#DEFLATED}.
@@ -136,6 +141,8 @@ final class JarEntryCopier {
         closer.close();
       }
       jarOut.closeEntry();
+    } else if (usesDataDescriptor(jarEntry)) {
+      copyEntrySlow(jarOut, name, jarIn, jarEntry);
     } else {
       Closer closer = Closer.create();
       try {
@@ -165,6 +172,29 @@ final class JarEntryCopier {
       outEntry.setMethod(ZipEntry.DEFLATED);
       outEntry.setSize(jarEntry.getSize());
     }
+  }
+
+  private static boolean usesDataDescriptor(ZipEntry jarEntry) {
+    return (ZE_FLAG.get(jarEntry) & DATA_DESCRIPTOR_FLAG) != 0;
+  }
+
+  private static void copyEntrySlow(
+      JarOutputStream jarOut, String name, JarFile jarIn, JarEntry jarEntry) throws IOException {
+    JarEntry outEntry = new JarEntry(name);
+    outEntry.setTime(jarEntry.getTime());
+    outEntry.setExtra(jarEntry.getExtra());
+    outEntry.setComment(jarEntry.getComment());
+    Closer closer = Closer.create();
+    try {
+      InputStream is = closer.register(jarIn.getInputStream(jarEntry));
+      jarOut.putNextEntry(outEntry);
+      ByteStreams.copy(is, jarOut);
+    } catch (IOException e) {
+      throw closer.rethrow(e);
+    } finally {
+      closer.close();
+    }
+    jarOut.closeEntry();
   }
 
   private JarEntryCopier() {

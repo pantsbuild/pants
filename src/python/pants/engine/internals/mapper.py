@@ -34,6 +34,12 @@ class DuplicateNameError(MappingError):
 AddressMapT = TypeVar("AddressMapT", bound="AddressMap")
 
 
+# A pseudo-spec to refer to deleted paths.
+DELETED_SPEC_PATH = "__deleted"
+# A pseudo-target type to refer to deleted paths.
+DELETED_TARGET_TYPE = "__deleted_target"
+
+
 @dataclass(frozen=True)
 class AddressMap:
     """Maps target adaptors from a byte source."""
@@ -184,6 +190,8 @@ class AddressFamily:
         return tuple(addr.target_name for addr in self.addresses_to_target_adaptors)
 
     def get_target_adaptor(self, address: Address) -> TargetAdaptor | None:
+        if self.namespace == DELETED_SPEC_PATH:
+            return TargetAdaptor(DELETED_TARGET_TYPE, "deleted_files", "deleted files")
         assert address.spec_path == self.namespace
         entry = self.name_to_target_adaptors.get(address.target_name)
         if entry is None:

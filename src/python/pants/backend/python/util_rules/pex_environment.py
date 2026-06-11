@@ -235,7 +235,7 @@ class CompletePexEnvironment:
         path = os.pathsep.join(self._pex_environment.path)
         subprocess_env_dict = dict(self._pex_environment.subprocess_environment_dict)
 
-        if "PATH" in self._pex_environment.subprocess_environment_dict:
+        if "PATH" in subprocess_env_dict:
             path = os.pathsep.join([path, subprocess_env_dict.pop("PATH")])
 
         d = dict(

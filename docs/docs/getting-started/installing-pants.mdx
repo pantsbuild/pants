@@ -5,33 +5,74 @@
 
 ---
 
-You can download and run an installer script that will install the Pants binary with this command:
+You can download and run an installer script that will install the `pants` binary with this command:
 
 ```
 curl --proto '=https' --tlsv1.2 -fsSL https://static.pantsbuild.org/setup/get-pants.sh | bash
 ```
 
-This script will install `pants` into `~/.local/bin`, which must be on your PATH. The installer script will warn you if it is not.
+This script will:
+- Determine your operating system and architecture (x86 or ARM)
+- Download the appropriate `pants` from GitHub and validates its fingerprint
+- Install `pants` into `~/.local/bin`
+- Warn you if `~/.local/bin` is not on your `PATH`
 
+:::caution Warning
 For security reasons, we don't recommend frequently curling this script directly to `bash`, e.g., on every CI run. If the script were compromised during some time window, you'd be more likely to download it during that window and be impacted. Instead, for regular use, we recommend checking this script into the root of your repo and pointing users and CI machines to that checked-in version. The script is very simple and need not be updated very often.
+:::
 
-Alternatively, on macOS you can also use homebrew to install `pants`:
-
-```
-brew install pantsbuild/tap/pants
-```
-
-You can also use the [`bin`](https://github.com/marcosnils/bin) tool to install `pants`:
-
-```
-bin i github.com/pantsbuild/scie-pants ~/.local/bin/pants
-```
-
-`pants` is a launcher binary that delegates to the underlying version of Pants in each repo. This allows you to have multiple repos, each using an independent version of Pants.
+The `pants` binary delegates to the underlying version of Pants in each repo. This allows you to have multiple repos, each using an independent version of Pants.
 
 - If you run `pants` in a repo that is already configured to use Pants, it will read the repo's Pants version from the `pants.toml` config file, install that version if necessary, and then run it.
 
-- If you run `pants` in a repo that is not yet configured to use Pants, it will prompt you to set up a skeleton `pants.toml` that uses that latest stable version of Pants. You'll then need to edit that config file to add [initial configuration](./initial-configuration.mdx).
+- If you run `pants` in a repo that is not yet configured to use Pants, it will prompt you to set up a skeleton `pants.toml` that uses that latest stable version of Pants. You can then update that file with your [initial configuration](./initial-configuration.mdx).
+
+### Alternative Installation Methods
+
+Using [Homebrew](https://brew.sh) on MacOS (ARM):
+
+```bash
+brew install pantsbuild/tap/pants
+```
+
+Using [`bin`](https://github.com/marcosnils/bin):
+
+```bash
+bin i github.com/pantsbuild/scie-pants ~/.local/bin/pants
+```
+
+Using the [GitHub CLI](https://cli.github.com), specifying your operating system and architecture:
+
+```bash
+# Using `macos-aarch64` here, other options are: `linux-aarch64`, `linux-x86_64`
+gh release download \
+    --repo pantsbuild/scie-pants \
+    --pattern "*macos-aarch64" \
+    --output ~/.local/bin/pants
+
+# Check attestations for "✓ Verification succeeded!"
+gh attestation verify ~/.local/bin/pants \
+    --repo pantsbuild/scie-pants \
+    --signer-repo pantsbuild/scie-pants
+
+# Allow running pants
+chmod +x ~/.local/bin/pants
+```
+
+Using `wget`:
+
+```bash
+# os-arch: `linux-aarch64`, `linux-x86_64`, or `macos-aarch64`
+wget https://github.com/pantsbuild/scie-pants/releases/download/{release_version}/scie-pants-{os-arch}
+wget https://github.com/pantsbuild/scie-pants/releases/download/{release_version}/scie-pants-{os-arch}.sha256
+
+# Verify SHA with `shasum -a 256` or `sha256sum`
+shasum -a 256 -c ./*.sha256
+
+# Allow running pants
+mv scie-pants-{os-arch} ~/.local/bin/pants
+chmod +x ~/.local/bin/pants
+```
 
 If you have difficulty installing Pants, see our [getting help](/community/getting-help) for community resources to help you resolve your issue.
 
@@ -65,5 +106,3 @@ You don't need to know this to use `pants`, but it may be of interest:
 The `pants` launcher binary is also known as [scie-pants](https://github.com/pantsbuild/scie-pants) (pronounced "ski pants"), It's implemented using [scie](https://github.com/a-scie/jump), a Self Contained Interpreted Executable launcher. scie is what allows `pants` to embed its own Python interpreter, instead of relying on a specific interpreter being available on your PATH.
 
 In fact, instead of literally embedding an interpreter in the `pants` binary, which would inflate its size, the binary is "hollowed out": Instead of the interpreter itself it contains metadata on how to download a platform-specific [standalone interpreter executable](https://gregoryszorc.com/docs/python-build-standalone/main/). The scie mechanism then downloads that interpreter file on first use, and caches it for future use. So if you update the `pants` launcher binary, you don't have to re-download the interpreter.
-
-See the links above for more details. We hope to soon add support in Pants for building scies out of your code, which will allow you to package and ship fully standalone Python binaries!

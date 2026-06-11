@@ -89,14 +89,14 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
     ) -> InterpreterConstraints:
         return cls([f"{interpreter_type}=={python_version_str}"])
 
-    def __init__(self, constraints: Iterable[str | Requirement] = ()) -> None:
+    def __new__(cls, constraints: Iterable[str | Requirement] = ()) -> InterpreterConstraints:
         # #12578 `parse_constraint` will sort the requirement's component constraints into a stable form.
         # We need to sort the component constraints for each requirement _before_ sorting the entire list
         # for the ordering to be correct.
         parsed_constraints = (
             i if isinstance(i, Requirement) else parse_constraint(i) for i in constraints
         )
-        super().__init__(sorted(parsed_constraints, key=lambda c: str(c)))
+        return super().__new__(cls, sorted(parsed_constraints, key=lambda c: str(c)))
 
     def __str__(self) -> str:
         return " OR ".join(str(constraint) for constraint in self)

@@ -65,12 +65,11 @@ Example: [#21007](https://github.com/pantsbuild/pants/pull/21007).
 
 ### Python Build Standalone known versions
 
-The Python Build Standalone provider needs to be updated with new upstream releases.  There are *many* artifacts here, so the hashes are stored in a json file that is updated by running:
+The Python Build Standalone provider needs to be updated with new upstream releases.  There are *many* artifacts here, so the hashes are stored in a json file that is updated by running (from the Pants repo root):
 
+```bash
+python3 build-support/bin/generate-pbs-urls.py
 ```
-pants run src/python/pants/backend/python/providers/python_build_standalone/scripts/generate_urls.py
-```
-
 
 ## Update or create FaaS complete platforms files
 

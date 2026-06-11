@@ -34,18 +34,18 @@ class PluginLoadOrderError(PluginLoadingError):
 def load_backends_and_plugins(
     plugins: list[str],
     backends: list[str],
-    bc_builder: BuildConfiguration.Builder | None = None,
+    bc_builder: BuildConfiguration.Builder,
 ) -> BuildConfiguration:
     """Load named plugins and source backends.
 
-    :param plugins: v2 plugins to load.
-    :param backends: v2 backends to load.
+    :param plugins: plugins to load.
+    :param backends: backends to load.
     :param bc_builder: The BuildConfiguration (for adding aliases).
     """
-    bc_builder = bc_builder or BuildConfiguration.Builder()
     load_build_configuration_from_source(bc_builder, backends)
     load_plugins(bc_builder, plugins)
-    register_builtin_goals(bc_builder)
+    if not bc_builder._pants_ng:
+        register_builtin_goals(bc_builder)
     return bc_builder.create()
 
 

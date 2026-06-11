@@ -6,11 +6,13 @@ from __future__ import annotations
 import importlib.resources
 import json
 import logging
+import tomllib
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
-from enum import StrEnum, auto
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
+
+from packaging.requirements import Requirement
 
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
@@ -18,8 +20,10 @@ from pants.backend.python.target_types import PythonRequirementsField
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
     InvalidPythonLockfileReason,
+    LockfileFormat,
     PythonLockfileMetadata,
     PythonLockfileMetadataV2,
+    PythonLockfileMetadataV8,
 )
 from pants.build_graph.address import Address
 from pants.core.util_rules.lockfile_metadata import (
@@ -49,13 +53,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-class LockfileFormat(StrEnum):
-    Pex = auto()
-    # The very old, deprecated constraints-based "lockfile" that should
-    # be removed entirely.
-    ConstraintsDeprecated = auto()
 
 
 @dataclass(frozen=True)
@@ -233,58 +230,61 @@ async def load_lockfile(
 
     lockfile_contents = await get_digest_contents(lockfile_digest)
     lock_bytes = lockfile_contents[0].content
-    lockfile_format = (
-        LockfileFormat.Pex
-        if is_probably_pex_json_lockfile(lock_bytes)
-        else LockfileFormat.ConstraintsDeprecated
-    )
+    lockfile_format: LockfileFormat | None = None
     constraints_strings = None
 
     metadata_url = PythonLockfileMetadata.metadata_location_for_lockfile(lockfile.url)
     metadata = None
-    if python_setup.invalid_lockfile_behavior != InvalidLockfileBehavior.ignore:
-        try:
-            metadata_digest = await read_file_or_resource(
-                metadata_url,
-                description_of_origin="We squelch errors, so this is never seen by users",
-            )
-            digest_contents = await get_digest_contents(metadata_digest)
-            metadata_bytes = digest_contents[0].content
-            json_dict = json.loads(metadata_bytes)
-            metadata = PythonLockfileMetadata.from_json_dict(
-                json_dict,
-                lockfile_description=f"the lockfile for `{lockfile.resolve_name}`",
-                error_suffix=softwrap(
-                    f"""
-                    To resolve this error, you will need to regenerate the lockfile by running
-                    `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}.
-                    """
-                ),
-            )
-            requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
-        except (IntrinsicError, FileNotFoundError):
-            # No metadata file or resource found, so fall through to finding a metadata
-            # header block prepended to the lockfile itself.
-            pass
 
-    if not metadata:
-        if lockfile_format == LockfileFormat.Pex:
-            header_delimiter = "//"
-            stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
-            lockfile_digest = await create_digest(
-                CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)])
-            )
-            requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
-        else:
-            header_delimiter = "#"
-            lock_string = lock_bytes.decode()
-            # Note: this is a very naive heuristic. It will overcount because entries often
-            # have >1 line due to `--hash`.
-            requirement_estimate = len(lock_string.splitlines())
-            constraints_strings = FrozenOrderedSet(
-                str(req) for req in parse_requirements_file(lock_string, rel_path=lockfile_path)
-            )
+    # If there's a sidecar metadata file, always load it, at least to get the lockfile_format.
+    try:
+        metadata_digest = await read_file_or_resource(
+            metadata_url,
+            description_of_origin="We squelch errors, so this is never seen by users",
+        )
+        digest_contents = await get_digest_contents(metadata_digest)
+        metadata_bytes = digest_contents[0].content
+        json_dict = json.loads(metadata_bytes)
+        metadata = PythonLockfileMetadata.from_json_dict(
+            json_dict,
+            lockfile_description=f"the lockfile for `{lockfile.resolve_name}`",
+            error_suffix=softwrap(
+                f"""
+                To resolve this error, you will need to regenerate the lockfile by running
+                `{bin_name()} generate-lockfiles --resolve={lockfile.resolve_name}.
+                """
+            ),
+        )
+        if isinstance(metadata, PythonLockfileMetadataV8):
+            lockfile_format = metadata.lockfile_format
+    except IntrinsicError:
+        # No metadata file or resource found, so fall through to finding a metadata header block
+        # prepended to the lockfile itself.
+        pass
 
+    # If this is a uv lockfile then its metadata will have told us so, otherwise fall back
+    # to detection (since older lockfiles may not have the format field in the metadata).
+    lockfile_format = lockfile_format or (
+        LockfileFormat.PEX
+        if is_probably_pex_json_lockfile(lock_bytes)
+        else LockfileFormat.CONSTRAINTS_DEPRECATED
+    )
+
+    if lockfile_format == LockfileFormat.CONSTRAINTS_DEPRECATED:
+        lock_string = lock_bytes.decode()
+        constraints_strings = FrozenOrderedSet(
+            str(req) for req in parse_requirements_file(lock_string, rel_path=lockfile_path)
+        )
+
+    if lockfile_format == LockfileFormat.PEX:
+        stripped_lock_bytes = strip_comments_from_pex_json_lockfile(lock_bytes)
+        lockfile_digest = await create_digest(
+            CreateDigest([FileContent(lockfile_path, stripped_lock_bytes)])
+        )
+
+    if not metadata and python_setup.invalid_lockfile_behavior != InvalidLockfileBehavior.ignore:
+        # uv lockfiles must have sidecar metadata, so this can only be Pex or ConstraintsDeprecated.
+        header_delimiter = "//" if lockfile_format == LockfileFormat.PEX else "#"
         metadata = get_metadata(
             python_setup,
             lock_bytes,
@@ -292,6 +292,39 @@ async def load_lockfile(
             lockfile.resolve_name,
             header_delimiter,
         )
+
+    match lockfile_format:
+        case LockfileFormat.UV:
+            # Use the virtual root package's direct dependencies as a rough estimate
+            # of how many packages need resolving.
+            # NB: The uv project recommends not relying on lockfile internals, but
+            # this particular aspect seems relatively stable in practice.
+            lockfile_toml = tomllib.loads(lock_bytes.decode())
+            root_package = next(
+                (
+                    p
+                    for p in lockfile_toml.get("package", [])
+                    if p.get("source", {}).get("virtual") == "."
+                ),
+                None,
+            )
+            deps = root_package.get("dependencies") if root_package else None
+            if deps is None:
+                logger.warning(
+                    f"Couldn't find the virtual root [[package]].dependencies entry in {lockfile_path}. "
+                    "Has the uv lockfile format changed? This will not affect correctness but "
+                    "may affect performance. Please reach out to the Pants team if you encounter "
+                    "this warning."
+                )
+            requirement_estimate = 4 if deps is None else len(deps)
+        case LockfileFormat.PEX:
+            requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
+        case LockfileFormat.CONSTRAINTS_DEPRECATED:
+            # Note: this is a very naive heuristic. It will overcount because entries often
+            # have >1 line due to `--hash`.
+            requirement_estimate = len(lock_bytes.splitlines())
+        case _:
+            raise ValueError(f"Unknown lockfile format: {lockfile_format}")
 
     return LoadedLockfile(
         lockfile_digest,
@@ -380,7 +413,7 @@ class ResolvePexConstraintsFile:
 
 
 @dataclass(frozen=True)
-class ResolvePexConfig:
+class ResolveConfig:
     """Configuration from `[python]` that impacts how the resolve is created."""
 
     indexes: tuple[str, ...]
@@ -449,9 +482,111 @@ class ResolvePexConfig:
         if self.uploaded_prior_to:
             yield f"--uploaded-prior-to={self.uploaded_prior_to}"
 
+    def uv_config(self, extra_find_links: Iterable[str] = ()) -> str:
+        """Content for uv.toml based on this resolve's configuration.
+
+        Only uv-supported fields are used. Call validate_for_uv() first to ensure no
+        pex-specific fields are set.
+        """
+        config_lines: list[str] = []
+
+        all_find_links = (*self.find_links, *extra_find_links)
+        if all_find_links:
+            config_lines.append("find-links = [")
+            for fl in all_find_links:
+                config_lines.append(f'    "{fl}",')
+            config_lines.append("]")
+            config_lines.append("")
+
+        if self.sources:
+            config_lines.append("[sources]")
+            for source in self.sources:
+                index_name, _, scope = source.partition("=")
+                req = Requirement(scope)
+                # Markers may contain double-quotes, so we use single quotes in the TOML.
+                marker = f", marker = '{req.marker}'" if req.marker else ""
+                config_lines.append(f'{req.name} = {{ index = "{index_name}"{marker} }}')
+            config_lines.append("")
+
+        if self.no_binary:
+            if ":all:" in self.no_binary:
+                config_lines.append("no-binary = true")
+            elif ":none:" not in self.no_binary:
+                config_lines.append("no-binary-package = [")
+                for pkg in self.no_binary:
+                    config_lines.append(f'    "{pkg}",')
+                config_lines.append("]")
+            config_lines.append("")
+
+        if self.only_binary:
+            if ":all:" in self.only_binary:
+                config_lines.append("no-build = true")
+            elif ":none:" not in self.only_binary:
+                config_lines.append("no-build-package = [")
+                for pkg in self.only_binary:
+                    config_lines.append(f'    "{pkg}",')
+                config_lines.append("]")
+            config_lines.append("")
+
+        if self.uploaded_prior_to:
+            config_lines.append(f'exclude-newer = "{self.uploaded_prior_to}"')
+            config_lines.append("")
+
+        indexes = []
+        for index in self.indexes:
+            part1, _, part2 = index.partition("=")
+            (name, url) = (part1, part2) if part2 else ("", part1)
+            index_data = {"url": url}
+            if name:
+                index_data["name"] = name
+            indexes.append(index_data)
+        if indexes:
+            # To turn off uv's fallback to PyPI we must set some other index to be the default.
+            # In uv the default index has the lowest priority, regardless of its position in the
+            # list of indexes, so we set the last index to be that default, to match user intent.
+            indexes[-1]["default"] = "true"
+            for index_data in indexes:
+                name = index_data.get("name", "")
+                url = index_data.get("url", "")
+                default = index_data.get("default", False)
+                config_lines.append("[[index]]")
+                if name:
+                    config_lines.append(f'name = "{name}"')
+                config_lines.append(f'url = "{url}"')
+                if default:
+                    config_lines.append("default = true")
+                config_lines.append("")
+        else:
+            config_lines.append("no-index = true")
+            config_lines.append("")
+
+        return "\n".join(config_lines) + "\n" if config_lines else ""
+
+    def validate_for_uv(self, resolve_name: str) -> None:
+        """Raise if any pex-specific resolve options are set that have no uv equivalent."""
+        pex_specific: list[str] = []
+        if self.constraints_file:
+            pex_specific.append("`[python].resolves_to_constraints_file`")
+        if self.complete_platforms:
+            pex_specific.append("`[python].resolves_to_complete_platforms`")
+        if self.excludes:
+            pex_specific.append("`[python].resolves_to_excludes`")
+        if self.overrides:
+            pex_specific.append("`[python].resolves_to_overrides`")
+        if self.lock_style != "universal":
+            pex_specific.append("`[python]._resolves_to_lock_style`")
+        if self.path_mappings:
+            pex_specific.append("`[python-repos].path_mappings`")
+        if pex_specific:
+            raise ValueError(
+                f"The following options are set for the resolve `{resolve_name}` but are not "
+                f"supported when using the uv resolver:\n"
+                + "\n".join(f"  - {opt}" for opt in pex_specific)
+            )
+
 
 @dataclass(frozen=True)
-class ResolvePexConfigRequest(EngineAwareParameter):
+class ResolveConfigRequest(EngineAwareParameter):
     """Find all configuration from `[python]` that impacts how the resolve is created.
 
     If `resolve_name` is None, then most per-resolve options will be ignored because there is no way
@@ -466,14 +601,14 @@ class ResolvePexConfigRequest(EngineAwareParameter):
 
 
 @rule
-async def determine_resolve_pex_config(
-    request: ResolvePexConfigRequest,
+async def determine_resolve_config(
+    request: ResolveConfigRequest,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
     union_membership: UnionMembership,
-) -> ResolvePexConfig:
+) -> ResolveConfig:
     if request.resolve_name is None:
-        return ResolvePexConfig(
+        return ResolveConfig(
             indexes=python_repos.indexes,
             find_links=python_repos.find_links,
             manylinux=python_setup.manylinux,
@@ -539,7 +674,7 @@ async def determine_resolve_pex_config(
             _constraints_digest, _constraints_file_path, FrozenOrderedSet(constraints)
         )
 
-    return ResolvePexConfig(
+    return ResolveConfig(
         indexes=python_repos.indexes,
         find_links=python_repos.find_links,
         manylinux=python_setup.manylinux,
@@ -563,7 +698,7 @@ def validate_metadata(
     consumed_req_strings: Iterable[str],
     validate_consumed_req_strings: bool,
     python_setup: PythonSetup,
-    resolve_config: ResolvePexConfig,
+    resolve_config: ResolveConfig,
 ) -> None:
     """Given interpreter constraints and requirements to be consumed, validate lockfile metadata."""
 

@@ -23,6 +23,9 @@ from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import (
     DockerImageBuildImageOutputField,
     DockerImageContextRootField,
+    DockerImageOutputDirectoriesField,
+    DockerImageOutputFilesField,
+    DockerImageOutputsMatchModeField,
     DockerImageRegistriesField,
     DockerImageRepositoryField,
     DockerImageSourceField,
@@ -47,17 +50,34 @@ from pants.backend.docker.util_rules.docker_build_context import (
     create_docker_build_context,
 )
 from pants.backend.docker.utils import format_rename_suggestion
-from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
+from pants.core.goals.package import (
+    BuiltPackage,
+    BuiltPackageArtifact,
+    OutputPathField,
+    PackageFieldSet,
+)
 from pants.core.goals.publish import PublishFieldSet
+from pants.core.util_rules.adhoc_process_support import check_outputs
 from pants.engine.collection import Collection
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, FileContent
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    CreateDigest,
+    FileContent,
+)
 from pants.engine.internals.graph import resolve_target
-from pants.engine.intrinsics import create_digest, execute_process
+from pants.engine.intrinsics import (
+    add_prefix,
+    create_digest,
+    digest_to_snapshot,
+    execute_process,
+)
 from pants.engine.process import Process, ProcessExecutionFailure
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import InvalidFieldException, Target, WrappedTargetRequest
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import bullet_list, softwrap
 from pants.util.value_interpolation import InterpolationContext, InterpolationError
 
@@ -92,6 +112,9 @@ class DockerPackageFieldSet(PackageFieldSet):
     target_stage: DockerImageTargetStageField
     output_path: OutputPathField
     output: DockerImageBuildImageOutputField
+    output_files: DockerImageOutputFilesField
+    output_directories: DockerImageOutputDirectoriesField
+    outputs_match_mode: DockerImageOutputsMatchModeField
 
     def pushes_on_package(self) -> bool:
         """Returns True if this docker_image target would push to a registry during packaging."""
@@ -433,6 +456,74 @@ class DockerImageBuildProcess:
     context_root: str
     image_refs: DockerImageRefs
     tags: tuple[str, ...]
+    captured_outputs: DockerBuildCapturedOutputs | None = None
+
+
+@dataclass(frozen=True)
+class DockerBuildCapturedOutputs:
+    output_options: FrozenDict[str, str]
+    output_files: tuple[str, ...]
+    output_directories: tuple[str, ...]
+
+
+def _validate_output_capture_path(
+    path: str, field_set: DockerPackageFieldSet, field_alias: str
+) -> str:
+    normalized_path = os.path.normpath(path)
+    if (
+        os.path.isabs(normalized_path)
+        or normalized_path == ".."
+        or normalized_path.startswith(f"..{os.sep}")
+    ):
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                The `{field_alias}` field in `docker_image` {field_set.address} contains {path!r}.
+                Pants can only capture relative paths that stay inside the build root.
+                """
+            )
+        )
+    return normalized_path
+
+
+def _docker_build_captured_outputs(
+    field_set: DockerPackageFieldSet,
+) -> DockerBuildCapturedOutputs | None:
+    output_files = tuple(
+        _validate_output_capture_path(path, field_set, DockerImageOutputFilesField.alias)
+        for path in (field_set.output_files.value or ())
+    )
+    output_directories = tuple(
+        _validate_output_capture_path(path, field_set, DockerImageOutputDirectoriesField.alias)
+        for path in (field_set.output_directories.value or ())
+    )
+    if not (output_files or output_directories):
+        return None
+
+    if field_set.output.value != field_set.output.default:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                The `docker_image` {field_set.address} sets both `{DockerImageBuildImageOutputField.alias}`
+                and output capture fields. Use `{DockerImageOutputFilesField.alias}` and/or
+                `{DockerImageOutputDirectoriesField.alias}` without setting
+                `{DockerImageBuildImageOutputField.alias}`; Pants will automatically use the
+                BuildKit local output exporter.
+                """
+            )
+        )
+
+    return DockerBuildCapturedOutputs(
+        output_options=FrozenDict({"type": "local", "dest": "."}),
+        output_files=output_files,
+        output_directories=output_directories,
+    )
+
+
+def _docker_build_captured_output_path(field_set: DockerPackageFieldSet) -> str:
+    if field_set.output_path.value != field_set.output_path.default:
+        return field_set.output_path.value_or_default(file_ending=None)
+    return field_set.address.spec_path
 
 
 @rule
@@ -479,6 +570,7 @@ async def get_docker_image_build_process(
         "__UPSTREAM_IMAGE_IDS": ",".join(context.upstream_image_ids),
     }
     context_root = field_set.get_context_root(options.default_context_root)
+    captured_outputs = _docker_build_captured_outputs(field_set)
     binary: BuildctlBinary | PodmanBinary | DockerBinary
     match options.build_engine:
         case DockerBuildEngine.BUILDCTL:
@@ -495,7 +587,7 @@ async def get_docker_image_build_process(
         context_root=context_root,
         env=env,
         tags=tags,
-        output=field_set.output.value,
+        output=captured_outputs.output_options if captured_outputs else field_set.output.value,
         extra_args=tuple(
             get_build_options(
                 context=context,
@@ -504,6 +596,8 @@ async def get_docker_image_build_process(
             )
         ),
         is_publish=isinstance(field_set, PublishFieldSet),
+        output_files=captured_outputs.output_files if captured_outputs else (),
+        output_directories=captured_outputs.output_directories if captured_outputs else (),
     )
     return DockerImageBuildProcess(
         process=process,
@@ -511,6 +605,7 @@ async def get_docker_image_build_process(
         context_root=context_root,
         image_refs=image_refs,
         tags=tags,
+        captured_outputs=captured_outputs,
     )
 
 
@@ -578,6 +673,29 @@ async def build_docker_image(
         logger.info(docker_build_output_msg)
     else:
         logger.debug(docker_build_output_msg)
+
+    if build_process.captured_outputs:
+        outputs_match_mode = field_set.outputs_match_mode.enum_value
+        await check_outputs(
+            output_digest=result.output_digest,
+            output_files=build_process.captured_outputs.output_files,
+            output_directories=build_process.captured_outputs.output_directories,
+            outputs_match_error_behavior=outputs_match_mode.glob_match_error_behavior,
+            outputs_match_mode=outputs_match_mode.glob_expansion_conjunction,
+            address=field_set.address,
+        )
+        output_path = _docker_build_captured_output_path(field_set)
+        digest = (
+            await add_prefix(AddPrefix(result.output_digest, output_path))
+            if result.output_digest != EMPTY_DIGEST and output_path and output_path != "."
+            else result.output_digest
+        )
+        snapshot = await digest_to_snapshot(digest)
+        artifact_paths = snapshot.files or snapshot.dirs
+        return BuiltPackage(
+            digest,
+            tuple(BuiltPackageArtifact(relpath=path) for path in artifact_paths),
+        )
 
     metadata_filename = field_set.output_path.value_or_default(file_ending="docker-info.json")
     metadata = DockerInfoV1.serialize(build_process.image_refs, image_id=image_id)

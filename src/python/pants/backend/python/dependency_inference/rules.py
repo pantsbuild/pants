@@ -19,6 +19,7 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwnersRequest,
     ResolveName,
     map_module_to_address,
+    module_from_stripped_path,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonAssetPaths,
@@ -54,6 +55,7 @@ from pants.core.util_rules.unowned_dependency_behavior import (
     UnownedDependencyUsage,
 )
 from pants.engine.addresses import Address, Addresses
+from pants.engine.internals.build_files import DELETED_ADDRESS
 from pants.engine.internals.graph import (
     OwnersRequest,
     determine_explicitly_provided_dependencies,
@@ -69,9 +71,15 @@ from pants.engine.target import (
     InferredDependencies,
 )
 from pants.engine.unions import UnionRule
-from pants.source.source_root import SourceRootRequest, get_source_root
+from pants.source.source_root import (
+    SourceRootRequest,
+    SourceRootsRequest,
+    get_optional_source_roots,
+    get_source_root,
+)
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
+from pants.vcs.changed import DeletedFiles, get_deleted_files
 
 logger = logging.getLogger(__name__)
 
@@ -490,6 +498,31 @@ async def infer_python_dependencies_via_source(
         parsed_dependencies.imports,
         resolve=resolve,
     )
+
+    if unowned_imports:
+        # Let's see if any of the unowned imports were provided by a deleted file.
+        deleted_files: DeletedFiles = await get_deleted_files(**implicitly())
+        deleted_python_files = tuple(f for f in deleted_files.paths if f.endswith((".py", ".pyi")))
+        if deleted_python_files:
+            source_roots_result = await get_optional_source_roots(
+                SourceRootsRequest.for_files(deleted_python_files)
+            )
+            # We drop files not under a source root, since they can't be used for import anyway.
+            stripped_deleted_python_files = tuple(
+                f.relative_to(opt_root.source_root.path)
+                for f, opt_root in source_roots_result.path_to_optional_root.items()
+                if opt_root.source_root
+            )
+            deleted_modules = tuple(
+                module_from_stripped_path(f) for f in stripped_deleted_python_files
+            )
+            for impt in unowned_imports:
+                for mod in deleted_modules:
+                    if impt == mod or (impt.startswith(mod) and impt[len(mod)] == "."):
+                        # At least one unowned import was provided by a deleted file, so we
+                        # inject a dep on the DeletedTarget pseudo-target.
+                        inferred_deps = frozenset(inferred_deps | {DELETED_ADDRESS})
+                        break
 
     return InferredDependencies(sorted(inferred_deps))
 

@@ -44,7 +44,7 @@ def rule_runner() -> RuleRunner:
     )
 
 
-requirements = PexRequirements(["psycopg2-binary==2.9.6"])
+requirements = PexRequirements(["psycopg2-binary==2.9.12"])
 
 
 @pytest.fixture

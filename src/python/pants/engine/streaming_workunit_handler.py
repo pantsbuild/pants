@@ -294,7 +294,7 @@ class _InnerHandler(threading.Thread):
         max_workunit_verbosity: LogLevel,
         allow_async_completion: bool,
     ) -> None:
-        super().__init__(daemon=True)
+        super().__init__(daemon=True, name="workunit-stream")
         self.scheduler = scheduler
         self.context = context
         self.stop_request = threading.Event()

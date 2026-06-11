@@ -96,6 +96,7 @@ target(
         "src/python/pants/backend/experimental/typescript",
         "src/python/pants/backend/experimental/visibility",
         "src/python/pants/backend/google_cloud_function/python",
+        "src/python/pants/backend/observability/opentelemetry",
         "src/python/pants/backend/plugin_development",
         "src/python/pants/backend/project_info",
         "src/python/pants/backend/python",

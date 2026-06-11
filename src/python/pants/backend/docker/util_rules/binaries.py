@@ -66,9 +66,11 @@ class BuildBinaryProtocol(Protocol):
         build_args: DockerBuildArgs,
         context_root: str,
         env: Mapping[str, str],
-        output: dict[str, str] | None,
+        output: Mapping[str, str] | None,
         extra_args: tuple[str, ...] = (),
         is_publish: bool = False,
+        output_files: tuple[str, ...] = (),
+        output_directories: tuple[str, ...] = (),
     ) -> Process: ...
 
 
@@ -92,6 +94,8 @@ class _DockerPodmanMixin(BaseBinary):
         output: Mapping[str, str] | None,
         extra_args: tuple[str, ...] = (),
         is_publish: bool = False,
+        output_files: tuple[str, ...] = (),
+        output_directories: tuple[str, ...] = (),
     ) -> Process:
         args = [self.path, "build", *extra_args]
 
@@ -118,6 +122,8 @@ class _DockerPodmanMixin(BaseBinary):
             env=self._get_process_environment(env),
             input_digest=digest,
             immutable_input_digests=self.extra_input_digests,
+            output_files=output_files,
+            output_directories=output_directories,
             # We must run the docker build commands every time, even if nothing has changed,
             # in case the user ran `docker image rm` outside of Pants.
             cache_scope=ProcessCacheScope.PER_SESSION,
@@ -189,6 +195,8 @@ class BuildctlBinary(BaseBinary):
         output: Mapping[str, str] | None,
         extra_args: tuple[str, ...] = (),
         is_publish: bool = False,
+        output_files: tuple[str, ...] = (),
+        output_directories: tuple[str, ...] = (),
     ) -> Process:
         args = [
             self.path,
@@ -223,6 +231,8 @@ class BuildctlBinary(BaseBinary):
             env=self._get_process_environment(env),
             input_digest=digest,
             immutable_input_digests=self.extra_input_digests,
+            output_files=output_files,
+            output_directories=output_directories,
             cache_scope=ProcessCacheScope.PER_SESSION,
         )
 

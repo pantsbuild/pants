@@ -37,6 +37,8 @@ from pants.engine.fs import (
     RemovePrefix,
 )
 from pants.engine.internals.graph import find_valid_field_sets, hydrate_sources, resolve_targets
+from pants.engine.internals.mapper import DELETED_TARGET_TYPE
+from pants.engine.internals.native_engine import StringSequenceField
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -651,6 +653,28 @@ class GenericTarget(Target):
     )
 
 
+class DeletedSources(StringSequenceField):
+    alias = "deleted_sources"
+    help = "Deleted files"
+
+
+class DeletedTarget(Target):
+    alias = DELETED_TARGET_TYPE
+    core_fields = (DeletedSources,)
+    help = help_text(
+        """
+        A pseudo-target representing all files deleted from the repo, when using
+        `--changed-since`.
+
+        Not intended to be user-visible, and does not represent any "real" BUILD entity.
+        Can be used as a sentinel when inferring dependents of deleted files.
+
+        See DELETED_ADDRESS in src/python/pants/engine/internals/build_files.py for
+        details on how this is used.
+        """
+    )
+
+
 # -----------------------------------------------------------------------------------------------
 # `Asset` targets (resources and files)
 # -----------------------------------------------------------------------------------------------
@@ -873,7 +897,7 @@ class LockfileSourceField(OptionalSingleSourceField):
     required = True
     value: str
 
-    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:
         return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 
@@ -903,7 +927,7 @@ class LockfilesGeneratorSourcesField(MultipleSourcesField):
 
     help = generate_multiple_sources_field_help_message("Example: `sources=['example.lock']`")
 
-    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:  # type: ignore[misc]
+    def path_globs(self, unmatched_build_file_globs: UnmatchedBuildFileGlobs) -> PathGlobs:
         return super().path_globs(UnmatchedBuildFileGlobs.ignore())
 
 

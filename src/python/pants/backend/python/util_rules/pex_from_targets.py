@@ -21,6 +21,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.local_dists import LocalDistsPexRequest, build_local_dists
 from pants.backend.python.util_rules.local_dists import rules as local_dists_rules
+from pants.backend.python.util_rules.lockfile_metadata import LockfileFormat
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     OptionalPexRequest,
@@ -34,7 +35,6 @@ from pants.backend.python.util_rules.pex_requirements import (
     EntireLockfile,
     LoadedLockfileRequest,
     Lockfile,
-    LockfileFormat,
     PexRequirements,
     Resolve,
     load_lockfile,
@@ -571,7 +571,10 @@ async def _determine_requirements_for_pex_from_targets(
         loaded_lockfile = await load_lockfile(
             LoadedLockfileRequest(chosen_resolve.lockfile), **implicitly()
         )
-        pex_native_subsetting_supported = loaded_lockfile.lockfile_format == LockfileFormat.Pex
+        pex_native_subsetting_supported = loaded_lockfile.lockfile_format in (
+            LockfileFormat.PEX,
+            LockfileFormat.UV,
+        )
         if loaded_lockfile.as_constraints_strings:
             requirements = dataclasses.replace(
                 requirements,
