@@ -85,6 +85,7 @@ from pants.engine.process import (
 from pants.engine.target import InvalidFieldException, WrappedTarget
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.option.global_options import GlobalOptions, KeepSandboxes
+from pants.option.ranked_value import Rank, RankedValue
 from pants.testutil.option_util import create_subsystem
 from pants.testutil.pytest_util import assert_logged, no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner, run_rule_with_mocks
@@ -191,6 +192,32 @@ def test_deprecated_docker_engine_options(caplog: pytest.LogCaptureFixture) -> N
     assert docker_options.push_engine == DockerPushEngine.PODMAN
     assert docker_options.run_engine == DockerRunEngine.PODMAN
     assert "`[docker].experimental_enable_podman` is deprecated" in caplog.text
+
+    caplog.clear()
+    docker_options = create_subsystem(DockerOptions, experimental_enable_podman=False)
+    assert docker_options.build_engine == DockerBuildEngine.DOCKER
+    assert docker_options.push_engine == DockerPushEngine.DOCKER
+    assert docker_options.run_engine == DockerRunEngine.DOCKER
+    assert "`[docker].experimental_enable_podman` is deprecated" in caplog.text
+
+
+def test_docker_engine_options_take_precedence_over_deprecated_podman_default(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.WARNING)
+
+    docker_options = create_subsystem(
+        DockerOptions,
+        experimental_enable_podman=RankedValue(Rank.HARDCODED, True),
+        build_engine=RankedValue(Rank.CONFIG, DockerBuildEngine.BUILDCTL),
+        push_engine=RankedValue(Rank.CONFIG, DockerPushEngine.DOCKER),
+        run_engine=RankedValue(Rank.CONFIG, DockerRunEngine.DOCKER),
+    )
+
+    assert docker_options.build_engine == DockerBuildEngine.BUILDCTL
+    assert docker_options.push_engine == DockerPushEngine.DOCKER
+    assert docker_options.run_engine == DockerRunEngine.DOCKER
+    assert "`[docker].experimental_enable_podman` is deprecated" not in caplog.text
 
 
 def _create_union_membership() -> UnionMembership:

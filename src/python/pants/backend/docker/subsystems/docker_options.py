@@ -216,26 +216,18 @@ class DockerOptions(Subsystem):
             Use [buildx](https://github.com/docker/buildx#buildx) (and BuildKit) for builds.
             """
         ),
-        deprecation_start_version="2.31.0",
+        deprecation_start_version="2.33.0",
         mutually_exclusive_group="build-engine",
     )
-    experimental_enable_podman = BoolOption(
-        default=None,
-        help=softwrap(
-            """
-            DEPRECATED: Use `[docker].build_engine`, `[docker].push_engine`, and
-            `[docker].run_engine` instead.
-
-            If true, use Podman for builds, pushes, and runs. If false, use Docker for builds,
-            pushes, and runs.
-            """
-        ),
-        deprecation_start_version="2.31.0",
-    )
-
     def _experimental_enable_podman_warning[
         E: DockerBuildEngine | DockerRunEngine | DockerPushEngine
     ](self, engine_type: type[E], engine: E, engine_opt: str) -> E:
+        if (
+            (engine_option := f"{engine_opt}_engine") in self.options
+            and not self.options.is_default(engine_option)
+        ):
+            return engine
+
         experimental_enable_podman = self.options.get("experimental_enable_podman", None)
         match experimental_enable_podman:
             case None:
@@ -251,6 +243,12 @@ class DockerOptions(Subsystem):
 
     @property
     def build_engine(self) -> DockerBuildEngine:
+        build_engine = cast(
+            DockerBuildEngine, self.options.get("build_engine", DockerBuildEngine.DOCKER)
+        )
+        if "build_engine" in self.options and not self.options.is_default("build_engine"):
+            return build_engine
+
         use_buildx = self.options.get("use_buildx")
         if use_buildx is not None:
             warning = '`[docker].use_buildx` is deprecated. BuildKit is now the default Docker build engine. Use `[docker].build_engine = "docker"` instead.'
@@ -262,7 +260,7 @@ class DockerOptions(Subsystem):
             return DockerBuildEngine.DOCKER
         return self._experimental_enable_podman_warning(
             DockerBuildEngine,
-            cast(DockerBuildEngine, self.options.get("build_engine", DockerBuildEngine.DOCKER)),
+            build_engine,
             "build",
         )
 
