@@ -219,13 +219,13 @@ class DockerOptions(Subsystem):
         deprecation_start_version="2.33.0",
         mutually_exclusive_group="build-engine",
     )
+
     def _experimental_enable_podman_warning[
         E: DockerBuildEngine | DockerRunEngine | DockerPushEngine
     ](self, engine_type: type[E], engine: E, engine_opt: str) -> E:
         if (
-            (engine_option := f"{engine_opt}_engine") in self.options
-            and not self.options.is_default(engine_option)
-        ):
+            engine_option := f"{engine_opt}_engine"
+        ) in self.options and not self.options.is_default(engine_option):
             return engine
 
         experimental_enable_podman = self.options.get("experimental_enable_podman", None)
