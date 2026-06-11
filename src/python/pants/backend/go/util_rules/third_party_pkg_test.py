@@ -738,3 +738,19 @@ def test_parse_go_sum() -> None:
     crlf_parsed = _parse_go_sum(crlf_sum)
     assert ("mod", "v1.0.0") in crlf_parsed
     assert len(crlf_parsed[("mod", "v1.0.0")]) == 2
+
+
+def test_gotoolchain_local_fail_fast(rule_runner: RuleRunner) -> None:
+    """When GOTOOLCHAIN=local is pinned, a go.mod demanding a newer toolchain must fail fast with
+    the deterministic message 'go.mod requires go >= X' rather than silently downloading a
+    toolchain (the old GOTOOLCHAIN=auto behaviour) or emitting an ambiguous network error."""
+    # Use `go 1.99.0` (not `go 99.0`): the latter produces "invalid GOTOOLCHAIN" because Go
+    # parses it as a bare major version, whereas 1.99.0 is parsed as a valid semver and triggers
+    # the expected 'requires go >= 1.99.0' failure path.
+    digest = set_up_go_mod(
+        rule_runner,
+        "module example.com/gotoolchain-test\ngo 1.99.0\n",
+        "",
+    )
+    with engine_error(ProcessExecutionFailure, contains="go.mod requires go >= 1.99.0"):
+        rule_runner.request(ModuleDescriptors, [ModuleDescriptorsRequest(digest, "")])
