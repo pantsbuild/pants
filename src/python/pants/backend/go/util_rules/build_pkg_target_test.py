@@ -713,3 +713,79 @@ def test_stdlib_embed_config(rule_runner: RuleRunner) -> None:
     assert embed_config is not None
     assert embed_config.patterns
     assert embed_config.files
+
+
+def test_stdlib_prebuilt_archives_used(rule_runner: RuleRunner) -> None:
+    """With pre-built stdlib archives enabled (the default), stdlib dependency requests are
+    "slim" (no sources, no dependency recursion) and the built output maps stdlib packages to
+    pre-built archives instead of from-source `__pkgs__/...` archives."""
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/stdlib-user
+                go 1.17
+                """
+            ),
+            "hasher.go": dedent(
+                """\
+                package hasher
+
+                import (
+                    "crypto/sha256"
+                    "fmt"
+                )
+
+                func Hash(b []byte) string {
+                    return fmt.Sprintf("%x", sha256.Sum256(b))
+                }
+                """
+            ),
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
+        }
+    )
+    build_request = rule_runner.request(
+        BuildGoPackageRequest,
+        [BuildGoPackageTargetRequest(Address("", target_name="pkg"), build_opts=GoBuildOptions())],
+    )
+
+    # Structural: every stdlib dependency request in the DAG is slim, so no path exists by
+    # which a stdlib package could be compiled from source.
+    stdlib_dep_requests = [dep for dep in build_request.direct_dependencies if dep.is_stdlib]
+    assert sorted(dep.import_path for dep in stdlib_dep_requests) == ["crypto/sha256", "fmt"]
+    for dep in stdlib_dep_requests:
+        assert dep.go_files == ()
+        assert dep.s_files == ()
+        assert dep.direct_dependencies == ()
+
+    # Output: stdlib archives come from the harvest layout, and the full transitive stdlib
+    # closure (e.g. `runtime`) is available for the link step even though no build request
+    # was ever constructed for it.
+    built_package = rule_runner.request(BuiltGoPackage, [build_request])
+    archive_paths = {ip: path for ip, (path, _) in built_package.transitive_pkg_archives.items()}
+    assert archive_paths["crypto/sha256"] == "__go_stdlib__/crypto/sha256.a"
+    assert archive_paths["fmt"] == "__go_stdlib__/fmt.a"
+    assert archive_paths["runtime"] == "__go_stdlib__/runtime.a"
+    assert archive_paths["example.com/stdlib-user"] == os.path.join(
+        "__pkgs__", path_safe("example.com/stdlib-user"), "__pkg__.a"
+    )
+
+
+def test_build_with_race_detector_falls_back(rule_runner: RuleRunner) -> None:
+    """Build options that change stdlib archive content (e.g. the race detector) must fall
+    back to full from-source stdlib build requests."""
+    build_request = rule_runner.request(
+        BuildGoPackageRequest,
+        [
+            BuildGoPackageRequestForStdlibRequest(
+                # NB: cgo must stay enabled: `-race requires cgo`.
+                "fmt",
+                build_opts=GoBuildOptions(cgo_enabled=True, with_race_detector=True),
+            )
+        ],
+    )
+    assert build_request.is_stdlib
+    assert build_request.go_files, "expected a non-slim request with sources present"
+    assert build_request.direct_dependencies, (
+        "expected a non-slim request with dependency recursion"
+    )
