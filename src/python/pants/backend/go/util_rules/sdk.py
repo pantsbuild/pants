@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import shlex
 import textwrap
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -15,6 +16,9 @@ from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.system_binaries import (
     BashBinary,
     BinaryShimsRequest,
+    CatBinary,
+    CpBinary,
+    MkdirBinary,
     create_binary_shims,
 )
 from pants.engine.env_vars import EnvironmentVarsRequest
@@ -38,6 +42,8 @@ class GoSdkProcess:
     output_directories: tuple[str, ...]
     replace_sandbox_root_in_args: bool
 
+    use_module_cache: bool
+
     def __init__(
         self,
         command: Iterable[str],
@@ -50,6 +56,7 @@ class GoSdkProcess:
         output_directories: Iterable[str] = (),
         allow_downloads: bool = False,
         replace_sandbox_root_in_args: bool = False,
+        use_module_cache: bool = False,
     ) -> None:
         object.__setattr__(self, "command", tuple(command))
         object.__setattr__(self, "description", description)
@@ -67,6 +74,7 @@ class GoSdkProcess:
         object.__setattr__(self, "output_files", tuple(output_files))
         object.__setattr__(self, "output_directories", tuple(output_directories))
         object.__setattr__(self, "replace_sandbox_root_in_args", replace_sandbox_root_in_args)
+        object.__setattr__(self, "use_module_cache", use_module_cache)
 
 
 @dataclass(frozen=True)
@@ -76,13 +84,23 @@ class GoSdkRunSetup:
 
     CHDIR_ENV = "__PANTS_CHDIR_TO"
     SANDBOX_ROOT_ENV = "__PANTS_REPLACE_SANDBOX_ROOT"
+    MODCACHE_ENV = "__PANTS_GO_MODCACHE"
+    FETCH_MODULE_ENV = "__PANTS_GO_FETCH_MODULE"
 
 
 @rule
-async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
+async def go_sdk_invoke_setup(
+    goroot: GoRoot,
+    cat: CatBinary,
+    cp: CpBinary,
+    mkdir: MkdirBinary,
+) -> GoSdkRunSetup:
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
     # absolute paths inside the sandbox.
+    cat_path = shlex.quote(cat.path)
+    cp_path = shlex.quote(cp.path)
+    mkdir_path = shlex.quote(mkdir.path)
     go_run_script = FileContent(
         "__run_go.sh",
         textwrap.dedent(
@@ -91,7 +109,49 @@ async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
             sandbox_root="$(/bin/pwd)"
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/cache"
-            /bin/mkdir -p "$GOPATH" "$GOCACHE"
+            {mkdir_path} -p "$GOPATH" "$GOCACHE"
+            if [ -n "${GoSdkRunSetup.MODCACHE_ENV}" ]; then
+              export GOMODCACHE="${{sandbox_root}}/__gomodcache"
+              export GOFLAGS="${{GOFLAGS:+${{GOFLAGS}} }}-modcacherw"
+              {mkdir_path} -p "$GOMODCACHE"
+            fi
+            if [ -n "${GoSdkRunSetup.FETCH_MODULE_ENV}" ]; then
+              module_version="${GoSdkRunSetup.FETCH_MODULE_ENV}"
+              "{goroot.path}/bin/go" mod download -json "$module_version" > __module_metadata.json
+              download_status=$?
+              {cat_path} __module_metadata.json
+              if [ "$download_status" -ne 0 ]; then
+                exit "$download_status"
+              fi
+              # Parse the Dir/GoMod paths from the metadata with shell string operations only:
+              # the sandbox PATH cannot be assumed to provide grep/sed.
+              dir=""
+              gomod=""
+              while IFS= read -r line; do
+                case "$line" in
+                  *'"Dir": "'*) if [ -z "$dir" ]; then dir=${{line#*'"Dir": "'}}; dir=${{dir%'"'*}}; fi ;;
+                  *'"GoMod": "'*) if [ -z "$gomod" ]; then gomod=${{line#*'"GoMod": "'}}; gomod=${{gomod%'"'*}}; fi ;;
+                esac
+              done < __module_metadata.json
+              marker="__gomodcache/"
+              dir_rel="${{dir#*${{marker}}}}"
+              gomod_rel="${{gomod#*${{marker}}}}"
+              if [ -z "$dir" ] || [ -z "$gomod" ] || [ "$dir_rel" = "$dir" ] || [ "$gomod_rel" = "$gomod" ]; then
+                echo "Failed to locate module $module_version under GOMODCACHE after download." 1>&2
+                exit 1
+              fi
+              dest_dir="$GOPATH/pkg/mod/$dir_rel"
+              dest_gomod="$GOPATH/pkg/mod/$gomod_rel"
+              {mkdir_path} -p "$dest_dir" "${{dest_gomod%/*}}" || exit 1
+              {cp_path} -Rp "$dir/." "$dest_dir/" || exit 1
+              {cp_path} -p "$gomod" "$dest_gomod" || exit 1
+              # Assert the copy produced the exact artifacts the Python rule will capture.
+              if [ ! -f "$dest_gomod" ] || [ ! -d "$dest_dir" ]; then
+                echo "Module $module_version was not copied into GOPATH/pkg/mod as expected." 1>&2
+                exit 1
+              fi
+              exit 0
+            fi
             if [ -n "${GoSdkRunSetup.CHDIR_ENV}" ]; then
               cd "${GoSdkRunSetup.CHDIR_ENV}"
             fi
@@ -164,6 +224,11 @@ async def setup_go_sdk_process(
     if request.replace_sandbox_root_in_args:
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
 
+    append_only_caches: dict[str, str] = {}
+    if request.use_module_cache:
+        env[GoSdkRunSetup.MODCACHE_ENV] = "1"
+        append_only_caches["go_mod_cache"] = "__gomodcache"
+
     # Disable the "coverage redesign" experiment on Go v1.20+ for now since Pants does not yet support it.
     if goroot.is_compatible_version("1.20") and not goroot.is_compatible_version("1.25"):
         exp_str = env.get("GOEXPERIMENT", "")
@@ -181,6 +246,7 @@ async def setup_go_sdk_process(
         description=request.description,
         output_files=request.output_files,
         output_directories=request.output_directories,
+        append_only_caches=append_only_caches,
         level=LogLevel.DEBUG,
     )
 
