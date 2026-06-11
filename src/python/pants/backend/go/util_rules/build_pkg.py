@@ -10,7 +10,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.go.util_rules import cgo, coverage
+from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.backend.go.util_rules import cgo, coverage, import_analysis, stdlib_archives
 from pants.backend.go.util_rules.assembly import (
     AssembleGoAssemblyFilesRequest,
     GenerateAssemblySymabisRequest,
@@ -32,8 +33,17 @@ from pants.backend.go.util_rules.coverage import (
 )
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
+from pants.backend.go.util_rules.import_analysis import (
+    GoStdLibPackagesRequest,
+    analyze_go_stdlib_packages,
+)
 from pants.backend.go.util_rules.import_config import ImportConfigRequest, generate_import_config
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, compute_go_tool_id
+from pants.backend.go.util_rules.stdlib_archives import (
+    GoStdlibArchivesRequest,
+    harvest_go_stdlib_archives,
+    stdlib_archives_compatible,
+)
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
@@ -294,11 +304,14 @@ class FallibleBuiltGoPackage(EngineAwareReturnType):
 
 @dataclass(frozen=True)
 class BuiltGoPackage:
-    """A compiled Go package as a `__pkg__.a` file, plus handles to its transitive closure.
+    """A compiled Go package archive, plus handles to its transitive closure.
 
-    `archive_digest` contains ONLY this package's own files, laid out as
-    `__pkgs__/{path_safe(import_path)}/__pkg__.a` (plus this package's module sources when
-    the cgo rules detected a `${SRCDIR}` reference that the linker will need).
+    `archive_digest` contains ONLY this package's own files. Packages compiled from source are
+    laid out as `__pkgs__/{path_safe(import_path)}/__pkg__.a` (plus this package's module
+    sources when the cgo rules detected a `${SRCDIR}` reference that the linker will need);
+    pre-built standard library packages are laid out as `__go_stdlib__/{import_path}.a`.
+    Nothing may assume either layout: `pkg_archive_path` and the paths in
+    `transitive_pkg_archives` are the source of truth.
 
     `transitive_pkg_archives` maps import path -> (archive path, digest-containing-that-archive)
     for this package AND all of its transitive dependencies. The digests are NOT merged;
@@ -609,10 +622,62 @@ async def _gather_transitive_prebuilt_object_files(
 # (triggered by `FallibleBuiltGoPackage` subclassing `EngineAwareReturnType`).
 @rule(desc="Compile with Go", level=LogLevel.DEBUG)
 async def build_go_package(
-    request: BuildGoPackageRequest, go_root: GoRoot
+    request: BuildGoPackageRequest, go_root: GoRoot, golang: GolangSubsystem
 ) -> FallibleBuiltGoPackage:
+    # Standard library packages on compatible build configurations short-circuit to the
+    # pre-compiled archives from the one-shot `go install std` harvest, skipping
+    # compile/symabis/assembly/pack processes entirely. This must use the same gate as
+    # `setup_build_go_package_target_request_for_stdlib`, which constructs "slim" stdlib
+    # requests (no sources, no dependency recursion) whenever the gate passes; both gates are
+    # pure functions of `(build_opts, [golang].use_prebuilt_stdlib_archives)` plus
+    # archive-map membership, so they always agree. Full from-source stdlib requests (e.g.
+    # from `go_sources/load_go_binary.py`) are short-circuited here too. Import paths without
+    # a pre-built archive fall through to from-source compilation.
+    if request.is_stdlib and stdlib_archives_compatible(request.build_opts, golang):
+        archives = await harvest_go_stdlib_archives(
+            GoStdlibArchivesRequest(cgo_enabled=request.build_opts.cgo_enabled), go_root
+        )
+        prebuilt_archive_path = archives.import_paths_to_pkg_a_files.get(request.import_path)
+        if prebuilt_archive_path is not None:
+            stdlib_packages = await analyze_go_stdlib_packages(
+                GoStdLibPackagesRequest(
+                    with_race_detector=False, cgo_enabled=request.build_opts.cgo_enabled
+                )
+            )
+            # The transitive closure comes from `go list` analysis rather than from
+            # `direct_dependencies`: slim requests carry no dependency recursion. Import paths
+            # without an archive (e.g. `unsafe`) have no compiled form and are skipped.
+            closure_archive_paths: dict[str, str] = {request.import_path: prebuilt_archive_path}
+            for dep_import_path in stdlib_packages[request.import_path].deps:
+                dep_archive_path = archives.import_paths_to_pkg_a_files.get(dep_import_path)
+                if dep_archive_path is not None:
+                    closure_archive_paths[dep_import_path] = dep_archive_path
+            # One unmerged digest handle per archive so that consumers' compile sandboxes
+            # (which merge only their DIRECT deps' `archive_digest`s) stay minimal, and the
+            # link step merges the closure exactly once, as with from-source packages.
+            archive_digests = await concurrently(
+                digest_subset_to_digest(DigestSubset(archives.digest, PathGlobs([archive_path])))
+                for archive_path in closure_archive_paths.values()
+            )
+            transitive_archives = {
+                import_path: (archive_path, archive_digest)
+                for (import_path, archive_path), archive_digest in zip(
+                    closure_archive_paths.items(), archive_digests
+                )
+            }
+            return FallibleBuiltGoPackage(
+                BuiltGoPackage(
+                    import_path=request.import_path,
+                    pkg_archive_path=prebuilt_archive_path,
+                    archive_digest=transitive_archives[request.import_path][1],
+                    transitive_pkg_archives=FrozenDict(transitive_archives),
+                ),
+                request.import_path,
+            )
+
     maybe_built_deps = await concurrently(
-        build_go_package(build_request, go_root) for build_request in request.direct_dependencies
+        build_go_package(build_request, **implicitly())
+        for build_request in request.direct_dependencies
     )
 
     direct_dep_archives: dict[str, str] = {}  # importcfg entries: DIRECT deps only
@@ -1053,4 +1118,6 @@ def rules():
         *collect_rules(),
         *cgo.rules(),
         *coverage.rules(),
+        *import_analysis.rules(),
+        *stdlib_archives.rules(),
     )

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
+from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_type_rules import (
     GoImportPathMappingRequest,
     map_import_paths_to_packages,
@@ -20,7 +21,7 @@ from pants.backend.go.target_types import (
     GoPackageSourcesField,
     GoThirdPartyPackageDependenciesField,
 )
-from pants.backend.go.util_rules import build_opts
+from pants.backend.go.util_rules import build_opts, stdlib_archives
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
@@ -50,6 +51,11 @@ from pants.backend.go.util_rules.import_analysis import (
     analyze_go_stdlib_packages,
 )
 from pants.backend.go.util_rules.pkg_pattern import match_simple_pattern
+from pants.backend.go.util_rules.stdlib_archives import (
+    GoStdlibArchivesRequest,
+    harvest_go_stdlib_archives,
+    stdlib_archives_compatible,
+)
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysisRequest,
     extract_package_info,
@@ -171,7 +177,43 @@ class BuildGoPackageRequestForStdlibRequest:
 async def setup_build_go_package_target_request_for_stdlib(
     request: BuildGoPackageRequestForStdlibRequest,
     goroot: GoRoot,
+    golang: GolangSubsystem,
 ) -> FallibleBuildGoPackageRequest:
+    # Standard library packages on compatible build configurations use the pre-compiled
+    # archives from the one-shot `go install std` harvest. Return a "slim" request: no
+    # sources, no dependency recursion, and no embed-config resolution (the harvested archive
+    # already incorporates embedded files). `build_go_package` short-circuits any stdlib
+    # request passing this same gate to the pre-built archive, so the slim request is never
+    # compiled from source. Import paths without an archive (e.g. `unsafe`) fall through to
+    # the from-source request below, as does everything when the gate is off.
+    if stdlib_archives_compatible(request.build_opts, golang):
+        archives = await harvest_go_stdlib_archives(
+            GoStdlibArchivesRequest(cgo_enabled=request.build_opts.cgo_enabled), goroot
+        )
+        if request.import_path in archives.import_paths_to_pkg_a_files:
+            stdlib_packages = await analyze_go_stdlib_packages(
+                GoStdLibPackagesRequest(
+                    with_race_detector=False, cgo_enabled=request.build_opts.cgo_enabled
+                )
+            )
+            pkg_info = stdlib_packages[request.import_path]
+            return FallibleBuildGoPackageRequest(
+                request=BuildGoPackageRequest(
+                    import_path=pkg_info.import_path,
+                    pkg_name=pkg_info.name,
+                    digest=EMPTY_DIGEST,
+                    dir_path=pkg_info.pkg_source_path,
+                    build_opts=request.build_opts,
+                    go_files=(),
+                    s_files=(),
+                    direct_dependencies=(),
+                    import_map=pkg_info.import_map,
+                    minimum_go_version=goroot.version,
+                    is_stdlib=True,
+                ),
+                import_path=request.import_path,
+            )
+
     stdlib_packages = await analyze_go_stdlib_packages(
         GoStdLibPackagesRequest(
             with_race_detector=request.build_opts.with_race_detector,
@@ -693,4 +735,5 @@ def rules():
     return (
         *collect_rules(),
         *build_opts.rules(),
+        *stdlib_archives.rules(),
     )

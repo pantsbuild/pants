@@ -214,17 +214,26 @@ def assert_built(
         "__pkgs__", path_safe(built_package.import_path), "__pkg__.a"
     )
     assert built_package.pkg_archive_path in own_files
+    # Standard library dependencies may resolve to pre-built archives
+    # (`__go_stdlib__/<import_path>.a`) instead of being compiled from source into the
+    # `__pkgs__/...` layout, depending on `[golang].use_prebuilt_stdlib_archives` and build
+    # options.
     expected = {
-        import_path: os.path.join("__pkgs__", path_safe(import_path), "__pkg__.a")
+        import_path: (
+            os.path.join("__pkgs__", path_safe(import_path), "__pkg__.a"),
+            f"__go_stdlib__/{import_path}.a",
+        )
         for import_path in expected_import_paths
     }
     actual = {
         import_path: archive_path
         for import_path, (archive_path, _) in built_package.transitive_pkg_archives.items()
     }
-    for import_path, pkg_archive_path in expected.items():
+    for import_path, acceptable_archive_paths in expected.items():
         assert import_path in actual, f"expected {import_path} to be in build output"
-        assert actual[import_path] == pkg_archive_path, "expected package archive paths to match"
+        assert actual[import_path] in acceptable_archive_paths, (
+            "expected package archive paths to match"
+        )
 
 
 def assert_pkg_target_built(
@@ -668,6 +677,10 @@ def test_xtest_deps(rule_runner: RuleRunner) -> None:
 
 @pytest.mark.no_error_if_skipped
 def test_stdlib_embed_config(rule_runner: RuleRunner) -> None:
+    # This test exercises embed-config resolution on the from-source stdlib path. With
+    # pre-built stdlib archives enabled (the default), stdlib build requests are "slim" and
+    # carry no embed config (the harvested archives already incorporate embedded files).
+    rule_runner.set_options(["--no-golang-use-prebuilt-stdlib-archives"], env_inherit={"PATH"})
     stdlib_packages = rule_runner.request(
         GoStdLibPackages, [GoStdLibPackagesRequest(with_race_detector=False, cgo_enabled=False)]
     )
