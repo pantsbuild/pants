@@ -203,8 +203,11 @@ class TargetFieldHelpInfo:
     def create(cls, field: type[Field], *, provider: str) -> TargetFieldHelpInfo:
         hints = get_type_hints(field.compute_value)
         if "raw_value" in hints:
+            # raw_value type hints are set when the field is implemented using the python API
             type_hint = pretty_print_type_hint(hints["raw_value"])
         else:
+            # _raw_value_type is set when the field is implemented in rust using pyo3 `pyclass`. These lack
+            # runtime type hints.
             type_hint = field._raw_value_type
 
         # Check if the field only allows for certain choices.

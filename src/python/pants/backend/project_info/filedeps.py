@@ -92,7 +92,7 @@ async def file_deps(
     if filedeps_subsystem.globs:
         unique_rel_paths.update(
             itertools.chain.from_iterable(
-                tgt.get(SourcesField).filespec["includes"] for tgt in targets
+                tgt.get(SourcesField).filespec.includes for tgt in targets
             )
         )
     else:

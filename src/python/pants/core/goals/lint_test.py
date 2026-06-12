@@ -176,7 +176,7 @@ def _all_lint_requests() -> Iterable[type[MockLintRequest]]:
         yield from subclasses
 
 
-def mock_target_partitioner(__implicitly: tuple) -> Partitions[MockLinterFieldSet, Any]:
+def mock_target_partitioner(__implicitly: tuple) -> Partitions[MockLinterFieldSet | str, Any]:
     request, typ = next(iter(__implicitly[0].items()))
     assert typ == LintTargetsRequest.PartitionRequest
     if type(request) is SkippedRequest.PartitionRequest:
@@ -186,7 +186,9 @@ def mock_target_partitioner(__implicitly: tuple) -> Partitions[MockLinterFieldSe
         getattr(cls, "PartitionRequest"): cls._requires_snapshot for cls in _all_lint_requests()
     }[type(request)]
     if operates_on_paths:
-        return Partitions.single_partition(fs.sources.globs for fs in request.field_sets)
+        return Partitions.single_partition(
+            f"{fs.address.target_name}.txt" for fs in request.field_sets
+        )
 
     return Partitions.single_partition(request.field_sets)
 

@@ -18,7 +18,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.core.environments import rules as environments_rules
 from pants.core.environments.rules import determine_bootstrap_environment
 from pants.core.util_rules import system_binaries
-from pants.engine import desktop, download_file, fs, intrinsics, process
+from pants.engine import composite_process, desktop, download_file, fs, intrinsics, process
 from pants.engine.console import Console
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import PathGlobs, Snapshot, Workspace
@@ -312,6 +312,7 @@ class EngineInitializer:
                 *specs_rules.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
+                *composite_process.rules(),
                 *environments_rules.rules(),
                 *system_binaries.rules(),
                 *platform_rules.rules(),
