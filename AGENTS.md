@@ -1,6 +1,6 @@
 # Pants Build System Contributor Guide
 
-This is the Pants build system repo -- a self-hosting build system where `./pants` runs Pants from source. Follow the conventions, architecture, and workflows specific to this codebase.
+This is the Pants build system repo -- a self-hosting build system where `pants` runs Pants from source. Follow the conventions, architecture, and workflows specific to this codebase.
 
 ## Critical Rules
 
