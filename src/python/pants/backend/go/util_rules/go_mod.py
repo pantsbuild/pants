@@ -38,6 +38,7 @@ from pants.engine.target import (
     WrappedTargetRequest,
 )
 from pants.util.docutil import bin_name
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
@@ -215,6 +216,18 @@ async def find_owning_go_mod(
     )
 
 
+def _is_directory_replacement(new_path: str) -> bool:
+    # Mirrors `modfile.IsDirectoryPath`: a `replace` directive whose target is a local
+    # directory (as opposed to a different module path) starts with `./`, `../`, `/`, or
+    # is `.`/`..` (or an absolute Windows path). Such replacements wire a `require`d module
+    # to a sibling first-party module on disk; module-path replacements do not.
+    return (
+        new_path in (".", "..")
+        or new_path.startswith(("./", "../", "/"))
+        or os.path.isabs(new_path)
+    )
+
+
 @dataclass(frozen=True)
 class GoModInfo:
     # Import path of the Go module, based on the `module` in `go.mod`.
@@ -222,6 +235,10 @@ class GoModInfo:
     digest: Digest
     mod_path: str
     minimum_go_version: str | None
+    # Maps the module path of each `replace`d module whose target is a local directory to
+    # that directory (relative to the build root). These are first-party modules referenced
+    # across `go.mod` boundaries; see `map_import_paths_to_packages` and issue #22097.
+    local_replace_module_dirs: FrozenDict[str, str] = FrozenDict()
 
 
 @dataclass(frozen=True)
@@ -265,11 +282,29 @@ async def determine_go_mod_info(
         )
     )
     module_metadata = json.loads(mod_json.stdout)
+
+    # Record `replace` directives that point a `require`d module at a local directory, so that
+    # dependency inference can resolve imports satisfied by sibling first-party modules. See #22097.
+    local_replace_module_dirs: dict[str, str] = {}
+    for replace in module_metadata.get("Replace") or []:
+        new = replace.get("New") or {}
+        new_path = new.get("Path")
+        # A directory replacement targets a filesystem path and carries no module version; a
+        # module-path replacement (path + version) is left to normal third-party resolution.
+        if not new_path or new.get("Version") or not _is_directory_replacement(new_path):
+            continue
+        old_path = (replace.get("Old") or {}).get("Path")
+        # Absolute on-disk paths cannot be mapped to in-repo `go_mod` targets, so skip them.
+        if not old_path or os.path.isabs(new_path):
+            continue
+        local_replace_module_dirs[old_path] = os.path.normpath(os.path.join(go_mod_dir, new_path))
+
     return GoModInfo(
         import_path=module_metadata["Module"]["Path"],
         digest=sources_digest,
         mod_path=go_mod_path,
         minimum_go_version=module_metadata.get("Go"),
+        local_replace_module_dirs=FrozenDict(local_replace_module_dirs),
     )
 
 
