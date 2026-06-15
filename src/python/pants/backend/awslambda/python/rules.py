@@ -28,7 +28,7 @@ from pants.backend.python.util_rules.faas import (
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -83,7 +83,8 @@ async def package_python_aws_lambda_function(
             pex_build_extra_args=field_set.pex_build_extra_args,
             layout=field_set.layout,
             reexported_handler_module=PythonAwsLambdaHandlerField.reexported_handler_module,
-        )
+        ),
+        **implicitly(),
     )
 
 
@@ -119,7 +120,8 @@ async def package_python_aws_lambda_layer(
             # a layer doesn't have a handler, just pulls in things via `dependencies`
             handler=None,
             reexported_handler_module=None,
-        )
+        ),
+        **implicitly(),
     )
 
 

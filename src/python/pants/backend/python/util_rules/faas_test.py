@@ -9,6 +9,7 @@ from unittest.mock import Mock
 import pytest
 
 from pants.backend.awslambda.python.target_types import rules as target_type_rules
+from pants.backend.python.subsystems.setup import PythonSetup, Resolver
 from pants.backend.python.target_types import (
     PythonRequirementTarget,
     PythonResolveField,
@@ -42,6 +43,7 @@ from pants.core.target_types import FileTarget
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import InferredDependencies, InvalidFieldException, Target
+from pants.testutil.option_util import create_subsystem
 from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error, run_rule_with_mocks
 from pants.util.strutil import softwrap
 
@@ -290,8 +292,9 @@ def test_infer_runtime_platforms_when_known_runtime_and_no_complete_platforms(
     platforms = rule_runner.request(RuntimePlatforms, [request])
 
     assert platforms == RuntimePlatforms(
-        expected_interpreter_version,
-        CompletePlatforms(expected_complete_platforms),
+        complete_platforms=CompletePlatforms(expected_complete_platforms),
+        interpreter_version=expected_interpreter_version,
+        uv_platform="x86_64-manylinux_2_17",
     )
 
 
@@ -323,14 +326,18 @@ def test_infer_runtime_platforms_when_complete_platforms(
     request = RuntimePlatformsRequest(
         address=address,
         target_name="unused",
-        runtime=TestRuntimeField("completely ignored!", address),
-        architecture=FaaSArchitecture.ARM64,  # ignored
+        runtime=TestRuntimeField("3.45", address),
+        architecture=FaaSArchitecture.X86_64,
         complete_platforms=PythonFaaSCompletePlatforms(["path:cp"], address),
     )
 
     platforms = rule_runner.request(RuntimePlatforms, [request])
 
-    assert platforms == RuntimePlatforms(None, CompletePlatforms(["path/cp.json"]))
+    assert platforms == RuntimePlatforms(
+        complete_platforms=CompletePlatforms(["path/cp.json"]),
+        interpreter_version=(3, 45),
+        uv_platform="x86_64-manylinux_2_17",
+    )
 
 
 @pytest.mark.parametrize(
@@ -372,8 +379,9 @@ def test_infer_runtime_platforms_when_known_narrow_ics_only(
     platforms = rule_runner.request(RuntimePlatforms, [request])
 
     assert platforms == RuntimePlatforms(
-        expected_interpreter_version,
-        CompletePlatforms(expected_complete_platforms),
+        complete_platforms=CompletePlatforms(expected_complete_platforms),
+        interpreter_version=expected_interpreter_version,
+        uv_platform="x86_64-manylinux_2_17",
     )
 
 
@@ -476,10 +484,12 @@ def test_venv_create_extra_args_are_passed_through() -> None:
     # Exercise
     run_rule_with_mocks(
         build_python_faas,
-        rule_args=[request],
+        rule_args=[request, create_subsystem(PythonSetup, resolver=Resolver.pex)],
         mock_calls={
             "pants.backend.python.util_rules.faas.infer_runtime_platforms": lambda _: RuntimePlatforms(
-                interpreter_version=None
+                complete_platforms=CompletePlatforms(),
+                interpreter_version=None,
+                uv_platform="aarch64-manylinux_2_17",
             ),
             "pants.backend.python.util_rules.pex.create_pex": lambda _: Pex(
                 digest=EMPTY_DIGEST, name="pex", python=None
@@ -527,10 +537,12 @@ def test_layout_should_be_passed_through_and_adjust_filename(input_layout, expec
     # Exercise
     run_rule_with_mocks(
         build_python_faas,
-        rule_args=[request],
+        rule_args=[request, create_subsystem(PythonSetup, resolver=Resolver.pex)],
         mock_calls={
             "pants.backend.python.util_rules.faas.infer_runtime_platforms": lambda _: RuntimePlatforms(
-                interpreter_version=None
+                complete_platforms=CompletePlatforms(),
+                interpreter_version=None,
+                uv_platform="aarch64-manylinux_2_17",
             ),
             "pants.backend.python.util_rules.pex.create_pex": lambda _: Pex(
                 digest=EMPTY_DIGEST, name="pex", python=None
@@ -573,10 +585,12 @@ def test_pex_build_extra_args_passed_through() -> None:
     # Exercise
     run_rule_with_mocks(
         build_python_faas,
-        rule_args=[request],
+        rule_args=[request, create_subsystem(PythonSetup, resolver=Resolver.pex)],
         mock_calls={
             "pants.backend.python.util_rules.faas.infer_runtime_platforms": lambda _: RuntimePlatforms(
-                interpreter_version=None
+                interpreter_version=None,
+                complete_platforms=CompletePlatforms(),
+                uv_platform="aarch64-manylinux_2_17",
             ),
             "pants.backend.python.util_rules.pex.create_pex": mock_build,
             "pants.backend.python.util_rules.pex_venv.pex_venv": Mock(

@@ -7,8 +7,13 @@ python_sources(overrides={"target_types.py": {"dependencies": [":complete_platfo
 resources(name="complete_platforms", sources=["complete_platform_*.json"])
 
 python_tests(name="target_types_test", sources=["target_types_test.py"], timeout=120)
+
 python_tests(
     name="rules_test",
     sources=["rules_test.py"],
+    dependencies=[
+        "src/python/pants/backend/awslambda/python/test_data",
+    ],
+    tags=["platform_specific_behavior"],
     timeout=300,
 )

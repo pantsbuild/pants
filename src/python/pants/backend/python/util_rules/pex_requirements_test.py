@@ -188,6 +188,7 @@ def test_validate_lockfiles(
             path_mappings=(),
             lock_style="universal",
             complete_platforms=(),
+            uv_platforms=(),
             uploaded_prior_to=None,
         ),
     )
@@ -372,6 +373,7 @@ class TestResolveConfigPexArgs:
                 path_mappings=[],
                 lock_style="universal",
                 complete_platforms=(),
+                uv_platforms=(),
                 uploaded_prior_to=None,
             ).pex_args()
         )
@@ -447,6 +449,7 @@ class TestResolveConfigPexArgs:
                 path_mappings=[],
                 lock_style="universal",
                 complete_platforms=(),
+                uv_platforms=(),
                 uploaded_prior_to="2023-09-20",
             ).pex_args()
         )
@@ -475,6 +478,7 @@ def _uv_config(
         path_mappings=[],
         lock_style="universal",
         complete_platforms=(),
+        uv_platforms=(),
         uploaded_prior_to=uploaded_prior_to,
     )
     return tomllib.loads(cfg.uv_config(extra_find_links=extra_find_links))
