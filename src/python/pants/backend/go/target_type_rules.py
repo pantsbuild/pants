@@ -48,6 +48,7 @@ from pants.backend.go.util_rules.go_mod import (
     GoModInfoRequest,
     OwningGoModRequest,
     determine_go_mod_info,
+    find_all_go_mod_targets,
     find_owning_go_mod,
 )
 from pants.backend.go.util_rules.import_analysis import (
@@ -273,7 +274,52 @@ async def map_import_paths_to_packages(
     request: GoImportPathMappingRequest,
     module_import_path_mappings: AllGoModuleImportPathsMappings,
 ) -> GoModuleImportPathsMapping:
-    return module_import_path_mappings.modules[request.go_mod_address]
+    base = module_import_path_mappings.modules[request.go_mod_address]
+
+    # #22097: a `go.mod` may `replace` a `require`d module with a local directory that holds
+    # another first-party `go_mod` target. Imports of that module's packages are not in this
+    # module's own import-path map, so fold in the replaced modules' maps. Go's `replace`
+    # directives only apply within the module that declares them (they are not transitive), so a
+    # single level of merging matches the build semantics.
+    go_mod_info = await determine_go_mod_info(GoModInfoRequest(request.go_mod_address))
+    if not go_mod_info.local_replace_module_dirs:
+        return base
+
+    all_go_mod_targets = await find_all_go_mod_targets(**implicitly())
+    address_by_spec_path = {tgt.address.spec_path: tgt.address for tgt in all_go_mod_targets}
+
+    merged_mapping: dict[str, GoImportPathsMappingAddressSet] = dict(base.mapping)
+    merged_address_to_import_path: dict[Address, str] = dict(base.address_to_import_path)
+    for replaced_module_path, replaced_dir in go_mod_info.local_replace_module_dirs.items():
+        replaced_address = address_by_spec_path.get(replaced_dir)
+        if replaced_address is None or replaced_address == request.go_mod_address:
+            continue
+        replaced_mapping = module_import_path_mappings.modules.get(replaced_address)
+        if replaced_mapping is None:
+            continue
+        # Only fold in the replaced module's OWN packages -- import paths under its module path.
+        # Its third-party dependencies must NOT be merged: the referencing module resolves those
+        # through its own `go.mod`, and merging them would make every shared third-party import
+        # path ambiguous (two addresses), which suppresses the inferred dependency.
+        prefix = f"{replaced_module_path}/"
+        for import_path, address_set in replaced_mapping.mapping.items():
+            if import_path != replaced_module_path and not import_path.startswith(prefix):
+                continue
+            existing = merged_mapping.get(import_path)
+            if existing is None:
+                merged_mapping[import_path] = address_set
+            else:
+                merged_mapping[import_path] = GoImportPathsMappingAddressSet(
+                    addresses=tuple(sorted({*existing.addresses, *address_set.addresses})),
+                    infer_all=existing.infer_all or address_set.infer_all,
+                )
+            for address in address_set.addresses:
+                merged_address_to_import_path.setdefault(address, import_path)
+
+    return GoModuleImportPathsMapping(
+        mapping=FrozenDict(merged_mapping),
+        address_to_import_path=FrozenDict(merged_address_to_import_path),
+    )
 
 
 @dataclass(frozen=True)
