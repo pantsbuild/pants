@@ -618,6 +618,7 @@ async def _setup_pex_requirements(
     loaded_lockfile, complete_req_strings = await _get_entire_lockfile_and_requirements(
         request.requirements
     )
+
     if loaded_lockfile:
         if loaded_lockfile.lockfile_format == LockfileFormat.UV:
             # The caller will need to set the argv. This is slightly awkward, and due to
