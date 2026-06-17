@@ -8,6 +8,7 @@ See https://www.pantsbuild.org/docs/python-backend.
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
+from pants.backend.python.dependency_inference import reverse_graph as reverse_graph_rules
 from pants.backend.python.goals import (
     coverage_py,
     export,
@@ -78,6 +79,7 @@ def rules():
         # Util rules
         *ancestor_files.rules(),
         *dependency_inference_rules.rules(),
+        *reverse_graph_rules.rules(),
         *local_dists_pep660.rules(),
         *pex.rules(),
         *pex_from_targets.rules(),
