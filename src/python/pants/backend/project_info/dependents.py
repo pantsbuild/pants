@@ -1,5 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from __future__ import annotations
+
 import json
 from collections import defaultdict
 from collections.abc import Iterable
@@ -9,6 +11,7 @@ from enum import Enum
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
+from pants.engine.environment import ChosenLocalEnvironmentName, EnvironmentName
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.internals.graph import resolve_dependencies
 from pants.engine.rules import collect_rules, concurrently, goal_rule, implicitly, rule
@@ -18,7 +21,9 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
 )
+from pants.engine.unions import UnionMembership, union
 from pants.option.option_types import BoolOption, EnumOption
+from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
@@ -27,6 +32,66 @@ from pants.util.ordered_set import FrozenOrderedSet
 @dataclass(frozen=True)
 class AddressToDependents:
     mapping: FrozenDict[Address, FrozenOrderedSet[Address]]
+
+
+# -----------------------------------------------------------------------------------------------
+# Pluggable batched reverse-graph computation
+# -----------------------------------------------------------------------------------------------
+#
+# The default `map_addresses_to_dependents` resolves the dependencies of *every* target
+# individually, which fans out to tens of engine nodes per target. On large repositories a
+# language backend can usually compute the same reverse graph far more cheaply with a single
+# batched pass over its sources. Backends opt in by implementing this union; the result is used
+# only when it can reproduce the per-target result exactly (otherwise it returns `None` and we fall
+# back to the always-correct per-target algorithm).
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class ReverseDependencyGraphImpl:
+    """A marker union for backend-provided batched reverse-dependency-graph implementations."""
+
+
+@dataclass(frozen=True)
+class MaybeReverseDependencyGraph:
+    """The batched reverse graph, or `None` if the implementation declined (caller must fall back)."""
+
+    result: AddressToDependents | None
+
+
+@rule(polymorphic=True)
+async def compute_reverse_dependency_graph(
+    request: ReverseDependencyGraphImpl,
+) -> MaybeReverseDependencyGraph:
+    raise NotImplementedError()
+
+
+class DependentsInferenceSubsystem(Subsystem):
+    options_scope = "dependents-inference"
+    help = (
+        "Options controlling how the reverse-dependency graph used by `dependents` and "
+        "`--changed-dependents` is computed."
+    )
+
+    use_batched_python = BoolOption(
+        default=False,
+        help=(
+            "EXPERIMENTAL. Build the reverse-dependency graph used by `dependents` and "
+            "`--changed-dependents` with a single batched pass over first-party Python sources, "
+            "instead of resolving the dependencies of every target individually.\n\n"
+            "On large Python repositories this is dramatically faster: the per-target resolution "
+            "fans out to tens of engine nodes per target, whereas the batched pass parses all "
+            "sources natively. It handles import and `__init__.py` inference across resolves and "
+            "parametrization, and resolves every other target (explicit `dependencies=`, "
+            "special-cased dependency fields, `conftest.py`/asset/other inference backends, "
+            "target generators) with the per-target algorithm, so the result is identical to "
+            "computing the graph per-target. The one case it does not reproduce is *raising* on "
+            "unowned imports under a non-default `[python-infer].unowned_dependency_behavior`; in a "
+            "repository with no unowned imports (the prerequisite for that setting to be silent) "
+            "the result is still identical. Off by default while it gains coverage."
+        ),
+        advanced=True,
+    )
 
 
 class DependentsOutputFormat(Enum):
@@ -41,7 +106,25 @@ class DependentsOutputFormat(Enum):
 
 
 @rule(desc="Map all targets to their dependents", level=LogLevel.DEBUG)
-async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> AddressToDependents:
+async def map_addresses_to_dependents(
+    all_targets: AllUnexpandedTargets,
+    dependents_inference: DependentsInferenceSubsystem,
+    union_membership: UnionMembership,
+    local_environment_name: ChosenLocalEnvironmentName,
+) -> AddressToDependents:
+    # Opt-in fast path: if a backend provides a batched implementation and it can reproduce the
+    # per-target result exactly, use it. Otherwise fall back to resolving every target's deps.
+    impls = union_membership.get(ReverseDependencyGraphImpl)
+    if dependents_inference.use_batched_python and len(impls) == 1:
+        impl = impls[0]
+        maybe = await compute_reverse_dependency_graph(
+            **implicitly(
+                {impl(): ReverseDependencyGraphImpl, local_environment_name.val: EnvironmentName}
+            )
+        )
+        if maybe.result is not None:
+            return maybe.result
+
     dependencies_per_target = await concurrently(
         resolve_dependencies(
             DependenciesRequest(
