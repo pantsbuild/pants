@@ -15,13 +15,15 @@ from pants.backend.python.lint.isort import subsystem as isort_subsystem
 from pants.backend.python.macros.python_artifact import PythonArtifact
 from pants.backend.python.target_types import (
     PythonDistribution,
+    PythonRequirementsField,
     PythonRequirementTarget,
     PythonResolveField,
     PythonSourceField,
     PythonSourcesGeneratorTarget,
 )
 from pants.backend.python.util_rules import local_dists_pep660, pex_from_targets
-from pants.base.specs import RawSpecs
+from pants.backend.python.util_rules.pex_requirements import PexRequirements
+from pants.base.specs import AddressLiteralSpec, RawSpecs
 from pants.core.goals.export import ExportResults
 from pants.core.util_rules import distdir
 from pants.engine.fs import CreateDigest
@@ -35,6 +37,8 @@ from pants.engine.target import (
     SingleSourceField,
     Target,
     Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, RuleRunner
@@ -61,6 +65,7 @@ def rule_runner() -> RuleRunner:
             *isort_subsystem.rules(),  # add a tool that we can try exporting
             QueryRule(Targets, [RawSpecs]),
             QueryRule(ExportResults, [ExportVenvsRequest]),
+            QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
         ],
         target_types=[PythonRequirementTarget, PythonSourcesGeneratorTarget, PythonDistribution],
         objects={"python_artifact": PythonArtifact, "parametrize": Parametrize},
@@ -188,6 +193,159 @@ def test_export_tool(rule_runner: RuleRunner) -> None:
     result = results[0]
     assert result.resolve == isort_subsystem.Isort.options_scope
     assert "isort" in result.description
+
+
+def test_export_venv_filtered_by_targets(rule_runner: RuleRunner) -> None:
+    """When target specs are provided, only their transitive requirements should be exported.
+
+    Dependency graph:
+      A (python_sources) -> B, C
+      B (python_sources) -> req_x
+      C (python_sources) -> req_z
+      req_x (python_requirement x==1.0) -> req_y
+      req_y (python_requirement y==1.0)
+      req_z (python_requirement z==1.0)
+
+    Expected req_strings:
+      export A  -> {x==1.0, y==1.0, z==1.0}
+      export B  -> {x==1.0, y==1.0}
+      export C  -> {z==1.0}
+
+    The req_strings are verified directly via TransitiveTargets (the same logic the export rule
+    uses). The export plumbing is verified with target D (a standalone source target with no
+    python_requirement deps), so req_strings is empty — this exercises the early-return path in
+    _setup_pex_requirements without requiring a PEX-native JSON lockfile.
+    """
+    vinfo = sys.version_info
+    current_interpreter = f"{vinfo.major}.{vinfo.minor}.{vinfo.micro}"
+    rule_runner.write_files(
+        {
+            "src/a/__init__.py": "",
+            "src/a/BUILD": dedent(
+                """\
+                python_sources(name='A', resolve='r', dependencies=['src/b:B', 'src/c:C'])
+                """
+            ),
+            "src/b/__init__.py": "",
+            "src/b/BUILD": dedent(
+                """\
+                python_sources(name='B', resolve='r', dependencies=[':req_x'])
+                python_requirement(name='req_x', requirements=['x==1.0'], resolve='r', dependencies=[':req_y'])
+                python_requirement(name='req_y', requirements=['y==1.0'], resolve='r')
+                """
+            ),
+            "src/c/__init__.py": "",
+            "src/c/BUILD": dedent(
+                """\
+                python_sources(name='C', resolve='r', dependencies=[':req_z'])
+                python_requirement(name='req_z', requirements=['z==1.0'], resolve='r')
+                """
+            ),
+            # Target D has no python_requirement deps — its req_strings is empty, so PEX
+            # subsetting is not invoked and the plain-text lockfile is accepted.
+            "src/d/__init__.py": "",
+            "src/d/BUILD": "python_sources(name='D', resolve='r')",
+            # Plain-text lockfile works here because the export plumbing assertion uses
+            # target D (empty req_strings → early return before PEX JSON parsing).
+            "lock.txt": "x==1.0\ny==1.0\nz==1.0",
+        }
+    )
+    rule_runner.set_options(
+        [
+            *pants_args_for_python_lockfiles,
+            f"--python-interpreter-constraints=['=={current_interpreter}']",
+            "--python-resolves={'r': 'lock.txt'}",
+            "--export-resolve=r",
+            "--source-root-patterns=['src']",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT"},
+    )
+
+    def get_targets(*specs: str) -> Targets:
+        return rule_runner.request(
+            Targets,
+            [
+                RawSpecs(
+                    address_literals=tuple(
+                        AddressLiteralSpec(path_component=p, target_component=t)
+                        for s in specs
+                        for p, t in [s.rsplit(":", 1)]
+                    ),
+                    description_of_origin="test",
+                )
+            ],
+        )
+
+    def req_strings_for(targets: Targets) -> set[str]:
+        tt = rule_runner.request(
+            TransitiveTargets,
+            [TransitiveTargetsRequest([t.address for t in targets])],
+        )
+        return set(
+            PexRequirements.req_strings_from_requirement_fields(
+                tgt[PythonRequirementsField]
+                for tgt in tt.closure
+                if tgt.has_field(PythonRequirementsField)
+            )
+        )
+
+    targets_A = get_targets("src/a:A")
+    targets_B = get_targets("src/b:B")
+    targets_C = get_targets("src/c:C")
+
+    # Verify transitive-closure req_strings: this is the core filtering logic.
+    assert req_strings_for(targets_A) == {"x==1.0", "y==1.0", "z==1.0"}
+    assert req_strings_for(targets_B) == {"x==1.0", "y==1.0"}
+    assert req_strings_for(targets_C) == {"z==1.0"}
+
+    # Combining B and C covers the full set of requirements — same as what no-target filtering
+    # would export (the union of all transitive deps across the resolve).
+    targets_B_and_C = get_targets("src/b:B", "src/c:C")
+    assert req_strings_for(targets_B_and_C) == {"x==1.0", "y==1.0", "z==1.0"}
+
+    # Verify the export plumbing: target D has no transitive python_requirement deps so
+    # req_strings is empty and the early-return path is taken (no PEX JSON lockfile needed).
+    targets_D = get_targets("src/d:D")
+    assert req_strings_for(targets_D) == set()
+    all_results = rule_runner.request(ExportResults, [ExportVenvsRequest(targets=targets_D)])
+    assert len(all_results) == 1
+    result = all_results[0]
+    assert result.resolve == "r"
+    assert result.reldir == f"python/virtualenvs/r/{current_interpreter}"
+
+
+def test_export_venv_filtered_wrong_resolve(rule_runner: RuleRunner) -> None:
+    """Passing a target from the wrong resolve should raise a clear error."""
+    vinfo = sys.version_info
+    current_interpreter = f"{vinfo.major}.{vinfo.minor}.{vinfo.micro}"
+    rule_runner.write_files(
+        {
+            "src/a/__init__.py": "",
+            "src/a/BUILD": "python_sources(name='A', resolve='r1')",
+            "lock.txt": "",
+        }
+    )
+    rule_runner.set_options(
+        [
+            *pants_args_for_python_lockfiles,
+            f"--python-interpreter-constraints=['=={current_interpreter}']",
+            "--python-resolves={'r1': 'lock.txt', 'r2': 'lock.txt'}",
+            "--export-resolve=r2",
+            "--source-root-patterns=['src']",
+        ],
+        env_inherit={"PATH", "PYENV_ROOT"},
+    )
+    targets = rule_runner.request(
+        Targets,
+        [
+            RawSpecs(
+                address_literals=(AddressLiteralSpec("src/a", "A"),),
+                description_of_origin="test",
+            )
+        ],
+    )
+    with pytest.raises(Exception, match="do not belong to the resolve `r2`"):
+        rule_runner.request(ExportResults, [ExportVenvsRequest(targets=targets)])
 
 
 def test_export_codegen_outputs():

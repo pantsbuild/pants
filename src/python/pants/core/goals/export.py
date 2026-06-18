@@ -201,9 +201,6 @@ async def export_goal(
 
     if not (export_subsys.resolve or export_subsys.options.bin):
         raise ExportError("Must specify at least one `--resolve` or `--bin` to export")
-    if targets:
-        raise ExportError("The `export` goal does not take target specs.")
-
     requests = tuple(request_type(targets) for request_type in request_types)
     all_results = await concurrently(
         export(**implicitly({request: ExportRequest})) for request in requests
