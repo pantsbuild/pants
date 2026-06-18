@@ -13,6 +13,7 @@ from pants.backend.python.target_types import PythonSourcesGeneratorTarget
 from pants.backend.project_info.dependents import DependentsGoal
 from pants.backend.project_info.dependents import rules as dependents_rules
 from pants.core.target_types import rules as core_target_types_rules
+from pants.engine.internals.parametrize import Parametrize
 from pants.testutil.python_rule_runner import PythonRuleRunner
 
 # Edges exercised below: import inference, `__init__.py` inference, explicit `dependencies=[...]`,
@@ -39,6 +40,7 @@ def rule_runner() -> PythonRuleRunner:
             *core_target_types_rules(),
         ],
         target_types=[PythonSourcesGeneratorTarget],
+        objects={"parametrize": Parametrize},
     )
     return runner
 
@@ -97,6 +99,50 @@ def test_batched_matches_per_target_empty_init(rule_runner: PythonRuleRunner) ->
     files["pkg/__init__.py"] = ""  # empty -> no init dependency under the default content_only mode
     rule_runner.write_files(files)
     _assert_equivalent(rule_runner, _QUERY_TARGETS)
+
+
+def test_batched_matches_per_target_parametrized_resolves(rule_runner: PythonRuleRunner) -> None:
+    """Targets parametrized across resolves are batched (parsed once, owners resolved per-resolve).
+
+    `use.py`'s import of `lib.core` must resolve to `core@resolve=a` from `use@resolve=a` and to
+    `core@resolve=b` from `use@resolve=b`, and the `__init__.py` edges must likewise be
+    resolve-matched -- exactly as the per-target algorithm produces them.
+    """
+    rule_runner.write_files(
+        {
+            "lib/__init__.py": "VERSION = 1\n",
+            "lib/core.py": "X = 1\n",
+            "lib/use.py": "from lib.core import X\n",  # import edge use -> core (within each resolve)
+            "lib/BUILD": "python_sources(resolve=parametrize('a', 'b'))",
+            "app/main.py": "import lib.use\n",  # import edge main -> use, only in resolve 'a'
+            "app/BUILD": "python_sources(resolve='a')",
+        }
+    )
+    resolve_args = (
+        "--python-enable-resolves",
+        "--python-resolves={'a': '', 'b': ''}",
+        "--python-default-resolve=a",
+    )
+    targets = [
+        "lib/core.py@resolve=a",
+        "lib/core.py@resolve=b",
+        "lib/use.py@resolve=a",
+        "lib/__init__.py@resolve=a",
+        "app/main.py",
+    ]
+    for target in targets:
+        for transitive in (False, True):
+            per_target = _dependents(
+                rule_runner, target, batched=False, transitive=transitive, extra_global_args=resolve_args
+            )
+            batched = _dependents(
+                rule_runner, target, batched=True, transitive=transitive, extra_global_args=resolve_args
+            )
+            assert per_target == batched, (
+                f"Divergence for {target} (transitive={transitive}):\n"
+                f"  per-target: {per_target}\n"
+                f"  batched:    {batched}"
+            )
 
 
 def test_falls_back_when_ineligible(rule_runner: PythonRuleRunner) -> None:

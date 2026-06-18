@@ -81,12 +81,14 @@ class DependentsInferenceSubsystem(Subsystem):
             "instead of resolving the dependencies of every target individually.\n\n"
             "On large Python repositories this is dramatically faster: the per-target resolution "
             "fans out to tens of engine nodes per target, whereas the batched pass parses all "
-            "sources in a single native call. It produces identical results for the cases it "
-            "supports and automatically falls back to the per-target algorithm for anything it "
-            "cannot reproduce exactly (custom dependency-inference backends, parametrization, "
-            "special-cased dependency fields, multiple resolves, `conftest.py` inference, asset "
-            "inference, or a non-default `[python-infer].unowned_dependency_behavior`). Off by "
-            "default while it gains coverage."
+            "sources natively. It handles import and `__init__.py` inference across resolves and "
+            "parametrization, and resolves every other target (explicit `dependencies=`, "
+            "special-cased dependency fields, `conftest.py`/asset/other inference backends, "
+            "target generators) with the per-target algorithm, so the result is identical to "
+            "computing the graph per-target. The one case it does not reproduce is *raising* on "
+            "unowned imports under a non-default `[python-infer].unowned_dependency_behavior`; in a "
+            "repository with no unowned imports (the prerequisite for that setting to be silent) "
+            "the result is still identical. Off by default while it gains coverage."
         ),
         advanced=True,
     )
