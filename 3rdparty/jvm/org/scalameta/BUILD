@@ -17,7 +17,7 @@ scala_artifact(
     name="scalameta",
     group="org.scalameta",
     artifact="scalameta",
-    version="4.14.2",
+    version="4.17.0",
     packages=["scala.meta.**"],
     resolve="scala_parser_dev",
 )
