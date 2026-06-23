@@ -3,6 +3,7 @@
 
 import functools
 import inspect
+import threading
 from collections.abc import Callable
 from contextlib import contextmanager
 from typing import Any, TypeVar
@@ -67,9 +68,8 @@ def memoized(func: F | None = None, key_factory=equal_args, cache_factory=dict) 
 
     By default, exactly one result is memoized for each unique combination of function arguments.
 
-    Note that memoization is not thread-safe and the default result cache will grow without bound;
-    so care must be taken to only apply this decorator to functions with single threaded access and
-    an expected reasonably small set of unique call parameters.
+    Note that the default result cache will grow without bound, so care must be taken to only apply
+    this decorator to functions with an expected reasonably small set of unique call parameters.
 
     Note that the wrapped function comes equipped with 3 helper function attributes:
 
@@ -115,32 +115,42 @@ def memoized(func: F | None = None, key_factory=equal_args, cache_factory=dict) 
 
     key_func = key_factory or equal_args
     memoized_results = cache_factory() if cache_factory else {}
+    lock = threading.RLock()
 
     @functools.wraps(func)
     def memoize(*args, **kwargs):
         key = key_func(*args, **kwargs)
-        if key in memoized_results:
-            return memoized_results[key]
-        result = func(*args, **kwargs)
-        memoized_results[key] = result
+        with lock:
+            try:
+                return memoized_results[key]
+            except KeyError:
+                result = func(*args, **kwargs)
+                memoized_results[key] = result
         return result
 
     @contextmanager
     def put(*args, **kwargs):
         key = key_func(*args, **kwargs)
-        yield functools.partial(memoized_results.__setitem__, key)
+
+        def setter(value):
+            with lock:
+                memoized_results[key] = value
+
+        yield setter
 
     memoize.put = put  # type: ignore[attr-defined]
 
     def forget(*args, **kwargs):
         key = key_func(*args, **kwargs)
-        if key in memoized_results:
-            del memoized_results[key]
+        with lock:
+            if key in memoized_results:
+                del memoized_results[key]
 
     memoize.forget = forget  # type: ignore[attr-defined]
 
     def clear():
-        memoized_results.clear()
+        with lock:
+            memoized_results.clear()
 
     memoize.clear = clear  # type: ignore[attr-defined]
 

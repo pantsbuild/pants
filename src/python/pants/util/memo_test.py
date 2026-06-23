@@ -1,6 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from pants.util.memo import (
@@ -169,6 +172,49 @@ def test_clear():
     assert 9 == square(3)
 
     assert [2, 3, 2, 3] == calculations
+
+
+def test_concurrent_same_key_calls_return_one_cached_value() -> None:
+    barrier = threading.Barrier(8)
+    call_lock = threading.Lock()
+    calls = 0
+
+    @memoized
+    def calculate(num):
+        nonlocal calls
+        barrier.wait()
+        with call_lock:
+            calls += 1
+            return calls + num
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(calculate, [42] * 8))
+
+    assert len(set(results)) == 1
+    assert calculate(42) == results[0]
+
+
+def test_concurrent_cache_helpers() -> None:
+    @memoized
+    def calculate(num):
+        return num + 100
+
+    def put(num) -> None:
+        with getattr(calculate, "put")(num) as putter:
+            putter(num)
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(put, range(32)))
+    assert [calculate(num) for num in range(32)] == list(range(32))
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(getattr(calculate, "forget"), range(16)))
+    assert [calculate(num) for num in range(16)] == [num + 100 for num in range(16)]
+    assert [calculate(num) for num in range(16, 32)] == list(range(16, 32))
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(lambda _: getattr(calculate, "clear")(), range(8)))
+    assert calculate(31) == 131
 
 
 class _Called:
