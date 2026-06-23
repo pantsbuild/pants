@@ -845,16 +845,32 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f3890df0a6f3c582a0a8b2a49a568729cb319f1600683e4458cc98b68ca32841",
-              "url": "https://files.pythonhosted.org/packages/c2/79/674aad5279dd1a77b85efa1cbf8dcead209dc5f38f55cbbfd75bc20cc65b/hdrhistogram-0.10.3.tar.gz"
+              "hash": "7bafdf18bcb142c0fe47c7b64ae3bd911b0593df4d04f1113a2ba88f05dd989d",
+              "url": "https://files.pythonhosted.org/packages/9a/8c/217f0987a175dcea53317484ca10a699a0591231045632c8a2c18da4d35b/hdrhistogram-0.10.7-cp314-cp314-musllinux_1_2_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2241f3e1f7449eb3013a866b5a21e83c8bdc59c8ade447b7f7fe8494e367f6d8",
+              "url": "https://files.pythonhosted.org/packages/10/74/e4aebac62e490c15876f275db923a1c3f9c8c174e22d02fe63c23ad12815/hdrhistogram-0.10.7-cp314-cp314-macosx_11_0_arm64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "bed4785a5e40e6260306e8e27ee3d31299263640cd7618040df88447ed57c2bd",
+              "url": "https://files.pythonhosted.org/packages/79/ba/0f5b04dd55da744e1f8ed251f12286fb21e488f6c9671323016e4e56a106/hdrhistogram-0.10.7.tar.gz"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2757e885a767e35be97094f07acbf9a76750c556afbb25d40111b5560786887e",
+              "url": "https://files.pythonhosted.org/packages/92/fa/f9fc7c9fed0af5fdc8316770a667a4bf94ffdda9b9c155f71a164a95a849/hdrhistogram-0.10.7-cp314-cp314-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl"
             }
           ],
           "project_name": "hdrhistogram",
           "requires_dists": [
-            "pbr>=1.4"
+            "pbr>=1.4",
+            "setuptools>=78.1.1"
           ],
-          "requires_python": null,
-          "version": "0.10.3"
+          "requires_python": ">=3.10",
+          "version": "0.10.7"
         },
         {
           "artifacts": [
@@ -3158,8 +3174,8 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.92.2",
-  "pip_version": "26.0.1",
+  "pex_version": "2.95.1",
+  "pip_version": "26.1.1",
   "prefer_older_binary": false,
   "requirements": [
     "PyGithub==2.8.1",
@@ -3172,7 +3188,7 @@
     "fastapi==0.120.1",
     "fasteners==0.20.0",
     "freezegun==1.5.5",
-    "hdrhistogram==0.10.3",
+    "hdrhistogram==0.10.7",
     "ijson==3.4.0.post0",
     "mypy-typing-asserts==0.1.1",
     "mypy~=1.19.1",
