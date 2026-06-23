@@ -103,27 +103,9 @@ def test_key_factory():
 
 
 # TODO[13244]
-def test_cache_factory():
-    class SingleEntryMap(dict):
-        def __setitem__(self, key, value):
-            self.clear()
-            return super().__setitem__(key, value)
-
-    calculations = []
-
-    @memoized(cache_factory=SingleEntryMap)
-    def square(num):
-        calculations.append(num)
-        return num * num
-
-    assert 4 == square(2)
-    assert 4 == square(2)
-    assert 9 == square(3)
-    assert 9 == square(3)
-    assert 4 == square(2)
-    assert 4 == square(2)
-
-    assert [2, 3, 2] == calculations
+def test_cache_factory_unsupported():
+    with pytest.raises(TypeError, match="cache_factory"):
+        memoized(cache_factory=dict)
 
 
 # TODO[13244]
@@ -174,24 +156,67 @@ def test_clear():
     assert [2, 3, 2, 3] == calculations
 
 
-def test_concurrent_same_key_calls_return_one_cached_value() -> None:
-    barrier = threading.Barrier(8)
+def test_concurrent_same_key_calls_wait_for_cached_value() -> None:
+    ready = threading.Barrier(8)
+    started = threading.Event()
+    unblock = threading.Event()
     call_lock = threading.Lock()
     calls = 0
 
     @memoized
     def calculate(num):
         nonlocal calls
-        barrier.wait()
         with call_lock:
             calls += 1
-            return calls + num
+        started.set()
+        assert unblock.wait(timeout=5)
+        return calls + num
+
+    def call_calculate():
+        ready.wait()
+        return calculate(42)
 
     with ThreadPoolExecutor(max_workers=8) as executor:
-        results = list(executor.map(calculate, [42] * 8))
+        futures = [executor.submit(call_calculate) for _ in range(8)]
+        assert started.wait(timeout=5)
+        unblock.set()
+        results = [future.result(timeout=5) for future in futures]
 
     assert len(set(results)) == 1
     assert calculate(42) == results[0]
+    assert calls == 1
+
+
+def test_concurrent_different_key_calls_compute_concurrently() -> None:
+    ready = threading.Barrier(8)
+    started = threading.Barrier(8)
+    done = threading.Event()
+
+    @memoized
+    def calculate(num):
+        ready.wait()
+        started.wait()
+        assert done.wait(timeout=5)
+        return num
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(calculate, num) for num in range(8)]
+        done.set()
+        assert [future.result(timeout=5) for future in futures] == list(range(8))
+
+
+def test_exception_not_cached() -> None:
+    calls = 0
+
+    @memoized
+    def calculate():
+        nonlocal calls
+        calls += 1
+        raise ValueError(calls)
+
+    for expected in (1, 2):
+        with pytest.raises(ValueError, match=str(expected)):
+            calculate()
 
 
 def test_concurrent_cache_helpers() -> None:

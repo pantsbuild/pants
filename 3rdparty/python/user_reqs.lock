@@ -824,21 +824,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f3890df0a6f3c582a0a8b2a49a568729cb319f1600683e4458cc98b68ca32841",
-              "url": "https://files.pythonhosted.org/packages/c2/79/674aad5279dd1a77b85efa1cbf8dcead209dc5f38f55cbbfd75bc20cc65b/hdrhistogram-0.10.3.tar.gz"
-            }
-          ],
-          "project_name": "hdrhistogram",
-          "requires_dists": [
-            "pbr>=1.4"
-          ],
-          "requires_python": null,
-          "version": "0.10.3"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "2c032fa028f46871ec7e1fc59fc15e8023eab3e6bbe6ece786a1611719a5d081",
               "url": "https://files.pythonhosted.org/packages/99/67/8d9f2c313618e161b82f3873188e7196126da1d6e29688df40eb3997c77a/httptools-0.8.0-cp314-cp314t-musllinux_1_2_x86_64.whl"
             },
@@ -1505,26 +1490,6 @@
           ],
           "requires_python": ">=3.9",
           "version": "1.1.1"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "ff223894eb1cd271a98076b13d3badff3bb36c424074d26334cd25aebeecea6b",
-              "url": "https://files.pythonhosted.org/packages/c0/db/61efa0d08a99f897ef98256b03e563092d36cc38dc4ebe4a85020fe40b31/pbr-7.0.3-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "b46004ec30a5324672683ec848aed9e8fc500b0d261d40a3229c2d2bbfcedc29",
-              "url": "https://files.pythonhosted.org/packages/5e/ab/1de9a4f730edde1bdbbc2b8d19f8fa326f036b4f18b2f72cfbea7dc53c26/pbr-7.0.3.tar.gz"
-            }
-          ],
-          "project_name": "pbr",
-          "requires_dists": [
-            "setuptools"
-          ],
-          "requires_python": ">=2.6",
-          "version": "7.0.3"
         },
         {
           "artifacts": [
@@ -3260,7 +3225,6 @@
     "fastapi==0.120.1",
     "fasteners==0.20.0",
     "freezegun==1.5.5",
-    "hdrhistogram==0.10.3",
     "ijson==3.4.0.post0",
     "mypy-typing-asserts==0.1.1",
     "mypy~=1.19.1",
