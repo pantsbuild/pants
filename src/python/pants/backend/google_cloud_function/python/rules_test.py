@@ -63,6 +63,7 @@ def rule_runner() -> PythonRuleRunner:
             *core_target_types_rules(),
             *package.rules(),
             QueryRule(BuiltPackage, (PythonGoogleCloudFunctionFieldSet,)),
+            QueryRule(BuiltPackage, (PexBinaryFieldSet,)),
         ],
         target_types=[
             FileTarget,
