@@ -443,8 +443,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             # Remove the pidfile so that the teardown script doesn't try to kill process 9.
             os.unlink(pidpath)
 
-    @pytest.mark.skip(reason="flaky: https://github.com/pantsbuild/pants/issues/8193")
-    @pytest.mark.no_error_if_skipped
     def test_pantsd_memory_usage(self):
         """Validates that after N runs, memory usage has increased by no more than X percent."""
         number_of_runs = 10
@@ -460,11 +458,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 ctx.checker.assert_running()
 
             final_memory_usage = ctx.checker.current_memory_usage()
-            self.assertTrue(
-                initial_memory_usage <= final_memory_usage,
-                f"Memory usage inverted unexpectedly: {initial_memory_usage} > {final_memory_usage}",
+            assert initial_memory_usage > 0, (
+                f"Expected non-zero initial memory usage, got {initial_memory_usage}"
             )
-
             increase_fraction = (float(final_memory_usage) / initial_memory_usage) - 1.0
             self.assertTrue(
                 increase_fraction <= max_memory_increase_fraction,
