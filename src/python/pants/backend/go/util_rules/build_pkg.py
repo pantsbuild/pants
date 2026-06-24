@@ -337,7 +337,9 @@ async def merge_built_go_package_archives(
             if import_path not in import_paths_to_pkg_a_files:
                 import_paths_to_pkg_a_files[import_path] = archive_path
                 digests.append(digest)
-    merged = await merge_digests(MergeDigests(digests))
+    # Sort so the `MergeDigests` input is canonical and identical archive sets share a
+    # `merge_digests` cache entry regardless of package iteration order.
+    merged = await merge_digests(MergeDigests(sorted(digests, key=lambda d: d.fingerprint)))
     return MergedGoPackageArchives(merged, FrozenDict(import_paths_to_pkg_a_files))
 
 
@@ -632,7 +634,8 @@ async def build_go_package(
                 transitive_pkg_archives[ip] = handle
 
     merged_deps_digest, import_config, embedcfg, action_id_result = await concurrently(
-        merge_digests(MergeDigests(direct_dep_digests)),
+        # Sort for a canonical `MergeDigests` input (see `merge_built_go_package_archives`).
+        merge_digests(MergeDigests(sorted(direct_dep_digests, key=lambda d: d.fingerprint))),
         generate_import_config(
             ImportConfigRequest(
                 FrozenDict(direct_dep_archives),
