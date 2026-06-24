@@ -160,7 +160,7 @@ impl Name {
     }
 
     fn from_remexec_name(name: &str) -> Result<Self, String> {
-        let mut components = Path::new(name).components();
+        let mut components = Path::new(name).components().fuse();
         match (components.next(), components.next()) {
             (Some(std::path::Component::Normal(_)), None) => Ok(Name(Intern::from(name))),
             _ => Err(format!("Remote output path component is invalid: {name:?}")),
