@@ -134,7 +134,7 @@ Some important `setup.py` metadata is inferred by Pants from your code and its d
 
 You can use almost any [keyword argument](https://packaging.python.org/guides/distributing-packages-using-setuptools/#setup-args) accepted by `setup.py` in the `setup()` function.
 
-However, you cannot use `data_files`, `install_requires`, `namespace_packages`, `package_dir`, `package_data`, or `packages` because Pants will generate these for you, based on the data derived from your code and dependencies.
+However, you cannot use `install_requires`, `namespace_packages`, `package_dir`, `package_data`, or `packages` because Pants will generate these for you, based on the data derived from your code and dependencies.
 
 :::note Use the `entry_points` field to register entry points like `console_scripts`
 The [`entry_points` field](../../../reference/targets/python_distribution.mdx#entry_points) allows you to configure [setuptools-style entry points](https://packaging.python.org/specifications/entry-points/#entry-points-specification):
