@@ -38,6 +38,18 @@ By default, `--changed-since` will only run over files directly changed. Often, 
   test
 ```
 
+When running pants tests as part of presubmit checks, often teams will want to run only tests affected by that
+particular pull request. To do that properly, you will first need to find the [merge base](https://git-scm.com/docs/git-merge-base)
+relative to origin/main and run all tests changed since that commit:
+
+```bash
+❯ MERGE_BASE=$(git merge-base HEAD origin/main)
+❯ pants \
+  --changed-since="$MERGE_BASE" \
+  --changed-dependents=transitive \
+  test
+```
+
 :::note Hint: Pants does not understand transitive third-party dependencies in this context.
 Changes to third-party dependencies (particularly, dependencies of dependencies) may not be
 surfaced as you expect via `--changed-*`. In particular, any change to a single dependency

@@ -9,11 +9,12 @@ use pyo3::types::{
     PyDict, PyIterator, PyList, PyMapping, PyNotImplemented, PySet, PyTuple, PyType,
 };
 
+use super::collection::FrozenCollectionData;
+
 #[pyclass(subclass, frozen, mapping, generic)]
 #[derive(Debug)]
 pub struct FrozenDict {
-    data: Py<PyDict>,
-    hash: isize,
+    inner: FrozenCollectionData,
 }
 
 #[pymethods]
@@ -97,31 +98,28 @@ impl FrozenDict {
     fn __repr__(slf: &Bound<Self>) -> PyResult<String> {
         Ok(format!(
             "FrozenDict({})",
-            slf.get().data.bind_borrowed(slf.py()).repr()?
+            slf.get().inner.data.bind_borrowed(slf.py()).repr()?
         ))
     }
 
-    fn __hash__(&self) -> isize {
-        self.hash
+    fn __hash__(&self, py: Python) -> PyResult<isize> {
+        self.inner.get_hash(py, compute_frozendict_hash)
     }
 
     fn __iter__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyIterator>> {
-        slf.get().data.as_any().bind_borrowed(slf.py()).try_iter()
+        slf.get().inner.iter(slf.py())
     }
 
     fn __eq__(&self, other: &Bound<PyAny>) -> PyResult<bool> {
-        self.data.bind_borrowed(other.py()).eq(other)
+        self.inner.data.bind_borrowed(other.py()).eq(other)
     }
 
     fn __len__(slf: PyRef<Self>) -> usize {
-        slf.data.bind_borrowed(slf.py()).len()
+        slf.inner.len(slf.py())
     }
 
     fn __reversed__<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyIterator>> {
-        let py = slf.py();
-        let keys = slf.get().data.bind_borrowed(py).keys();
-        keys.reverse()?;
-        keys.try_iter()
+        slf.get().inner.reversed(slf.py())
     }
 
     fn __lt__<'py>(&self, other: &Bound<'py, PyAny>) -> PyResult<bool> {
@@ -131,9 +129,9 @@ impl FrozenDict {
             ));
         }
         let py = other.py();
-        let self_dict = self.data.bind_borrowed(py);
+        let self_dict = self.inner.data.bind_borrowed(py);
         let other_fd = other.cast::<FrozenDict>()?;
-        let other_dict = other_fd.get().data.bind_borrowed(py);
+        let other_dict = other_fd.get().inner.data.bind_borrowed(py);
 
         let self_len = self_dict.len();
         let other_len = other_dict.len();
@@ -161,13 +159,13 @@ impl FrozenDict {
     }
 
     fn __contains__(&self, input: &Bound<PyAny>) -> PyResult<bool> {
-        self.data.bind_borrowed(input.py()).contains(input)
+        self.inner.contains(input)
     }
 
     fn __or__<'py>(&self, other: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
         let py = other.py();
         if let Some(other) = get_inner_or_mapping(&other)? {
-            let py_args = PyTuple::new(py, [self.data.bind_borrowed(py).bitor(other)?])?;
+            let py_args = PyTuple::new(py, [self.inner.data.bind_borrowed(py).bitor(other)?])?;
             Self::from_pyargs(&py_args, None)?.into_bound_py_any(py)
         } else {
             Ok(PyNotImplemented::get(py).into_bound_py_any(py)?)
@@ -177,7 +175,7 @@ impl FrozenDict {
     fn __ror__<'py>(&self, other: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
         let py = other.py();
         if let Some(other) = get_inner_or_mapping(&other)? {
-            let py_args = PyTuple::new(py, [other.bitor(self.data.bind_borrowed(py))?])?;
+            let py_args = PyTuple::new(py, [other.bitor(self.inner.data.bind_borrowed(py))?])?;
 
             Self::from_pyargs(&py_args, None)?.into_bound_py_any(py)
         } else {
@@ -186,22 +184,22 @@ impl FrozenDict {
     }
 
     fn keys<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
-        let dict = slf.get().data.bind_borrowed(slf.py());
+        let dict = slf.get().inner.data.bind_borrowed(slf.py());
         dict.call_method0(intern!(slf.py(), "keys"))
     }
 
     fn values<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
-        let dict = slf.get().data.bind_borrowed(slf.py());
+        let dict = slf.get().inner.data.bind_borrowed(slf.py());
         dict.call_method0(intern!(slf.py(), "values"))
     }
 
     fn items<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
-        let dict = slf.get().data.bind_borrowed(slf.py());
+        let dict = slf.get().inner.data.bind_borrowed(slf.py());
         dict.call_method0(intern!(slf.py(), "items"))
     }
 
     pub fn __getnewargs__(&self) -> PyResult<(&Py<PyDict>,)> {
-        Ok((&self.data,))
+        Ok((&self.inner.data,))
     }
 }
 
@@ -211,7 +209,7 @@ fn get_inner_or_mapping<'a, 'py>(
     let py = obj.py();
     Ok(if obj.is_instance_of::<FrozenDict>() {
         let fd: &Bound<FrozenDict> = obj.cast::<FrozenDict>()?;
-        Some(fd.get().data.bind(py).cast::<PyMapping>()?)
+        Some(fd.get().inner.data.bind(py).cast::<PyMapping>()?)
     } else {
         obj.cast::<PyMapping>().ok()
     })
@@ -296,15 +294,13 @@ impl FrozenDict {
 
     fn from_pydict(dict: Bound<PyDict>) -> PyResult<Self> {
         let hash = compute_frozendict_hash(&dict)?;
-
         Ok(Self {
-            data: dict.unbind(),
-            hash,
+            inner: FrozenCollectionData::new(dict, hash),
         })
     }
 
     pub fn iter(slf: Bound<Self>) -> PyResult<KeyValueIter> {
-        KeyValueIter::new(slf.get().data.bind_borrowed(slf.py()).as_mapping())
+        KeyValueIter::new(slf.get().inner.data.bind_borrowed(slf.py()).as_mapping())
     }
 
     fn inner_get<'a, 'py>(
@@ -312,7 +308,8 @@ impl FrozenDict {
         input: Borrowed<'a, 'py, PyAny>,
         default: Option<Bound<'py, PyAny>>,
     ) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.data
+        self.inner
+            .data
             .bind_borrowed(input.py())
             .get_item(input)
             .transpose()
@@ -321,7 +318,7 @@ impl FrozenDict {
     }
 }
 
-/// Compute a commutative hash for a dictionary
+/// Compute a commutative hash for a dictionary (XOR of hash((k, v)) pairs).
 fn compute_frozendict_hash(dict: &Bound<PyDict>) -> PyResult<isize> {
     let mut h: isize = 0;
     for (k, v) in dict {

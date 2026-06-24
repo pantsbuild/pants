@@ -61,9 +61,18 @@ class NodeJsProjectEnvironment:
 
     @property
     def node_modules_directories(self) -> Iterable[str]:
+        """node_modules paths to capture from the install Process.
+
+        In a project with workspaces enabled, the package manager may install deps under a
+        member's node_modules directory (pnpm does this by default). We capture those paths
+        too so the sandbox match what the package manager actually installs.
+        """
         yield "node_modules"
         if self.package and not self.project.single_workspace:
-            yield os.path.join(self.relative_workspace_directory(), "node_modules")
+            for workspace in self.project.workspaces:
+                if workspace.root_dir != self.project.root_dir:
+                    rel_dir = fast_relpath(workspace.root_dir, self.project.root_dir)
+                    yield os.path.join(rel_dir, "node_modules")
 
     @property
     def target(self) -> Target | None:

@@ -35,7 +35,11 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
 from pants.engine.goal import CurrentExecutingGoals, Goal
 from pants.engine.internals import native_engine, options_parsing
-from pants.engine.internals.native_engine import ProcessExecutionEnvironment, PyExecutor
+from pants.engine.internals.native_engine import (
+    ProcessExecutionEnvironment,
+    PyExecutor,
+    _Concurrently,
+)
 from pants.engine.internals.scheduler import ExecutionError, Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Call, Params
 from pants.engine.internals.session import SessionValues
@@ -710,34 +714,20 @@ def run_rule_with_mocks(
 
     unconsumed_mock_calls = set(mock_calls.keys())
 
-    def get(res: Call | Coroutine):
-        if isinstance(res, Coroutine):
-            # A call-by-name element in a concurrently() is a Coroutine whose frame is
-            # the trampoline wrapper that creates and immediately awaits the Call.
-            locals = inspect.getcoroutinelocals(res)
-            assert locals is not None
-            rule_id = locals["rule_id"]
-            args = locals["args"]
-            kwargs = dict(locals["kwargs"])
-            __implicitly = locals.get("__implicitly")
-            if __implicitly:
-                kwargs["__implicitly"] = __implicitly
-            mock_call = mock_calls.get(rule_id)
-            if mock_call:
-                unconsumed_mock_calls.discard(rule_id)
-                # Close the original, unmocked, coroutine, to prevent the "was never awaited"
-                # warning polluting stderr data that the test may examine.
-                res.close()
-                return mock_call(*args, **kwargs)
-            raise AssertionError(f"No mock_call provided for {rule_id}.")
-        elif isinstance(res, Call):
-            mock_call = mock_calls.get(res.rule_id)
-            if mock_call:
-                unconsumed_mock_calls.discard(res.rule_id)
-                return mock_call(*res.inputs)
-            raise AssertionError(f"No mock_call provided for {res.rule_id}.")
-        else:
+    def get(res: Any):
+        if not isinstance(res, Call):
             raise AssertionError(f"Bad arg type: {res}")
+        mock_call = mock_calls.get(res.rule_id)
+        if mock_call is None:
+            raise AssertionError(f"No mock_call provided for {res.rule_id}.")
+        unconsumed_mock_calls.discard(res.rule_id)
+        # NB: if the mock declares an `__implicitly` parameter, forward the raw `(dict,)` so it
+        # can inspect declared types (e.g. to route polymorphic dispatch); otherwise unpack the
+        # implicit values positionally.
+        implicit = res.implicit_args
+        if implicit and "__implicitly" in inspect.signature(mock_call).parameters:
+            return mock_call(*res.args, __implicitly=(implicit,))
+        return mock_call(*res.args, *implicit)
 
     rule_coroutine = res
     rule_input = None
@@ -754,6 +744,8 @@ def run_rule_with_mocks(
             res = rule_coroutine.send(rule_input)
             if isinstance(res, Call):
                 rule_input = get(res)
+            elif isinstance(res, _Concurrently):
+                rule_input = [get(g) for g in res.calls]
             elif type(res) in (tuple, list):
                 rule_input = [get(g) for g in res]
             else:

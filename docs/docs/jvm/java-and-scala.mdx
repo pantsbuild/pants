@@ -103,6 +103,10 @@ The Scala backend currently requires that a `jvm_artifact` target for the `org.s
 
 In many cases, the dependencies of your first-party code are automatically inferred via [dependency inference](https://blog.pantsbuild.org/automatically-unlocking-concurrent-builds-and-fine-grained-caching-on-the-jvm-with-dependency-inference/) based on your `import` statements. If you do need to declare additional dependencies for any reason, you can do so using Pants' [syntax for declaring dependencies for targets](../using-pants/key-concepts/targets-and-build-files.mdx).
 
+:::caution Scala 3 top-level definitions
+Pants's Scala dependency inference does not implement Scala 3's full scoping rules. References to Scala 3 top-level definitions (`val`/`def`/etc. declared directly in a package, without an enclosing `object` or `class`) in another file of the same package [will not be inferred](https://github.com/pantsbuild/pants/issues/23023). For those cross-file references, declare the dependency explicitly via the target's `dependencies` field.
+:::
+
 ### Third-party dependencies and lockfiles
 
 Third-party dependencies (i.e. those from repositories like [Maven central](https://search.maven.org/)) are also automatically inferred via dependency inference, but must first be declared once per repository as [`jvm_artifact` targets](../../reference/targets/jvm_artifact.mdx):

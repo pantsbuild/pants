@@ -12,6 +12,7 @@ import pytest
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
     InvalidPythonLockfileReason,
+    LockfileFormat,
     PythonLockfileMetadata,
     PythonLockfileMetadataV1,
     PythonLockfileMetadataV2,
@@ -46,6 +47,8 @@ def test_metadata_json_round_trip() -> None:
         lock_style="universal",
         complete_platforms=(),
         uploaded_prior_to=None,
+        lockfile_format=LockfileFormat.PEX,
+        resolve="resolve_name",
     )
     output_metadata = PythonLockfileMetadata.from_json_dict(
         json.loads(input_metadata.to_json()), "", ""
@@ -69,6 +72,8 @@ def test_metadata_header_round_trip() -> None:
         lock_style="universal",
         complete_platforms=(),
         uploaded_prior_to=None,
+        lockfile_format=LockfileFormat.PEX,
+        resolve="resolve_name",
     )
     serialized_lockfile = input_metadata.add_header_to_lockfile(
         b"req1==1.0", regenerate_command="./pants lock", delimeter="#"

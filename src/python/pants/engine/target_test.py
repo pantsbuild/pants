@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 import re
 import string
 from collections import namedtuple
@@ -1219,6 +1220,37 @@ def test_multiple_sources_field_ban_subdirs() -> None:
         TestSources(["**"], Address("project"))
     with pytest.raises(InvalidFieldException):
         TestSources(["dir/f.ext"], Address("project"))
+
+
+@pytest.mark.parametrize(
+    ("dirpath", "glob"),
+    [
+        (dirpath, prefix + body)
+        for dirpath in ("", "src", "src/python", "src/python/pants/engine", "a/b/c/d/e")
+        for body in (
+            "f.ext",
+            "file_name.py",
+            "*.py",
+            "*",
+            "**",
+            "**/*.py",
+            "dir/*.py",
+            "a/b/c.txt",
+            "sub/dir/**/*.pyi",
+            "/abs/f.py",
+            "/abs/dir/*.py",
+            "BUILD",
+            "with.multiple.dots.ext",
+        )
+        for prefix in ("", "!")
+    ],
+)
+def test_prefix_glob_with_dirpath_matches_os_path_join(dirpath: str, glob: str) -> None:
+    if glob.startswith("!"):
+        expected = f"!{os.path.join(dirpath, glob[1:])}"
+    else:
+        expected = os.path.join(dirpath, glob)
+    assert MultipleSourcesField.prefix_glob_with_dirpath(dirpath, glob) == expected
 
 
 # -----------------------------------------------------------------------------------------------

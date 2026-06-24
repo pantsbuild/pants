@@ -354,6 +354,18 @@ impl PathGlobs {
         }
     }
 
+    pub fn globs(&self) -> &[String] {
+        &self.globs
+    }
+
+    pub fn strict_match_behavior(&self) -> &StrictGlobMatching {
+        &self.strict_match_behavior
+    }
+
+    pub fn conjunction(&self) -> &GlobExpansionConjunction {
+        &self.conjunction
+    }
+
     pub fn parse(self) -> Result<glob_matching::PreparedPathGlobs, String> {
         glob_matching::PreparedPathGlobs::create(
             self.globs,
@@ -440,7 +452,11 @@ impl Vfs<String> for DigestTrie {
         )))
     }
 
-    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, String> {
+    async fn path_metadata(
+        &self,
+        path: PathBuf,
+        _follow_symlinks: bool,
+    ) -> Result<Option<PathMetadata>, String> {
         let entry = match self.entry(&path)? {
             Some(e) => e,
             None => return Ok(None),
@@ -499,7 +515,11 @@ impl Vfs<String> for DigestTrie {
 pub trait Vfs<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     async fn read_link(&self, link: &Link) -> Result<PathBuf, E>;
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, E>;
-    async fn path_metadata(&self, path: PathBuf) -> Result<Option<PathMetadata>, E>;
+    async fn path_metadata(
+        &self,
+        path: PathBuf,
+        follow_symlinks: bool,
+    ) -> Result<Option<PathMetadata>, E>;
     fn is_ignored(&self, stat: &Stat) -> bool;
     fn mk_error(msg: &str) -> E;
 }
@@ -573,7 +593,7 @@ pub fn increase_limits() -> Result<String, String> {
         if cur < TARGET_NOFILE_LIMIT {
             let err_suffix = format!(
                 "To avoid 'too many open file handle' errors, we recommend a limit of at least {TARGET_NOFILE_LIMIT}: \
-        please see https://www.pantsbuild.org/docs/troubleshooting#too-many-open-files-error \
+        please see https://www.pantsbuild.org/stable/docs/using-pants/troubleshooting-common-issues#too-many-open-files-error \
         for more information."
             );
             // If we might be able to increase the soft limit, try to.

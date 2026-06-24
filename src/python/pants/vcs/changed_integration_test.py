@@ -106,7 +106,10 @@ def _run_pants_goal(
             goal,
         ],
         workdir=workdir,
-        config={"GLOBAL": {"backend_packages": ["pants.backend.shell"]}},
+        config={
+            "GLOBAL": {"backend_packages": ["pants.backend.python", "pants.backend.shell"]},
+            "python": {"interpreter_constraints": ["==3.14.*"]},
+        },
     )
 
 
@@ -293,3 +296,48 @@ def test_pants_ignored_file(repo: str) -> None:
     for dependents in (DependentsOption.NONE, DependentsOption.DIRECT):
         assert_list_stdout(repo, [], dependents)
         assert_count_loc(repo, dependents, expected_num_files=0)
+
+
+def test_deleted_file() -> None:
+    with temporary_dir(root_dir=get_buildroot()) as worktree:
+        _run_git(["init"])
+        _run_git(["config", "user.email", "you@example.com"])
+        _run_git(["config", "user.name", "Your Name"])
+        _run_git(["config", "commit.gpgsign", "false"])
+
+        # Currently only the python backend supports deleted file deps properly,
+        # so we use a python example.
+        project = {
+            ".gitignore": dedent(
+                f"""\
+                {Path(worktree).relative_to(get_buildroot())}
+                .pants.d/pids
+                __pycache__
+                .coverage.*  # For some reason, CI adds these files
+                """
+            ),
+            "src/python/top/foo.py": "",
+            "src/python/top/bar.py": "import top.foo",
+            "src/python/top/bar_test.py": "import top.bar",
+            "src/python/top/BUILD": dedent(
+                """\
+                python_sources()
+                python_tests(name="tests")
+                """
+            ),
+        }
+        for fp, content in project.items():
+            create_file(fp, content)
+
+        _run_git(["add", "."])
+        _run_git(["commit", "-m", "blah"])
+
+        delete_file("src/python/top/foo.py")
+        result = _run_pants_goal(worktree, "list", DependentsOption.TRANSITIVE)
+        result.assert_success()
+        assert sorted(result.stdout.strip().splitlines()) == [
+            "src/python/top/bar.py",
+            "src/python/top/bar_test.py:tests",
+            "src/python/top:tests",
+            "src/python/top:top",
+        ]

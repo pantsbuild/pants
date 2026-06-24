@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum, auto
 from typing import Any, cast
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -19,6 +19,14 @@ from pants.core.util_rules.lockfile_metadata import (
 from pants.util.pip_requirement import PipRequirement
 
 _python_lockfile_metadata = lockfile_metadata_registrar(LockfileScope.PYTHON)
+
+
+class LockfileFormat(StrEnum):
+    PEX = auto()
+    UV = auto()
+    # The very old, deprecated constraints-based "lockfile" that should
+    # be removed entirely.
+    CONSTRAINTS_DEPRECATED = auto()
 
 
 class InvalidPythonLockfileReason(Enum):
@@ -58,6 +66,8 @@ class PythonLockfileMetadata(LockfileMetadata):
         lock_style: str,
         complete_platforms: tuple[str, ...],
         uploaded_prior_to: str | None,
+        lockfile_format: LockfileFormat,
+        resolve: str,
     ) -> PythonLockfileMetadata:
         """Call the most recent version of the `LockfileMetadata` class to construct a concrete
         instance.
@@ -67,7 +77,7 @@ class PythonLockfileMetadata(LockfileMetadata):
         writing, while still allowing us to support _reading_ older, deprecated metadata versions.
         """
 
-        return PythonLockfileMetadataV7(
+        return PythonLockfileMetadataV8(
             valid_for_interpreter_constraints,
             requirements,
             manylinux=manylinux,
@@ -80,6 +90,8 @@ class PythonLockfileMetadata(LockfileMetadata):
             lock_style=lock_style,
             complete_platforms=complete_platforms,
             uploaded_prior_to=uploaded_prior_to,
+            lockfile_format=lockfile_format,
+            resolve=resolve,
         )
 
     @staticmethod
@@ -703,3 +715,55 @@ class PythonLockfileMetadataV7(PythonLockfileMetadataV6):
             failure_reasons.add(InvalidPythonLockfileReason.UPLOADED_PRIOR_TO_MISMATCH)
 
         return LockfileMetadataValidation(failure_reasons)
+
+
+@_python_lockfile_metadata(8)
+@dataclass(frozen=True)
+class PythonLockfileMetadataV8(PythonLockfileMetadataV7):
+    """Lockfile version that records the lockfile format (pex, uv, etc.) and the resolve name."""
+
+    lockfile_format: LockfileFormat
+    resolve: str
+
+    @classmethod
+    def _from_json_dict(
+        cls: type[PythonLockfileMetadataV8],
+        json_dict: dict[Any, Any],
+        lockfile_description: str,
+        error_suffix: str,
+    ) -> PythonLockfileMetadataV8:
+        v7_metadata = PythonLockfileMetadataV7._from_json_dict(
+            json_dict, lockfile_description, error_suffix
+        )
+        metadata = _get_metadata(json_dict, lockfile_description, error_suffix)
+
+        lockfile_format = metadata("lockfile_format", LockfileFormat, LockfileFormat)
+        resolve = metadata("resolve", str, str)
+
+        return PythonLockfileMetadataV8(
+            valid_for_interpreter_constraints=v7_metadata.valid_for_interpreter_constraints,
+            requirements=v7_metadata.requirements,
+            manylinux=v7_metadata.manylinux,
+            requirement_constraints=v7_metadata.requirement_constraints,
+            only_binary=v7_metadata.only_binary,
+            no_binary=v7_metadata.no_binary,
+            excludes=v7_metadata.excludes,
+            overrides=v7_metadata.overrides,
+            sources=v7_metadata.sources,
+            lock_style=v7_metadata.lock_style,
+            complete_platforms=v7_metadata.complete_platforms,
+            uploaded_prior_to=v7_metadata.uploaded_prior_to,
+            lockfile_format=lockfile_format,
+            resolve=resolve,
+        )
+
+    @classmethod
+    def additional_header_attrs(cls, instance: LockfileMetadata) -> dict[Any, Any]:
+        instance = cast(PythonLockfileMetadataV8, instance)
+        return {
+            "lockfile_format": instance.lockfile_format,
+            "resolve": instance.resolve,
+        }
+
+    def is_valid_for(self, **kwargs) -> LockfileMetadataValidation:
+        return super().is_valid_for(**kwargs)

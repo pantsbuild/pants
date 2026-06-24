@@ -8,11 +8,11 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v6
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
     - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
           3.7
@@ -28,7 +28,7 @@ jobs:
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
         SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
       name: Prepare cache comparison
@@ -40,7 +40,7 @@ jobs:
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_ARGS: ${{ github.event.inputs.pants_args }}
-        PANTS_SHOALSOFT_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         SOURCE_DIFFSPEC: ${{ github.event.inputs.source_diffspec }}
         SOURCE_DIFFSPEC_STEP: ${{ github.event.inputs.source_diffspec_step }}
       name: Run cache comparison
