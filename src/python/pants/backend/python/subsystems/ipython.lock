@@ -13,55 +13,55 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e3078351a059199dd5138cb1c706e6430c05eff2ff136af5eb4790f9d28932e2",
-              "url": "https://files.pythonhosted.org/packages/25/8a/c46dcc25341b5bce5472c718902eb3d38600a903b14fa6aeecef3f21a46f/asttokens-3.0.0-py3-none-any.whl"
+              "hash": "15a3ebc0f43c2d0a50eeafea25e19046c68398e487b9f1f5b517f7c0f40f976a",
+              "url": "https://files.pythonhosted.org/packages/d2/39/e7eaf1799466a4aef85b6a4fe7bd175ad2b1c6345066aa33f1f58d4b18d0/asttokens-3.0.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0dcd8baa8d62b0c1d118b399b2ddba3c4aff271d0d7a9e0d4c1681c79035bbc7",
-              "url": "https://files.pythonhosted.org/packages/4a/e7/82da0a03e7ba5141f05cce0d302e6eed121ae055e0456ca228bf693984bc/asttokens-3.0.0.tar.gz"
+              "hash": "71a4ee5de0bde6a31d64f6b13f2293ac190344478f081c3d1bccfcf5eacb0cb7",
+              "url": "https://files.pythonhosted.org/packages/be/a5/8e3f9b6771b0b408517c82d97aed8f2036509bc247d46114925e32fe33f0/asttokens-3.0.1.tar.gz"
             }
           ],
           "project_name": "asttokens",
           "requires_dists": [
-            "astroid<4,>=2; extra == \"astroid\"",
-            "astroid<4,>=2; extra == \"test\"",
+            "astroid<5,>=2; extra == \"astroid\"",
+            "astroid<5,>=2; extra == \"test\"",
             "pytest-cov; extra == \"test\"",
             "pytest-xdist; extra == \"test\"",
-            "pytest; extra == \"test\""
+            "pytest<9.0; extra == \"test\""
           ],
           "requires_python": ">=3.8",
-          "version": "3.0.0"
+          "version": "3.0.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a",
-              "url": "https://files.pythonhosted.org/packages/4e/8c/f3147f5c4b73e7550fe5f9352eaa956ae838d5c51eb58e7a25b9f3e2643b/decorator-5.2.1-py3-none-any.whl"
+              "hash": "f47fe6fdbd2edd623ecfe36875d37aba411624e2670dd395dddae1358689bb3c",
+              "url": "https://files.pythonhosted.org/packages/05/7f/798705f5296a58ca505d600456748d1be48078eac8a7050d8a98bc9edb89/decorator-5.3.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "65f266143752f734b0a7cc83c46f4618af75b8c5911b00ccb61d0ac9b6da0360",
-              "url": "https://files.pythonhosted.org/packages/43/fa/6d96a0978d19e17b68d634497769987b16c8f4cd0a7a05048bec693caa6b/decorator-5.2.1.tar.gz"
+              "hash": "4cbcdd55a6efadb9dbea26b858f4fb3264567b52d69ca0d25b721b553f60ea82",
+              "url": "https://files.pythonhosted.org/packages/60/8b/32f9823da46cde7df2087faa08cd98d01b908f8dcab982cdba9c84e85355/decorator-5.3.1.tar.gz"
             }
           ],
           "project_name": "decorator",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "5.2.1"
+          "version": "5.3.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "4d111e6e0c13d0644cad6ddaa7ed0261a0b36971f6d23e7ec9b4b9097da78a10",
-              "url": "https://files.pythonhosted.org/packages/36/f4/c6e662dade71f56cd2f3735141b265c3c79293c109549c1e6933b0651ffc/exceptiongroup-1.3.0-py3-none-any.whl"
+              "hash": "a7a39a3bd276781e98394987d3a5701d0c4edffb633bb7a5144577f82c773598",
+              "url": "https://files.pythonhosted.org/packages/8a/0e/97c33bf5009bdbac74fd2beace167cab3f978feb69cc36f1ef79360d6c4e/exceptiongroup-1.3.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88",
-              "url": "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz"
+              "hash": "8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219",
+              "url": "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz"
             }
           ],
           "project_name": "exceptiongroup",
@@ -70,7 +70,7 @@
             "typing-extensions>=4.6.0; python_version < \"3.13\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.3.0"
+          "version": "1.3.1"
         },
         {
           "artifacts": [
@@ -247,18 +247,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d56ce5156ba6085e00a9d54fead6ed29a9c47e215cd1bba2e976ef39f5710a76",
-              "url": "https://files.pythonhosted.org/packages/af/33/ee4519fa02ed11a94aef9559552f3b17bb863f2ecfe1a35dc7f548cde231/matplotlib_inline-0.2.1-py3-none-any.whl"
+              "hash": "3c821cf1c209f59fb2d2d64abbf5b23b67bcb2210d663f9918dd851c6da1fcf6",
+              "url": "https://files.pythonhosted.org/packages/41/09/5b161152e2d90f7b87f781c2e1267494aef9c32498df793f73ad0a0a494a/matplotlib_inline-0.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e1ee949c340d771fc39e241ea75683deb94762c8fa5f2927ec57c83c4dffa9fe",
-              "url": "https://files.pythonhosted.org/packages/c7/74/97e72a36efd4ae2bccb3463284300f8953f199b5ffbc04cbbb0ec78f74b1/matplotlib_inline-0.2.1.tar.gz"
+              "hash": "72f3fe8fce36b70d4a5b612f899090cd0401deddc4ea90e1572b9f4bfb058c79",
+              "url": "https://files.pythonhosted.org/packages/bd/c0/9f7c9a46090390368a4d7bcb76bb87a4a36c421e4c0792cdb53486ffac7a/matplotlib_inline-0.2.2.tar.gz"
             }
           ],
           "project_name": "matplotlib-inline",
           "requires_dists": [
             "flake8; extra == \"test\"",
+            "matplotlib; extra == \"test\"",
             "nbdime; extra == \"test\"",
             "nbval; extra == \"test\"",
             "notebook; extra == \"test\"",
@@ -266,31 +267,31 @@
             "traitlets"
           ],
           "requires_python": ">=3.9",
-          "version": "0.2.1"
+          "version": "0.2.2"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "646204b5ee239c396d040b90f9e272e9a8017c630092bf59980beb62fd033887",
-              "url": "https://files.pythonhosted.org/packages/16/32/f8e3c85d1d5250232a5d3477a2a28cc291968ff175caeadaf3cc19ce0e4a/parso-0.8.5-py2.py3-none-any.whl"
+              "hash": "a8926eb2a1b915486941fdbd31e86a4baf88fe8c210f25f2f35ecec5b574ca1c",
+              "url": "https://files.pythonhosted.org/packages/99/5d/8268b644392ee874ee82a635cd0df1773de230bde356c38de28e298392cc/parso-0.8.7-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "034d7354a9a018bdce352f48b2a8a450f05e9d6ee85db84764e9b6bd96dafe5a",
-              "url": "https://files.pythonhosted.org/packages/d4/de/53e0bcf53d13e005bd8c92e7855142494f41171b34c2536b86187474184d/parso-0.8.5.tar.gz"
+              "hash": "eaaac4c9fdd5e9e8852dc778d2d7405897ec510f2a298071453e5e3a07914bb1",
+              "url": "https://files.pythonhosted.org/packages/30/4b/90c937815137d43ce71ba043cd3566221e9df6b9c805f24b5d138c9d40a7/parso-0.8.7.tar.gz"
             }
           ],
           "project_name": "parso",
           "requires_dists": [
             "docopt; extra == \"testing\"",
             "flake8==5.0.4; extra == \"qa\"",
-            "mypy==0.971; extra == \"qa\"",
             "pytest; extra == \"testing\"",
-            "types-setuptools==67.2.0.1; extra == \"qa\""
+            "types-setuptools==67.2.0.1; extra == \"qa\"",
+            "zuban==0.5.1; extra == \"qa\""
           ],
           "requires_python": ">=3.6",
-          "version": "0.8.5"
+          "version": "0.8.7"
         },
         {
           "artifacts": [
@@ -374,21 +375,21 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b",
-              "url": "https://files.pythonhosted.org/packages/c7/21/705964c7812476f378728bdf590ca4b771ec72385c533964653c68e86bdc/pygments-2.19.2-py3-none-any.whl"
+              "hash": "81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176",
+              "url": "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887",
-              "url": "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz"
+              "hash": "6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f",
+              "url": "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz"
             }
           ],
           "project_name": "pygments",
           "requires_dists": [
             "colorama>=0.4.6; extra == \"windows-terminal\""
           ],
-          "requires_python": ">=3.8",
-          "version": "2.19.2"
+          "requires_python": ">=3.9",
+          "version": "2.20.0"
         },
         {
           "artifacts": [
@@ -421,19 +422,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f",
-              "url": "https://files.pythonhosted.org/packages/00/c0/8f5d070730d7836adc9c9b6408dec68c6ced86b304a9b26a14df072a6e8c/traitlets-5.14.3-py3-none-any.whl"
+              "hash": "770a53705f84b81ac107e83a1b3328ff2dae16094d8fc3cfc004e4b22dfd8e92",
+              "url": "https://files.pythonhosted.org/packages/96/8d/1080ee4c231f361b6ce4470d556c8c435b67c7e0753aaa641497ee92f88b/traitlets-5.15.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9ed0579d3502c94b4b3732ac120375cda96f923114522847de4b3bb98b96b6b7",
-              "url": "https://files.pythonhosted.org/packages/eb/79/72064e6a701c2183016abbbfedaba506d81e30e232a68c9f0d6f6fcd1574/traitlets-5.14.3.tar.gz"
+              "hash": "7b1c07854fe25acb39e009bae49f11b79ff6cbb2f27999104e9110e7a6b53722",
+              "url": "https://files.pythonhosted.org/packages/57/a9/a2584b8313b89f94869ddb3c4074617a691de1812a614d2d50e32ca5a7a6/traitlets-5.15.1.tar.gz"
             }
           ],
           "project_name": "traitlets",
           "requires_dists": [
             "argcomplete>=3.0.3; extra == \"test\"",
-            "mypy>=1.7.0; extra == \"test\"",
+            "mypy<1.19,>=1.17.0; extra == \"test\"",
             "myst-parser; extra == \"docs\"",
             "pre-commit; extra == \"test\"",
             "pydata-sphinx-theme; extra == \"docs\"",
@@ -442,8 +443,8 @@
             "pytest<8.2,>=7.0; extra == \"test\"",
             "sphinx; extra == \"docs\""
           ],
-          "requires_python": ">=3.8",
-          "version": "5.14.3"
+          "requires_python": ">=3.9",
+          "version": "5.15.1"
         },
         {
           "artifacts": [
@@ -467,19 +468,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a7bb560c8aee30f9957e5f9895805edd20602f2d7f720186dfd906e82b4982e1",
-              "url": "https://files.pythonhosted.org/packages/af/b5/123f13c975e9f27ab9c0770f514345bd406d0e8d3b7a0723af9d43f710af/wcwidth-0.2.14-py2.py3-none-any.whl"
+              "hash": "f453740b1e4a4f3291faa37944c555d71056c4da08d59809b307ef4feba695c8",
+              "url": "https://files.pythonhosted.org/packages/bd/6e/95b0e537de1f4d4301f76f944642c6da50d1511cc7b3d64dc418a66c7509/wcwidth-0.8.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4d478375d31bc5395a3c55c40ccdf3354688364cd61c4f6adacaa9215d0b3605",
-              "url": "https://files.pythonhosted.org/packages/24/30/6b0809f4510673dc723187aeaf24c7f5459922d01e2f794277a3dfb90345/wcwidth-0.2.14.tar.gz"
+              "hash": "faf5b4a5366a72dc49cad48cdf21f52bdf63bdda995178e483ba247ff79089b9",
+              "url": "https://files.pythonhosted.org/packages/49/b4/51fe890511f0f242d07cb1ebe6a5b6db417262b9d2568b460347c57d95cc/wcwidth-0.8.1.tar.gz"
             }
           ],
           "project_name": "wcwidth",
           "requires_dists": [],
-          "requires_python": ">=3.6",
-          "version": "0.2.14"
+          "requires_python": ">=3.8",
+          "version": "0.8.1"
         }
       ],
       "marker": null,
@@ -490,8 +491,8 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.69.1",
-  "pip_version": "25.3",
+  "pex_version": "2.95.1",
+  "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
     "ipython<9,>=7.34"
