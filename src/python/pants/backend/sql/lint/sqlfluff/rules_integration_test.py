@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from textwrap import dedent
 
@@ -15,17 +16,13 @@ from pants.backend.sql.lint.sqlfluff.rules import (
     SqlfluffFormatRequest,
     SqlfluffLintRequest,
 )
-from pants.backend.sql.lint.sqlfluff.skip_field import SkipSqlfluffField
-from pants.backend.sql.lint.sqlfluff.subsystem import SqlfluffFieldSet
 from pants.backend.sql.target_types import SqlSourcesGeneratorTarget
 from pants.core.goals.fix import FixResult
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResult
 from pants.core.util_rules import config_files
-from pants.core.util_rules.partitions import _EmptyMetadata
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.addresses import Address
-from pants.engine.target import Target
+from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 GOOD_FILE = dedent(
@@ -56,6 +53,20 @@ CONFIG_POSTGRES = dedent(
     dialect = postgres
     """
 )
+CONFIG_PYPROJECT = dedent(
+    """\
+    [tool.sqlfluff.core]
+    dialect = "postgres"
+    exclude_rules = ["RF03"]
+    """
+)
+CONFIG_NATIVE = dedent(
+    """\
+    [sqlfluff]
+    dialect = postgres
+    exclude_rules = RF03
+    """
+)
 
 
 @pytest.fixture
@@ -77,238 +88,295 @@ def rule_runner() -> RuleRunner:
 
 def run_sqlfluff(
     rule_runner: RuleRunner,
-    targets: list[Target],
+    paths: list[str],
+    files: dict[str, str],
     *,
     extra_args: list[str] | None = None,
-) -> tuple[FixResult, LintResult, FmtResult]:
+) -> tuple[PantsResult, PantsResult, PantsResult]:
     args = [
-        "--backend-packages=pants.backend.sql.lint.sqlfluff",
+        "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
+        "--no-watch-filesystem",
+        "--no-pantsd",
         '--sqlfluff-fix-args="--force"',
         *(extra_args or ()),
     ]
-    rule_runner.set_options(args, env_inherit={"PATH", "PYENV_ROOT", "HOME"})
 
-    field_sets = [
-        SqlfluffFieldSet.create(tgt) for tgt in targets if SqlfluffFieldSet.is_applicable(tgt)
-    ]
-    source_reqs = [SourceFilesRequest(field_set.source for field_set in field_sets)]
-    input_sources = rule_runner.request(SourceFiles, source_reqs)
+    with setup_tmpdir(files) as workdir:
+        result = run_pants(command=[*args, "list", f"{workdir}/::"])
+        result.assert_success()
+        assert result.stdout == "abc"
 
-    fix_result = rule_runner.request(
-        FixResult,
-        [
-            SqlfluffFixRequest.Batch(
-                "",
-                tuple(field_sets),
-                partition_metadata=_EmptyMetadata(),
-                snapshot=input_sources.snapshot,
-            ),
-        ],
-    )
-    lint_result = rule_runner.request(
-        LintResult,
-        [
-            SqlfluffLintRequest.Batch(
-                "",
-                tuple(field_sets),
-                partition_metadata=_EmptyMetadata(),
-            ),
-        ],
-    )
-    fmt_result = rule_runner.request(
-        FmtResult,
-        [
-            SqlfluffFormatRequest.Batch(
-                "",
-                tuple(field_sets),
-                partition_metadata=_EmptyMetadata(),
-                snapshot=input_sources.snapshot,
-            )
-        ],
-    )
-
+        addresses = [f"{workdir}/{path}" for path in paths]
+        fix_result = run_pants(command=[*args, "fix", *addresses])
+        lint_result = run_pants(command=[*args, "lint", *addresses])
+        fmt_result = run_pants(command=[*args, "fmt", *addresses])
     return fix_result, lint_result, fmt_result
 
 
-@pytest.mark.platform_specific_behavior
-def test_passing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "query.sql": GOOD_FILE,
-            "BUILD": "sql_sources(name='t')",
-            ".sqlfluff": CONFIG_POSTGRES,
-        }
-    )
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="query.sql"))
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [tgt])
-    assert fix_result.stdout == dedent(
-        """\
-        ==== finding fixable violations ====
-        FORCE MODE: Attempting fixes...
-        ==== no fixable linting violations found ====
-        All Finished!
-        """
-    )
-    assert fix_result.stderr == ""
-    assert lint_result.exit_code == 0
-    assert not fix_result.did_change
-    assert fix_result.output == rule_runner.make_snapshot({"query.sql": GOOD_FILE})
-    assert not fmt_result.did_change
-    assert fmt_result.output == rule_runner.make_snapshot({"query.sql": GOOD_FILE})
+def collect_files(rootdir: str) -> dict:
+    result = {}
+    for root, _, files in os.walk(rootdir):
+        for file in files:
+            path = f"{root}/{file}"
+            relpath = os.path.relpath(path, rootdir)
+            result[relpath] = Path(path).read_text()
+    return result
 
 
-def test_failing(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "query.sql": BAD_FILE,
-            "BUILD": "sql_sources(name='t')",
-            ".sqlfluff": CONFIG_POSTGRES,
-        }
-    )
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="query.sql"))
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [tgt])
-    assert fix_result.stdout == dedent(
-        """\
-        ==== finding fixable violations ====
-        FORCE MODE: Attempting fixes...
-        == [query.sql] FAIL
-        L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
-                               | select. [references.consistent]
-        == [query.sql] FIXED
-        1 fixable linting violations found
-          [1 unfixable linting violations found]
-        """
-    )
-    assert fix_result.stderr == ""
-    assert lint_result.stdout == dedent(
-        """\
-         == [query.sql] FAIL
-         L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
-                                | select. [references.consistent]
-         L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
-                                | select which is inconsistent with previous references.
-                                | [references.consistent]
-         All Finished!
-         """
-    )
-    assert lint_result.stderr == ""
-    assert lint_result.exit_code == 1
-    assert fix_result.did_change
-    assert fix_result.output == rule_runner.make_snapshot({"query.sql": GOOD_FILE})
-    assert not fmt_result.did_change
-    assert fmt_result.output == rule_runner.make_snapshot({"query.sql": BAD_FILE})
-
-
-def test_multiple_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "good.sql": GOOD_FILE,
-            "bad.sql": BAD_FILE,
-            "unformatted.sql": UNFORMATTED_FILE,
-            "BUILD": "sql_sources(name='t')",
-            ".sqlfluff": CONFIG_POSTGRES,
-        }
-    )
-    tgts = [
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.sql")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.sql")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.sql")),
+@pytest.fixture
+def args():
+    return [
+        "--backend-packages=['pants.backend.experimental.sql','pants.backend.experimental.sql.lint.sqlfluff']",
+        '--sqlfluff-fix-args="--force"',
+        "--python-interpreter-constraints=['==3.12.*']",
     ]
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, tgts)
-    assert lint_result.exit_code == 1
-    assert fix_result.output == rule_runner.make_snapshot(
-        {"good.sql": GOOD_FILE, "bad.sql": GOOD_FILE, "unformatted.sql": GOOD_FILE}
+
+
+@pytest.fixture
+def good_query():
+    return {
+        "project/query.sql": GOOD_FILE,
+        "project/BUILD": "sql_sources()",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+
+
+def test_passing_lint(good_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(good_query) as tmpdir:
+        result = run_pants([*args, "lint", f"{tmpdir}/project:"])
+    result.assert_success()
+
+
+def test_passing_fix(good_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(good_query) as tmpdir:
+        result = run_pants([*args, "fix", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert result.stdout == ""
+    assert "sqlfluff format made no changes." in result.stderr
+    assert "sqlfluff made no changes." in result.stderr
+    assert files["project/query.sql"] == GOOD_FILE
+
+
+def test_passing_fmt(good_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(good_query) as tmpdir:
+        result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert result.stdout == ""
+    assert "sqlfluff format made no changes." in result.stderr
+    assert files["project/query.sql"] == GOOD_FILE
+
+
+@pytest.fixture
+def bad_query():
+    return {
+        "project/query.sql": BAD_FILE,
+        "project/BUILD": "sql_sources()",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+
+
+def test_failing_lint(bad_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(bad_query) as tmpdir:
+        result = run_pants([*args, "lint", f"{tmpdir}/project:"])
+    result.assert_failure()
+    assert (
+        dedent(
+            f"""\
+    == [{tmpdir}/project/query.sql] FAIL
+    L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                           | select. [references.consistent]
+    L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                           | select which is inconsistent with previous references.
+                           | [references.consistent]
+    All Finished!
+    """
+        )
+        in result.stderr
     )
-    assert fix_result.did_change is True
-    assert fmt_result.output == rule_runner.make_snapshot(
-        {"good.sql": GOOD_FILE, "bad.sql": BAD_FILE, "unformatted.sql": GOOD_FILE}
+
+
+def test_failing_fix(bad_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(bad_query) as tmpdir:
+        result = run_pants([*args, "fix", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert "sqlfluff made changes." in result.stderr
+    assert files["project/query.sql"] == GOOD_FILE
+
+
+def test_failing_fmt(bad_query: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(bad_query) as tmpdir:
+        result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert "sqlfluff format made no changes." in result.stderr
+    assert files["project/query.sql"] == BAD_FILE
+
+
+@pytest.fixture
+def multiple_queries() -> dict[str, str]:
+    return {
+        "project/good.sql": GOOD_FILE,
+        "project/bad.sql": BAD_FILE,
+        "project/unformatted.sql": UNFORMATTED_FILE,
+        "project/BUILD": "sql_sources(name='t')",
+        "project/.sqlfluff": CONFIG_POSTGRES,
+    }
+
+
+def test_multiple_targets_lint(multiple_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(multiple_queries) as tmpdir:
+        result = run_pants([*args, "lint", f"{tmpdir}/project:"])
+    result.assert_failure()
+    assert (
+        dedent(
+            f"""\
+            == [{tmpdir}/project/bad.sql] FAIL
+            L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                                   | select. [references.consistent]
+            L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                                   | select which is inconsistent with previous references.
+                                   | [references.consistent]
+            == [{tmpdir}/project/unformatted.sql] FAIL
+            L:   1 | P:   1 | LT09 | Select targets should be on a new line unless there is
+                                   | only one select target. [layout.select_targets]
+            All Finished!
+            """
+        )
+        in result.stderr
     )
-    assert fmt_result.did_change is True
 
 
-def test_skip_field(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "good.sql": GOOD_FILE,
-            "bad.sql": BAD_FILE,
-            "unformatted.sql": UNFORMATTED_FILE,
-            "BUILD": "sql_sources(name='t', skip_sqlfluff=True)",
-        }
-    )
-    tgts = [
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="good.sql")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.sql")),
-        rule_runner.get_target(Address("", target_name="t", relative_file_path="unformatted.sql")),
-    ]
-    for tgt in tgts:
-        assert tgt.get(SkipSqlfluffField).value is True
+def test_multiple_targets_fix(multiple_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(multiple_queries) as tmpdir:
+        result = run_pants([*args, "fix", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert "sqlfluff made changes." in result.stderr
+    assert files["project/good.sql"] == GOOD_FILE
+    assert files["project/bad.sql"] == GOOD_FILE
+    assert files["project/unformatted.sql"] == GOOD_FILE
 
-    fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, tgts)
 
-    assert lint_result.exit_code == 0
-    assert fix_result.output == rule_runner.make_snapshot({})
-    assert fix_result.did_change is False
-    assert fmt_result.output == rule_runner.make_snapshot({})
-    assert fmt_result.did_change is False
+def test_multiple_targets_fmt(multiple_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(multiple_queries) as tmpdir:
+        result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert "sqlfluff format made changes." in result.stderr
+    assert files["project/good.sql"] == GOOD_FILE
+    assert files["project/bad.sql"] == BAD_FILE
+    assert files["project/unformatted.sql"] == GOOD_FILE
+
+
+@pytest.fixture
+def skip_queries() -> dict[str, str]:
+    return {
+        "project/good.sql": GOOD_FILE,
+        "project/bad.sql": BAD_FILE,
+        "project/unformatted.sql": UNFORMATTED_FILE,
+        "project/BUILD": "sql_sources(skip_sqlfluff=True)",
+    }
+
+
+def test_skip_field_lint(skip_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(skip_queries) as tmpdir:
+        result = run_pants([*args, "lint", f"{tmpdir}/project:"])
+    result.assert_success()
+
+
+def test_skip_field_fix(skip_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(skip_queries) as tmpdir:
+        result = run_pants([*args, "fix", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert files["project/good.sql"] == GOOD_FILE
+    assert files["project/bad.sql"] == BAD_FILE
+    assert files["project/unformatted.sql"] == UNFORMATTED_FILE
+
+
+def test_skip_field_fmt(skip_queries: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(skip_queries) as tmpdir:
+        result = run_pants([*args, "fmt", f"{tmpdir}/project:"])
+        files = collect_files(tmpdir)
+    result.assert_success()
+    assert files["project/good.sql"] == GOOD_FILE
+    assert files["project/bad.sql"] == BAD_FILE
+    assert files["project/unformatted.sql"] == UNFORMATTED_FILE
 
 
 @pytest.mark.parametrize(
-    "file_path,config_path,extra_args,should_change",
+    ("files",),
     (
-        [Path("query.sql"), Path("pyproject.toml"), [], False],
-        [Path("query.sql"), Path(".sqlfluff"), [], False],
-        [Path("custom/query.sql"), Path("custom/pyproject.toml"), [], False],
-        [Path("custom/query.sql"), Path("custom/.sqlfluff"), [], False],
-        [
-            Path("query.sql"),
-            Path("custom/config.sqlfluff"),
-            ["--sqlfluff-config=custom/config.sqlfluff"],
-            False,
-        ],
-        [
-            Path("query.sql"),
-            Path("custom/.sqlfluff"),
-            ['--sqlfluff-args="--dialect=postgres"'],
-            True,
-        ],
+        pytest.param(
+            {
+                "query.sql": BAD_FILE,
+                "BUILD": "sql_sources()",
+                "pyproject.toml": CONFIG_PYPROJECT,
+            },
+            id="root:query.sql+pyproject.toml",
+        ),
+        pytest.param(
+            {
+                "query.sql": BAD_FILE,
+                "BUILD": "sql_sources()",
+                ".sqlfluff": CONFIG_NATIVE,
+            },
+            id="root:query.sql+.sqlfluff",
+        ),
+        pytest.param(
+            {
+                "project/query.sql": BAD_FILE,
+                "project/BUILD": "sql_sources()",
+                "project/pyproject.toml": CONFIG_PYPROJECT,
+            },
+            id="subdir:query.sql+pyproject.toml",
+        ),
+        pytest.param(
+            {
+                "project/query.sql": BAD_FILE,
+                "project/BUILD": "sql_sources()",
+                "project/.sqlfluff": CONFIG_NATIVE,
+            },
+            id="subdir:query.sql+.sqlfluff",
+        ),
     ),
 )
-def test_config_file(
-    rule_runner: RuleRunner,
-    file_path: Path,
-    config_path: Path,
-    extra_args: list[str],
-    should_change: bool,
-) -> None:
-    if config_path.stem == "pyproject":
-        config = dedent(
-            """\
-            [tool.sqlfluff.core]
-            dialect = "postgres"
-            exclude_rules = ["RF03"]
-            """
-        )
-    else:
-        config = dedent(
-            """\
-            [sqlfluff]
-            dialect = postgres
-            exclude_rules = RF03
-            """
-        )
+def test_config_file(files: dict[str, str], args: list[str]) -> None:
+    with setup_tmpdir(files) as tmpdir:
+        result = run_pants([*args, "fix", f"{tmpdir}::"])
 
-    rule_runner.write_files(
-        {
-            file_path: BAD_FILE,
-            file_path.parent / "BUILD": "sql_sources()",
-            config_path: config,
-        }
-    )
+    result.assert_success()
+    assert "sqlfluff made no changes" in result.stderr
 
-    spec_path = str(file_path.parent).replace(".", "")
-    rel_file_path = file_path.relative_to(*file_path.parts[:1]) if spec_path else file_path
-    addr = Address(spec_path, relative_file_path=str(rel_file_path))
-    tgt = rule_runner.get_target(addr)
-    fix_result, lint_result, _ = run_sqlfluff(rule_runner, [tgt], extra_args=extra_args)
-    assert lint_result.exit_code == (1 if should_change else 0)
-    assert fix_result.did_change is should_change
+
+def test_custom_config_path(args: list[str]) -> None:
+    files = {
+        "query.sql": BAD_FILE,
+        "BUILD": "sql_sources()",
+        "custom/config.sqlfluff": CONFIG_NATIVE,
+    }
+
+    with setup_tmpdir(files) as tmpdir:
+        extra_args = [f"--sqlfluff-config={tmpdir}/custom/config.sqlfluff"]
+        result = run_pants([*args, *extra_args, "fix", f"{tmpdir}::"])
+
+    result.assert_success()
+    assert "sqlfluff made no changes" in result.stderr
+
+
+def test_project_config_doesnt_affect_root_query(args: list[str]) -> None:
+    files = {
+        "query.sql": BAD_FILE,
+        "BUILD": "sql_sources()",
+        "custom/.sqlfluff": CONFIG_NATIVE,
+    }
+    extra_args = ['--sqlfluff-args="--dialect=postgres"']
+
+    with setup_tmpdir(files) as tmpdir:
+        result = run_pants([*args, *extra_args, "fix", f"{tmpdir}::"])
+
+    result.assert_success()
+    assert "sqlfluff made changes" in result.stderr
