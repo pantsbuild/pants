@@ -196,10 +196,13 @@ impl Drop for TestServer {
     }
 }
 
+pub trait DebugMessage: prost::Message + Debug {}
+impl<T: prost::Message + Debug> DebugMessage for T {}
+
 #[derive(Debug)]
 pub struct ReceivedMessage {
     pub message_type: String,
-    pub message: Box<dyn prost::Message>,
+    pub message: Box<dyn DebugMessage>,
     pub received_at: Instant,
     pub headers: MetadataMap,
 }
@@ -220,7 +223,7 @@ impl MockResponder {
         }
     }
 
-    fn log<T: prost::Message + Clone + Sized + 'static>(&self, request: &Request<T>) {
+    fn log<T: DebugMessage + Clone + Sized + 'static>(&self, request: &Request<T>) {
         let headers = request.metadata().clone();
 
         let message = request.get_ref().clone();
