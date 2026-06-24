@@ -268,6 +268,7 @@ def generate_python_tool_lockfiles(
             "--python-resolves-to-constraints-file={}",
             "--python-resolves-to-no-binary={}",
             "--python-resolves-to-only-binary={}",
+            # Aligned with Pant's internal value in pants.toml
             "--python-resolves-to-uploaded-prior-to={'__default__': 'P2D'}",
             "--python-separate-lockfile-metadata-file",
             "--pex-emit-warnings=true",
