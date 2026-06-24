@@ -10,7 +10,9 @@ the entire standard library in a single `go install std` invocation and capture 
 keyed on `(go version, GOOS, GOARCH, cgo_enabled)`, so the harvest runs once per
 configuration and is cached forever.
 
-This mirrors the architecture used by Bazel's rules_go.
+This mirrors the architecture used by Bazel's rules_go, which compiles the standard library
+once per configuration in the same way; see
+https://github.com/bazel-contrib/rules_go/blob/master/go/tools/builders/stdlib.go.
 
 The archives are only usable for build configurations that match how `go install std`
 compiles the standard library; `stdlib_archives_compatible` is the single gate deciding
@@ -47,7 +49,10 @@ class GoStdlibArchivesRequest:
     `cgo_enabled` is a cache-key dimension, not a compatibility gate: the contents of some
     archives (e.g. `net`, `os/user`) differ between the cgo and non-cgo configurations, and
     `runtime/cgo` only exists in the cgo configuration, so each configuration is harvested
-    separately.
+    separately. Other content-affecting options (race/msan/asan, coverage, custom compiler or
+    assembler flags) are deliberately *not* dimensions here: rather than harvest a variant for
+    each, `stdlib_archives_compatible` disqualifies them entirely and the build falls back to
+    compiling the standard library from source package-by-package, as before.
     """
 
     cgo_enabled: bool
@@ -115,6 +120,10 @@ async def harvest_go_stdlib_archives(
             GoSdkProcess(
                 command=("install", "-trimpath", "-pkgdir", PKGDIR_PREFIX, "std"),
                 env={
+                    # The critical setting: `installgoroot=all` makes `go install -pkgdir` write
+                    # an archive for *every* standard library package into `-pkgdir`, rather than
+                    # only the handful not already present in GOROOT. Without it the harvest is
+                    # nearly empty. Introduced in Go 1.20 (gated on the version check above).
                     "GODEBUG": "installgoroot=all",
                     "CGO_ENABLED": "1" if request.cgo_enabled else "0",
                 },
