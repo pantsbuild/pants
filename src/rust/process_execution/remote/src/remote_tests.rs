@@ -175,6 +175,43 @@ async fn make_execute_request() {
 }
 
 #[tokio::test]
+async fn make_execute_request_with_root_output_directory_uses_empty_output_path() {
+    let executor = task_executor::Executor::new();
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::local_only(executor, store_dir).unwrap();
+
+    let input_directory = TestDirectory::containing_roland();
+    let req = Process {
+        argv: owned_string_vec(&["/bin/echo", "yo"]),
+        env: BTreeMap::new(),
+        working_directory: None,
+        input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+        output_files: BTreeSet::new(),
+        output_directories: relative_paths(&["."]).collect(),
+        timeout: None,
+        description: "root output".to_owned(),
+        level: log::Level::Info,
+        append_only_caches: BTreeMap::new(),
+        jdk_home: None,
+        execution_slot_variable: None,
+        concurrency_available: 0,
+        concurrency: None,
+        cache_scope: ProcessCacheScope::Always,
+        execution_environment: make_environment(Platform::Linux_x86_64),
+        remote_cache_speculation_delay: std::time::Duration::from_millis(0),
+        attempt: 0,
+    };
+
+    let request = process_execution::make_execute_request(&req, None, None, &store, None)
+        .await
+        .unwrap();
+
+    assert_eq!(request.command.output_paths, vec![String::new()]);
+    assert!(request.command.output_files.is_empty());
+    assert!(request.command.output_directories.is_empty());
+}
+
+#[tokio::test]
 async fn make_execute_request_with_instance_name() {
     let executor = task_executor::Executor::new();
     let store_dir = TempDir::new().unwrap();
