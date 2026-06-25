@@ -1442,37 +1442,45 @@ pub async fn make_execute_request(
         platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
     }
 
-    // Extract `Platform` proto from the `Command` to avoid a partial move of `Command`.
-    let mut command_platform = command.platform.take().unwrap_or_default();
+    // Platform manipulation on the deprecated `Command.platform` field.
+    #[expect(
+        deprecated,
+        reason = "Intentional use of deprecated Command.platform; \
+                                will migrate to Action.platform once target servers support it"
+    )]
+    {
+        // Extract `Platform` proto from the `Command` to avoid a partial move of `Command`.
+        let mut command_platform = command.platform.take().unwrap_or_default();
 
-    // Add configured platform properties to the `Platform`.
-    for (name, value) in platform_properties {
+        // Add configured platform properties to the `Platform`.
+        for (name, value) in platform_properties {
+            command_platform
+                .properties
+                .push(remexec::platform::Property {
+                    name: name.clone(),
+                    value: value.clone(),
+                });
+        }
+
+        // Sort the platform properties.
+        //
+        // From the remote execution spec:
+        //   The properties that make up this platform. In order to ensure that
+        //   equivalent `Platform`s always hash to the same value, the properties MUST
+        //   be lexicographically sorted by name, and then by value. Sorting of strings
+        //   is done by code point, equivalently, by the UTF-8 bytes.
+        //
+        // Note: BuildBarn enforces this requirement.
         command_platform
             .properties
-            .push(remexec::platform::Property {
-                name: name.clone(),
-                value: value.clone(),
+            .sort_by(|x, y| match x.name.cmp(&y.name) {
+                Ordering::Equal => x.value.cmp(&y.value),
+                v => v,
             });
+
+        // Store the separate copy back into the Command proto.
+        command.platform = Some(command_platform);
     }
-
-    // Sort the platform properties.
-    //
-    // From the remote execution spec:
-    //   The properties that make up this platform. In order to ensure that
-    //   equivalent `Platform`s always hash to the same value, the properties MUST
-    //   be lexicographically sorted by name, and then by value. Sorting of strings
-    //   is done by code point, equivalently, by the UTF-8 bytes.
-    //
-    // Note: BuildBarn enforces this requirement.
-    command_platform
-        .properties
-        .sort_by(|x, y| match x.name.cmp(&y.name) {
-            Ordering::Equal => x.value.cmp(&y.value),
-            v => v,
-        });
-
-    // Store the separate copy back into the Command proto.
-    command.platform = Some(command_platform);
 
     // Sort the environment variables. REv2 spec requires sorting by name for same reasons that
     // platform properties are sorted, i.e. consistent hashing.
