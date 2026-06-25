@@ -13,8 +13,19 @@ from pants.backend.javascript.nodejs_project_environment import (
     NodeJsProjectEnvironmentProcess,
 )
 from pants.backend.javascript.package_json import PackageJsonTarget
+from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.resolve import NodeJSProjectResolves
-from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
+from pants.backend.javascript.subsystems.nodejs import (
+    NodeJS,
+    NodeJSToolProcess,
+    UserChosenNodeJSResolveAliases,
+)
+from pants.backend.javascript.subsystems.nodejs_tool import (
+    NodeJSToolBase,
+    _lockfile_dest_for_resource,
+    _parse_package_name_and_version,
+    _tool_package_json_bytes,
+)
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
@@ -23,13 +34,16 @@ from pants.core.goals.generate_lockfiles import (
     RequestedUserResolveNames,
     UserGenerateLockfiles,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.tailor import TailorGoal
+from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import AddPrefix
-from pants.engine.intrinsics import add_prefix
+from pants.engine.intrinsics import add_prefix, create_digest, get_digest_contents
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.docutil import bin_name
+from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize, softwrap
 
@@ -125,6 +139,137 @@ async def generate_lockfile_from_package_jsons(
     return GenerateLockfileResult(output_digest, request.resolve_name, request.lockfile_dest)
 
 
+@dataclass(frozen=True)
+class GenerateNodeJSToolLockfile(GenerateLockfile):
+    package: str
+    package_manager: PackageManager
+
+
+class KnownNodeJSToolResolveNamesRequest(KnownUserResolveNamesRequest):
+    pass
+
+
+class RequestedNodeJSToolResolveNames(RequestedUserResolveNames):
+    pass
+
+
+@rule
+async def determine_nodejs_tool_resolves(
+    _: KnownNodeJSToolResolveNamesRequest,
+    union_membership: UnionMembership,
+) -> KnownUserResolveNames:
+    tool_classes = ExportableTool.filter_for_subclasses(union_membership, NodeJSToolBase)
+    names = tuple(
+        sorted(
+            tool_cls.options_scope
+            for tool_cls in tool_classes.values()
+            if tool_cls.default_lockfile_resources
+        )
+    )
+    return KnownUserResolveNames(
+        names=names,
+        option_name="[nodejs].tool_lockfiles",
+        requested_resolve_names_cls=RequestedNodeJSToolResolveNames,
+    )
+
+
+@rule
+async def setup_nodejs_tool_lockfile_requests(
+    requested: RequestedNodeJSToolResolveNames,
+    nodejs: NodeJS,
+    union_membership: UnionMembership,
+) -> UserGenerateLockfiles:
+    pkg_manager_and_version = nodejs.default_package_manager
+    if pkg_manager_and_version is None:
+        raise ValueError(
+            softwrap(
+                f"""
+                A package manager version must be configured in
+                [{nodejs.options_scope}].package_managers to generate NodeJS tool lockfiles.
+                """
+            )
+        )
+    pkg_manager = PackageManager.from_string(pkg_manager_and_version)
+
+    # Discover tool classes dynamically via the ExportableTool union membership.
+    tool_classes_by_scope: dict[str, type[NodeJSToolBase]] = {
+        scope: tool_cls
+        for scope, tool_cls in ExportableTool.filter_for_subclasses(
+            union_membership, NodeJSToolBase
+        ).items()
+        if tool_cls.default_lockfile_resources
+    }
+
+    requests = []
+    for name in requested:
+        tool_cls = tool_classes_by_scope.get(name)
+        if tool_cls is None:
+            continue
+        lockfile_resources = tool_cls.default_lockfile_resources
+        if lockfile_resources and pkg_manager.name in lockfile_resources:
+            resource_pkg, filename = lockfile_resources[pkg_manager.name]
+            lockfile_dest = _lockfile_dest_for_resource(resource_pkg, filename)
+        else:
+            lockfile_dest = f"{name}.{pkg_manager.lockfile_name}"
+
+        requests.append(
+            GenerateNodeJSToolLockfile(
+                resolve_name=name,
+                lockfile_dest=lockfile_dest,
+                diff=False,
+                package=tool_cls.default_version,
+                package_manager=pkg_manager,
+            )
+        )
+    return UserGenerateLockfiles(requests)
+
+
+@rule
+async def generate_nodejs_tool_lockfile(
+    request: GenerateNodeJSToolLockfile,
+) -> GenerateLockfileResult:
+    package_name, package_version = _parse_package_name_and_version(request.package)
+
+    input_digest = await create_digest(
+        CreateDigest(
+            [
+                FileContent(
+                    "package.json",
+                    _tool_package_json_bytes(request.resolve_name, package_name, package_version),
+                )
+            ]
+        ),
+        **implicitly(),
+    )
+
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            NodeJSToolProcess(
+                request.package_manager.name,
+                request.package_manager.version,
+                args=request.package_manager.generate_lockfile_args,
+                description=(
+                    f"Generate {request.package_manager.lockfile_name} "
+                    f"for '{request.resolve_name}'."
+                ),
+                input_digest=input_digest,
+                output_files=(request.package_manager.lockfile_name,),
+                extra_env=FrozenDict(request.package_manager.extra_env),
+            )
+        )
+    )
+
+    # The sandbox output is `<lockfile_name>` at the digest root; relocate to `lockfile_dest`
+    # so `workspace.write_digest` lands it at the expected path (and filename).
+    digest_contents = await get_digest_contents(result.output_digest)
+    [file_content] = digest_contents
+    output_digest = await create_digest(
+        CreateDigest([FileContent(request.lockfile_dest, file_content.content)]),
+        **implicitly(),
+    )
+    return GenerateLockfileResult(output_digest, request.resolve_name, request.lockfile_dest)
+
+
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
@@ -132,4 +277,7 @@ def rules() -> Iterable[Rule | UnionRule]:
         UnionRule(GenerateLockfile, GeneratePackageLockJsonFile),
         UnionRule(KnownUserResolveNamesRequest, KnownPackageJsonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPackageJsonUserResolveNames),
+        UnionRule(GenerateLockfile, GenerateNodeJSToolLockfile),
+        UnionRule(KnownUserResolveNamesRequest, KnownNodeJSToolResolveNamesRequest),
+        UnionRule(RequestedUserResolveNames, RequestedNodeJSToolResolveNames),
     )
