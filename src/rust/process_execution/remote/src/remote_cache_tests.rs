@@ -863,6 +863,134 @@ async fn make_action_result_basic() {
 }
 
 #[tokio::test]
+async fn make_action_result_handles_root_output_path() {
+    #[derive(Debug)]
+    struct MockCommandRunner;
+
+    #[async_trait]
+    impl CommandRunnerTrait for MockCommandRunner {
+        async fn run(
+            &self,
+            _context: Context,
+            _workunit: &mut RunningWorkunit,
+            _req: Process,
+        ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+            unimplemented!()
+        }
+
+        async fn shutdown(&self) -> Result<(), String> {
+            Ok(())
+        }
+    }
+
+    let store_dir = TempDir::new().unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+    store
+        .store_file_bytes(TestData::roland().bytes(), false)
+        .await
+        .expect("Error saving file bytes");
+    store
+        .store_file_bytes(TestData::robin().bytes(), false)
+        .await
+        .expect("Error saving file bytes");
+    store
+        .record_directory(&TestDirectory::containing_roland().directory(), true)
+        .await
+        .expect("Error saving directory");
+    store
+        .record_directory(&TestDirectory::nested().directory(), true)
+        .await
+        .expect("Error saving directory");
+    let directory_digest = store
+        .record_directory(&TestDirectory::double_nested().directory(), true)
+        .await
+        .expect("Error saving directory");
+
+    let mock_command_runner = Arc::new(MockCommandRunner);
+    let cas = StubCAS::builder().build().await;
+    let runner = crate::remote_cache::CommandRunner::from_provider_options(
+        RemoteCacheRunnerOptions {
+            inner: mock_command_runner.clone(),
+            instance_name: None,
+            process_cache_namespace: None,
+            executor: executor.clone(),
+            store: store.clone(),
+            cache_read: true,
+            cache_write: true,
+            warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
+            cache_content_behavior: CacheContentBehavior::Defer,
+            append_only_caches_base_path: None,
+        },
+        RemoteStoreOptions {
+            provider: RemoteProvider::Reapi,
+            instance_name: None,
+            store_address: cas.address(),
+            tls_config: tls::Config::default(),
+            headers: BTreeMap::default(),
+            concurrency_limit: 256,
+            timeout: CACHE_READ_TIMEOUT,
+            retries: 0,
+            batch_api_size_limit: 0,
+            batch_load_enabled: false,
+            chunk_size_bytes: 0,
+        },
+    )
+    .await
+    .expect("caching command runner");
+
+    let command = remexec::Command {
+        arguments: vec!["this is a test".into()],
+        output_paths: vec![String::new()],
+        ..Default::default()
+    };
+
+    let process_result = FallibleProcessResultWithPlatform {
+        stdout_digest: TestData::roland().digest(),
+        stderr_digest: TestData::robin().digest(),
+        output_directory: DirectoryDigest::from_persisted_digest(directory_digest),
+        exit_code: 102,
+        metadata: ProcessResultMetadata::new(
+            None,
+            ProcessResultSource::Ran,
+            ProcessExecutionEnvironment {
+                name: None,
+                platform: Platform::Linux_x86_64,
+                strategy: ProcessExecutionStrategy::Local,
+                local_keep_sandboxes: KeepSandboxes::Never,
+            },
+            RunId(0),
+        ),
+    };
+
+    let (action_result, digests) = runner
+        .make_action_result(&command, &process_result, &store)
+        .await
+        .unwrap();
+
+    assert_eq!(action_result.output_files.len(), 0);
+    assert_eq!(action_result.output_directories.len(), 1);
+    assert_eq!(
+        action_result.output_directories[0],
+        remexec::OutputDirectory {
+            path: String::new(),
+            tree_digest: Some(TestTree::double_nested().digest().into()),
+            is_topologically_sorted: false,
+            ..Default::default()
+        }
+    );
+
+    let actual_digests_set = digests.into_iter().collect::<HashSet<_>>();
+    let expected_digests_set = hashset! {
+      TestData::roland().digest(),
+      TestData::robin().digest(),
+      TestTree::double_nested().digest(),
+    };
+    assert_eq!(expected_digests_set, actual_digests_set);
+}
+
+#[tokio::test]
 async fn no_remote_cache_on_scope_local() {
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
