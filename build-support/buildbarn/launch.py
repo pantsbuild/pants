@@ -711,13 +711,7 @@ def _write_remote_execution_worker_config(
     runners: [{{
       endpoint: {{ address: 'unix:///worker/runner' }},
       concurrency: 1,
-      instanceNamePrefix: '{instance_name}',
-      platform: {{
-        properties: [
-          {{ name: 'OSFamily', value: 'linux' }},
-          {{ name: 'container-image', value: 'docker://{execution_image_reference}' }},
-        ],
-      }},
+      instanceNamePrefix: '',
       workerId: {{
         datacenter: 'pants',
         rack: 'buildbarn',

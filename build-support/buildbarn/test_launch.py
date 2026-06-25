@@ -128,9 +128,9 @@ def test_write_remote_execution_worker_config_uses_instance_prefix_and_execution
     )
 
     config = config_path.read_text()
-    assert "instanceNamePrefix: 'fuse'" in config
-    assert "name: 'OSFamily', value: 'linux'" in config
-    assert "container-image', value: 'docker://ghcr.io/example/executor:tag@sha256:" in config
+    assert "instanceNamePrefix: ''" in config
+    assert "address: 'unix:///worker/runner'" in config
+    assert "ghcr.io/example/executor:tag@sha256:" not in config
 
 
 def test_prepare_remote_execution_dirs_creates_expected_paths(tmp_path: Path) -> None:

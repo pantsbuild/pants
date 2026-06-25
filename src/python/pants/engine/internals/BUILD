@@ -25,6 +25,10 @@ python_tests(
             "dependencies": ["build-support/buildbarn"],
             "timeout": 180,
         },
+        "buildbarn_remote_execution_integration_test.py": {
+            "dependencies": ["build-support/buildbarn"],
+            "timeout": 300,
+        },
         "scheduler_integration_test.py": {
             "dependencies": [
                 "testprojects/src/python:hello_directory",
