@@ -21,6 +21,10 @@ python_tests(
         "remote_cache_integration_test.py": {
             "dependencies": ["testprojects/src/jvm:lib_directory"],
         },
+        "buildbarn_remote_cache_integration_test.py": {
+            "dependencies": ["build-support/buildbarn"],
+            "timeout": 180,
+        },
         "scheduler_integration_test.py": {
             "dependencies": [
                 "testprojects/src/python:hello_directory",

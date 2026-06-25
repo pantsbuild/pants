@@ -104,6 +104,7 @@ root_patterns = [
   "tests/*",
   "3rdparty/*",
   "/build-support/bin",
+  "/build-support/buildbarn",
   "/build-support/flake8",
   "/build-support/migration-support",
   "/pants-plugins",

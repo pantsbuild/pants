@@ -3,22 +3,22 @@
   "images": [
     {
       "name": "bb-storage",
-      "reference": "ghcr.io/buildbarn/bb-storage:20260623T170048Z-b4bd798@sha256:7c0f3a0b399189fc67a971b11a0de7c28b7f2b6f09515ada3092c62ff280e40d",
+      "reference": "ghcr.io/buildbarn/bb-storage:20260609T094425Z-10acc76@sha256:36201141f924865ddbea1bc518c4f98dd0dbb744181ef34f9f5e864d3dcf43f8",
       "required_for": ["cache", "remote-execution"]
     },
     {
       "name": "bb-scheduler",
-      "reference": "ghcr.io/buildbarn/bb-scheduler:20260614T164626Z-1ae1eed@sha256:74357a81279c4e0bc9ce8892cda435fb2557dbebd24c1904d746d4f718a9fdba",
+      "reference": "ghcr.io/buildbarn/bb-scheduler:20260527T162223Z-c48dcda@sha256:95417d159b5b9f17a6c915fec43603be51c553f68de439a9affcfe811bd0c6da",
       "required_for": ["remote-execution"]
     },
     {
       "name": "bb-worker",
-      "reference": "ghcr.io/buildbarn/bb-worker:20260614T164626Z-1ae1eed@sha256:bb24d5c2cd0bcd2c1029ecd430817b77f3e984214e39640e278ba6beea3dde58",
+      "reference": "ghcr.io/buildbarn/bb-worker:20260527T162223Z-c48dcda@sha256:4cc65f0dd716fd0942ccc0fdd770421065b7f3bf55062a184c4376e4c0a4a13e",
       "required_for": ["remote-execution"]
     },
     {
       "name": "bb-runner-installer",
-      "reference": "ghcr.io/buildbarn/bb-runner-installer:20260614T164626Z-1ae1eed@sha256:4b690c1f22eb02ee90132c03ee561cafcc57dbfcf5835ac62cda25eae5822c08",
+      "reference": "ghcr.io/buildbarn/bb-runner-installer:20260527T162223Z-c48dcda@sha256:0f719066773c365ba902edebb9f7ea8e23b3b4a82002c6dbdbb0c74965bcc34d",
       "required_for": ["remote-execution"]
     },
     {
