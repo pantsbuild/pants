@@ -25,6 +25,11 @@
       "name": "busybox",
       "reference": "docker.io/library/busybox:1.36.1@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662",
       "required_for": ["remote-execution"]
+    },
+    {
+      "name": "ubuntu-act-22-04",
+      "reference": "ghcr.io/catthehacker/ubuntu:act-22.04@sha256:b3098f231fa07cf5c2423b0f2c2e7dacf85c0c508c7f27687febe30bab8cfd3e",
+      "required_for": ["remote-execution"]
     }
   ]
 }

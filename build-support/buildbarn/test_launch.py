@@ -58,10 +58,13 @@ def test_launcher_teardown_collects_logs_and_removes_container(tmp_path: Path) -
             return completed_process(args, stdout="hello\n", stderr="world\n")
         if args[:3] == ["docker", "rm", "--force"]:
             return completed_process(args)
+        if args[:3] == ["docker", "network", "rm"]:
+            return completed_process(args)
         raise AssertionError(f"Unexpected command: {args}")
 
     launcher = launch.BuildbarnLauncher(temp_dir=tmp_path, run_command=run_command)
-    launcher._container = launch.ContainerProcess(name="container-1", image="image")
+    launcher._containers.append(launch.ContainerProcess(name="container-1", image="image"))
+    launcher._container_logs["container-1"] = tmp_path / "bb_storage.log"
     launcher._launched = launch.CacheOnlyBuildbarn(
         address="grpc://127.0.0.1:12345",
         instance_name="fuse",
@@ -102,3 +105,43 @@ def test_launcher_fails_when_manifest_lacks_storage_image(tmp_path: Path) -> Non
 
     with pytest.raises(launch.FetchError, match="bb-storage"):
         launcher.launch_cache_only()
+
+
+def test_write_remote_execution_frontend_config_routes_to_storage_and_scheduler(tmp_path: Path) -> None:
+    config_path = tmp_path / "frontend.jsonnet"
+
+    launch._write_remote_execution_frontend_config(config_path)
+
+    config = config_path.read_text()
+    assert "address: 'scheduler:8982'" in config
+    assert "address: 'storage:8981'" in config
+    assert "executeAuthorizer: { allow: {} }" in config
+
+
+def test_write_remote_execution_worker_config_uses_instance_prefix_and_execution_image(tmp_path: Path) -> None:
+    config_path = tmp_path / "worker.jsonnet"
+
+    launch._write_remote_execution_worker_config(
+        config_path,
+        instance_name="fuse",
+        execution_image_reference="ghcr.io/example/executor:tag@sha256:" + "e" * 64,
+    )
+
+    config = config_path.read_text()
+    assert "instanceNamePrefix: 'fuse'" in config
+    assert "name: 'OSFamily', value: 'linux'" in config
+    assert "container-image', value: 'docker://ghcr.io/example/executor:tag@sha256:" in config
+
+
+def test_prepare_remote_execution_dirs_creates_expected_paths(tmp_path: Path) -> None:
+    launch._prepare_remote_execution_dirs(tmp_path)
+
+    expected_paths = [
+        tmp_path / "storage-cas" / "persistent_state",
+        tmp_path / "storage-ac" / "persistent_state",
+        tmp_path / "storage-fsac" / "persistent_state",
+        tmp_path / "worker" / "build",
+        tmp_path / "worker" / "cache",
+        tmp_path / "bb",
+    ]
+    assert all(path.exists() for path in expected_paths)
