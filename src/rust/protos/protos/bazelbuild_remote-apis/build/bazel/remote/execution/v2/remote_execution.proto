@@ -813,7 +813,7 @@ message Command {
   // the action. See documentation note in the
   // [Action][build.bazel.remote.execution.v2.Action] for migration.
   //Platform platform = 5 [ deprecated = true ];
-  Platform platform = 5;
+   Platform platform = 5 [ deprecated = true ];
 
   // The working directory, relative to the input root, for the command to run
   // in. It must be a directory which exists in the input tree. If it is left
