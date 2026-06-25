@@ -34,6 +34,101 @@ use process_execution::{
 
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 
+#[derive(Debug)]
+struct NoopCommandRunner;
+
+#[async_trait]
+impl CommandRunnerTrait for NoopCommandRunner {
+    async fn run(
+        &self,
+        _context: Context,
+        _workunit: &mut RunningWorkunit,
+        _req: Process,
+    ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+        unimplemented!()
+    }
+
+    async fn shutdown(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+async fn make_action_result_runner(store: &Store, executor: task_executor::Executor) -> crate::remote_cache::CommandRunner {
+    let cas = StubCAS::builder().build().await;
+    crate::remote_cache::CommandRunner::from_provider_options(
+        RemoteCacheRunnerOptions {
+            inner: Arc::new(NoopCommandRunner),
+            instance_name: None,
+            process_cache_namespace: None,
+            executor: executor.clone(),
+            store: store.clone(),
+            cache_read: true,
+            cache_write: true,
+            warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
+            cache_content_behavior: CacheContentBehavior::Defer,
+            append_only_caches_base_path: None,
+        },
+        RemoteStoreOptions {
+            provider: RemoteProvider::Reapi,
+            instance_name: None,
+            store_address: cas.address(),
+            tls_config: tls::Config::default(),
+            headers: BTreeMap::default(),
+            concurrency_limit: 256,
+            timeout: CACHE_READ_TIMEOUT,
+            retries: 0,
+            batch_api_size_limit: 0,
+            batch_load_enabled: false,
+            chunk_size_bytes: 0,
+        },
+    )
+    .await
+    .expect("caching command runner")
+}
+
+async fn store_double_nested_output_tree(store: &Store) -> Digest {
+    store
+        .store_file_bytes(TestData::roland().bytes(), false)
+        .await
+        .expect("Error saving file bytes");
+    store
+        .store_file_bytes(TestData::robin().bytes(), false)
+        .await
+        .expect("Error saving file bytes");
+    store
+        .record_directory(&TestDirectory::containing_roland().directory(), true)
+        .await
+        .expect("Error saving directory");
+    store
+        .record_directory(&TestDirectory::nested().directory(), true)
+        .await
+        .expect("Error saving directory");
+    store
+        .record_directory(&TestDirectory::double_nested().directory(), true)
+        .await
+        .expect("Error saving directory")
+}
+
+fn make_process_result(directory_digest: Digest) -> FallibleProcessResultWithPlatform {
+    FallibleProcessResultWithPlatform {
+        stdout_digest: TestData::roland().digest(),
+        stderr_digest: TestData::robin().digest(),
+        output_directory: DirectoryDigest::from_persisted_digest(directory_digest),
+        exit_code: 102,
+        metadata: ProcessResultMetadata::new(
+            None,
+            ProcessResultSource::Ran,
+            ProcessExecutionEnvironment {
+                name: None,
+                platform: Platform::Linux_x86_64,
+                strategy: ProcessExecutionStrategy::Local,
+                local_keep_sandboxes: KeepSandboxes::Never,
+            },
+            RunId(0),
+        ),
+    }
+}
+
 /// A mock of the local runner used for better hermeticity of the tests.
 #[derive(Debug, Clone)]
 struct MockLocalCommandRunner {
@@ -717,81 +812,11 @@ async fn extract_output_file() {
 
 #[tokio::test]
 async fn make_action_result_basic() {
-    #[derive(Debug)]
-    struct MockCommandRunner;
-
-    #[async_trait]
-    impl CommandRunnerTrait for MockCommandRunner {
-        async fn run(
-            &self,
-            _context: Context,
-            _workunit: &mut RunningWorkunit,
-            _req: Process,
-        ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-            unimplemented!()
-        }
-
-        async fn shutdown(&self) -> Result<(), String> {
-            Ok(())
-        }
-    }
-
     let store_dir = TempDir::new().unwrap();
     let executor = task_executor::Executor::new();
     let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-
-    store
-        .store_file_bytes(TestData::roland().bytes(), false)
-        .await
-        .expect("Error saving file bytes");
-    store
-        .store_file_bytes(TestData::robin().bytes(), false)
-        .await
-        .expect("Error saving file bytes");
-    store
-        .record_directory(&TestDirectory::containing_roland().directory(), true)
-        .await
-        .expect("Error saving directory");
-    store
-        .record_directory(&TestDirectory::nested().directory(), true)
-        .await
-        .expect("Error saving directory");
-    let directory_digest = store
-        .record_directory(&TestDirectory::double_nested().directory(), true)
-        .await
-        .expect("Error saving directory");
-
-    let mock_command_runner = Arc::new(MockCommandRunner);
-    let cas = StubCAS::builder().build().await;
-    let runner = crate::remote_cache::CommandRunner::from_provider_options(
-        RemoteCacheRunnerOptions {
-            inner: mock_command_runner.clone(),
-            instance_name: None,
-            process_cache_namespace: None,
-            executor: executor.clone(),
-            store: store.clone(),
-            cache_read: true,
-            cache_write: true,
-            warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
-            cache_content_behavior: CacheContentBehavior::Defer,
-            append_only_caches_base_path: None,
-        },
-        RemoteStoreOptions {
-            provider: RemoteProvider::Reapi,
-            instance_name: None,
-            store_address: cas.address(),
-            tls_config: tls::Config::default(),
-            headers: BTreeMap::default(),
-            concurrency_limit: 256,
-            timeout: CACHE_READ_TIMEOUT,
-            retries: 0,
-            batch_api_size_limit: 0,
-            batch_load_enabled: false,
-            chunk_size_bytes: 0,
-        },
-    )
-    .await
-    .expect("caching command runner");
+    let directory_digest = store_double_nested_output_tree(&store).await;
+    let runner = make_action_result_runner(&store, executor.clone()).await;
 
     let command = remexec::Command {
         arguments: vec!["this is a test".into()],
@@ -800,23 +825,7 @@ async fn make_action_result_basic() {
         ..Default::default()
     };
 
-    let process_result = FallibleProcessResultWithPlatform {
-        stdout_digest: TestData::roland().digest(),
-        stderr_digest: TestData::robin().digest(),
-        output_directory: DirectoryDigest::from_persisted_digest(directory_digest),
-        exit_code: 102,
-        metadata: ProcessResultMetadata::new(
-            None,
-            ProcessResultSource::Ran,
-            ProcessExecutionEnvironment {
-                name: None,
-                platform: Platform::Linux_x86_64,
-                strategy: ProcessExecutionStrategy::Local,
-                local_keep_sandboxes: KeepSandboxes::Never,
-            },
-            RunId(0),
-        ),
-    };
+    let process_result = make_process_result(directory_digest);
 
     let (action_result, digests) = runner
         .make_action_result(&command, &process_result, &store)
@@ -864,81 +873,11 @@ async fn make_action_result_basic() {
 
 #[tokio::test]
 async fn make_action_result_handles_root_output_path() {
-    #[derive(Debug)]
-    struct MockCommandRunner;
-
-    #[async_trait]
-    impl CommandRunnerTrait for MockCommandRunner {
-        async fn run(
-            &self,
-            _context: Context,
-            _workunit: &mut RunningWorkunit,
-            _req: Process,
-        ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
-            unimplemented!()
-        }
-
-        async fn shutdown(&self) -> Result<(), String> {
-            Ok(())
-        }
-    }
-
     let store_dir = TempDir::new().unwrap();
     let executor = task_executor::Executor::new();
     let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-
-    store
-        .store_file_bytes(TestData::roland().bytes(), false)
-        .await
-        .expect("Error saving file bytes");
-    store
-        .store_file_bytes(TestData::robin().bytes(), false)
-        .await
-        .expect("Error saving file bytes");
-    store
-        .record_directory(&TestDirectory::containing_roland().directory(), true)
-        .await
-        .expect("Error saving directory");
-    store
-        .record_directory(&TestDirectory::nested().directory(), true)
-        .await
-        .expect("Error saving directory");
-    let directory_digest = store
-        .record_directory(&TestDirectory::double_nested().directory(), true)
-        .await
-        .expect("Error saving directory");
-
-    let mock_command_runner = Arc::new(MockCommandRunner);
-    let cas = StubCAS::builder().build().await;
-    let runner = crate::remote_cache::CommandRunner::from_provider_options(
-        RemoteCacheRunnerOptions {
-            inner: mock_command_runner.clone(),
-            instance_name: None,
-            process_cache_namespace: None,
-            executor: executor.clone(),
-            store: store.clone(),
-            cache_read: true,
-            cache_write: true,
-            warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
-            cache_content_behavior: CacheContentBehavior::Defer,
-            append_only_caches_base_path: None,
-        },
-        RemoteStoreOptions {
-            provider: RemoteProvider::Reapi,
-            instance_name: None,
-            store_address: cas.address(),
-            tls_config: tls::Config::default(),
-            headers: BTreeMap::default(),
-            concurrency_limit: 256,
-            timeout: CACHE_READ_TIMEOUT,
-            retries: 0,
-            batch_api_size_limit: 0,
-            batch_load_enabled: false,
-            chunk_size_bytes: 0,
-        },
-    )
-    .await
-    .expect("caching command runner");
+    let directory_digest = store_double_nested_output_tree(&store).await;
+    let runner = make_action_result_runner(&store, executor.clone()).await;
 
     let command = remexec::Command {
         arguments: vec!["this is a test".into()],
@@ -946,23 +885,7 @@ async fn make_action_result_handles_root_output_path() {
         ..Default::default()
     };
 
-    let process_result = FallibleProcessResultWithPlatform {
-        stdout_digest: TestData::roland().digest(),
-        stderr_digest: TestData::robin().digest(),
-        output_directory: DirectoryDigest::from_persisted_digest(directory_digest),
-        exit_code: 102,
-        metadata: ProcessResultMetadata::new(
-            None,
-            ProcessResultSource::Ran,
-            ProcessExecutionEnvironment {
-                name: None,
-                platform: Platform::Linux_x86_64,
-                strategy: ProcessExecutionStrategy::Local,
-                local_keep_sandboxes: KeepSandboxes::Never,
-            },
-            RunId(0),
-        ),
-    };
+    let process_result = make_process_result(directory_digest);
 
     let (action_result, digests) = runner
         .make_action_result(&command, &process_result, &store)
@@ -988,6 +911,119 @@ async fn make_action_result_handles_root_output_path() {
       TestTree::double_nested().digest(),
     };
     assert_eq!(expected_digests_set, actual_digests_set);
+}
+
+#[tokio::test]
+async fn make_action_result_uses_output_paths_for_files_and_directories() {
+    let store_dir = TempDir::new().unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+    let directory_digest = store_double_nested_output_tree(&store).await;
+    let runner = make_action_result_runner(&store, executor).await;
+
+    let command = remexec::Command {
+        output_paths: vec!["pets/cats".into(), "pets/cats/roland.ext".into()],
+        ..Default::default()
+    };
+
+    let (action_result, digests) = runner
+        .make_action_result(&command, &make_process_result(directory_digest), &store)
+        .await
+        .unwrap();
+
+    assert_eq!(action_result.output_files.len(), 1);
+    assert_eq!(action_result.output_files[0].path, "pets/cats/roland.ext");
+    assert_eq!(action_result.output_files[0].digest, Some(TestData::roland().digest().into()));
+    assert_eq!(action_result.output_directories.len(), 1);
+    assert_eq!(action_result.output_directories[0].path, "pets/cats");
+    assert_eq!(
+        action_result.output_directories[0].tree_digest,
+        Some(TestTree::roland_at_root().digest().into())
+    );
+
+    let actual_digests_set = digests.into_iter().collect::<HashSet<_>>();
+    let expected_digests_set = hashset! {
+      TestData::roland().digest(),
+      TestData::robin().digest(),
+      TestTree::roland_at_root().digest(),
+    };
+    assert_eq!(expected_digests_set, actual_digests_set);
+}
+
+#[tokio::test]
+async fn make_action_result_ignores_deprecated_outputs_when_output_paths_present() {
+    let store_dir = TempDir::new().unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+    let directory_digest = store_double_nested_output_tree(&store).await;
+    let runner = make_action_result_runner(&store, executor).await;
+
+    let command = remexec::Command {
+        output_paths: vec!["pets/cats/roland.ext".into()],
+        output_files: vec!["does/not/exist.txt".into()],
+        output_directories: vec!["does/not/exist".into()],
+        ..Default::default()
+    };
+
+    let (action_result, _) = runner
+        .make_action_result(&command, &make_process_result(directory_digest), &store)
+        .await
+        .unwrap();
+
+    assert_eq!(action_result.output_files.len(), 1);
+    assert_eq!(action_result.output_files[0].path, "pets/cats/roland.ext");
+    assert!(action_result.output_directories.is_empty());
+}
+
+#[tokio::test]
+async fn make_action_result_omits_missing_output_paths() {
+    let store_dir = TempDir::new().unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+    let directory_digest = store_double_nested_output_tree(&store).await;
+    let runner = make_action_result_runner(&store, executor).await;
+
+    let command = remexec::Command {
+        output_paths: vec!["missing".into(), "pets/cats/roland.ext".into()],
+        ..Default::default()
+    };
+
+    let (action_result, _) = runner
+        .make_action_result(&command, &make_process_result(directory_digest), &store)
+        .await
+        .unwrap();
+
+    assert_eq!(action_result.output_files.len(), 1);
+    assert_eq!(action_result.output_files[0].path, "pets/cats/roland.ext");
+    assert!(action_result.output_directories.is_empty());
+}
+
+#[tokio::test]
+async fn make_action_result_handles_overlapping_output_paths() {
+    let store_dir = TempDir::new().unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+    let directory_digest = store_double_nested_output_tree(&store).await;
+    let runner = make_action_result_runner(&store, executor).await;
+
+    let command = remexec::Command {
+        output_paths: vec!["pets".into(), "pets/cats/roland.ext".into()],
+        ..Default::default()
+    };
+
+    let (action_result, _) = runner
+        .make_action_result(&command, &make_process_result(directory_digest), &store)
+        .await
+        .unwrap();
+
+    assert_eq!(action_result.output_files.len(), 1);
+    assert_eq!(action_result.output_files[0].path, "pets/cats/roland.ext");
+    assert_eq!(action_result.output_directories.len(), 1);
+    assert_eq!(action_result.output_directories[0].path, "pets");
+    assert_eq!(
+        action_result.output_directories[0].tree_digest,
+        Some(TestTree::nested().digest().into())
+    );
 }
 
 #[tokio::test]
