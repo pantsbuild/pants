@@ -270,31 +270,36 @@ fn create_digest(py: Python, create_digest: Value) -> PyResult<PyGeneratorRespon
                         ))
                     })?
                     .into_iter()
-                    .map(|obj| {
-                        let raw_path: String = externs::getattr(&obj, "path").unwrap();
-                        let path = RelativePath::new(PathBuf::from(raw_path)).unwrap();
-                        if obj.hasattr("content").unwrap() {
+                    .map(|obj| -> Result<CreateDigestItem, Failure> {
+                        let raw_path: String = externs::getattr(&obj, "path").map_err(throw)?;
+                        let path = RelativePath::new(PathBuf::from(raw_path))
+                            .map_err(|e| throw(format!("The `path` must be relative: {e}")))?;
+                        if obj.hasattr("content").map_err(Failure::from)? {
                             let bytes = bytes::Bytes::from(
-                                externs::getattr::<Vec<u8>>(&obj, "content").unwrap(),
+                                externs::getattr::<Vec<u8>>(&obj, "content").map_err(throw)?,
                             );
                             let is_executable: bool =
-                                externs::getattr(&obj, "is_executable").unwrap();
+                                externs::getattr(&obj, "is_executable").map_err(throw)?;
                             new_file_count += 1;
-                            CreateDigestItem::FileContent(path, bytes, is_executable)
-                        } else if obj.hasattr("file_digest").unwrap() {
+                            Ok(CreateDigestItem::FileContent(path, bytes, is_executable))
+                        } else if obj.hasattr("file_digest").map_err(Failure::from)? {
                             let py_file_digest: PyFileDigest =
-                                externs::getattr(&obj, "file_digest").unwrap();
+                                externs::getattr(&obj, "file_digest").map_err(throw)?;
                             let is_executable: bool =
-                                externs::getattr(&obj, "is_executable").unwrap();
-                            CreateDigestItem::FileEntry(path, py_file_digest.0, is_executable)
-                        } else if obj.hasattr("target").unwrap() {
-                            let target: String = externs::getattr(&obj, "target").unwrap();
-                            CreateDigestItem::SymlinkEntry(path, PathBuf::from(target))
+                                externs::getattr(&obj, "is_executable").map_err(throw)?;
+                            Ok(CreateDigestItem::FileEntry(
+                                path,
+                                py_file_digest.0,
+                                is_executable,
+                            ))
+                        } else if obj.hasattr("target").map_err(Failure::from)? {
+                            let target: String = externs::getattr(&obj, "target").map_err(throw)?;
+                            Ok(CreateDigestItem::SymlinkEntry(path, PathBuf::from(target)))
                         } else {
-                            CreateDigestItem::Dir(path)
+                            Ok(CreateDigestItem::Dir(path))
                         }
                     })
-                    .collect())
+                    .collect::<Result<Vec<_>, _>>()?)
             })?
         };
 
@@ -355,9 +360,8 @@ fn digest_subset_to_digest(digest_subset: Value) -> PyGeneratorResponseNativeCal
         let store = context.core.store();
         let (path_globs, original_digest) = Python::attach(|py| {
             let py_digest_subset = digest_subset.bind(py);
-            let py_path_globs: Bound<'_, PyAny> =
-                externs::getattr(py_digest_subset, "globs").unwrap();
-            let py_digest: Bound<'_, PyAny> = externs::getattr(py_digest_subset, "digest").unwrap();
+            let py_path_globs: Bound<'_, PyAny> = externs::getattr(py_digest_subset, "globs")?;
+            let py_digest: Bound<'_, PyAny> = externs::getattr(py_digest_subset, "digest")?;
             let res: NodeResult<_> = Ok((
                 Snapshot::lift_prepared_path_globs(&py_path_globs)?,
                 lift_directory_digest(&py_digest)?,
