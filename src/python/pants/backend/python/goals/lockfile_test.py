@@ -404,6 +404,69 @@ def test_find_links_scoped_to_resolve() -> None:
     assert result_by_resolve["b"].find_links == FrozenOrderedSet([])
 
 
+def test_sync_strips_embedded_metadata_header(rule_runner: PythonRuleRunner) -> None:
+    """Regression test for https://github.com/pantsbuild/pants/issues/23398."""
+    rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-resolver=pex",
+            "--no-python-separate-lockfile-metadata-file",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GeneratePexLockfile(
+                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=InterpreterConstraints(),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+                lock_style="universal",
+                complete_platforms=(),
+            )
+        ],
+    )
+    rule_runner.write_digest(result.digest)
+
+    rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-resolver=pex",
+            "--no-python-separate-lockfile-metadata-file",
+            "--generate-lockfiles-sync",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    sync_result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GeneratePexLockfile(
+                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=InterpreterConstraints(),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+                lock_style="universal",
+                complete_platforms=(),
+            )
+        ],
+    )
+    sync_digest_contents = rule_runner.request(DigestContents, [sync_result.digest])
+    assert len(sync_digest_contents) == 1
+    content = sync_digest_contents[0].content.decode()
+    header, _, body = content.partition("\n\n")
+    assert header.strip() != ""
+    lock_content = json.loads(body)
+    reqs = lock_content["locked_resolves"][0]["locked_requirements"]
+    assert len(reqs) == 1
+    assert reqs[0]["project_name"] == "ansicolors"
+
+
 def test_empty_requirements(rule_runner: PythonRuleRunner) -> None:
     with pytest.raises(ExecutionError) as excinfo:
         json.loads(

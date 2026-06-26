@@ -32,6 +32,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     ResolveConfig,
     ResolveConfigRequest,
     determine_resolve_config,
+    strip_comments_from_pex_json_lockfile,
 )
 from pants.backend.python.util_rules.uv import UvEnvironment, generate_pyproject_toml
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
@@ -189,6 +190,16 @@ async def generate_pex_lockfile(
                 conjunction=GlobExpansionConjunction.any_match,
             )
         )
+
+        if existing_lockfile_digest != EMPTY_DIGEST:
+            existing_lockfile_contents = await get_digest_contents(existing_lockfile_digest)
+            if existing_lockfile_contents:
+                stripped = strip_comments_from_pex_json_lockfile(
+                    existing_lockfile_contents[0].content
+                )
+                existing_lockfile_digest = await create_digest(
+                    CreateDigest([FileContent(req.lockfile_dest, stripped)])
+                )
     else:
         existing_lockfile_digest = EMPTY_DIGEST
 
