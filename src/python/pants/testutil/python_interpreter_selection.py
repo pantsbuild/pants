@@ -116,7 +116,7 @@ def skip_unless_python311_present(func):
 
 
 def skip_unless_python310_and_python311_present(func):
-    """A test skip decorator that only runs a test method if python3.8 and python3.9 are present."""
+    """A test skip decorator that only runs a test method if python3.10 and python3.11 are present."""
     return skip_unless_all_pythons_present(PY_310, PY_311)(func)
 
 

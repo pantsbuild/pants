@@ -320,7 +320,7 @@ def test_multiple_resolves() -> None:
         [
             "--python-resolves={'a': 'a.lock', 'b': 'b.lock'}",
             # Override interpreter constraints for 'b', but use default for 'a'.
-            "--python-resolves-to-interpreter-constraints={'b': ['==3.9.*']}",
+            "--python-resolves-to-interpreter-constraints={'b': ['==3.10.*']}",
             "--python-enable-resolves",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
@@ -332,7 +332,7 @@ def test_multiple_resolves() -> None:
         GeneratePexLockfile(
             requirements=FrozenOrderedSet(["a"]),
             find_links=FrozenOrderedSet([]),
-            interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.10,<3.15"]),
             resolve_name="a",
             lockfile_dest="a.lock",
             diff=False,
@@ -342,7 +342,7 @@ def test_multiple_resolves() -> None:
         GeneratePexLockfile(
             requirements=FrozenOrderedSet(["b"]),
             find_links=FrozenOrderedSet([]),
-            interpreter_constraints=InterpreterConstraints(["==3.9.*"]),
+            interpreter_constraints=InterpreterConstraints(["==3.10.*"]),
             resolve_name="b",
             lockfile_dest="b.lock",
             diff=False,
@@ -669,7 +669,7 @@ def test_uv_lockfile_generation(
                     ]
                 ),
                 find_links=FrozenOrderedSet([]),
-                interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
+                interpreter_constraints=InterpreterConstraints(["CPython>=3.10,<3.15"]),
                 resolve_name="test",
                 lockfile_dest="test.lock",
                 diff=False,
