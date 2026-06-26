@@ -1,0 +1,59 @@
+services:
+  storage:
+    image: ${BB_STORAGE_IMAGE}
+    command: ["/config/storage.jsonnet"]
+    volumes:
+      - ${BUILDBARN_ASSETS_ROOT}/storage.jsonnet:/config/storage.jsonnet:ro
+      - ${BUILDBARN_RUNTIME_ROOT}/storage-cas:/storage-cas
+      - ${BUILDBARN_RUNTIME_ROOT}/storage-ac:/storage-ac
+      - ${BUILDBARN_RUNTIME_ROOT}/storage-fsac:/storage-fsac
+
+  frontend:
+    image: ${BB_STORAGE_IMAGE}
+    command: ["/config/frontend.jsonnet"]
+    depends_on:
+      - storage
+      - scheduler
+    ports:
+      - "127.0.0.1::8980"
+    volumes:
+      - ${BUILDBARN_ASSETS_ROOT}/frontend.jsonnet:/config/frontend.jsonnet:ro
+
+  scheduler:
+    image: ${BB_SCHEDULER_IMAGE}
+    command: ["/config/scheduler.jsonnet"]
+    depends_on:
+      - storage
+    volumes:
+      - ${BUILDBARN_ASSETS_ROOT}/scheduler.jsonnet:/config/scheduler.jsonnet:ro
+
+  runner-installer:
+    image: ${BB_RUNNER_INSTALLER_IMAGE}
+    restart: "no"
+    volumes:
+      - ${BUILDBARN_RUNTIME_ROOT}/bb:/bb
+
+  runner:
+    image: ${BB_EXECUTION_IMAGE}
+    command:
+      - sh
+      - -c
+      - while ! test -f /bb/installed; do sleep 1; done; exec /bb/bb_runner /config/runner.jsonnet
+    network_mode: none
+    depends_on:
+      - runner-installer
+    volumes:
+      - ${BUILDBARN_ASSETS_ROOT}/runner.jsonnet:/config/runner.jsonnet:ro
+      - ${BUILDBARN_RUNTIME_ROOT}/bb:/bb
+      - ${BUILDBARN_RUNTIME_ROOT}/worker:/worker
+
+  worker:
+    image: ${BB_WORKER_IMAGE}
+    command: ["/config/worker.jsonnet"]
+    depends_on:
+      - storage
+      - scheduler
+      - runner
+    volumes:
+      - ${BUILDBARN_ASSETS_ROOT}/worker.jsonnet:/config/worker.jsonnet:ro
+      - ${BUILDBARN_RUNTIME_ROOT}/worker:/worker

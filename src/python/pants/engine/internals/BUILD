@@ -1,9 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_sources(
-    overrides={"native_engine.pyi": {"dependencies": [":native_engine"]}},
-)
+python_sources(overrides={"native_engine.pyi": {"dependencies": [":native_engine"]}})
 
 python_tests(
     name="tests",
@@ -21,14 +19,8 @@ python_tests(
         "remote_cache_integration_test.py": {
             "dependencies": ["testprojects/src/jvm:lib_directory"],
         },
-        "buildbarn_remote_cache_integration_test.py": {
-            "dependencies": ["build-support/buildbarn"],
-            "timeout": 180,
-        },
-        "buildbarn_remote_execution_integration_test.py": {
-            "dependencies": ["build-support/buildbarn"],
-            "timeout": 300,
-        },
+        "buildbarn_remote_cache_integration_test.py": {"timeout": 180},
+        "buildbarn_remote_execution_integration_test.py": {"timeout": 300},
         "scheduler_integration_test.py": {
             "dependencies": [
                 "testprojects/src/python:hello_directory",

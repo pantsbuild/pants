@@ -10,11 +10,11 @@ import os
 import shutil
 import subprocess
 
-import launch as buildbarn_launch
 import pytest
 
 from pants.base.specs import Specs
 from pants.engine.fs import Digest, DigestContents, FileDigest
+from pants.engine.internals.buildbarn import BuildbarnLauncher
 from pants.engine.internals.engine_testutil import WorkunitTracker
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
@@ -172,7 +172,7 @@ def buildbarn_remote_execution_address() -> BuildbarnExecutionAddress:
         yield buildbarn
         return
 
-    launcher = buildbarn_launch.BuildbarnLauncher(instance_name=instance_name)
+    launcher = BuildbarnLauncher(instance_name=instance_name)
     try:
         instance = launcher.launch_remote_execution()
         buildbarn = BuildbarnExecutionAddress(

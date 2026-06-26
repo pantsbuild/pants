@@ -10,8 +10,8 @@ import shutil
 import subprocess
 import time
 
-import launch as buildbarn_launch
 import pytest
+from pants.engine.internals.buildbarn import BuildbarnLauncher
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
@@ -51,7 +51,7 @@ def buildbarn_cache_address() -> BuildbarnAddress:
         yield BuildbarnAddress(address=existing_address, instance_name=instance_name)
         return
 
-    with buildbarn_launch.BuildbarnLauncher(instance_name=instance_name) as instance:
+    with BuildbarnLauncher(instance_name=instance_name) as instance:
         yield BuildbarnAddress(address=instance.address, instance_name=instance.instance_name)
 
 
