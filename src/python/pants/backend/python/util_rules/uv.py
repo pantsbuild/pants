@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from textwrap import dedent  # noqa: PNT20
 from typing import ClassVar, cast
 
+from packaging.requirements import Requirement
+
 from pants.backend.python.subsystems import uv as uv_subsystem
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
 from pants.backend.python.subsystems.uv import (
@@ -115,14 +117,20 @@ async def get_uv_environment(
 # The synthetic project name (pants-lockfile-for-*) must not collide with any real requirement.
 # uv will include this project as a virtual package in the lockfile, and we set package = false,
 # so it won't try to install it.
-def generate_pyproject_toml(resolve: str, ics: InterpreterConstraints, reqs: Iterable[str]) -> str:
+def generate_pyproject_toml(
+    resolve: str,
+    ics: InterpreterConstraints,
+    reqs: Iterable[str],
+    indexes: Iterable[str] | None = None,
+    sources: Iterable[str] = tuple(),
+) -> str:
     def escape_double_quotes(s: str) -> str:
         return s.replace('"', '\\"')
 
     requires_python = ",".join(str(constraint.specifier) for constraint in ics)
     deps_lines = "\n".join(f'    "{escape_double_quotes(r)}",' for r in sorted(reqs))
 
-    return dedent(
+    content = dedent(
         """
         [project]
         name = "pants-lockfile-for-{resolve}"
@@ -136,6 +144,42 @@ def generate_pyproject_toml(resolve: str, ics: InterpreterConstraints, reqs: Ite
         package = false
         """
     ).format(resolve=resolve, requires_python=requires_python, deps_lines=deps_lines)
+
+    if indexes is not None:
+        parsed_indexes = []
+        for index in indexes:
+            part1, _, part2 = index.partition("=")
+            (name, url) = (part1, part2) if part2 else ("", part1)
+            parsed_indexes.append((name, url))
+        if parsed_indexes:
+            # To turn off uv's fallback to PyPI we must set some other index to be the default.
+            # In uv the default index has the lowest priority, regardless of its position in the
+            # list of indexes, so we set the last index to be that default, to match user intent.
+            for i, (name, url) in enumerate(parsed_indexes):
+                is_default = i == len(parsed_indexes) - 1
+                content += "[[tool.uv.index]]\n"
+                if name:
+                    content += f'name = "{name}"\n'
+                content += f'url = "{url}"\n'
+                if is_default:
+                    content += "default = true\n"
+                content += "\n"
+        else:
+            content += "no-index = true\n\n"
+
+    sources = tuple(sources)
+    if sources:
+        source_lines = ["[tool.uv.sources]"]
+        for source in sources:
+            index_name, _, scope = source.partition("=")
+            req = Requirement(scope)
+            # Markers may contain double-quotes, so we use single quotes in the TOML.
+            marker = f", marker = '{req.marker}'" if req.marker else ""
+            source_lines.append(f'{req.name} = {{ index = "{index_name}"{marker} }}')
+        source_lines.append("")
+        content += "\n".join(source_lines) + "\n"
+
+    return content
 
 
 @rule
