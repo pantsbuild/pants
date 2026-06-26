@@ -3,13 +3,15 @@
 
 #![allow(deprecated)] // TODO: Move to REAPI `output_path` instead of `output_files` and `output_directories`.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryInto;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
+use bytes::Bytes;
+use grpc_util::prost::MessageExt;
 use maplit::hashset;
 use tempfile::TempDir;
 use tokio::time::sleep;
@@ -31,6 +33,7 @@ use process_execution::{
     ProcessExecutionEnvironment, ProcessExecutionStrategy, ProcessResultMetadata,
     ProcessResultSource, local::KeepSandboxes, make_execute_request,
 };
+use remote_provider::choose_action_cache_provider;
 
 const CACHE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -133,6 +136,34 @@ impl StoreSetup {
     }
 }
 
+fn remote_store_options(store_address: String) -> RemoteStoreOptions {
+    RemoteStoreOptions {
+        provider: RemoteProvider::Reapi,
+        store_address,
+        instance_name: None,
+        tls_config: tls::Config::default(),
+        headers: BTreeMap::new(),
+        chunk_size_bytes: 10 * 1024 * 1024,
+        timeout: Duration::from_secs(1),
+        retries: 1,
+        concurrency_limit: 256,
+        batch_api_size_limit: 4 * 1024 * 1024,
+        batch_load_enabled: false,
+    }
+}
+
+async fn store_for_remote(cas_address: String) -> (Store, TempDir, task_executor::Executor) {
+    let executor = task_executor::Executor::new();
+    let store_temp_dir = TempDir::new().unwrap();
+    let store_dir = store_temp_dir.path().join("store_dir");
+    let store = Store::local_only(executor.clone(), store_dir)
+        .unwrap()
+        .into_with_remote(remote_store_options(cas_address))
+        .await
+        .unwrap();
+    (store, store_temp_dir, executor)
+}
+
 fn create_local_runner(
     exit_code: i32,
     delay_ms: u64,
@@ -151,6 +182,15 @@ async fn create_cached_runner(
     store_setup: &StoreSetup,
     cache_content_behavior: CacheContentBehavior,
 ) -> Box<dyn CommandRunnerTrait> {
+    create_cached_runner_with_cache_write(local, store_setup, cache_content_behavior, true).await
+}
+
+async fn create_cached_runner_with_cache_write(
+    local: Box<dyn CommandRunnerTrait>,
+    store_setup: &StoreSetup,
+    cache_content_behavior: CacheContentBehavior,
+    cache_write: bool,
+) -> Box<dyn CommandRunnerTrait> {
     Box::new(
         crate::remote_cache::CommandRunner::from_provider_options(
             RemoteCacheRunnerOptions {
@@ -160,7 +200,7 @@ async fn create_cached_runner(
                 executor: store_setup.executor.clone(),
                 store: store_setup.store.clone(),
                 cache_read: true,
-                cache_write: true,
+                cache_write,
                 warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
                 cache_content_behavior,
                 append_only_caches_base_path: None,
@@ -186,20 +226,23 @@ async fn create_cached_runner(
 
 // TODO: Unfortunately, this code cannot be moved to the `testutil::mock` crate, because that
 // introduces a cycle between this crate and that one.
-async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
+async fn create_process_for_store(store: &Store) -> (Process, Digest) {
     let process = Process::new(vec![
         "this process will not execute: see MockLocalCommandRunner".to_string(),
     ]);
     let EntireExecuteRequest {
         action, command, ..
-    } = make_execute_request(&process, None, None, &store_setup.store, None)
+    } = make_execute_request(&process, None, None, store, None)
         .await
         .unwrap();
-    let (_command_digest, action_digest) =
-        ensure_action_stored_locally(&store_setup.store, &command, &action)
-            .await
-            .unwrap();
+    let (_command_digest, action_digest) = ensure_action_stored_locally(store, &command, &action)
+        .await
+        .unwrap();
     (process, action_digest)
+}
+
+async fn create_process(store_setup: &StoreSetup) -> (Process, Digest) {
+    create_process_for_store(&store_setup.store).await
 }
 
 #[tokio::test]
@@ -223,6 +266,439 @@ async fn cache_read_success() {
         .unwrap();
     assert_eq!(remote_result.exit_code, 0);
     assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 0);
+}
+
+// Verifies that a traversal path in ActionResult.output_files[].path (e.g. "../outside.txt")
+// is rejected. The escaping field is the top-level OutputFile.path on the ActionResult proto,
+// handled in process_execution/src/lib.rs via RelativePath::new(). Tests the full runner stack:
+// the cache hit is rejected, the runner falls back to local execution, and no file is written
+// outside the materialization root.
+#[tokio::test]
+async fn cache_read_output_file_paths_must_not_escape_materialization_root() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+    let payload = TestData::new("PANTS_REMOTE_CACHE_HOST_WRITE\n");
+    let store_setup =
+        StoreSetup::new_with_stub_cas(StubCAS::builder().file(&payload).build().await).await;
+    let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
+    let cache_runner = create_cached_runner_with_cache_write(
+        local_runner,
+        &store_setup,
+        CacheContentBehavior::Fetch,
+        false,
+    )
+    .await;
+
+    let (process, action_digest) = create_process(&store_setup).await;
+    store_setup.cas.action_cache.action_map.lock().insert(
+        action_digest.hash,
+        remexec::ActionResult {
+            exit_code: 0,
+            stdout_digest: Some(EMPTY_DIGEST.into()),
+            stderr_digest: Some(EMPTY_DIGEST.into()),
+            output_files: vec![remexec::OutputFile {
+                path: "../outside.txt".to_owned(),
+                digest: Some(payload.digest().into()),
+                is_executable: false,
+                ..remexec::OutputFile::default()
+            }],
+            ..remexec::ActionResult::default()
+        },
+    );
+
+    let remote_result = cache_runner
+        .run(Context::default(), &mut workunit, process)
+        .await
+        .unwrap();
+    assert_eq!(remote_result.exit_code, 1);
+    assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
+
+    let materialize_parent = TempDir::new().unwrap();
+    let materialize_root = materialize_parent.path().join("root");
+    store_setup
+        .store
+        .materialize_directory(
+            materialize_root.clone(),
+            &materialize_root,
+            remote_result.output_directory,
+            false,
+            &Default::default(),
+            fs::Permissions::Writable,
+        )
+        .await
+        .unwrap();
+
+    let escaped_path = materialize_parent.path().join("outside.txt");
+    if escaped_path.exists() {
+        eprintln!(
+            "escaped_path={} escaped_content={}",
+            escaped_path.display(),
+            std::fs::read_to_string(&escaped_path).unwrap()
+        );
+    }
+
+    assert!(
+        !escaped_path.exists(),
+        "remote cache ActionResult output_files path escaped the materialization root"
+    );
+}
+
+// Verifies that a traversal path via a DirectoryNode.name = ".." inside a Tree proto is
+// rejected. The escaping field is a directory entry name inside an OutputDirectory tree blob,
+// handled in fs/src/directory.rs via from_remexec_name(). Tests the full runner stack: the cache
+// hit is rejected, the runner falls back to local execution, and no file is written outside the
+// materialization root.
+#[tokio::test]
+async fn cache_read_output_directory_tree_must_not_escape_materialization_root() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+    let payload = TestData::new("PANTS_REMOTE_TREE_HOST_WRITE\n");
+    let child_directory = remexec::Directory {
+        files: vec![remexec::FileNode {
+            name: "outside.txt".to_owned(),
+            digest: Some(payload.digest().into()),
+            is_executable: false,
+            ..remexec::FileNode::default()
+        }],
+        ..remexec::Directory::default()
+    };
+    let root_directory = remexec::Directory {
+        directories: vec![remexec::DirectoryNode {
+            name: "..".to_owned(),
+            digest: Some(Digest::of_bytes(&child_directory.to_bytes()).into()),
+        }],
+        ..remexec::Directory::default()
+    };
+    let tree = remexec::Tree {
+        root: Some(root_directory),
+        children: vec![child_directory],
+    };
+    let tree_bytes = tree.to_bytes();
+    let tree_digest = Digest::of_bytes(&tree_bytes);
+
+    let store_setup = StoreSetup::new_with_stub_cas(
+        StubCAS::builder()
+            .file(&payload)
+            .unverified_content(tree_digest.hash, Bytes::from(tree_bytes))
+            .build()
+            .await,
+    )
+    .await;
+    let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
+    let cache_runner = create_cached_runner_with_cache_write(
+        local_runner,
+        &store_setup,
+        CacheContentBehavior::Fetch,
+        false,
+    )
+    .await;
+
+    let (process, action_digest) = create_process(&store_setup).await;
+    store_setup.cas.action_cache.action_map.lock().insert(
+        action_digest.hash,
+        remexec::ActionResult {
+            exit_code: 0,
+            stdout_digest: Some(EMPTY_DIGEST.into()),
+            stderr_digest: Some(EMPTY_DIGEST.into()),
+            output_directories: vec![remexec::OutputDirectory {
+                path: ".".to_owned(),
+                tree_digest: Some(tree_digest.into()),
+                is_topologically_sorted: false,
+                ..remexec::OutputDirectory::default()
+            }],
+            ..remexec::ActionResult::default()
+        },
+    );
+
+    let remote_result = cache_runner
+        .run(Context::default(), &mut workunit, process)
+        .await
+        .unwrap();
+    assert_eq!(remote_result.exit_code, 1);
+    assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
+
+    let materialize_parent = TempDir::new().unwrap();
+    let materialize_root = materialize_parent.path().join("root");
+    store_setup
+        .store
+        .materialize_directory(
+            materialize_root.clone(),
+            &materialize_root,
+            remote_result.output_directory,
+            false,
+            &BTreeSet::new(),
+            fs::Permissions::Writable,
+        )
+        .await
+        .unwrap();
+
+    let escaped_path = materialize_parent.path().join("outside.txt");
+    if escaped_path.exists() {
+        eprintln!(
+            "escaped_path={} escaped_content={}",
+            escaped_path.display(),
+            std::fs::read_to_string(&escaped_path).unwrap()
+        );
+    }
+
+    assert!(
+        !escaped_path.exists(),
+        "remote cache OutputDirectory Tree path escaped the materialization root"
+    );
+}
+
+// Verifies that a traversal path via a FileNode.name = "../outside.txt" inside a Tree proto is
+// rejected. The escaping field is a file entry name inside an OutputDirectory tree blob, handled
+// in fs/src/directory.rs via from_remexec_name(). Distinct from the DirectoryNode variant above:
+// here the traversal is in a FileNode name directly, not a directory entry that is then
+// descended into. Tests the full runner stack: the cache hit is rejected, the runner falls back
+// to local execution, and no file is written outside the materialization root.
+#[tokio::test]
+async fn cache_read_output_directory_tree_names_must_not_escape_materialization_root() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+    let payload = TestData::new("PANTS_REMOTE_TREE_HOST_WRITE\n");
+    let malicious_tree = remexec::Tree {
+        root: Some(remexec::Directory {
+            files: vec![remexec::FileNode {
+                name: "../outside.txt".to_owned(),
+                digest: Some(payload.digest().into()),
+                is_executable: false,
+                ..remexec::FileNode::default()
+            }],
+            ..remexec::Directory::default()
+        }),
+        ..remexec::Tree::default()
+    };
+    let tree_bytes = malicious_tree.to_bytes();
+    let tree_digest = Digest::of_bytes(&tree_bytes);
+    let store_setup = StoreSetup::new_with_stub_cas(
+        StubCAS::builder()
+            .file(&payload)
+            .unverified_content(tree_digest.hash, Bytes::from(tree_bytes))
+            .build()
+            .await,
+    )
+    .await;
+    let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
+    let cache_runner = create_cached_runner_with_cache_write(
+        local_runner,
+        &store_setup,
+        CacheContentBehavior::Fetch,
+        false,
+    )
+    .await;
+
+    let (process, action_digest) = create_process(&store_setup).await;
+    store_setup.cas.action_cache.action_map.lock().insert(
+        action_digest.hash,
+        remexec::ActionResult {
+            exit_code: 0,
+            stdout_digest: Some(EMPTY_DIGEST.into()),
+            stderr_digest: Some(EMPTY_DIGEST.into()),
+            output_directories: vec![remexec::OutputDirectory {
+                path: String::new(),
+                tree_digest: Some(tree_digest.into()),
+                is_topologically_sorted: false,
+                ..remexec::OutputDirectory::default()
+            }],
+            ..remexec::ActionResult::default()
+        },
+    );
+
+    let remote_result = cache_runner
+        .run(Context::default(), &mut workunit, process)
+        .await
+        .unwrap();
+    assert_eq!(remote_result.exit_code, 1);
+    assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
+
+    let materialize_parent = TempDir::new().unwrap();
+    let materialize_root = materialize_parent.path().join("root");
+    store_setup
+        .store
+        .materialize_directory(
+            materialize_root.clone(),
+            &materialize_root,
+            remote_result.output_directory,
+            false,
+            &BTreeSet::new(),
+            fs::Permissions::Writable,
+        )
+        .await
+        .unwrap();
+
+    assert!(
+        !materialize_parent.path().join("outside.txt").exists(),
+        "remote cache ActionResult output_directories tree name escaped the materialization root"
+    );
+}
+
+// Verifies the artifact subdirectory escape scenario: a process whose output root is a
+// subdirectory of the workspace (e.g. dist/package-output) cannot have its cached result write
+// a sibling file (e.g. dist/trusted-artifact.txt) via a "../" path in output_files[].path.
+// Single-actor: the cache entry is seeded by directly inserting into the stub action map,
+// representing a malformed entry already present in the cache.
+#[tokio::test]
+async fn cache_read_output_file_paths_must_not_escape_artifact_subdirectory() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+    let payload = TestData::new("PANTS_REMOTE_CACHE_ARTIFACT_MUTATION\n");
+    let store_setup =
+        StoreSetup::new_with_stub_cas(StubCAS::builder().file(&payload).build().await).await;
+    let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
+    let cache_runner =
+        create_cached_runner(local_runner, &store_setup, CacheContentBehavior::Fetch).await;
+
+    let (process, action_digest) = create_process(&store_setup).await;
+    store_setup.cas.action_cache.action_map.lock().insert(
+        action_digest.hash,
+        remexec::ActionResult {
+            exit_code: 0,
+            stdout_digest: Some(EMPTY_DIGEST.into()),
+            stderr_digest: Some(EMPTY_DIGEST.into()),
+            output_files: vec![remexec::OutputFile {
+                path: "../trusted-artifact.txt".to_owned(),
+                digest: Some(payload.digest().into()),
+                is_executable: false,
+                ..remexec::OutputFile::default()
+            }],
+            ..remexec::ActionResult::default()
+        },
+    );
+
+    let remote_result = cache_runner
+        .run(Context::default(), &mut workunit, process)
+        .await
+        .unwrap();
+    assert_eq!(remote_result.exit_code, 1);
+    assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
+
+    let workspace = TempDir::new().unwrap();
+    let artifact_root = workspace.path().join("dist").join("package-output");
+    store_setup
+        .store
+        .materialize_directory(
+            artifact_root.clone(),
+            workspace.path(),
+            remote_result.output_directory,
+            false,
+            &BTreeSet::new(),
+            fs::Permissions::Writable,
+        )
+        .await
+        .unwrap();
+
+    assert!(
+        !workspace
+            .path()
+            .join("dist")
+            .join("trusted-artifact.txt")
+            .exists(),
+        "remote cache hit escaped a package-specific artifact subdirectory"
+    );
+}
+
+// Verifies the same artifact subdirectory escape as above, but via a two-actor model: a separate
+// writer store seeds the malicious ActionResult through the real action cache API
+// (choose_action_cache_provider + update_action_result), then a separate read-only consumer
+// store hits the cache. Both actors compute the same Action digest, establishing that the
+// consumer would legitimately get a cache hit. This models the threat where a lower-trust job
+// with cache-write access poisons a result later consumed by a higher-trust, read-only job.
+#[tokio::test]
+async fn cache_read_rejects_low_trust_writer_seeded_artifact_subdirectory_escape() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+    let shared_cas = StubCAS::builder().build().await;
+    let cas_address = shared_cas.address();
+
+    let (writer_store, _writer_store_temp_dir, _writer_executor) =
+        store_for_remote(cas_address.clone()).await;
+    let (consumer_store, consumer_store_temp_dir, consumer_executor) =
+        store_for_remote(cas_address.clone()).await;
+    let store_setup = StoreSetup {
+        store: consumer_store,
+        _store_temp_dir: consumer_store_temp_dir,
+        cas: shared_cas,
+        executor: consumer_executor,
+    };
+
+    let payload = TestData::new("LOW_TRUST_CACHE_WRITER_SEEDED_ARTIFACT_MUTATION\n");
+    let payload_digest = writer_store
+        .store_file_bytes(payload.bytes(), false)
+        .await
+        .unwrap();
+    assert_eq!(payload_digest, payload.digest());
+    writer_store
+        .ensure_remote_has_recursive(vec![payload_digest])
+        .await
+        .unwrap();
+
+    let (_writer_process, writer_action_digest) = create_process_for_store(&writer_store).await;
+    let (consumer_process, consumer_action_digest) = create_process(&store_setup).await;
+    assert_eq!(
+        writer_action_digest, consumer_action_digest,
+        "writer and consumer did not compute the same Action digest"
+    );
+
+    let action_cache = choose_action_cache_provider(remote_store_options(cas_address))
+        .await
+        .unwrap();
+    action_cache
+        .update_action_result(
+            writer_action_digest,
+            remexec::ActionResult {
+                exit_code: 0,
+                stdout_digest: Some(EMPTY_DIGEST.into()),
+                stderr_digest: Some(EMPTY_DIGEST.into()),
+                output_files: vec![remexec::OutputFile {
+                    path: "../trusted-artifact.txt".to_owned(),
+                    digest: Some(payload_digest.into()),
+                    is_executable: false,
+                    ..remexec::OutputFile::default()
+                }],
+                ..remexec::ActionResult::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    let (local_runner, local_runner_call_counter) = create_local_runner(1, 1000);
+    let cache_runner = create_cached_runner_with_cache_write(
+        local_runner,
+        &store_setup,
+        CacheContentBehavior::Fetch,
+        false,
+    )
+    .await;
+    let remote_result = cache_runner
+        .run(Context::default(), &mut workunit, consumer_process)
+        .await
+        .unwrap();
+    assert_eq!(remote_result.exit_code, 1);
+    assert_eq!(local_runner_call_counter.load(Ordering::SeqCst), 1);
+
+    let protected_workspace = TempDir::new().unwrap();
+    let artifact_root = protected_workspace
+        .path()
+        .join("dist")
+        .join("package-output");
+    store_setup
+        .store
+        .materialize_directory(
+            artifact_root,
+            protected_workspace.path(),
+            remote_result.output_directory,
+            false,
+            &BTreeSet::new(),
+            fs::Permissions::Writable,
+        )
+        .await
+        .unwrap();
+
+    assert!(
+        !protected_workspace
+            .path()
+            .join("dist")
+            .join("trusted-artifact.txt")
+            .exists(),
+        "low-trust writer seeded cache result escaped a protected artifact subdirectory"
+    );
 }
 
 /// If the cache has any issues during reads from the action cache, we should gracefully fallback
