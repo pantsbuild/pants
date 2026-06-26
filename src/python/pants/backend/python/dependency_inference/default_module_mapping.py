@@ -112,6 +112,7 @@ DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
     "antlr4-python3-runtime": ("antlr4",),
     "apache-airflow": ("airflow",),
     "apache-airflow-client": ("airflow_client",),
+    "apache-airflow-mypy": ("airflow_mypy",),
     "atlassian-python-api": ("atlassian",),
     "attrs": ("attr", "attrs"),
     "auth0-python": ("auth0",),
