@@ -263,7 +263,7 @@ fn create_digest(py: Python, create_digest: Value) -> PyResult<PyGeneratorRespon
         let items: Vec<CreateDigestItem> = {
             Python::attach(|py| -> Result<_, Failure> {
                 let py_create_digest = create_digest.bind(py);
-                Ok(externs::collect_iterable(py_create_digest)
+                externs::collect_iterable(py_create_digest)
                     .map_err(|e| {
                         throw(format!(
                             "Error while collecting CreateDigestItem instances: {e}"
@@ -299,7 +299,7 @@ fn create_digest(py: Python, create_digest: Value) -> PyResult<PyGeneratorRespon
                             Ok(CreateDigestItem::Dir(path))
                         }
                     })
-                    .collect::<Result<Vec<_>, _>>()?)
+                    .collect::<Result<Vec<_>, _>>()
             })?
         };
 
