@@ -1685,7 +1685,7 @@ pub fn extract_output_files(
         .output_files
         .iter()
         .map(|output_file| {
-            let output_file_path_buf = PathBuf::from(output_file.path.clone());
+            let output_file_path_buf = PathBuf::from(RelativePath::new(&output_file.path)?);
             let digest: Result<Digest, String> = require_digest(output_file.digest.as_ref());
             path_map.insert(output_file_path_buf.clone(), digest?);
             Ok(PathStat::file(
