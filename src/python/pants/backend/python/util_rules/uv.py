@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import shlex
@@ -27,7 +26,6 @@ from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
 )
-from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
@@ -144,7 +142,6 @@ async def create_venv_repository_from_uv_lockfile(
     downloaded_uv: DownloadedUv,
     uv_env: UvEnvironment,
     realpath_binary: RealpathBinary,
-    buildroot: BuildRoot,
 ) -> VenvRepository:
     """Install all packages from a uv lockfile into a virtualenv."""
     if request.lockfile.lockfile_format != LockfileFormat.UV:
@@ -193,11 +190,16 @@ async def create_venv_repository_from_uv_lockfile(
         )
     )
 
-    # We maintain one cached venv per buildroot+interpreter+resolve. uv will efficiently
-    # incrementally update the venv as the lockfile changes, and will handle concurrency of
-    # `uv sync` with appropriate locking.
-    buildroot_entropy = hashlib.sha256(buildroot.path.encode()).hexdigest()
-    venv_path_suffix = os.path.join(buildroot_entropy, metadata.resolve, request.python.fingerprint)
+    # We maintain one cached venv per input content+interpreter+resolve+platform. uv will handle
+    # concurrency of `uv sync` with appropriate locking.
+    # Note that a new venv will be created from scratch when the lockfile changes, but
+    # this is very fast, and may be preferable to thrashing the same venv, especially
+    # across multiple instances of the same repo on the same machine.
+    # Note also that we don't inject the buildroot path, as abspaths to repo roots can change
+    # between runs on ephemeral runners, and defeat caches.
+    venv_path_suffix = os.path.join(
+        input_digest.fingerprint, metadata.resolve, request.python.fingerprint
+    )
 
     uv_cmd = shlex.join(
         (
