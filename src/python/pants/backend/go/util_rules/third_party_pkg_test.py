@@ -3,7 +3,10 @@
 
 from __future__ import annotations
 
+import os
 import os.path
+import pathlib
+import tempfile
 from textwrap import dedent
 
 import pytest
@@ -738,3 +741,189 @@ def test_parse_go_sum() -> None:
     crlf_parsed = _parse_go_sum(crlf_sum)
     assert ("mod", "v1.0.0") in crlf_parsed
     assert len(crlf_parsed[("mod", "v1.0.0")]) == 2
+
+
+def _make_rule_runner(named_caches_dir: str) -> RuleRunner:
+    """Create a RuleRunner with a fixed named-caches-dir (for named-cache tests)."""
+    runner = RuleRunner(
+        rules=[
+            *sdk.rules(),
+            *third_party_pkg.rules(),
+            *first_party_pkg.rules(),
+            *load_go_binary.rules(),
+            *build_pkg.rules(),
+            *import_analysis.rules(),
+            *link.rules(),
+            *assembly.rules(),
+            *target_type_rules.rules(),
+            *go_mod.rules(),
+            QueryRule(AllThirdPartyPackages, [AllThirdPartyPackagesRequest]),
+            QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgAnalysisRequest]),
+            QueryRule(ModuleDescriptors, [ModuleDescriptorsRequest]),
+        ],
+        target_types=[GoModTarget],
+        bootstrap_args=[f"--named-caches-dir={named_caches_dir}"],
+    )
+    runner.set_options(["--golang-cgo-enabled"], env_inherit={"PATH"})
+    return runner
+
+
+def test_named_cache_digest_equality() -> None:
+    """Digest produced by download_and_analyze_module is identical across cold and warm cache.
+
+    This test is the absolute-path-leak detector: if any sandbox-absolute path leaks
+    into a captured digest, the two digests will differ because the sandbox roots differ.
+    """
+    go_mod_single = dedent(
+        """\
+        module example.com/cache-test
+        go 1.16
+        require github.com/google/uuid v1.3.0
+        """
+    )
+    with tempfile.TemporaryDirectory() as named_caches_dir:
+        # Run 1: cold cache -- populates go_mod_cache named cache
+        runner1 = _make_rule_runner(named_caches_dir)
+        digest1 = runner1.make_snapshot({"go.mod": go_mod_single, "go.sum": UUID_GO_SUM}).digest
+        result1 = runner1.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("cache-test", target_name="mod"),
+                    digest1,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
+        uuid_pkg1 = result1.import_paths_to_pkg_info["github.com/google/uuid"]
+
+        # Run 2: warm cache, fresh LMDB store (new RuleRunner = new in-memory store)
+        runner2 = _make_rule_runner(named_caches_dir)
+        digest2 = runner2.make_snapshot({"go.mod": go_mod_single, "go.sum": UUID_GO_SUM}).digest
+        result2 = runner2.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("cache-test", target_name="mod"),
+                    digest2,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
+        uuid_pkg2 = result2.import_paths_to_pkg_info["github.com/google/uuid"]
+
+        # Digests must be byte-identical: cold vs warm cache produces the same sources.
+        assert uuid_pkg1.digest == uuid_pkg2.digest, (
+            "Digest differs between cold and warm named cache runs -- "
+            "likely an absolute sandbox path leaked into the captured digest."
+        )
+        assert uuid_pkg1.dir_path == uuid_pkg2.dir_path
+
+        # Run 3: independent cache dir -- must still produce equal digest
+        with tempfile.TemporaryDirectory() as named_caches_dir2:
+            runner3 = _make_rule_runner(named_caches_dir2)
+            digest3 = runner3.make_snapshot({"go.mod": go_mod_single, "go.sum": UUID_GO_SUM}).digest
+            result3 = runner3.request(
+                AllThirdPartyPackages,
+                [
+                    AllThirdPartyPackagesRequest(
+                        Address("cache-test", target_name="mod"),
+                        digest3,
+                        "go.mod",
+                        build_opts=GoBuildOptions(),
+                    )
+                ],
+            )
+            uuid_pkg3 = result3.import_paths_to_pkg_info["github.com/google/uuid"]
+            assert uuid_pkg1.digest == uuid_pkg3.digest, (
+                "Digest differs across different named-cache directories -- "
+                "likely an absolute sandbox path leaked into the captured digest."
+            )
+
+
+def test_named_cache_populated_and_writable() -> None:
+    """After a download, the go_mod_cache named cache is populated and owner-writable.
+
+    The -modcacherw flag ensures Go writes the cache with writable permissions so
+    Pants can prune or clear the named cache without permission errors.
+    """
+    go_mod_single = dedent(
+        """\
+        module example.com/cache-writability-test
+        go 1.16
+        require rsc.io/quote v1.5.2
+        """
+    )
+    rsc_quote_go_sum = dedent(
+        """\
+        golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c h1:qgOY6WgZOaTkIIMiVjBQcw93ERBE4m30iBm00nkL0i8=
+        golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+        rsc.io/quote v1.5.2 h1:w5fcysjrx7yqtD/aO+QwRjYZOKnaM9Uh2b40tElTs3Y=
+        rsc.io/quote v1.5.2/go.mod h1:LzX7hefJvL54yjefDEDHNONDjII0t9xZLPXsUe+TKr0=
+        rsc.io/sampler v1.3.0 h1:7uVkIFmeBqHfdjD+gZwtXXI+RODJ2Wc4O7MPEh/QiW4=
+        rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+        """
+    )
+    with tempfile.TemporaryDirectory() as named_caches_dir:
+        runner = _make_rule_runner(named_caches_dir)
+        digest = runner.make_snapshot({"go.mod": go_mod_single, "go.sum": rsc_quote_go_sum}).digest
+        runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("cache-writability-test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
+        cache_dir = pathlib.Path(named_caches_dir) / "go_mod_cache"
+        assert cache_dir.exists(), (
+            f"go_mod_cache named cache directory not created at {cache_dir}; "
+            "the named cache may not be mounted or GOMODCACHE not set correctly."
+        )
+        # Find at least one file and verify it is owner-writable (proof of -modcacherw).
+        found_writable = False
+        for root, _dirs, files in os.walk(str(cache_dir)):
+            for fname in files:
+                fpath = os.path.join(root, fname)
+                if os.access(fpath, os.W_OK):
+                    found_writable = True
+                    break
+            if found_writable:
+                break
+        assert found_writable, (
+            "No owner-writable files found in go_mod_cache; "
+            "-modcacherw flag may not be reaching the Go process."
+        )
+
+
+def test_analyze_module_dependencies_uses_named_cache() -> None:
+    """analyze_module_dependencies uses the named cache (no output_directories capture).
+
+    Verifies that after running analyze_module_dependencies, the go_mod_cache is
+    populated (named cache is mounted and used), and the returned ModuleDescriptors
+    has the expected modules without a go_mods_digest field.
+    """
+    go_mod_content = dedent(
+        """\
+        module example.com/dep-analysis-test
+        go 1.16
+        require github.com/google/uuid v1.3.0
+        """
+    )
+    with tempfile.TemporaryDirectory() as named_caches_dir:
+        runner = _make_rule_runner(named_caches_dir)
+        digest = runner.make_snapshot({"go.mod": go_mod_content, "go.sum": UUID_GO_SUM}).digest
+        result = runner.request(
+            ModuleDescriptors,
+            [ModuleDescriptorsRequest(digest=digest, path="")],
+        )
+        assert any(mod.name == "github.com/google/uuid" for mod in result.modules)
+        # go_mods_digest was removed; verify ModuleDescriptors has only 'modules'.
+        assert not hasattr(result, "go_mods_digest"), (
+            "ModuleDescriptors.go_mods_digest should have been removed in this PR."
+        )

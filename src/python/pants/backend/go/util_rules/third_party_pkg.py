@@ -114,11 +114,12 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
 
 @dataclass(frozen=True)
 class AllThirdPartyPackages:
-    """All the packages downloaded from a go.mod, along with a digest of the downloaded files.
+    """All the packages downloaded from a go.mod.
 
-    The digest has files in the format `gopath/pkg/mod`, which is what `GoSdkProcess` sets `GOPATH`
-    to. This means that you can include the digest in a process and Go will properly consume it as
-    the `GOPATH`.
+    Each ``ThirdPartyPkgAnalysis`` carries its own per-package digest with files
+    in ``gopath/pkg/mod/<module@version>/...`` layout (the captured subset from the
+    download sandbox). Consumers merge whichever package digests they need into
+    their own input digest.
     """
 
     digest: Digest
@@ -151,7 +152,6 @@ class ModuleDescriptor:
 @dataclass(frozen=True)
 class ModuleDescriptors:
     modules: FrozenOrderedSet[ModuleDescriptor]
-    go_mods_digest: Digest
 
 
 @dataclass(frozen=True)
@@ -232,17 +232,17 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
             GoSdkProcess(
                 command=["list", "-mod=readonly", "-e", "-m", "-json", "all"],
                 input_digest=request.digest,
-                output_directories=("gopath",),
                 working_dir=request.path if request.path else None,
                 # Allow downloads of the module metadata (i.e., go.mod files).
                 allow_downloads=True,
+                use_module_cache=True,
                 description="Analyze Go module dependencies.",
             )
         )
     )
 
     if len(mod_list_result.stdout) == 0:
-        return ModuleDescriptors(FrozenOrderedSet(), EMPTY_DIGEST)
+        return ModuleDescriptors(FrozenOrderedSet())
 
     descriptors: dict[tuple[str, str], ModuleDescriptor] = {}
 
@@ -276,7 +276,7 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
     # Gazelle does this, mainly to store the sum on the go_repository rule. We could store it (or its
     # absence) to be able to download sums automatically.
 
-    return ModuleDescriptors(FrozenOrderedSet(descriptors.values()), mod_list_result.output_digest)
+    return ModuleDescriptors(FrozenOrderedSet(descriptors.values()))
 
 
 def strip_sandbox_prefix(path: str, marker: str) -> str:
@@ -529,12 +529,20 @@ async def download_and_analyze_module(
         synthetic_files.append(FileContent("go.sum", synthetic_go_sum.encode()))
     synthetic_digest = await create_digest(CreateDigest(synthetic_files))
 
+    # Fetch the module into the named cache and copy to gopath/pkg/mod in one process.
+    # The __PANTS_GO_FETCH_MODULE mode in __run_go.sh handles both steps atomically:
+    # it runs `go mod download -json`, emits the metadata on stdout, then copies the
+    # extracted tree from __gomodcache into gopath/pkg/mod. This avoids any race
+    # between the download (process 1) and copy (process 2) that would violate the
+    # self-healing invariant if the named cache were wiped between steps.
     download_result = await fallible_to_exec_result_or_raise(
         **implicitly(
             GoSdkProcess(
-                ("mod", "download", "-json", f"{request.name}@{request.version}"),
+                (),
+                env={"__PANTS_GO_FETCH_MODULE": f"{request.name}@{request.version}"},
                 input_digest=synthetic_digest,
                 allow_downloads=True,
+                use_module_cache=True,
                 output_directories=("gopath",),
                 description=f"Download Go module {request.name}@{request.version}.",
             )
@@ -543,12 +551,20 @@ async def download_and_analyze_module(
 
     if len(download_result.stdout) == 0:
         raise AssertionError(
-            f"Expected output from `go mod download` for {request.name}@{request.version}."
+            f"Expected metadata output from module fetch for {request.name}@{request.version}."
         )
+    module_metadata_json = json.loads(download_result.stdout)
 
-    module_metadata = json.loads(download_result.stdout)
-    module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
-    go_mod_relpath = strip_sandbox_prefix(module_metadata["GoMod"], "gopath/")
+    # Dir/GoMod point into __gomodcache (absolute sandbox paths). Extract the
+    # portion after __gomodcache/ to get the relative path within the cache tree,
+    # then re-prefix with gopath/pkg/mod/ to match where the copy step placed them.
+    # strip_sandbox_prefix returns path[marker_pos:] (includes the marker), so we
+    # strip the marker length to get just the relative tail.
+    _modcache_marker = "__gomodcache/"
+    _dir_from_marker = strip_sandbox_prefix(module_metadata_json["Dir"], _modcache_marker)
+    _gomod_from_marker = strip_sandbox_prefix(module_metadata_json["GoMod"], _modcache_marker)
+    module_sources_relpath = "gopath/pkg/mod/" + _dir_from_marker[len(_modcache_marker) :]
+    go_mod_relpath = "gopath/pkg/mod/" + _gomod_from_marker[len(_modcache_marker) :]
 
     module_sources_snapshot = await digest_to_snapshot(
         **implicitly(
