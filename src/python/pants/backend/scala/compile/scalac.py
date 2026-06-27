@@ -30,7 +30,7 @@ from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Directory, MergeDigests
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
-from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
+from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
@@ -242,7 +242,8 @@ async def compile_scala_source(
                     output_files=(output_file,),
                     description=f"Capture outputs of {request.component} for scalac",
                     level=LogLevel.TRACE,
-                    cache_scope=ProcessCacheScope.LOCAL_SUCCESSFUL,
+                    cache_scope=jvm.intermediate_jar_cache_scope,
+                    remote_cache_speculation_delay_millis=jvm.intermediate_jars_remote_cache_speculation_delay,
                 )
             )
         )
