@@ -3,10 +3,27 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from pants.engine.fs import FileDigest
 from pants.engine.process import ProcessCacheScope
+from pants.jvm.resolve.coordinate import Coordinate, InvalidCoordinateString
 from pants.option.option_types import BoolOption, DictOption, IntOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
+from pants.util.memo import memoized_property
 from pants.util.strutil import help_text, softwrap
+
+
+@dataclass(frozen=True)
+class NailgunServer:
+    coordinate: Coordinate
+    main_class: str
+    file_digest: FileDigest
+
+    @property
+    def file_name(self) -> str:
+        c = self.coordinate
+        return f"{c.group}_{c.artifact}_{c.version}.jar"
 
 
 class JvmSubsystem(Subsystem):
@@ -176,27 +193,27 @@ class JvmSubsystem(Subsystem):
             return ProcessCacheScope.SUCCESSFUL
         return ProcessCacheScope.LOCAL_SUCCESSFUL
 
-    nailgun_group = StrOption(
-        default="com.martiansoftware",
-        help="The Maven group ID for the Nailgun server.",
+    _nailgun_server = StrOption(
+        default="com.martiansoftware:nailgun-server:0.9.1#com.martiansoftware.nailgun.NGServer",
+        help=softwrap(
+            """
+            The Nailgun server artifact to run, as `group:artifact:version#main.class.Name`.
+
+            The portion before `#` is a standard Maven coordinate; the portion after `#`
+            is the fully-qualified main class used to start the server.
+            """
+        ),
         advanced=True,
     )
 
-    nailgun_artifact = StrOption(
-        default="nailgun-server",
-        help="The Maven artifact ID for the Nailgun server.",
-        advanced=True,
-    )
-
-    nailgun_version = StrOption(
-        default="0.9.1",
-        help="The Maven version for the Nailgun server.",
-        advanced=True,
-    )
-
-    nailgun_main_class = StrOption(
-        default="com.martiansoftware.nailgun.NGServer",
-        help="The main class entry point for the Nailgun server.",
+    nailgun_jar_digest = StrOption(
+        default="4518faa6bf4bd26fccdc4d85e1625dc679381a08d56872d8ad12151dda9cef25:32927",
+        help=softwrap(
+            """
+            The digest of the Nailgun server JAR, as `sha256:length_in_bytes`,
+            used to verify the artifact fetched for `[jvm].nailgun_server`.
+            """
+        ),
         advanced=True,
     )
 
@@ -206,14 +223,46 @@ class JvmSubsystem(Subsystem):
         advanced=True,
     )
 
-    nailgun_sha256 = StrOption(
-        default="4518faa6bf4bd26fccdc4d85e1625dc679381a08d56872d8ad12151dda9cef25",
-        help="The SHA256 fingerprint of the Nailgun server JAR.",
-        advanced=True,
-    )
+    @memoized_property
+    def nailgun_server(self) -> NailgunServer:
+        raw = self._nailgun_server
+        coord_str, sep, main_class = raw.partition("#")
+        main_class = main_class.strip()
+        if not sep or not main_class:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    The `[jvm].nailgun_server` option value {raw!r} is missing the main class.
+                    Expected the form `group:artifact:version#main.class.Name`.
+                    """
+                )
+            )
+        try:
+            coordinate = Coordinate.from_coord_str(coord_str)
+        except InvalidCoordinateString as e:
+            raise ValueError(
+                softwrap(
+                    f"""
+                    The `[jvm].nailgun_server` option value {raw!r} is invalid: {e}.
+                    Expected the form `group:artifact:version#main.class.Name`.
+                    """
+                )
+            ) from e
 
-    nailgun_size = IntOption(
-        default=32927,
-        help="The size in bytes of the Nailgun server JAR.",
-        advanced=True,
-    )
+        digest = self.nailgun_jar_digest
+        fingerprint, dsep, length = digest.partition(":")
+        if not fingerprint or not dsep or not length.isdigit():
+            raise ValueError(
+                softwrap(
+                    f"""
+                    The `[jvm].nailgun_jar_digest` option value {digest!r} is invalid.
+                    Expected the form `sha256:length_in_bytes`.
+                    """
+                )
+            )
+
+        return NailgunServer(
+            coordinate=coordinate,
+            main_class=main_class,
+            file_digest=FileDigest(fingerprint=fingerprint, serialized_bytes_length=int(length)),
+        )

@@ -16,13 +16,13 @@ from typing import ClassVar
 
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.util_rules.system_binaries import BashBinary, LnBinary
-from pants.engine.fs import CreateDigest, Digest, FileContent, FileDigest, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import CoarsenedTarget
 from pants.jvm.compile import ClasspathEntry
-from pants.jvm.resolve.coordinate import Coordinate, Coordinates
+from pants.jvm.resolve.coordinate import Coordinates
 from pants.jvm.resolve.coursier_fetch import CoursierLockfileEntry, coursier_fetch_one_coord
 from pants.jvm.resolve.coursier_setup import Coursier
 from pants.jvm.subsystems import JvmSubsystem
@@ -165,21 +165,13 @@ def parse_jre_major_version(version_lines: str) -> int | None:
 
 @rule
 async def fetch_nailgun(jvm: JvmSubsystem) -> Nailgun:
-    group = jvm.nailgun_group
-    artifact = jvm.nailgun_artifact
-    version = jvm.nailgun_version
-    coord_str = f"{group}:{artifact}:{version}"
-    file_name = f"{group}_{artifact}_{version}.jar"
     nailgun = await coursier_fetch_one_coord(
         CoursierLockfileEntry(
-            coord=Coordinate.from_coord_str(coord_str),
-            file_name=file_name,
+            coord=jvm.nailgun_server.coordinate,
+            file_name=jvm.nailgun_server.file_name,
             direct_dependencies=Coordinates(),
             dependencies=Coordinates(),
-            file_digest=FileDigest(
-                fingerprint=jvm.nailgun_sha256,
-                serialized_bytes_length=jvm.nailgun_size,
-            ),
+            file_digest=jvm.nailgun_server.file_digest,
         )
     )
 
@@ -444,7 +436,7 @@ async def jvm_process(
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
         if jvm.nailgun_enable_agent:
             jvm_options.append(f"-javaagent:{request.jdk.nailgun_jar}")
-        env["PANTS_NAILGUN_MAIN_CLASS"] = jvm.nailgun_main_class
+        env["PANTS_NAILGUN_MAIN_CLASS"] = jvm.nailgun_server.main_class
 
     remote_cache_speculation_delay_millis = 0
     if request.remote_cache_speculation_delay is not None:
