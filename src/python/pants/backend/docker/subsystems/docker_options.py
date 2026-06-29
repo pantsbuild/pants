@@ -207,6 +207,24 @@ class DockerOptions(Subsystem):
         default=False,
         help="Do not use the Docker cache when building images.",
     )
+    _build_extra_options = ShellStrListOption(
+        help=softwrap(
+            f"""
+            Global extra options to pass to the `docker build` / `podman build` command.
+
+            These are appended after all other computed flags. If any option specified here uses a
+            flag that is already covered by a dedicated field (e.g. `--pull`, `--network`,
+            `--platform`), the dedicated field's contribution is suppressed in favour of
+            the value given here, to avoid duplicate or conflicting flags.
+
+            Example:
+
+                [{options_scope}]
+                build_extra_options = ["--pull=always"]
+
+            """
+        ),
+    )
     build_verbose = BoolOption(
         default=False,
         help="Whether to log the Docker output to the console. If false, only the image ID is logged.",
@@ -301,6 +319,10 @@ class DockerOptions(Subsystem):
     @property
     def build_args(self) -> tuple[str, ...]:
         return tuple(sorted(set(self._build_args)))
+
+    @property
+    def build_extra_options(self) -> tuple[str, ...]:
+        return tuple(self._build_extra_options)
 
     @property
     def tools(self) -> tuple[str, ...]:
