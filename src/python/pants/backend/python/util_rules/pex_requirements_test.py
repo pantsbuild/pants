@@ -482,32 +482,23 @@ def _uv_config(
 
 
 def test_uv_config_indexes():
-    ics = InterpreterConstraints([">=3.8"])
+    parsed = _uv_config(indexes=[])
+    assert parsed.get("no-index") is True
+    assert "index" not in parsed
 
-    parsed = tomllib.loads(generate_pyproject_toml("test", ics, [], indexes=[]))
-    assert parsed["tool"]["uv"].get("no-index") is True
-    assert "index" not in parsed["tool"]["uv"]
-
-    parsed = tomllib.loads(
-        generate_pyproject_toml("test", ics, [], indexes=["https://example.com/simple"])
-    )
-    indexes = parsed["tool"]["uv"]["index"]
+    parsed = _uv_config(indexes=["https://example.com/simple"])
+    indexes = parsed["index"]
     assert len(indexes) == 1
     assert indexes[0]["url"] == "https://example.com/simple"
     assert indexes[0]["default"] is True
 
-    parsed = tomllib.loads(
-        generate_pyproject_toml(
-            "test",
-            ics,
-            [],
-            indexes=[
-                "https://primary.example.com/simple",
-                "fallback=https://secondary.example.com/simple",
-            ],
-        )
+    parsed = _uv_config(
+        indexes=[
+            "https://primary.example.com/simple",
+            "fallback=https://secondary.example.com/simple",
+        ],
     )
-    indexes = parsed["tool"]["uv"]["index"]
+    indexes = parsed["index"]
     assert len(indexes) == 2
     assert indexes[0]["url"] == "https://primary.example.com/simple"
     assert "name" not in indexes[0]
@@ -515,6 +506,18 @@ def test_uv_config_indexes():
     assert indexes[1]["url"] == "https://secondary.example.com/simple"
     assert indexes[1].get("name") == "fallback"
     assert indexes[1]["default"] is True
+
+    # Verify TOML ordering: indexes (array-of-tables) coexist correctly with
+    # top-level key-value settings like find-links and no-binary-package.
+    parsed = _uv_config(
+        indexes=["https://example.com/simple"],
+        find_links=["https://example.com/wheels"],
+        no_binary=["somepkg"],
+    )
+    assert parsed["find-links"] == ["https://example.com/wheels"]
+    assert parsed["no-binary-package"] == ["somepkg"]
+    assert len(parsed["index"]) == 1
+    assert parsed["index"][0]["url"] == "https://example.com/simple"
 
 
 def test_uv_config_find_links():
@@ -538,13 +541,27 @@ def test_uv_config_sources():
     assert "sources" not in parsed.get("tool", {}).get("uv", {})
 
     parsed = tomllib.loads(
-        generate_pyproject_toml("test", ics, ["requests"], sources=["myindex=requests>=2.0"])
+        generate_pyproject_toml(
+            "test",
+            ics,
+            ["requests"],
+            indexes=["myindex=https://example.com/simple"],
+            sources=["myindex=requests>=2.0"],
+        )
     )
     assert parsed["tool"]["uv"]["sources"] == {"requests": {"index": "myindex"}}
+    # The referenced index should also be declared in pyproject.toml.
+    assert parsed["tool"]["uv"]["index"] == [
+        {"name": "myindex", "url": "https://example.com/simple"}
+    ]
 
     parsed = tomllib.loads(
         generate_pyproject_toml(
-            "test", ics, ["requests"], sources=['myindex=requests>=2.0; python_version > "3.8"']
+            "test",
+            ics,
+            ["requests"],
+            indexes=["myindex=https://example.com/simple"],
+            sources=['myindex=requests>=2.0; python_version > "3.8"'],
         )
     )
     assert parsed["tool"]["uv"]["sources"]["requests"]["index"] == "myindex"
@@ -555,11 +572,18 @@ def test_uv_config_sources():
             "test",
             ics,
             ["requests", "boto3"],
+            indexes=[
+                "indexa=https://a.example.com/simple",
+                "indexb=https://b.example.com/simple",
+            ],
             sources=["indexa=requests>=2.0", "indexb=boto3>=1.0"],
         )
     )
     assert parsed["tool"]["uv"]["sources"]["requests"] == {"index": "indexa"}
     assert parsed["tool"]["uv"]["sources"]["boto3"] == {"index": "indexb"}
+    # Both referenced indexes should be declared.
+    index_names = {idx["name"] for idx in parsed["tool"]["uv"]["index"]}
+    assert index_names == {"indexa", "indexb"}
 
 
 def test_uv_config_no_binary():
