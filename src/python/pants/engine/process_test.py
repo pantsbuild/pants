@@ -519,6 +519,34 @@ def test_concurrency_templating(rule_runner: RuleRunner) -> None:
     assert result.stderr == b""
 
 
+def test_stdin(rule_runner: RuleRunner) -> None:
+    stdin_content = b"Hello from stdin!\nLine 2\nLine 3\n"
+    process = Process(
+        argv=("/bin/cat",),
+        stdin=stdin_content,
+        description="test stdin piping",
+    )
+    result = rule_runner.request(ProcessResult, [process])
+
+    assert result.stdout == stdin_content
+    assert result.stderr == b""
+
+
+def test_stdin_empty(rule_runner: RuleRunner) -> None:
+    file_content = b"file contents\n"
+    input_digest = rule_runner.request(
+        Digest, [CreateDigest([FileContent("test.txt", file_content)])]
+    )
+    process = Process(
+        argv=("/bin/cat", "-", "test.txt"),
+        description="test empty stdin",
+        input_digest=input_digest,
+    )
+    result = rule_runner.request(ProcessResult, [process])
+
+    assert result.stdout == file_content
+
+
 def test_concurrency_enum():
     exactly_one = ProcessConcurrency.exactly(1)
     min_one = ProcessConcurrency.range(1, min=1)

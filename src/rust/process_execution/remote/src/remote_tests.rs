@@ -94,6 +94,7 @@ async fn make_execute_request() {
             .collect(),
         working_directory: None,
         input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+        stdin: None,
         // Intentionally poorly sorted:
         output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
         output_directories: relative_paths(&["directory/name"]).collect(),
@@ -188,6 +189,7 @@ async fn make_execute_request_with_instance_name() {
             .collect(),
         working_directory: None,
         input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+        stdin: None,
         // Intentionally poorly sorted:
         output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
         output_directories: relative_paths(&["directory/name"]).collect(),
@@ -303,6 +305,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
             .collect(),
         working_directory: None,
         input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+        stdin: None,
         // Intentionally poorly sorted:
         output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
         output_directories: relative_paths(&["directory/name"]).collect(),
@@ -578,6 +581,7 @@ async fn make_execute_request_with_timeout() {
             .collect(),
         working_directory: None,
         input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+        stdin: None,
         // Intentionally poorly sorted:
         output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
         output_directories: relative_paths(&["directory/name"]).collect(),
@@ -678,6 +682,7 @@ async fn make_execute_request_with_append_only_caches() {
             .collect(),
         working_directory: Some(RelativePath::new(Path::new("animals")).unwrap()),
         input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+        stdin: None,
         output_files: BTreeSet::new(),
         output_directories: BTreeSet::new(),
         timeout: one_second(),
@@ -841,6 +846,7 @@ async fn make_execute_request_using_immutable_inputs() {
             .collect(),
         working_directory: None,
         input_digests,
+        stdin: None,
         output_files: relative_paths(&["path/to/file.ext", "other/file.ext"]).collect(),
         output_directories: relative_paths(&["directory/name"]).collect(),
         timeout: None,
@@ -2859,4 +2865,30 @@ fn assert_cancellation_requests(
 
 fn one_second() -> Option<Duration> {
     Some(Duration::from_millis(1000))
+}
+
+#[tokio::test]
+async fn stdin_with_remote_execution_fails() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+
+    let cas = mock::StubCAS::builder().build().await;
+    let (command_runner, _store) = create_command_runner(cas.address(), &cas).await;
+
+    let mut process = Process::new(owned_string_vec(&["/bin/cat"]));
+    process.stdin = Some(b"test input".to_vec());
+    process.description = "test stdin rejection".to_string();
+    process.execution_environment = make_environment(Platform::Linux_x86_64);
+
+    let result = command_runner
+        .run(Context::default(), &mut workunit, process)
+        .await;
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("cannot use stdin with remote execution"),
+        "Expected error about stdin with remote execution, got: {}",
+        err
+    );
 }
