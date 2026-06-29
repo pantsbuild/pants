@@ -31,7 +31,7 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestSubset,
-    FileContent,
+    FileEntry,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
@@ -44,6 +44,7 @@ from pants.engine.intrinsics import (
     digest_subset_to_digest,
     execute_process,
     get_digest_contents,
+    get_digest_entries,
     merge_digests,
     remove_prefix,
 )
@@ -299,17 +300,18 @@ async def _rename_single_file_in_classpath_entry(
     after Coursier's JSON-report coord — `{group}_{artifact}_jar_sources_{version}.jar`)
     to the `-sources.jar` suffix IntelliJ-Scala BSP recognises.
     """
-    contents = await get_digest_contents(entry.digest)
-    if len(contents) != 1:
+    entries = await get_digest_entries(entry.digest)
+    file_entries = [e for e in entries if isinstance(e, FileEntry)]
+    if len(file_entries) != 1:
         raise AssertionError(
-            f"Expected exactly one file in source-jar ClasspathEntry, got {len(contents)}: "
-            f"{[fc.path for fc in contents]}"
+            f"Expected exactly one file in source-jar ClasspathEntry, got {len(file_entries)}: "
+            f"{[e.path for e in file_entries]}"
         )
-    (file_content,) = contents
-    if file_content.path == new_basename:
+    (file_entry,) = file_entries
+    if file_entry.path == new_basename:
         return entry
     renamed_digest = await create_digest(
-        CreateDigest([FileContent(new_basename, file_content.content)])
+        CreateDigest([FileEntry(new_basename, file_entry.file_digest, file_entry.is_executable)])
     )
     return ClasspathEntry(digest=renamed_digest, filenames=(new_basename,))
 
