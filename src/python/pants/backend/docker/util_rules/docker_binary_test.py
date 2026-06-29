@@ -1,15 +1,23 @@
 # Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from collections import namedtuple
 from hashlib import sha256
+from typing import cast
 from unittest import mock
 
 import pytest
 
 from pants.backend.docker.subsystems.docker_options import DockerOptions
-from pants.backend.docker.util_rules.docker_binary import DockerBinary, get_docker, rules
+from pants.backend.docker.util_rules.binaries import (
+    BuildctlBinary,
+    DockerBinary,
+    PodmanBinary,
+    get_buildctl,
+    get_docker,
+    get_podman,
+)
 from pants.backend.docker.util_rules.docker_build_args import DockerBuildArgs
-from pants.backend.experimental.docker.podman.register import rules as podman_rules
 from pants.core.util_rules.system_binaries import (
     BinaryNotFoundError,
     BinaryPath,
@@ -18,35 +26,45 @@ from pants.core.util_rules.system_binaries import (
     BinaryShims,
     BinaryShimsRequest,
 )
-from pants.engine.fs import EMPTY_DIGEST, Digest, DigestEntries
+from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.process import Process, ProcessCacheScope
-from pants.engine.rules import QueryRule
 from pants.testutil.option_util import create_subsystem
-from pants.testutil.rule_runner import RuleRunner, run_rule_with_mocks
+from pants.testutil.rule_runner import run_rule_with_mocks
+
+BinaryInfo = namedtuple("BinaryInfo", ["cls", "path", "name"])
+
+
+@pytest.fixture(
+    params=[
+        BinaryInfo(DockerBinary, "/bin/docker", "docker"),
+        BinaryInfo(PodmanBinary, "/bin/podman", "podman"),
+    ]
+)
+def binary_info(request) -> BinaryInfo:
+    return cast(BinaryInfo, request.param)
 
 
 @pytest.fixture
-def docker_path() -> str:
-    return "/bin/docker"
+def binary_path(binary_info: BinaryInfo) -> str:
+    return cast(str, binary_info.path)
 
 
 @pytest.fixture
-def docker(docker_path: str) -> DockerBinary:
-    return DockerBinary(docker_path)
+def binary(binary_info: BinaryInfo) -> DockerBinary | PodmanBinary:
+    return cast(DockerBinary | PodmanBinary, binary_info.cls(binary_info.path))
 
 
 @pytest.fixture
-def rule_runner() -> RuleRunner:
-    return RuleRunner(
-        rules=[
-            *rules(),
-            *podman_rules(),
-            QueryRule(DigestEntries, (Digest,)),
-        ]
-    )
+def buildctl_path() -> str:
+    return "/bin/buildctl"
 
 
-def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> None:
+@pytest.fixture
+def buildctl(buildctl_path: str) -> BuildctlBinary:
+    return BuildctlBinary(buildctl_path)
+
+
+def test_binary_build_image(binary_path: str, binary: DockerBinary | PodmanBinary) -> None:
     dockerfile = "src/test/repo/Dockerfile"
     digest = Digest(sha256().hexdigest(), 123)
     tags = (
@@ -54,23 +72,27 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
         "test:latest",
     )
     env = {"DOCKER_HOST": "tcp://127.0.0.1:1234"}
-    build_request = docker.build_image(
+    build_request = binary.build_image(
         tags=tags,
         digest=digest,
         dockerfile=dockerfile,
         build_args=DockerBuildArgs.from_strings("arg1=2"),
         context_root="build/context",
         env=env,
-        use_buildx=False,
         extra_args=("--pull", "--squash"),
+        output={"type": "docker"},
+        output_files=("dist/app",),
+        output_directories=("reports",),
     )
 
     assert build_request == Process(
         argv=(
-            docker_path,
+            binary_path,
             "build",
             "--pull",
             "--squash",
+            "--output",
+            "type=docker",
             "--tag",
             tags[0],
             "--tag",
@@ -83,63 +105,230 @@ def test_docker_binary_build_image(docker_path: str, docker: DockerBinary) -> No
         ),
         env=env,
         input_digest=digest,
+        output_files=("dist/app",),
+        output_directories=("reports",),
         cache_scope=ProcessCacheScope.PER_SESSION,
         description="",  # The description field is marked `compare=False`
     )
     assert build_request.description == "Building docker image test:0.1.0 +1 additional tag."
 
 
-def test_docker_binary_push_image(docker_path: str, docker: DockerBinary) -> None:
+def test_binary_push_image(binary_path: str, binary: DockerBinary | PodmanBinary) -> None:
     image_ref = "registry/repo/name:tag"
-    push_request = docker.push_image(image_ref)
+    push_request = binary.push_image(image_ref)
     assert push_request == Process(
-        argv=(docker_path, "push", image_ref),
+        argv=(binary_path, "push", image_ref),
         cache_scope=ProcessCacheScope.PER_SESSION,
         description="",  # The description field is marked `compare=False`
     )
     assert push_request.description == f"Pushing docker image {image_ref}"
 
 
-def test_docker_binary_run_image(docker_path: str, docker: DockerBinary) -> None:
+def test_binary_run_image(binary_path: str, binary: DockerBinary | PodmanBinary) -> None:
     image_ref = "registry/repo/name:tag"
     port_spec = "127.0.0.1:80:8080/tcp"
-    run_request = docker.run_image(
+    run_request = binary.run_image(
         image_ref, docker_run_args=("-p", port_spec), image_args=("test-input",)
     )
     assert run_request == Process(
-        argv=(docker_path, "run", "-p", port_spec, image_ref, "test-input"),
+        argv=(binary_path, "run", "-p", port_spec, image_ref, "test-input"),
         cache_scope=ProcessCacheScope.PER_SESSION,
         description="",  # The description field is marked `compare=False`
     )
     assert run_request.description == f"Running docker image {image_ref}"
 
 
-@pytest.mark.parametrize("podman_enabled", [True, False])
-@pytest.mark.parametrize("podman_found", [True, False])
-def test_get_docker(rule_runner: RuleRunner, podman_enabled: bool, podman_found: bool) -> None:
+def test_buildctl_binary_build_image(buildctl_path: str, buildctl: BuildctlBinary) -> None:
+    dockerfile = "src/test/repo/Dockerfile"
+    digest = Digest(sha256().hexdigest(), 123)
+    tags = (
+        "test:0.1.0",
+        "test:latest",
+    )
+    env = {"BUILDKIT_HOST": "tcp://127.0.0.1:1234"}
+    build_request = buildctl.build_image(
+        tags=tags,
+        digest=digest,
+        dockerfile=dockerfile,
+        build_args=DockerBuildArgs.from_strings("arg1=2"),
+        context_root="build/context",
+        env=env,
+        extra_args=("--progress=plain",),
+        output=None,
+    )
+
+    assert build_request == Process(
+        argv=(
+            buildctl_path,
+            "build",
+            "--frontend",
+            "dockerfile.v0",
+            "--local",
+            "context=build/context",
+            "--local",
+            "dockerfile=src/test/repo",
+            "--opt",
+            "filename=Dockerfile",
+            "--progress=plain",
+            "--opt",
+            "build-arg:arg1=2",
+            "--output",
+            "type=image,name=test:0.1.0",
+            "--output",
+            "type=image,name=test:latest",
+        ),
+        env=env,
+        input_digest=digest,
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description="",  # The description field is marked `compare=False`
+    )
+    assert build_request.description == "Building docker image test:0.1.0 +1 additional tag."
+
+
+def test_buildctl_binary_build_image_publish(buildctl_path: str, buildctl: BuildctlBinary) -> None:
+    dockerfile = "src/test/repo/Dockerfile"
+    digest = Digest(sha256().hexdigest(), 123)
+    tags = (
+        "test:0.1.0",
+        "test:latest",
+    )
+    build_request = buildctl.build_image(
+        tags=tags,
+        digest=digest,
+        dockerfile=dockerfile,
+        build_args=DockerBuildArgs(()),
+        context_root="build/context",
+        env={},
+        output=None,
+        is_publish=True,
+    )
+
+    assert build_request == Process(
+        argv=(
+            buildctl_path,
+            "build",
+            "--frontend",
+            "dockerfile.v0",
+            "--local",
+            "context=build/context",
+            "--local",
+            "dockerfile=src/test/repo",
+            "--opt",
+            "filename=Dockerfile",
+            "--output",
+            "type=image,name=test:0.1.0,push=true",
+            "--output",
+            "type=image,name=test:latest,push=true",
+        ),
+        input_digest=digest,
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description="",
+    )
+
+
+def test_buildctl_binary_build_image_custom_output(
+    buildctl_path: str, buildctl: BuildctlBinary
+) -> None:
+    dockerfile = "src/test/repo/Dockerfile"
+    digest = Digest(sha256().hexdigest(), 123)
+    tags = ("test:0.1.0",)
+    build_request = buildctl.build_image(
+        tags=tags,
+        digest=digest,
+        dockerfile=dockerfile,
+        build_args=DockerBuildArgs(()),
+        context_root=".",
+        env={},
+        output={"type": "image", "name": "custom:tag", "push": "true"},
+    )
+
+    assert build_request == Process(
+        argv=(
+            buildctl_path,
+            "build",
+            "--frontend",
+            "dockerfile.v0",
+            "--local",
+            "context=.",
+            "--local",
+            "dockerfile=src/test/repo",
+            "--opt",
+            "filename=Dockerfile",
+            "--output",
+            "type=image,name=custom:tag,push=true",
+        ),
+        input_digest=digest,
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description="",
+    )
+
+
+def test_buildctl_binary_build_image_local_output(
+    buildctl_path: str, buildctl: BuildctlBinary
+) -> None:
+    dockerfile = "src/test/repo/Dockerfile"
+    digest = Digest(sha256().hexdigest(), 123)
+    build_request = buildctl.build_image(
+        tags=("test:0.1.0",),
+        digest=digest,
+        dockerfile=dockerfile,
+        build_args=DockerBuildArgs(()),
+        context_root=".",
+        env={},
+        output={"type": "local", "dest": "."},
+        output_files=("bin/app",),
+        output_directories=("share",),
+    )
+
+    assert build_request == Process(
+        argv=(
+            buildctl_path,
+            "build",
+            "--frontend",
+            "dockerfile.v0",
+            "--local",
+            "context=.",
+            "--local",
+            "dockerfile=src/test/repo",
+            "--opt",
+            "filename=Dockerfile",
+            "--output",
+            "type=local,dest=.",
+        ),
+        input_digest=digest,
+        output_files=("bin/app",),
+        output_directories=("share",),
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        description="",
+    )
+
+
+@pytest.mark.parametrize(
+    ["binary_name", "rule_func", "binary_cls"],
+    [
+        ("docker", get_docker, DockerBinary),
+        ("podman", get_podman, PodmanBinary),
+        ("buildctl", get_buildctl, BuildctlBinary),
+    ],
+)
+def test_get_binary(binary_name, rule_func, binary_cls) -> None:
     docker_options = create_subsystem(
         DockerOptions,
-        experimental_enable_podman=podman_enabled,
         tools=[],
         optional_tools=[],
     )
     docker_options_env_aware = mock.MagicMock(spec=DockerOptions.EnvironmentAware)
 
     def mock_find_binary(request: BinaryPathRequest) -> BinaryPaths:
-        if request.binary_name == "podman" and podman_found:
-            return BinaryPaths("podman", paths=[BinaryPath("/bin/podman")])
+        if request.binary_name == binary_name:
+            return BinaryPaths(binary_name, [BinaryPath(f"/bin/{binary_name}")])
+        return BinaryPaths(request.binary_name, ())
 
-        elif request.binary_name == "docker":
-            return BinaryPaths("docker", [BinaryPath("/bin/docker")])
-
-        else:
-            return BinaryPaths(request.binary_name, ())
-
-    def mock_create_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
+    def mock_create_binary_shims(_request: BinaryShimsRequest) -> BinaryShims:
         return BinaryShims(EMPTY_DIGEST, "cache_name")
 
     result = run_rule_with_mocks(
-        get_docker,
+        rule_func,
         rule_args=[docker_options, docker_options_env_aware],
         mock_calls={
             "pants.core.util_rules.system_binaries.find_binary": mock_find_binary,
@@ -147,30 +336,33 @@ def test_get_docker(rule_runner: RuleRunner, podman_enabled: bool, podman_found:
         },
     )
 
-    if podman_enabled and podman_found:
-        assert result.path == "/bin/podman"
-        assert result.is_podman
-    else:
-        assert result.path == "/bin/docker"
-        assert not result.is_podman
+    assert isinstance(result, binary_cls)
+    assert result.path == f"/bin/{binary_name}"
 
 
-def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize(
+    ["binary_name", "rule_func"],
+    [
+        ("docker", get_docker),
+        ("podman", get_podman),
+        ("buildctl", get_buildctl),
+    ],
+)
+def test_get_binary_with_tools(binary_name, rule_func) -> None:
     def mock_find_binary(request: BinaryPathRequest) -> BinaryPaths:
-        if request.binary_name == "docker":
-            return BinaryPaths("docker", paths=[BinaryPath("/bin/docker")])
+        if request.binary_name == binary_name:
+            return BinaryPaths(binary_name, paths=[BinaryPath(f"/bin/{binary_name}")])
         elif request.binary_name == "real-tool":
             return BinaryPaths("real-tool", paths=[BinaryPath("/bin/a-real-tool")])
         else:
             return BinaryPaths(request.binary_name, ())
 
-    def mock_create_binary_shims(request: BinaryShimsRequest) -> BinaryShims:
+    def mock_create_binary_shims(_request: BinaryShimsRequest) -> BinaryShims:
         return BinaryShims(EMPTY_DIGEST, "cache_name")
 
     def run(tools: list[str], optional_tools: list[str]) -> None:
         docker_options = create_subsystem(
             DockerOptions,
-            experimental_enable_podman=False,
             tools=tools,
             optional_tools=optional_tools,
         )
@@ -180,7 +372,7 @@ def test_get_docker_with_tools(rule_runner: RuleRunner) -> None:
         nonlocal mock_create_binary_shims
 
         run_rule_with_mocks(
-            get_docker,
+            rule_func,
             rule_args=[docker_options, docker_options_env_aware],
             mock_calls={
                 "pants.core.util_rules.system_binaries.find_binary": mock_find_binary,
