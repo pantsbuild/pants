@@ -209,7 +209,10 @@ async fn make_execute_request_deduplicates_and_sorts_output_paths() {
         .await
         .unwrap();
 
-    assert_eq!(request.command.output_paths, vec!["a", "b", "c", "dir", "shared"]);
+    assert_eq!(
+        request.command.output_paths,
+        vec!["a", "b", "c", "dir", "shared"]
+    );
     assert!(request.command.output_files.is_empty());
     assert!(request.command.output_directories.is_empty());
 }

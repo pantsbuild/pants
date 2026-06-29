@@ -56,7 +56,10 @@ impl CommandRunnerTrait for NoopCommandRunner {
     }
 }
 
-async fn make_action_result_runner(store: &Store, executor: task_executor::Executor) -> crate::remote_cache::CommandRunner {
+async fn make_action_result_runner(
+    store: &Store,
+    executor: task_executor::Executor,
+) -> crate::remote_cache::CommandRunner {
     let cas = StubCAS::builder().build().await;
     crate::remote_cache::CommandRunner::from_provider_options(
         RemoteCacheRunnerOptions {
@@ -1409,7 +1412,10 @@ async fn make_action_result_uses_output_paths_for_files_and_directories() {
 
     assert_eq!(action_result.output_files.len(), 1);
     assert_eq!(action_result.output_files[0].path, "pets/cats/roland.ext");
-    assert_eq!(action_result.output_files[0].digest, Some(TestData::roland().digest().into()));
+    assert_eq!(
+        action_result.output_files[0].digest,
+        Some(TestData::roland().digest().into())
+    );
     assert_eq!(action_result.output_directories.len(), 1);
     assert_eq!(action_result.output_directories[0].path, "pets/cats");
     assert_eq!(

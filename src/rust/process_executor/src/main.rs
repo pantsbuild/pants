@@ -518,7 +518,7 @@ async fn extract_request_from_action_digest(
                 // Filter out environment variables which will be (re-)set by ExecutionRequest
                 // construction.
                 env.name != process_execution::CACHE_KEY_TARGET_PLATFORM_ENV_VAR_NAME
-        })
+            })
             .map(|env| (env.name.clone(), env.value.clone()))
             .collect(),
         working_directory,
@@ -632,8 +632,8 @@ mod tests {
     use clap::Parser;
     use fs::EMPTY_DIRECTORY_DIGEST;
     use remote::remote::store_proto_locally;
-    use std::sync::atomic::{AtomicU64, Ordering};
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -783,9 +783,12 @@ mod tests {
         assert!(process.output_files.is_empty());
         assert_eq!(
             process.output_directories,
-            [RelativePath::new("dir").unwrap(), RelativePath::new("file.txt").unwrap()]
-                .into_iter()
-                .collect()
+            [
+                RelativePath::new("dir").unwrap(),
+                RelativePath::new("file.txt").unwrap()
+            ]
+            .into_iter()
+            .collect()
         );
     }
 
@@ -853,7 +856,9 @@ mod tests {
 
         assert_eq!(
             process.output_files,
-            [RelativePath::new("file.txt").unwrap()].into_iter().collect()
+            [RelativePath::new("file.txt").unwrap()]
+                .into_iter()
+                .collect()
         );
         assert_eq!(
             process.output_directories,
