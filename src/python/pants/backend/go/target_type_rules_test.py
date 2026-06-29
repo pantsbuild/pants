@@ -161,6 +161,147 @@ def test_go_package_dependency_inference(rule_runner: RuleRunner) -> None:
     assert not get_deps(Address("foo/bad"))
 
 
+def test_cross_module_local_replace_dependency_inference(rule_runner: RuleRunner) -> None:
+    # A package in one module that imports a package from a sibling first-party module, wired via a
+    # local-directory `replace` directive, should have that dependency inferred (#22097).
+    rule_runner.write_files(
+        {
+            "app/BUILD": "go_mod()",
+            "app/go.mod": dedent(
+                """\
+                module go.example.com/app
+                go 1.17
+
+                require go.example.com/lib v0.0.0
+
+                replace go.example.com/lib => ../lib
+                """
+            ),
+            "app/go.sum": "",
+            "app/pkg/app.go": dedent(
+                """\
+                package pkg
+
+                import "go.example.com/lib/greet"
+
+                var _ = greet.Hello
+                """
+            ),
+            "app/pkg/BUILD": "go_package()",
+            "lib/BUILD": "go_mod()",
+            "lib/go.mod": dedent(
+                """\
+                module go.example.com/lib
+                go 1.17
+                """
+            ),
+            "lib/greet/greet.go": dedent(
+                """\
+                package greet
+
+                const Hello = "hello"
+                """
+            ),
+            "lib/greet/BUILD": "go_package()",
+        }
+    )
+
+    def get_deps(addr: Address) -> set[Address]:
+        tgt = rule_runner.get_target(addr)
+        return set(
+            rule_runner.request(
+                Addresses,
+                [DependenciesRequest(tgt[Dependencies])],
+            )
+        )
+
+    assert get_deps(Address("app/pkg")) == {Address("lib/greet")}
+
+
+def test_cross_module_local_replace_does_not_shadow_third_party(rule_runner: RuleRunner) -> None:
+    # A locally-replaced module's OWN third-party dependencies must not be folded into the
+    # referencing module's import map. If they were, a third-party import shared by both modules
+    # would map to two addresses (one generated per `go_mod`), become ambiguous, and have its
+    # inferred dependency silently dropped (#22097 regression guard).
+    go_sum = dedent(
+        """\
+        golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c h1:qgOY6WgZOaTkIIMiVjBQcw93ERBE4m30iBm00nkL0i8=
+        golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+        rsc.io/quote v1.5.2 h1:w5fcysjrx7yqtD/aO+QwRjYZOKnaM9Uh2b40tElTs3Y=
+        rsc.io/quote v1.5.2/go.mod h1:LzX7hefJvL54yjefDEDHNONDjII0t9xZLPXsUe+TKr0=
+        rsc.io/sampler v1.3.0 h1:7uVkIFmeBqHfdjD+gZwtXXI+RODJ2Wc4O7MPEh/QiW4=
+        rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+        """
+    )
+    rule_runner.write_files(
+        {
+            "app/BUILD": "go_mod()",
+            "app/go.mod": dedent(
+                """\
+                module go.example.com/app
+                go 1.17
+
+                require (
+                    go.example.com/lib v0.0.0
+                    rsc.io/quote v1.5.2
+                )
+
+                replace go.example.com/lib => ../lib
+                """
+            ),
+            "app/go.sum": go_sum,
+            "app/pkg/app.go": dedent(
+                """\
+                package pkg
+
+                import (
+                    "go.example.com/lib/greet"
+                    "rsc.io/quote"
+                )
+
+                var _ = greet.Hello
+                var _ = quote.Hello
+                """
+            ),
+            "app/pkg/BUILD": "go_package()",
+            "lib/BUILD": "go_mod()",
+            "lib/go.mod": dedent(
+                """\
+                module go.example.com/lib
+                go 1.17
+
+                require rsc.io/quote v1.5.2
+                """
+            ),
+            "lib/go.sum": go_sum,
+            "lib/greet/greet.go": dedent(
+                """\
+                package greet
+
+                import "rsc.io/quote"
+
+                var Hello = quote.Hello
+                """
+            ),
+            "lib/greet/BUILD": "go_package()",
+        }
+    )
+
+    def get_deps(addr: Address) -> set[Address]:
+        tgt = rule_runner.get_target(addr)
+        return set(
+            rule_runner.request(
+                Addresses,
+                [DependenciesRequest(tgt[Dependencies])],
+            )
+        )
+
+    deps = get_deps(Address("app/pkg"))
+    # The first-party cross-module import resolves, AND the shared third-party import resolves to
+    # `app`'s own generated target -- unambiguously, not dropped.
+    assert deps == {Address("lib/greet"), Address("app", generated_name="rsc.io/quote")}
+
+
 # -----------------------------------------------------------------------------------------------
 # `go_package` validation
 # -----------------------------------------------------------------------------------------------
