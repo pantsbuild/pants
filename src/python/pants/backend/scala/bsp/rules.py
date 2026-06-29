@@ -413,9 +413,7 @@ async def bsp_scala_test_classes_request(request: ScalaTestClassesParams) -> Sca
 # -----------------------------------------------------------------------------------------------
 # The bodies live in `pants.jvm.bsp.dependencies` so that any JVM language
 # backend (Java, Scala, ...) can register a `BSPDependencyModulesRequest` /
-# `BSPDependencySourcesRequest` union member that delegates here. The Scala-
-# specific request types below just bind `field_set_type` to the Scala field
-# set; the @rule body is a one-liner.
+# `BSPDependencySourcesRequest` union member that delegates here.=
 
 
 @dataclass(frozen=True)

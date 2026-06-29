@@ -159,8 +159,6 @@ async def bsp_java_resources_request(
 # -----------------------------------------------------------------------------------------------
 # Dependency Modules / Sources
 # -----------------------------------------------------------------------------------------------
-# Bodies live in `pants.jvm.bsp.dependencies` — the request types below just
-# bind the Java field set, and the @rule bodies are one-line delegations.
 
 
 @dataclass(frozen=True)

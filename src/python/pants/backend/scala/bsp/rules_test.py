@@ -1,10 +1,6 @@
 # Copyright 2026 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# Tests for `get_entry_for_coord` moved with the function to
-# `src/python/pants/jvm/bsp/dependencies_test.py` when the JVM-generic BSP
-# dependency rules were lifted out of the Scala backend.
-
 from pants.backend.scala.bsp import rules as scala_bsp_rules
 
 
