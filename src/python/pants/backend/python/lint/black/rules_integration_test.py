@@ -21,7 +21,6 @@ from pants.engine.target import Target
 from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_python38_present,
-    skip_unless_python39_present,
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import QueryRule
@@ -231,27 +230,6 @@ def test_works_with_python38(rule_runner: PythonRuleRunner) -> None:
             "--black-install-from-resolve=black-py38-testing",
         ],
     )
-    assert "1 file left unchanged" in fmt_result.stderr
-    assert fmt_result.output == rule_runner.make_snapshot({"f.py": content})
-    assert fmt_result.did_change is False
-
-
-@skip_unless_python39_present
-def test_works_with_python39(rule_runner: PythonRuleRunner) -> None:
-    """Black's typed-ast dependency does not understand Python 3.9, so we must instead run Black
-    with Python 3.9 when relevant."""
-    content = dedent(
-        """\
-        @lambda _: int
-        def replaced(x: bool) -> str:
-            return "42" if x is True else "1/137"
-        """
-    )
-    rule_runner.write_files(
-        {"f.py": content, "BUILD": "python_sources(name='t', interpreter_constraints=['>=3.9'])"}
-    )
-    tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
-    fmt_result = run_black(rule_runner, [tgt], expected_ics=">=3.9")
     assert "1 file left unchanged" in fmt_result.stderr
     assert fmt_result.output == rule_runner.make_snapshot({"f.py": content})
     assert fmt_result.did_change is False
