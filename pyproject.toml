@@ -60,17 +60,83 @@ line-length = 100
 target-version = "py314"
 
 [tool.ruff.lint]
-# I: isort (import sorting)
-# UP: pyupgrade (update Python code to `target-version`)
-select = ["I", "UP"]
-# UP006/UP035: replaces DefaultDict with collections.defaultdict - lots of churn (which SJ wants to batch after 3.14)
-# UP007: Many buried, non-auto-fixable unions
-# UP018: Replaces `int(42)` in tests, breaking call-by-type and implicitly
-# UP031: Two string replacements that are not auto-fixable
-# UP036: Outdated version check (in rule_visitor for Python 3.8)
-# UP040/UP046/UP047:  Cost-benefit unclear, see https://github.com/python/cpython/issues/114159
-ignore = ["UP006", "UP007", "UP018", "UP031", "UP035", "UP036", "UP040", "UP046", "UP047"]
+select = [
+  "C4",  # https://docs.astral.sh/ruff/rules/#flake8-comprehensions-c4
+  "E",   # https://docs.astral.sh/ruff/rules/#error-e
+  "F",   # https://docs.astral.sh/ruff/rules/#pyflakes-f
+  "I",   # https://docs.astral.sh/ruff/rules/#isort-i
+  "ISC", # https://docs.astral.sh/ruff/rules/#flake8-implicit-str-concat-isc
+  "RUF", # https://docs.astral.sh/ruff/rules/#ruff-specific-rules-ruf
+  "UP",  # https://docs.astral.sh/ruff/rules/#pyupgrade-up (update Python code to `target-version`)
+  "W",   # https://docs.astral.sh/ruff/rules/#warning-w
+  "YTT", # https://docs.astral.sh/ruff/rules/#flake8-2020-ytt
+]
 external = ["PNT20"]
+ignore = [
+  # unnecessary-collection-call: Unnecessary {kind}() call (rewrite as a literal). Note: Taken from existing Flake8 ignore.
+  "C408",
+  # unnecessary-dict-comprehension-for-iterable: Unnecessary dict comprehension for iterable; use dict.fromkeys instead. TODO: Revisit these errors.
+  "C420",
+  # line-too-long: Line too long ({width} > {limit}). Note: Handled by `ruff`.
+  "E501",
+  # type-comparison: Use is and is not for type comparisons, or isinstance() for isinstance checks. TODO: Revisit these errors.
+  "E721",
+  # lambda-assignment: Do not assign a lambda expression, use a def. TODO: Single instance, revisit.
+  "E731",
+  # ambiguous-variable-name: Ambiguous variable name: {name}. Note: Checks for certain single-letter variable names that look like numbers.
+  "E741",
+  # multi-value-repeated-key-literal: Dictionary key literal {name} repeated. TODO: Probably need to fix, these are likely real bugs.
+  "F601",
+  # explicit-string-concatenation: Explicitly concatenated string should be implicitly concatenated. TODO: Can be auto-fixed.
+  "ISC003",
+  # ambiguous-unicode-character-string: String contains ambiguous {}. Did you mean {}?. TODO: Revisit this.
+  "RUF001",
+  # ambiguous-unicode-character-comment: Comment contains ambiguous {}. Did you mean {}?. TODO: Revisit this.
+  "RUF003",
+  # collection-literal-concatenation: Consider {expression} instead of concatenation. TODO: Fix this.
+  "RUF005",
+  # function-call-in-dataclass-default-argument: Do not perform function call {name} in dataclass defaults
+  "RUF009",
+  # explicit-f-string-type-conversion: Use explicit conversion flag. TODO: Revisit and likely fix this.
+  "RUF010",
+  # mutable-class-default: Mutable default value for class attribute. TODO: Revisit this.
+  "RUF012",
+  # unnecessary-iterable-allocation-for-first-element: Prefer next({iterable}) over single element slice. TODO: Fix this.
+  "RUF015",
+  # unnecessary-key-check: Unnecessary key check before dictionary access. TODO: Fix this.
+  "RUF019",
+  # parenthesize-chained-operators: Parenthesize a and b expressions when chaining and and or together, to make the precedence clear. TODO: Fix this.
+  "RUF021",
+  # unsorted-dunder-slots: {}.__slots__ is not sorted. TODO: Revisit this.
+  "RUF023",
+  # pytest-raises-ambiguous-pattern: Pattern passed to match= contains metacharacters but is neither escaped nor raw. TODO: Fix this.
+  "RUF043",
+  # unnecessary-cast-to-int: Value being cast to int is already an integer. TODO: Fix this.
+  "RUF046",
+  # unused-unpacked-variable: Unpacked variable {name} is never used. TODO: Fix this.
+  "RUF059",
+  # unused-noqa: Unused {}. TODO: Fix this.
+  "RUF100",
+  # non-pep585-annotation: Use {to} instead of {from} for type annotation. Note: (lots of churn)
+  "UP006",
+  # non-pep604-annotation-union: Use X | Y for type annotations. Note: Many buried, non-auto-fixable unions
+  "UP007",
+  # native-literals: Unnecessary {literal_type} call (rewrite as a literal). Note: Replaces `int(42)` in tests, breaking call-by-type and implicitly
+  "UP018",
+  # printf-string-formatting: Use format specifiers instead of percent format. Note: Two string replacements that are not auto-fixable
+  "UP031",
+  # deprecated-import: Import from {target} instead: {names}. Note: Replaces `DefaultDict` with `collections.defaultdict` (lots of churn).
+  "UP035",
+  # outdated-version-block: Version block is outdated for minimum Python version. Note: Outdated version check (in rule_visitor for Python 3.8)
+  "UP036",
+  # UP040/UP046/UP047:  Cost-benefit unclear, see https://github.com/python/cpython/issues/114159
+  # non-pep695-type-alias: Type alias {name} uses {type_alias_method} instead of the type keyword. Note: Cost-benefit unclear, see https://github.com/python/cpython/issues/114159
+  "UP040",
+  # non-pep695-generic-class: Generic class {name} uses Generic subclass instead of type parameters. Note: Cost-benefit unclear, see https://github.com/python/cpython/issues/114159
+  "UP046",
+  # non-pep695-generic-function: Generic function {name} should use type parameters. Note: Cost-benefit unclear, see https://github.com/python/cpython/issues/114159
+  "UP047",
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["internal_plugins", "pants", "pants_test", "python_constant"]
