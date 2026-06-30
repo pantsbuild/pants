@@ -40,6 +40,7 @@ from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
     setup_build_go_package_target_request,
+    setup_build_go_package_target_request_for_stdlib,
 )
 from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
 from pants.backend.go.util_rules.import_analysis import (
@@ -143,6 +144,14 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBui
     )
     assert thirdparty_dep.request is not None
 
+    # The generated code imports `fmt` directly, so it must be declared as a direct
+    # dependency: the compile sandbox/importcfg contains only direct deps' export data.
+    fmt_dep = await setup_build_go_package_target_request_for_stdlib(
+        BuildGoPackageRequestForStdlibRequest("fmt", build_opts=GoBuildOptions()),
+        **implicitly(),
+    )
+    assert fmt_dep.request is not None
+
     return FallibleBuildGoPackageRequest(
         request=BuildGoPackageRequest(
             import_path="codegen.com/gen",
@@ -152,7 +161,7 @@ async def generate_from_file(request: GoCodegenBuildFilesRequest) -> FallibleBui
             build_opts=GoBuildOptions(),
             go_files=("f.go",),
             s_files=(),
-            direct_dependencies=(thirdparty_dep.request,),
+            direct_dependencies=(fmt_dep.request, thirdparty_dep.request),
             minimum_go_version=None,
         ),
         import_path="codegen.com/gen",
@@ -200,18 +209,31 @@ def assert_built(
     rule_runner: RuleRunner, request: BuildGoPackageRequest, *, expected_import_paths: list[str]
 ) -> None:
     built_package = rule_runner.request(BuiltGoPackage, [request])
-    result_files = rule_runner.request(Snapshot, [built_package.digest]).files
+    own_files = rule_runner.request(Snapshot, [built_package.archive_digest]).files
+    assert built_package.pkg_archive_path == os.path.join(
+        "__pkgs__", path_safe(built_package.import_path), "__pkg__.a"
+    )
+    assert built_package.pkg_archive_path in own_files
+    # Standard library dependencies may resolve to pre-built archives
+    # (`__go_stdlib__/<import_path>.a`) instead of being compiled from source into the
+    # `__pkgs__/...` layout, depending on `[golang].use_prebuilt_stdlib_archives` and build
+    # options.
     expected = {
-        import_path: os.path.join("__pkgs__", path_safe(import_path), "__pkg__.a")
+        import_path: (
+            os.path.join("__pkgs__", path_safe(import_path), "__pkg__.a"),
+            f"__go_stdlib__/{import_path}.a",
+        )
         for import_path in expected_import_paths
     }
-    actual = dict(built_package.import_paths_to_pkg_a_files)
-    for import_path, pkg_archive_path in expected.items():
+    actual = {
+        import_path: archive_path
+        for import_path, (archive_path, _) in built_package.transitive_pkg_archives.items()
+    }
+    for import_path, acceptable_archive_paths in expected.items():
         assert import_path in actual, f"expected {import_path} to be in build output"
-        assert actual[import_path] == expected[import_path], (
+        assert actual[import_path] in acceptable_archive_paths, (
             "expected package archive paths to match"
         )
-    assert set(expected.values()).issubset(set(result_files))
 
 
 def assert_pkg_target_built(
@@ -579,7 +601,7 @@ def test_build_codegen_target(rule_runner: RuleRunner) -> None:
         expected_import_path="codegen.com/gen",
         expected_dir_path="codegen",
         expected_go_file_names=["f.go"],
-        expected_direct_dependency_import_paths=["github.com/google/uuid"],
+        expected_direct_dependency_import_paths=["fmt", "github.com/google/uuid"],
         expected_transitive_dependency_import_paths=[],
     )
 
@@ -655,6 +677,10 @@ def test_xtest_deps(rule_runner: RuleRunner) -> None:
 
 @pytest.mark.no_error_if_skipped
 def test_stdlib_embed_config(rule_runner: RuleRunner) -> None:
+    # This test exercises embed-config resolution on the from-source stdlib path. With
+    # pre-built stdlib archives enabled (the default), stdlib build requests are "slim" and
+    # carry no embed config (the harvested archives already incorporate embedded files).
+    rule_runner.set_options(["--no-golang-use-prebuilt-stdlib-archives"], env_inherit={"PATH"})
     stdlib_packages = rule_runner.request(
         GoStdLibPackages, [GoStdLibPackagesRequest(with_race_detector=False, cgo_enabled=False)]
     )
@@ -687,3 +713,79 @@ def test_stdlib_embed_config(rule_runner: RuleRunner) -> None:
     assert embed_config is not None
     assert embed_config.patterns
     assert embed_config.files
+
+
+def test_stdlib_prebuilt_archives_used(rule_runner: RuleRunner) -> None:
+    """With pre-built stdlib archives enabled (the default), stdlib dependency requests are
+    "slim" (no sources, no dependency recursion) and the built output maps stdlib packages to
+    pre-built archives instead of from-source `__pkgs__/...` archives."""
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/stdlib-user
+                go 1.17
+                """
+            ),
+            "hasher.go": dedent(
+                """\
+                package hasher
+
+                import (
+                    "crypto/sha256"
+                    "fmt"
+                )
+
+                func Hash(b []byte) string {
+                    return fmt.Sprintf("%x", sha256.Sum256(b))
+                }
+                """
+            ),
+            "BUILD": "go_mod(name='mod')\ngo_package(name='pkg')",
+        }
+    )
+    build_request = rule_runner.request(
+        BuildGoPackageRequest,
+        [BuildGoPackageTargetRequest(Address("", target_name="pkg"), build_opts=GoBuildOptions())],
+    )
+
+    # Structural: every stdlib dependency request in the DAG is slim, so no path exists by
+    # which a stdlib package could be compiled from source.
+    stdlib_dep_requests = [dep for dep in build_request.direct_dependencies if dep.is_stdlib]
+    assert sorted(dep.import_path for dep in stdlib_dep_requests) == ["crypto/sha256", "fmt"]
+    for dep in stdlib_dep_requests:
+        assert dep.go_files == ()
+        assert dep.s_files == ()
+        assert dep.direct_dependencies == ()
+
+    # Output: stdlib archives come from the harvest layout, and the full transitive stdlib
+    # closure (e.g. `runtime`) is available for the link step even though no build request
+    # was ever constructed for it.
+    built_package = rule_runner.request(BuiltGoPackage, [build_request])
+    archive_paths = {ip: path for ip, (path, _) in built_package.transitive_pkg_archives.items()}
+    assert archive_paths["crypto/sha256"] == "__go_stdlib__/crypto/sha256.a"
+    assert archive_paths["fmt"] == "__go_stdlib__/fmt.a"
+    assert archive_paths["runtime"] == "__go_stdlib__/runtime.a"
+    assert archive_paths["example.com/stdlib-user"] == os.path.join(
+        "__pkgs__", path_safe("example.com/stdlib-user"), "__pkg__.a"
+    )
+
+
+def test_build_with_race_detector_falls_back(rule_runner: RuleRunner) -> None:
+    """Build options that change stdlib archive content (e.g. the race detector) must fall
+    back to full from-source stdlib build requests."""
+    build_request = rule_runner.request(
+        BuildGoPackageRequest,
+        [
+            BuildGoPackageRequestForStdlibRequest(
+                # NB: cgo must stay enabled: `-race requires cgo`.
+                "fmt",
+                build_opts=GoBuildOptions(cgo_enabled=True, with_race_detector=True),
+            )
+        ],
+    )
+    assert build_request.is_stdlib
+    assert build_request.go_files, "expected a non-slim request with sources present"
+    assert build_request.direct_dependencies, (
+        "expected a non-slim request with dependency recursion"
+    )
