@@ -34,6 +34,7 @@ pub mod engine_aware;
 mod frozen_ordered_set;
 mod frozendict;
 pub mod fs;
+pub mod hunk;
 mod interface;
 #[cfg(test)]
 mod interface_tests;
