@@ -332,7 +332,7 @@ def test_multiple_resolves() -> None:
         GeneratePexLockfile(
             requirements=FrozenOrderedSet(["a"]),
             find_links=FrozenOrderedSet([]),
-            interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.10,<3.15"]),
             resolve_name="a",
             lockfile_dest="a.lock",
             diff=False,
