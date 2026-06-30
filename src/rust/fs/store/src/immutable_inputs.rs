@@ -62,7 +62,23 @@ impl ImmutableInputs {
         directory_digest: DirectoryDigest,
     ) -> Result<PathBuf, StoreError> {
         let digest = directory_digest.as_digest();
-        let cell = self.0.contents.lock().entry(digest).or_default().clone();
+        // we must verify the memoized path still exists on disk.
+        // If it was deleted, we invalidate the cache and force re-materialization.
+        let cell = {
+            let mut contents = self.0.contents.lock();
+            let cell = contents.entry(digest).or_default().clone();
+            if let Some(path) = cell.get() {
+                if path.exists() {
+                    cell
+                } else {
+                    let new_cell = Arc::new(OnceCell::new());
+                    contents.insert(digest, new_cell.clone());
+                    new_cell
+                }
+            } else {
+                cell
+            }
+        };
 
         // We (might) need to initialize the value.
         //
