@@ -337,6 +337,58 @@ def test_from_image_build_arg_not_in_repo_issue_15585(rule_runner: RuleRunner) -
     )
 
 
+def test_from_image_build_arg_mixed_address_and_literal(rule_runner: RuleRunner) -> None:
+    """A Dockerfile with two `FROM $ARG` base images: one Pants address, one plain image ref.
+
+    Only the address-valued arg should be substituted with the built upstream image; the
+    literal-valued arg should be left untouched (as in the `..._not_in_repo_issue_15585` test).
+
+    Both args are classified as "from image" build args, since the literal registry ref also
+    matches the loose address regex. The build args are stored sorted by "NAME=VALUE", so
+    `AAA_LITERAL` comes first. At resolution the literal is dropped (`skip_invalid_addresses`),
+    which shortens the resolved-address list; `zip(build_args.keys(), resolved_addresses)` then
+    pairs the first key (`AAA_LITERAL`) with the only upstream image and silently drops
+    `ZZZ_UPSTREAM` -- so the real address-valued arg is never substituted.
+    """
+    rule_runner.write_files(
+        {
+            "src/upstream/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image",
+                  repository="upstream/{name}",
+                  image_tags=["1.0"],
+                  instructions=["FROM alpine:3.16.1"],
+                )
+                """
+            ),
+            "src/downstream/BUILD": "docker_image(name='image')",
+            "src/downstream/Dockerfile": dedent(
+                """\
+                ARG AAA_LITERAL=registry.example.com/base:1.0
+                ARG ZZZ_UPSTREAM=src/upstream:image
+                FROM $AAA_LITERAL AS first
+                FROM $ZZZ_UPSTREAM
+                """
+            ),
+        }
+    )
+
+    context = assert_build_context(
+        rule_runner,
+        Address("src/downstream", target_name="image"),
+        expected_files=["src/downstream/Dockerfile", "src.upstream/image.docker-info.json"],
+        build_upstream_images=True,
+        expected_num_upstream_images=1,
+    )
+
+    build_args = context.build_args.to_dict()
+    # The address-valued arg must be substituted with the built upstream image ref.
+    assert build_args.get("ZZZ_UPSTREAM") == "upstream/image:1.0"
+    # The literal-valued arg must not be hijacked with the upstream image ref.
+    assert "AAA_LITERAL" not in build_args
+
+
 def test_build_args_for_copy(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
