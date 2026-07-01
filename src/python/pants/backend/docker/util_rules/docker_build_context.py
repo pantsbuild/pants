@@ -357,20 +357,28 @@ async def create_docker_build_context(
         dockerfile_build_args = dockerfile_info.from_image_build_args.with_overrides(
             supplied_build_args
         ).nonempty()
-        # Parse the build args values into Address instances.
-        from_image_addresses = await resolve_unparsed_address_inputs(
-            UnparsedAddressInputs(
-                dockerfile_build_args.values(),
-                owning_address=dockerfile_info.address,
-                description_of_origin=softwrap(
-                    f"""
-                    the FROM arguments from the file {dockerfile_info.source}
-                    from the target {dockerfile_info.address}
-                    """
+        # Parse each build arg value into an Address independently, so that a value which does
+        # not resolve to an in-repo target (e.g. a plain image ref such as
+        # `registry.example.com/base:1.0`) is skipped in place rather than shifting the
+        # positional alignment of the remaining args. Resolving the whole batch at once and
+        # then zipping the result against the arg names silently mispairs args whenever a
+        # non-last value is dropped by `skip_invalid_addresses`.
+        from_image_addresses = await concurrently(
+            resolve_unparsed_address_inputs(
+                UnparsedAddressInputs(
+                    [value],
+                    owning_address=dockerfile_info.address,
+                    description_of_origin=softwrap(
+                        f"""
+                        the FROM arguments from the file {dockerfile_info.source}
+                        from the target {dockerfile_info.address}
+                        """
+                    ),
+                    skip_invalid_addresses=True,
                 ),
-                skip_invalid_addresses=True,
-            ),
-            **implicitly(),
+                **implicitly(),
+            )
+            for value in dockerfile_build_args.values()
         )
         # Map those addresses to the corresponding built image ref (tag).
         address_to_built_image_tag = {
@@ -385,10 +393,12 @@ async def create_docker_build_context(
             for image in built.artifacts
             if isinstance(image, BuiltDockerImage)
         ]
-        # Create the FROM image build args.
+        # Create the FROM image build args. Each arg is paired with its own resolution result,
+        # so a skipped (non-address) value can never be substituted onto the wrong arg name.
         from_image_build_args = [
-            f"{arg_name}={address_to_built_image_tag[addr]}"
-            for arg_name, addr in zip(dockerfile_build_args.keys(), from_image_addresses)
+            f"{arg_name}={address_to_built_image_tag[addresses[0]]}"
+            for arg_name, addresses in zip(dockerfile_build_args.keys(), from_image_addresses)
+            if addresses and addresses[0] in address_to_built_image_tag
         ]
         build_args = build_args.extended(from_image_build_args)
 
