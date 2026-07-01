@@ -46,6 +46,7 @@ from pants.backend.python.target_types import (
     PexShBootField,
     PexShebangField,
     PexStripEnvField,
+    PexValidateEntryPointField,
     PexVenvHermeticScripts,
     PexVenvSitePackagesCopies,
     ResolvePexEntryPointRequest,
@@ -88,6 +89,7 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
     output_path: OutputPathField
     emit_warnings: PexEmitWarningsField
     ignore_errors: PexIgnoreErrorsField
+    validate_entry_point: PexValidateEntryPointField
     inherit_path: PexInheritPathField
     sh_boot: PexShBootField
     shebang: PexShebangField
@@ -137,6 +139,8 @@ class PexBinaryFieldSet(PackageFieldSet, RunFieldSet):
             args.append("--emit-warnings")
         if self.ignore_errors.value is True:
             args.append("--ignore-errors")
+        if self.validate_entry_point.value is True:
+            args.append("--validate-entry-point")
         if self.inherit_path.value is not None:
             args.append(f"--inherit-path={self.inherit_path.value}")
         if self.sh_boot.value is True:
