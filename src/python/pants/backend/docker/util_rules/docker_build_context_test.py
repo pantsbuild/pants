@@ -337,6 +337,52 @@ def test_from_image_build_arg_not_in_repo_issue_15585(rule_runner: RuleRunner) -
     )
 
 
+def test_from_image_build_arg_unresolvable_address_does_not_misalign(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        {
+            "src/upstream/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image",
+                  repository="upstream/{name}",
+                  image_tags=["1.0"],
+                  instructions=["FROM alpine:3.16.1"],
+                )
+                """
+            ),
+            "src/downstream/BUILD": "docker_image(name='image')",
+            "src/downstream/Dockerfile": dedent(
+                """\
+                ARG PYTHON_VERSION="python:3.10.2-slim"
+                ARG BASE_IMAGE=src/upstream:image
+                FROM $PYTHON_VERSION
+                FROM $BASE_IMAGE
+                """
+            ),
+        }
+    )
+
+    assert_build_context(
+        rule_runner,
+        Address("src/downstream", target_name="image"),
+        expected_files=["src/downstream/Dockerfile", "src.upstream/image.docker-info.json"],
+        build_upstream_images=True,
+        expected_interpolation_context={
+            "tags": {
+                "baseimage": "3.10.2-slim",
+                "stage0": "3.10.2-slim",
+                "stage1": "1.0",
+            },
+            "build_args": {
+                "BASE_IMAGE": "upstream/image:1.0",
+            },
+        },
+        expected_num_upstream_images=1,
+    )
+
+
 def test_build_args_for_copy(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
