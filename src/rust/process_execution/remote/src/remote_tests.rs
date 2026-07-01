@@ -127,8 +127,11 @@ async fn make_execute_request() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
         platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
@@ -137,7 +140,7 @@ async fn make_execute_request() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
+                    "32971a297dfcfb667a65654789f421bdc994f83471e2b7930ad92efa3701a4fc",
                 )
                 .unwrap(),
                 187,
@@ -152,7 +155,7 @@ async fn make_execute_request() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "16bf057effe6d18553979a069228f0da81df307c964ea0f162bb60e31070bb27",
+                    "4a105049ffdc361e260e5dd94b7639e8cb5c9d8721c08f73608204153b8a958f",
                 )
                 .unwrap(),
                 141,
@@ -172,6 +175,83 @@ async fn make_execute_request() {
             input_root_digest: input_directory.directory_digest(),
         })
     );
+}
+
+#[tokio::test]
+async fn make_execute_request_deduplicates_and_sorts_output_paths() {
+    let executor = task_executor::Executor::new();
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::local_only(executor, store_dir).unwrap();
+
+    let input_directory = TestDirectory::containing_roland();
+    let req = Process {
+        argv: owned_string_vec(&["/bin/echo", "yo"]),
+        env: BTreeMap::new(),
+        working_directory: None,
+        input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+        output_files: relative_paths(&["b", "a", "shared"]).collect(),
+        output_directories: relative_paths(&["shared", "dir", "c"]).collect(),
+        timeout: None,
+        description: "dedupe outputs".to_owned(),
+        level: log::Level::Info,
+        append_only_caches: BTreeMap::new(),
+        jdk_home: None,
+        execution_slot_variable: None,
+        concurrency_available: 0,
+        concurrency: None,
+        cache_scope: ProcessCacheScope::Always,
+        execution_environment: make_environment(Platform::Linux_x86_64),
+        remote_cache_speculation_delay: std::time::Duration::from_millis(0),
+        attempt: 0,
+    };
+
+    let request = process_execution::make_execute_request(&req, None, None, &store, None)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        request.command.output_paths,
+        vec!["a", "b", "c", "dir", "shared"]
+    );
+    assert!(request.command.output_files.is_empty());
+    assert!(request.command.output_directories.is_empty());
+}
+
+#[tokio::test]
+async fn make_execute_request_with_root_output_directory_uses_empty_output_path() {
+    let executor = task_executor::Executor::new();
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::local_only(executor, store_dir).unwrap();
+
+    let input_directory = TestDirectory::containing_roland();
+    let req = Process {
+        argv: owned_string_vec(&["/bin/echo", "yo"]),
+        env: BTreeMap::new(),
+        working_directory: None,
+        input_digests: InputDigests::with_input_files(input_directory.directory_digest()),
+        output_files: BTreeSet::new(),
+        output_directories: relative_paths(&["."]).collect(),
+        timeout: None,
+        description: "root output".to_owned(),
+        level: log::Level::Info,
+        append_only_caches: BTreeMap::new(),
+        jdk_home: None,
+        execution_slot_variable: None,
+        concurrency_available: 0,
+        concurrency: None,
+        cache_scope: ProcessCacheScope::Always,
+        execution_environment: make_environment(Platform::Linux_x86_64),
+        remote_cache_speculation_delay: std::time::Duration::from_millis(0),
+        attempt: 0,
+    };
+
+    let request = process_execution::make_execute_request(&req, None, None, &store, None)
+        .await
+        .unwrap();
+
+    assert_eq!(request.command.output_paths, vec![String::new()]);
+    assert!(request.command.output_files.is_empty());
+    assert!(request.command.output_directories.is_empty());
 }
 
 #[tokio::test]
@@ -229,8 +309,11 @@ async fn make_execute_request_with_instance_name() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
         platform: Some(remexec::Platform {
             properties: vec![remexec::platform::Property {
                 name: "target_platform".to_owned(),
@@ -244,7 +327,7 @@ async fn make_execute_request_with_instance_name() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "9f8a65e780495003c341923b62a06ae6796dcad47e396dc89704b10bc26e1729",
+                    "e5c892b3e948480fc176a6a7f65bfdfb87e2d4f30917ee230297a4a37b943961",
                 )
                 .unwrap(),
                 216,
@@ -260,7 +343,7 @@ async fn make_execute_request_with_instance_name() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "5b017857389d245cd0663105f3b8ee47bb7412940e4859098c8af46bdd21c8b6",
+                    "b7e49a5b8c0ebfc83cd5781dd969e0944c96f72abd33a0b7cdd41fcb5c49c03f",
                 )
                 .unwrap(),
                 141,
@@ -340,8 +423,11 @@ async fn make_execute_request_with_cache_key_gen_version() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
         platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
@@ -353,7 +439,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "04ed10b1ddac69249ad1ca463fd4284c4f9c0115a2f2aaf1fd8a9ce6571ee29c",
+                    "f9996a17289be6b11868095feb7350a0ae08e4776a024b24f22f1cd161f2c40d",
                 )
                 .unwrap(),
                 224,
@@ -368,7 +454,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "e55329e2c0413a6def422752f9e964204e7e40ec81e2867a6222a43727ba29d1",
+                    "da0c70eb9a63eac75965502da88138d2892398cae9be2a46f4d901bef4af7f80",
                 )
                 .unwrap(),
                 141,
@@ -611,8 +697,11 @@ async fn make_execute_request_with_timeout() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
         platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
@@ -621,7 +710,7 @@ async fn make_execute_request_with_timeout() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
+                    "32971a297dfcfb667a65654789f421bdc994f83471e2b7930ad92efa3701a4fc",
                 )
                 .unwrap(),
                 187,
@@ -637,7 +726,7 @@ async fn make_execute_request_with_timeout() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "6e3666265a4ef89ddf26a406516484429b2d8e744fbae6b36a66c6853407626a",
+                    "dce109cabaa03c589dc3e3ca80c55bae50c297621e5f123f06f21e260c2f296b",
                 )
                 .unwrap(),
                 145,
@@ -873,8 +962,11 @@ async fn make_execute_request_using_immutable_inputs() {
                 value: "value".to_owned(),
             },
         ],
-        output_files: vec!["other/file.ext".to_owned(), "path/to/file.ext".to_owned()],
-        output_directories: vec!["directory/name".to_owned()],
+        output_paths: vec![
+            "directory/name".to_owned(),
+            "other/file.ext".to_owned(),
+            "path/to/file.ext".to_owned(),
+        ],
         platform: Some(remexec::Platform::default()),
         ..Default::default()
     };
@@ -883,7 +975,7 @@ async fn make_execute_request_using_immutable_inputs() {
         command_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "d7b7538a7a57a2b04da51ffffff758036f43ebb92d37b66bd1bb8c6af0030e57",
+                    "32971a297dfcfb667a65654789f421bdc994f83471e2b7930ad92efa3701a4fc",
                 )
                 .unwrap(),
                 187,
@@ -898,7 +990,7 @@ async fn make_execute_request_using_immutable_inputs() {
         action_digest: Some(
             (&Digest::new(
                 Fingerprint::from_hex_string(
-                    "2c1eae75a54d2464ac63ba51587deb3986f15c3966c61f77fb9b06b195f4127a",
+                    "f60f2840c763524939be54bf1cca83819b47071c1f6ddfcf49db5c98c5ad9f0b",
                 )
                 .unwrap(),
                 141,
