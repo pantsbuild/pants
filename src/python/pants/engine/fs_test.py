@@ -667,6 +667,11 @@ def test_snapshot_from_outside_buildroot_failure(rule_runner: RuleRunner) -> Non
     assert "doesnotexist" in str(exc.value)
 
 
+def test_capture_snapshots_rejects_malformed_input(rule_runner: RuleRunner) -> None:
+    with pytest.raises(ValueError, match="Could not get field `root`"):
+        rule_runner.scheduler.capture_snapshots([object()])  # type: ignore[list-item]
+
+
 # -----------------------------------------------------------------------------------------------
 # `CreateDigest`
 # -----------------------------------------------------------------------------------------------
@@ -696,6 +701,16 @@ def test_create_digest_with_file_entries(rule_runner: RuleRunner) -> None:
     assert snapshot.dirs == ("a",)
     assert snapshot.files == ("4.txt", "a/4.txt.ln")
     assert snapshot.digest != EMPTY_DIGEST
+
+
+def test_create_digest_rejects_malformed_item(rule_runner: RuleRunner) -> None:
+    with pytest.raises(ExecutionError, match="Could not get field `path`"):
+        rule_runner.request(Digest, [CreateDigest([object()])])  # type: ignore[list-item]
+
+
+def test_create_digest_rejects_absolute_path(rule_runner: RuleRunner) -> None:
+    with pytest.raises(ExecutionError, match="The `path` must be relative"):
+        rule_runner.request(Digest, [CreateDigest([FileContent("/absolute/path.txt", b"")])])
 
 
 # -----------------------------------------------------------------------------------------------
@@ -841,6 +856,14 @@ def test_digest_subset_nonexistent_filename_globs(rule_runner: RuleRunner) -> No
     #             )
     #         ],
     #     )
+
+
+def test_digest_subset_rejects_malformed_request(rule_runner: RuleRunner) -> None:
+    digest_subset = object.__new__(DigestSubset)
+    object.__setattr__(digest_subset, "digest", EMPTY_DIGEST)
+    object.__setattr__(digest_subset, "globs", object())
+    with pytest.raises(ExecutionError, match="Failed to get `globs`"):
+        rule_runner.request(Snapshot, [digest_subset])
 
 
 # -----------------------------------------------------------------------------------------------
