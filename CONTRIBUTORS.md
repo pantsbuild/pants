@@ -144,6 +144,7 @@ Created as part of the release process.
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
++ Hussein Awala
 + Hwasung Lee
 + Ian Tabolt
 + Idan Attias
@@ -169,6 +170,7 @@ Created as part of the release process.
 + Jan Berkel
 + Jan Paul Erkelens
 + Jason Barnett
++ Jason D'Amour
 + Jason Jackson
 + Jason Song
 + Jay Crumb
