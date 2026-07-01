@@ -24,7 +24,7 @@ from pants.backend.python.util_rules.faas import (
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -67,7 +67,8 @@ async def package_python_google_cloud_function(
             include_sources=True,
             reexported_handler_module=PythonGoogleCloudFunctionHandlerField.reexported_handler_module,
             log_only_reexported_handler_func=True,
-        )
+        ),
+        **implicitly(),
     )
 
 

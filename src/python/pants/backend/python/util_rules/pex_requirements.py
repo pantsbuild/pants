@@ -426,6 +426,9 @@ class ResolveConfig:
     path_mappings: tuple[str, ...]
     lock_style: str
     complete_platforms: tuple[str, ...]
+    uv_platforms: tuple[
+        str, ...
+    ]  # Each entry is "uv_platform:python_version", e.g. "x86_64-unknown-linux-gnu:3.12"
     uploaded_prior_to: str | None
 
     def pex_args(self) -> Iterator[str]:
@@ -525,10 +528,10 @@ class ResolveConfig:
     def validate_for_uv(self, resolve_name: str) -> None:
         """Raise if any pex-specific resolve options are set that have no uv equivalent."""
         pex_specific: list[str] = []
-        if self.constraints_file:
-            pex_specific.append("`[python].resolves_to_constraints_file`")
         if self.complete_platforms:
             pex_specific.append("`[python].resolves_to_complete_platforms`")
+        if self.constraints_file:
+            pex_specific.append("`[python].resolves_to_constraints_file`")
         if self.excludes:
             pex_specific.append("`[python].resolves_to_excludes`")
         if self.overrides:
@@ -580,7 +583,8 @@ async def determine_resolve_config(
             sources=FrozenOrderedSet(),
             path_mappings=python_repos.path_mappings,
             lock_style="universal",  # Default to universal when no resolve name
-            complete_platforms=(),  # No complete platforms by default
+            complete_platforms=(),
+            uv_platforms=(),
             uploaded_prior_to=None,
         )
 
@@ -593,6 +597,7 @@ async def determine_resolve_config(
     complete_platforms = tuple(
         python_setup.resolves_to_complete_platforms().get(request.resolve_name) or []
     )
+    uv_platforms = tuple(python_setup.resolves_to_uv_platforms().get(request.resolve_name) or [])
     uploaded_prior_to = python_setup.resolves_to_uploaded_prior_to().get(request.resolve_name)
 
     constraints_file: ResolvePexConstraintsFile | None = None
@@ -647,6 +652,7 @@ async def determine_resolve_config(
         path_mappings=python_repos.path_mappings,
         lock_style=lock_style,
         complete_platforms=complete_platforms,
+        uv_platforms=uv_platforms,
         uploaded_prior_to=uploaded_prior_to,
     )
 
