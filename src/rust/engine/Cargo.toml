@@ -35,6 +35,7 @@ futures-core = { workspace = true }
 graph = { path = "../graph" }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
+hdrhistogram = { workspace = true }
 indexmap = { workspace = true }
 internment = { workspace = true }
 itertools = { workspace = true }
@@ -43,6 +44,7 @@ log = { workspace = true }
 logging = { path = "../logging" }
 nailgun = { path = "../nailgun" }
 num_enum = { workspace = true }
+once_cell = { workspace = true }
 options = { path = "../options" }
 options_pants_ng = { path = "../pants_ng/options" }
 pantsd = { path = "../pantsd" }

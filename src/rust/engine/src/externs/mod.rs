@@ -37,6 +37,7 @@ pub mod fs;
 mod interface;
 #[cfg(test)]
 mod interface_tests;
+pub mod memo;
 pub mod nailgun;
 mod options;
 mod pants_ng;

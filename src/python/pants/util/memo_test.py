@@ -1,6 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from pants.util.memo import (
@@ -100,27 +103,9 @@ def test_key_factory():
 
 
 # TODO[13244]
-def test_cache_factory():
-    class SingleEntryMap(dict):
-        def __setitem__(self, key, value):
-            self.clear()
-            return super().__setitem__(key, value)
-
-    calculations = []
-
-    @memoized(cache_factory=SingleEntryMap)
-    def square(num):
-        calculations.append(num)
-        return num * num
-
-    assert 4 == square(2)
-    assert 4 == square(2)
-    assert 9 == square(3)
-    assert 9 == square(3)
-    assert 4 == square(2)
-    assert 4 == square(2)
-
-    assert [2, 3, 2] == calculations
+def test_cache_factory_unsupported():
+    with pytest.raises(TypeError, match="cache_factory"):
+        memoized(cache_factory=dict)
 
 
 # TODO[13244]
@@ -169,6 +154,92 @@ def test_clear():
     assert 9 == square(3)
 
     assert [2, 3, 2, 3] == calculations
+
+
+def test_concurrent_same_key_calls_wait_for_cached_value() -> None:
+    ready = threading.Barrier(8)
+    started = threading.Event()
+    unblock = threading.Event()
+    call_lock = threading.Lock()
+    calls = 0
+
+    @memoized
+    def calculate(num):
+        nonlocal calls
+        with call_lock:
+            calls += 1
+        started.set()
+        assert unblock.wait(timeout=5)
+        return calls + num
+
+    def call_calculate():
+        ready.wait()
+        return calculate(42)
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(call_calculate) for _ in range(8)]
+        assert started.wait(timeout=5)
+        unblock.set()
+        results = [future.result(timeout=5) for future in futures]
+
+    assert len(set(results)) == 1
+    assert calculate(42) == results[0]
+    assert calls == 1
+
+
+def test_concurrent_different_key_calls_compute_concurrently() -> None:
+    ready = threading.Barrier(8)
+    started = threading.Barrier(8)
+    done = threading.Event()
+
+    @memoized
+    def calculate(num):
+        ready.wait()
+        started.wait()
+        assert done.wait(timeout=5)
+        return num
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(calculate, num) for num in range(8)]
+        done.set()
+        assert [future.result(timeout=5) for future in futures] == list(range(8))
+
+
+def test_exception_not_cached() -> None:
+    calls = 0
+
+    @memoized
+    def calculate():
+        nonlocal calls
+        calls += 1
+        raise ValueError(calls)
+
+    for expected in (1, 2):
+        with pytest.raises(ValueError, match=str(expected)):
+            calculate()
+
+
+def test_concurrent_cache_helpers() -> None:
+    @memoized
+    def calculate(num):
+        return num + 100
+
+    def put(num) -> None:
+        with getattr(calculate, "put")(num) as putter:
+            putter(num)
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(put, range(32)))
+    assert [calculate(num) for num in range(32)] == list(range(32))
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(getattr(calculate, "forget"), range(16)))
+    assert [calculate(num) for num in range(16)] == [num + 100 for num in range(16)]
+    assert [calculate(num) for num in range(16, 32)] == list(range(16, 32))
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        list(executor.map(lambda _: getattr(calculate, "clear")(), range(8)))
+    assert calculate(31) == 131
 
 
 class _Called:

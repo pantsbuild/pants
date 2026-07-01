@@ -4,8 +4,8 @@
 
 # This bootstrap script runs pants from the live sources in this repo.
 #
-# The script defaults to running with Python 3.11. To use another Python version,
-# prefix the script with `PY=python3.14`.
+# The script uses `PY` if set, otherwise a uv-managed `.python-version` pin when present,
+# otherwise `python3.14` from PATH.
 
 set -eo pipefail
 

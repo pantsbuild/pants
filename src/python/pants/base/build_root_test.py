@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import time
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -57,6 +59,27 @@ def test_temporary(tmp_build_root) -> None:
     with build_root.temporary(new_path):
         assert new_path == build_root.path
     assert original_path == build_root.path
+
+
+def test_concurrent_temporary_and_reset(tmp_build_root) -> None:
+    build_root, original_path, _ = tmp_build_root
+    paths = [os.path.realpath(safe_mkdtemp()) for _ in range(8)]
+
+    def use_path(path: str) -> None:
+        with build_root.temporary(path):
+            time.sleep(0.01)
+            assert build_root.path == path
+        build_root.path = path
+        build_root.reset()
+
+    try:
+        with ThreadPoolExecutor(max_workers=len(paths)) as executor:
+            list(executor.map(use_path, paths))
+        build_root.reset()
+        assert build_root.path == original_path
+    finally:
+        for path in paths:
+            safe_rmtree(path)
 
 
 def test_singleton(tmp_build_root) -> None:

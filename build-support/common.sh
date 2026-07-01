@@ -52,7 +52,16 @@ function determine_python() {
     which "${PY}" && return 0
   fi
 
-  version='3.14'
+  repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. && pwd -P)"
+  if [[ -f "${repo_root}/.python-version" ]] && command -v uv &> /dev/null; then
+    interpreter_path="$(uv python find --project "${repo_root}" --no-python-downloads 2> /dev/null || true)"
+    if [[ -n "${interpreter_path}" ]]; then
+      echo "${interpreter_path}"
+      return 0
+    fi
+  fi
+
+  version='3.14t'
   interpreter_path="$(command -v "python${version}")"
   if [[ -z "${interpreter_path}" ]]; then
     echo "pants: Failed to find a Python ${version} interpreter" 1>&2 && return 1

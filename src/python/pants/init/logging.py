@@ -7,6 +7,7 @@ import http.client
 import locale
 import logging
 import sys
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from io import BufferedReader, TextIOWrapper
@@ -26,6 +27,9 @@ from pants.util.strutil import strip_prefix
 # setup a 'WARN' logging level name that maps to 'WARNING'.
 logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(pants_logging.TRACE, "TRACE")
+
+_python_logging_lock = threading.RLock()
+_stdio_init_lock = threading.RLock()
 
 
 class _NativeHandler(Handler):
@@ -108,43 +112,44 @@ def _python_logging_setup(
         if self.isEnabledFor(LogLevel.TRACE.level):
             self._log(LogLevel.TRACE.level, message, *args, **kwargs)
 
-    logging.Logger.trace = trace_fn  # type: ignore[attr-defined]
-    logger = logging.getLogger(None)
+    with _python_logging_lock:
+        logging.Logger.trace = trace_fn  # type: ignore[attr-defined]
+        logger = logging.getLogger(None)
 
-    def clear_logging_handlers():
-        handlers = tuple(logger.handlers)
-        for handler in handlers:
-            logger.removeHandler(handler)
-        return handlers
+        def clear_logging_handlers():
+            handlers = tuple(logger.handlers)
+            for handler in handlers:
+                logger.removeHandler(handler)
+            return handlers
 
-    def set_logging_handlers(handlers):
-        for handler in handlers:
+        def set_logging_handlers(handlers):
+            for handler in handlers:
+                logger.addHandler(handler)
+
+        # Remove existing handlers, and restore them afterward.
+        handlers = clear_logging_handlers()
+        try:
+            # This routes warnings through our loggers instead of straight to raw stderr.
+            logging.captureWarnings(True)
+            handler = _NativeHandler()
+            exc_formatter = _ExceptionFormatter(level, print_stacktrace=print_stacktrace)
+            handler.setFormatter(exc_formatter)
             logger.addHandler(handler)
+            level.set_level_for(logger)
 
-    # Remove existing handlers, and restore them afterward.
-    handlers = clear_logging_handlers()
-    try:
-        # This routes warnings through our loggers instead of straight to raw stderr.
-        logging.captureWarnings(True)
-        handler = _NativeHandler()
-        exc_formatter = _ExceptionFormatter(level, print_stacktrace=print_stacktrace)
-        handler.setFormatter(exc_formatter)
-        logger.addHandler(handler)
-        level.set_level_for(logger)
+            for key, level in log_levels_by_target.items():
+                level.set_level_for(logging.getLogger(key))
 
-        for key, level in log_levels_by_target.items():
-            level.set_level_for(logging.getLogger(key))
+            if logger.isEnabledFor(LogLevel.TRACE.level):
+                http.client.HTTPConnection.debuglevel = 1
+                requests_logger = logging.getLogger("requests.packages.urllib3")
+                LogLevel.TRACE.set_level_for(requests_logger)
+                requests_logger.propagate = True
 
-        if logger.isEnabledFor(LogLevel.TRACE.level):
-            http.client.HTTPConnection.debuglevel = 1
-            requests_logger = logging.getLogger("requests.packages.urllib3")
-            LogLevel.TRACE.set_level_for(requests_logger)
-            requests_logger.propagate = True
-
-        yield
-    finally:
-        clear_logging_handlers()
-        set_logging_handlers(handlers)
+            yield
+        finally:
+            clear_logging_handlers()
+            set_logging_handlers(handlers)
 
 
 @contextmanager
@@ -192,39 +197,40 @@ def initialize_stdio_raw(
         else:
             literal_filters.append(filt)
 
-    # Set the pants log destination.
-    log_path = str(pants_log_path(PurePath(pants_workdir)))
-    safe_mkdir_for(log_path)
+    with _stdio_init_lock:
+        # Set the pants log destination.
+        log_path = str(pants_log_path(PurePath(pants_workdir)))
+        safe_mkdir_for(log_path)
 
-    # Initialize thread-local stdio, and replace sys.std* with proxies.
-    original_stdin, original_stdout, original_stderr = sys.stdin, sys.stdout, sys.stderr
-    try:
-        raw_stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
-            global_level.level,
-            log_show_rust_3rdparty,
-            show_target,
-            {k: v.level for k, v in log_levels_by_target.items()},
-            tuple(literal_filters),
-            tuple(regex_filters),
-            log_path,
-        )
-        sys.stdin = TextIOWrapper(
-            BufferedReader(raw_stdin),
-            # NB: We set the default encoding explicitly to bypass logic in the TextIOWrapper
-            # constructor that would poke the underlying file (which is not valid until a
-            # `stdio_destination` is set).
-            encoding=locale.getpreferredencoding(False),
-        )
+        # Initialize thread-local stdio, and replace sys.std* with proxies.
+        original_stdin, original_stdout, original_stderr = sys.stdin, sys.stdout, sys.stderr
+        try:
+            raw_stdin, sys.stdout, sys.stderr = native_engine.stdio_initialize(
+                global_level.level,
+                log_show_rust_3rdparty,
+                show_target,
+                {k: v.level for k, v in log_levels_by_target.items()},
+                tuple(literal_filters),
+                tuple(regex_filters),
+                log_path,
+            )
+            sys.stdin = TextIOWrapper(
+                BufferedReader(raw_stdin),
+                # NB: We set the default encoding explicitly to bypass logic in the TextIOWrapper
+                # constructor that would poke the underlying file (which is not valid until a
+                # `stdio_destination` is set).
+                encoding=locale.getpreferredencoding(False),
+            )
 
-        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[misc,assignment]
-        # Install a Python logger that will route through the Rust logger.
-        with _python_logging_setup(
-            global_level, log_levels_by_target, print_stacktrace=print_stacktrace
-        ):
-            yield
-    finally:
-        sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
-        sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[misc,assignment]
+            sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[misc,assignment]
+            # Install a Python logger that will route through the Rust logger.
+            with _python_logging_setup(
+                global_level, log_levels_by_target, print_stacktrace=print_stacktrace
+            ):
+                yield
+        finally:
+            sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
+            sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[misc,assignment]
 
 
 def pants_log_path(workdir: PurePath) -> PurePath:

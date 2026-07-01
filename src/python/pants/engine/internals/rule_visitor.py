@@ -7,6 +7,7 @@ import inspect
 import itertools
 import logging
 import sys
+import threading
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -52,6 +53,7 @@ def _node_str(node: Any) -> str:
 
 
 PANTS_RULE_DESCRIPTORS_MODULE_KEY = "__pants_rule_descriptors__"
+_rule_descriptors_lock = threading.RLock()
 
 
 @dataclass(frozen=True)
@@ -83,16 +85,17 @@ def get_module_scope_rules(module: ModuleType) -> tuple[RuleDescriptor, ...]:
 
     Note that we don't support recursive rules defined dynamically in inner scopes.
     """
-    descriptors = getattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY, None)
-    if descriptors is None:
-        descriptors = []
-        for node in ast.iter_child_nodes(ast.parse(inspect.getsource(module))):
-            if isinstance(node, ast.AsyncFunctionDef) and isinstance(node.returns, ast.Name):
-                descriptors.append(RuleDescriptor(module.__name__, node.name, node.returns.id))
-        descriptors = tuple(descriptors)
-        setattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY, descriptors)
+    with _rule_descriptors_lock:
+        descriptors = getattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY, None)
+        if descriptors is None:
+            descriptors = []
+            for node in ast.iter_child_nodes(ast.parse(inspect.getsource(module))):
+                if isinstance(node, ast.AsyncFunctionDef) and isinstance(node.returns, ast.Name):
+                    descriptors.append(RuleDescriptor(module.__name__, node.name, node.returns.id))
+            descriptors = tuple(descriptors)
+            setattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY, descriptors)
 
-    return descriptors
+        return descriptors
 
 
 class _TypeStack:
