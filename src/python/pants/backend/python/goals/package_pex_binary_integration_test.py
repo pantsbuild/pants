@@ -499,6 +499,65 @@ def test_extra_build_args(rule_runner: PythonRuleRunner) -> None:
     assert additional_args[-1] == "value-goes-here"
 
 
+def test_validate_entry_point_plumb(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/app.py": "print('hello')\n",
+            "src/py/project/BUILD": dedent(
+                """\
+                python_sources(name="lib")
+                pex_binary(name="default", entry_point="app.py")
+                pex_binary(name="validate", entry_point="app.py", validate_entry_point=True)
+                """
+            ),
+        }
+    )
+
+    default_args = rule_runner.request(
+        PexFromTargetsRequestForBuiltPackage,
+        [
+            PexBinaryFieldSet.create(
+                rule_runner.get_target(Address("src/py/project", target_name="default"))
+            )
+        ],
+    ).request.additional_args
+    validate_args = rule_runner.request(
+        PexFromTargetsRequestForBuiltPackage,
+        [
+            PexBinaryFieldSet.create(
+                rule_runner.get_target(Address("src/py/project", target_name="validate"))
+            )
+        ],
+    ).request.additional_args
+
+    assert "--validate-entry-point" not in default_args
+    assert "--validate-entry-point" in validate_args
+
+
+def test_validate_entry_point_end_to_end(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/py/project/BUILD": dedent(
+                """\
+                pex_binary(name="bad", entry_point="does.not.exist:null", validate_entry_point=True)
+                pex_binary(name="bad-unchecked", entry_point="does.not.exist:null")
+                """
+            ),
+        }
+    )
+
+    bad = PexBinaryFieldSet.create(
+        rule_runner.get_target(Address("src/py/project", target_name="bad"))
+    )
+    with pytest.raises(ExecutionError, match="does.not.exist"):
+        rule_runner.request(BuiltPackage, [bad])
+
+    unchecked = PexBinaryFieldSet.create(
+        rule_runner.get_target(Address("src/py/project", target_name="bad-unchecked"))
+    )
+    rule_runner.request(BuiltPackage, [unchecked])
+
+
 def test_package_with_python_provider() -> None:
     # Per https://github.com/pantsbuild/pants/issues/21048, test packaging a local/unconstrained pex
     # binary when using a Python that isn't automatically visible on $PATH (using the PBS provider
