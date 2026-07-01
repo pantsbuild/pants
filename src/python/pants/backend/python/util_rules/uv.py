@@ -121,7 +121,7 @@ def generate_pyproject_toml(
     resolve: str,
     ics: InterpreterConstraints,
     reqs: Iterable[str],
-    indexes: Iterable[str] | None = None,
+    indexes: Iterable[str] = (),
     sources: Iterable[str] = tuple(),
 ) -> str:
     def escape_double_quotes(s: str) -> str:
@@ -145,30 +145,32 @@ def generate_pyproject_toml(
         """
     ).format(resolve=resolve, requires_python=requires_python, deps_lines=deps_lines)
 
-    if indexes is not None:
+    # Sources map package names to named indexes and must be in pyproject.toml — uv rejects
+    # [sources] in uv.toml.  However, sources reference index names, so the referenced indexes
+    # must also be declared here (as [[tool.uv.index]]) for uv to validate the name references.
+    #
+    # Index definitions for actual package resolution go in uv.toml (via uv_config()) because
+    # all uv invocations use --no-config --config-file=uv.toml, which causes [tool.uv] config
+    # in pyproject.toml to be ignored for resolution purposes.
+    sources = tuple(sources)
+    if sources:
+        # Collect index names referenced by sources so we can declare them in pyproject.toml.
+        referenced_index_names = {source.partition("=")[0] for source in sources}
+
+        # Write [[tool.uv.index]] entries for indexes that sources reference.
         parsed_indexes = []
         for index in indexes:
             part1, _, part2 = index.partition("=")
             (name, url) = (part1, part2) if part2 else ("", part1)
             parsed_indexes.append((name, url))
-        if parsed_indexes:
-            # To turn off uv's fallback to PyPI we must set some other index to be the default.
-            # In uv the default index has the lowest priority, regardless of its position in the
-            # list of indexes, so we set the last index to be that default, to match user intent.
-            for i, (name, url) in enumerate(parsed_indexes):
-                is_default = i == len(parsed_indexes) - 1
-                content += "[[tool.uv.index]]\n"
-                if name:
-                    content += f'name = "{name}"\n'
-                content += f'url = "{url}"\n'
-                if is_default:
-                    content += "default = true\n"
-                content += "\n"
-        else:
-            content += "no-index = true\n\n"
 
-    sources = tuple(sources)
-    if sources:
+        for name, url in parsed_indexes:
+            if name in referenced_index_names:
+                content += "[[tool.uv.index]]\n"
+                content += f'name = "{name}"\n'
+                content += f'url = "{url}"\n'
+                content += "\n"
+
         source_lines = ["[tool.uv.sources]"]
         for source in sources:
             index_name, _, scope = source.partition("=")

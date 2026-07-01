@@ -520,6 +520,39 @@ class ResolveConfig:
             config_lines.append(f'exclude-newer = "{self.uploaded_prior_to}"')
             config_lines.append("")
 
+        # Indexes must go in uv.toml rather than pyproject.toml because all uv invocations
+        # use --no-config --config-file=uv.toml, which causes [tool.uv] in pyproject.toml
+        # to be ignored.
+        # TOML ordering: [[index]] (array-of-tables) must come after all top-level
+        # key-value pairs, otherwise subsequent keys are absorbed into the last array element.
+        indexes = []
+        for index in self.indexes:
+            part1, _, part2 = index.partition("=")
+            (name, url) = (part1, part2) if part2 else ("", part1)
+            index_data = {"url": url}
+            if name:
+                index_data["name"] = name
+            indexes.append(index_data)
+        if indexes:
+            # To turn off uv's fallback to PyPI we must set some other index to be the default.
+            # In uv the default index has the lowest priority, regardless of its position in the
+            # list of indexes, so we set the last index to be that default, to match user intent.
+            indexes[-1]["default"] = "true"
+            for index_data in indexes:
+                name = index_data.get("name", "")
+                url = index_data.get("url", "")
+                default = index_data.get("default", False)
+                config_lines.append("[[index]]")
+                if name:
+                    config_lines.append(f'name = "{name}"')
+                config_lines.append(f'url = "{url}"')
+                if default:
+                    config_lines.append("default = true")
+                config_lines.append("")
+        else:
+            config_lines.append("no-index = true")
+            config_lines.append("")
+
         return "\n".join(config_lines) + "\n" if config_lines else ""
 
     def validate_for_uv(self, resolve_name: str) -> None:
