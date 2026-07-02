@@ -44,6 +44,7 @@ log = { workspace = true }
 logging = { path = "../logging" }
 nailgun = { path = "../nailgun" }
 num_enum = { workspace = true }
+once_cell = { workspace = true }
 options = { path = "../options" }
 options_pants_ng = { path = "../pants_ng/options" }
 pantsd = { path = "../pantsd" }

@@ -7,6 +7,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from typing import Any, TypeVar
 
+from pants.engine.internals import native_engine
 from pants.util.meta import T, classproperty
 
 FuncType = Callable[..., Any]
@@ -62,14 +63,13 @@ def per_instance(*args, **kwargs):
     return equal_args(*instance_and_rest, **kwargs)
 
 
-def memoized(func: F | None = None, key_factory=equal_args, cache_factory=dict) -> F:
+def memoized(func: F | None = None, key_factory=equal_args, cache_factory=None) -> F:
     """Memoizes the results of a function call.
 
     By default, exactly one result is memoized for each unique combination of function arguments.
 
-    Note that memoization is not thread-safe and the default result cache will grow without bound;
-    so care must be taken to only apply this decorator to functions with single threaded access and
-    an expected reasonably small set of unique call parameters.
+    Note that the default result cache will grow without bound, so care must be taken to only apply
+    this decorator to functions with an expected reasonably small set of unique call parameters.
 
     Note that the wrapped function comes equipped with 3 helper function attributes:
 
@@ -84,19 +84,17 @@ def memoized(func: F | None = None, key_factory=equal_args, cache_factory=dict) 
     :API: public
 
     :param func: The function to wrap.  Only generally passed by the python runtime and should be
-                 omitted when passing a custom `key_factory` or `cache_factory`.
+                 omitted when passing a custom `key_factory`.
     :param key_factory: A function that can form a cache key from the arguments passed to the
                         wrapped, memoized function; by default uses simple parameter-set equality;
                         ie `equal_args`.
-    :param cache_factory: A no-arg callable that produces a mapping object to use for the memoized
-                          method's value cache.  By default the `dict` constructor, but could be a
-                          a factory for an LRU cache for example.
+    :param cache_factory: Deprecated and ignored. Memoization caches are now engine-managed.
     :raises: `ValueError` if the wrapper is applied to anything other than a function.
     :returns: A wrapped function that memoizes its results or else a function wrapper that does this.
     """
     if func is None:
         # We're being applied as a decorator factory; ie: the user has supplied args, like so:
-        # >>> @memoized(cache_factory=lru_cache)
+        # >>> @memoized(key_factory=create_key)
         # ... def expensive_operation(user):
         # ...   pass
         # So we return a decorator with the user-supplied args curried in for the python decorator
@@ -113,41 +111,53 @@ def memoized(func: F | None = None, key_factory=equal_args, cache_factory=dict) 
     if not inspect.isfunction(func):
         raise ValueError("The @memoized decorator must be applied innermost of all decorators.")
 
+    if cache_factory is not None:
+        from pants.base.deprecated import warn_or_error
+
+        warn_or_error(
+            removal_version="2.35.0.dev0",
+            entity=f"the cache_factory argument to @memoized (on {func.__qualname__})",
+            hint=(
+                "Memoization caches are now engine-managed for thread safety under "
+                "free-threaded Python, so custom cache factories (e.g. LRU caches) are no "
+                "longer honored. The argument is silently ignored and can be removed."
+            ),
+        )
+
     key_func = key_factory or equal_args
-    memoized_results = cache_factory() if cache_factory else {}
+    cache = native_engine.LockMap()
 
     @functools.wraps(func)
     def memoize(*args, **kwargs):
         key = key_func(*args, **kwargs)
-        if key in memoized_results:
-            return memoized_results[key]
-        result = func(*args, **kwargs)
-        memoized_results[key] = result
-        return result
+        return cache.get_or_insert(key, lambda: func(*args, **kwargs))
 
     @contextmanager
     def put(*args, **kwargs):
         key = key_func(*args, **kwargs)
-        yield functools.partial(memoized_results.__setitem__, key)
+
+        def setter(value):
+            cache.put(key, value)
+
+        yield setter
 
     memoize.put = put  # type: ignore[attr-defined]
 
     def forget(*args, **kwargs):
         key = key_func(*args, **kwargs)
-        if key in memoized_results:
-            del memoized_results[key]
+        cache.forget(key)
 
     memoize.forget = forget  # type: ignore[attr-defined]
 
     def clear():
-        memoized_results.clear()
+        cache.clear()
 
     memoize.clear = clear  # type: ignore[attr-defined]
 
     return memoize  # type: ignore[return-value]
 
 
-def memoized_method(func: F | None = None, key_factory=per_instance, cache_factory=dict) -> F:
+def memoized_method(func: F | None = None, key_factory=per_instance, cache_factory=None) -> F:
     """A convenience wrapper for memoizing instance methods.
 
     Typically you'd expect a memoized instance method to hold a cached value per class instance;
@@ -173,10 +183,10 @@ def memoized_method(func: F | None = None, key_factory=per_instance, cache_facto
     :API: public
 
     :param func: The function to wrap.  Only generally passed by the python runtime and should be
-                 omitted when passing a custom `key_factory` or `cache_factory`.
+                 omitted when passing a custom `key_factory`.
     :param key_factory: A function that can form a cache key from the arguments passed to the
                         wrapped, memoized function; by default `per_instance`.
-    :param kwargs: Any extra keyword args accepted by `memoized`.
+    :param cache_factory: Deprecated and ignored. Memoization caches are now engine-managed.
     :raises: `ValueError` if the wrapper is applied to anything other than a function.
     :returns: A wrapped function that memoizes its results or else a function wrapper that does this.
     """
@@ -184,7 +194,7 @@ def memoized_method(func: F | None = None, key_factory=per_instance, cache_facto
 
 
 def memoized_property(
-    func: Callable[..., T] | None = None, key_factory=per_instance, cache_factory=dict
+    func: Callable[..., T] | None = None, key_factory=per_instance, cache_factory=None
 ) -> T:
     """A convenience wrapper for memoizing properties.
 
@@ -239,10 +249,10 @@ def memoized_property(
     :API: public
 
     :param func: The property getter method to wrap.  Only generally passed by the python runtime and
-                 should be omitted when passing a custom `key_factory` or `cache_factory`.
+                 should be omitted when passing a custom `key_factory`.
     :param key_factory: A function that can form a cache key from the arguments passed to the
                         wrapped, memoized function; by default `per_instance`.
-    :param kwargs: Any extra keyword args accepted by `memoized`.
+    :param cache_factory: Deprecated and ignored. Memoization caches are now engine-managed.
     :raises: `ValueError` if the wrapper is applied to anything other than a function.
     :returns: A read-only property that memoizes its calculated value and un-caches its value when
               `del`ed.
@@ -255,25 +265,23 @@ def memoized_property(
 
 
 # TODO[13244]: fix type hint issue when using @memoized_classmethod and friends
-def memoized_classmethod(func: F | None = None, key_factory=per_instance, cache_factory=dict) -> F:
+def memoized_classmethod(func: F | None = None, key_factory=per_instance, cache_factory=None) -> F:
     return classmethod(  # type: ignore[return-value]
         memoized_method(func, key_factory=key_factory, cache_factory=cache_factory)
     )
 
 
 def memoized_classproperty(
-    func: Callable[..., T] | None = None, key_factory=per_instance, cache_factory=dict
+    func: Callable[..., T] | None = None, key_factory=per_instance, cache_factory=None
 ) -> T:
     return classproperty(
         memoized_classmethod(func, key_factory=key_factory, cache_factory=cache_factory)
     )
 
 
-def testable_memoized_property(
-    func: Callable[..., T] | None = None, key_factory=per_instance, cache_factory=dict
-) -> T:
+def testable_memoized_property(func: Callable[..., T] | None = None, key_factory=per_instance) -> T:
     """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
-    getter = memoized_method(func=func, key_factory=key_factory, cache_factory=cache_factory)
+    getter = memoized_method(func=func, key_factory=key_factory)
 
     def setter(self, val):
         with getter.put(self) as putter:
