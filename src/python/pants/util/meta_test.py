@@ -1,7 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import time
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -14,6 +16,22 @@ def test_singleton() -> None:
         pass
 
     assert One() is One()
+
+
+def test_singleton_concurrent_construction() -> None:
+    constructions = 0
+
+    class One(metaclass=SingletonMetaclass):
+        def __init__(self) -> None:
+            nonlocal constructions
+            time.sleep(0.01)
+            constructions += 1
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        instances = list(executor.map(lambda _: One(), range(8)))
+
+    assert len({id(instance) for instance in instances}) == 1
+    assert constructions == 1
 
 
 class WithProp:

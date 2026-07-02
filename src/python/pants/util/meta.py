@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import threading
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -19,11 +20,14 @@ class SingletonMetaclass(type):
         pass
     """
 
+    _instance_lock = threading.RLock()
+
     def __call__(cls, *args: Any, **kwargs: Any) -> Any:
         # TODO: convert this into an `@memoized_classproperty`!
-        if not hasattr(cls, "instance"):
-            cls.instance = super().__call__(*args, **kwargs)
-        return cls.instance
+        with SingletonMetaclass._instance_lock:
+            if not hasattr(cls, "instance"):
+                cls.instance = super().__call__(*args, **kwargs)
+            return cls.instance
 
 
 class _ClassPropertyDescriptor:
