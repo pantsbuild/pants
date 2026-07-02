@@ -1,6 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::cell::Cell;
 use std::time::Duration;
 
 use pyo3::exceptions::PyException;
@@ -12,11 +13,51 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-// NB: This exists because we need the PyInterpreterState to pass to PyThreadState_New,
-// however PyInterpreterState_Get wasn't added until Py 3.9. They vary in implementation, but because
-// we don't have any sub-interpreters they should both return the same object.
-unsafe extern "C" {
-    pub fn PyInterpreterState_Main() -> *mut ffi::PyInterpreterState;
+thread_local! {
+    /// This thread's detached `PyThreadState` and the `PyGILState_STATE` returned by the
+    /// `PyGILState_Ensure` call that created it.
+    static THREAD_STATE: Cell<Option<(*mut ffi::PyThreadState, ffi::PyGILState_STATE)>> =
+        const { Cell::new(None) };
+}
+
+/// Create a thread state for this thread up front and keep it until `thread_state_destroy`.
+///
+/// Each `Python::attach` on a thread with no thread state creates one via `PyGILState_Ensure`
+/// and destroys it again on release. That resets the debug trace function between calls (see
+/// https://github.com/PyO3/pyo3/issues/2495), and on free-threaded builds the teardown is
+/// expensive: `PyThreadState_Clear` abandons the thread's mimalloc heaps, which every other
+/// thread then pays to reclaim on allocation.
+///
+/// NB: The state must be created with `PyGILState_Ensure`: the gilstate machinery does not know
+/// about states created with `PyThreadState_New`, and would still create and destroy its own on
+/// every attach. `PyEval_SaveThread` then detaches, leaving the thread parked without a state
+/// attached (which would otherwise block free-threaded stop-the-world pauses).
+fn thread_state_create() {
+    unsafe {
+        let gilstate = ffi::PyGILState_Ensure();
+        let tstate = ffi::PyEval_SaveThread();
+        THREAD_STATE.set(Some((tstate, gilstate)));
+    }
+    if std::env::var("PANTS_DEBUG").is_ok() {
+        Python::attach(|py| {
+            let _ = py.eval(c"__import__('debugpy').debug_this_thread()", None, None);
+        });
+    }
+}
+
+/// Release the thread state created by `thread_state_create`. Tokio recycles blocking-pool
+/// threads after an idle timeout, so thread states must die with their threads or they
+/// accumulate for the life of the process. Re-attaching and then releasing the last gilstate
+/// reference has CPython clear and delete the state.
+fn thread_state_destroy() {
+    if let Some((tstate, gilstate)) = THREAD_STATE.take() {
+        unsafe {
+            if ffi::Py_IsInitialized() != 0 {
+                ffi::PyEval_RestoreThread(tstate);
+                ffi::PyGILState_Release(gilstate);
+            }
+        }
+    }
 }
 
 #[pyclass]
@@ -27,20 +68,12 @@ pub struct PyExecutor(pub task_executor::Executor);
 impl PyExecutor {
     #[new]
     fn __new__(core_threads: usize, max_threads: usize) -> PyResult<Self> {
-        task_executor::Executor::new_owned(core_threads, max_threads, || {
-            // NB: We need a PyThreadState object which lives throughout the lifetime of this thread
-            // as the debug trace object is attached to it. Otherwise the PyThreadState is
-            // constructed/destroyed with each `with_gil` call (inside PyGILState_Ensure/PyGILState_Release).
-            //
-            // Constructing (and leaking) a ThreadState object allocates and associates it with the current
-            // thread, and the Python runtime won't wipe the trace function between calls.
-            // See https://github.com/PyO3/pyo3/issues/2495
-            let _ =
-                unsafe { ffi::PyThreadState_New(Python::attach(|_| PyInterpreterState_Main())) };
-            Python::attach(|py| {
-                let _ = py.eval(c"__import__('debugpy').debug_this_thread()", None, None);
-            });
-        })
+        task_executor::Executor::new_owned(
+            core_threads,
+            max_threads,
+            thread_state_create,
+            thread_state_destroy,
+        )
         .map(PyExecutor)
         .map_err(PyException::new_err)
     }
