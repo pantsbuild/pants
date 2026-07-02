@@ -38,7 +38,7 @@ jobs:
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
-    - name: Set up Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -49,6 +49,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Install Protoc
       uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
@@ -148,7 +149,7 @@ jobs:
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -160,6 +161,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Install Protoc
       uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
@@ -267,7 +269,7 @@ jobs:
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
-    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -277,6 +279,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Install Protoc
       uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
@@ -550,7 +553,7 @@ jobs:
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
-    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -560,6 +563,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Install Protoc
       uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
@@ -782,7 +786,7 @@ jobs:
         echo "PANTS_REMOTE_STORE_ADDRESS=grpc://localhost:9092" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_READ=true" >> "$GITHUB_ENV"
         echo "PANTS_REMOTE_CACHE_WRITE=${CACHE_WRITE}" >> "$GITHUB_ENV"
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -794,6 +798,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -908,7 +913,7 @@ jobs:
       with:
         cache: false
         go-version: 1.24.9
-    - name: Set up Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -919,6 +924,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -1036,7 +1042,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -1048,6 +1054,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -1165,7 +1172,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -1177,6 +1184,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -1294,7 +1302,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -1306,6 +1314,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -1423,7 +1432,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -1435,6 +1444,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -1552,7 +1562,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -1564,6 +1574,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -1681,7 +1692,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -1693,6 +1704,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -1810,7 +1822,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -1822,6 +1834,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -1939,7 +1952,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -1951,6 +1964,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -2068,7 +2082,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -2080,6 +2094,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -2197,7 +2212,7 @@ jobs:
         curl --fail -L https://binaries.pantsbuild.org/bin/thrift/linux/x86_64/0.15.0/thrift -o "${HOME}/.thrift/thrift"
         chmod +x "${HOME}/.thrift/thrift"
         echo "${HOME}/.thrift" >> $GITHUB_PATH
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -2209,6 +2224,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:
@@ -2295,7 +2311,7 @@ jobs:
       with:
         cache: false
         go-version: 1.24.9
-    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -2305,6 +2321,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - name: Download native binaries
       uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
       with:

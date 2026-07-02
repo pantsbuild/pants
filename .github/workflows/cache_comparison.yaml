@@ -11,7 +11,7 @@ jobs:
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         fetch-depth: 10
-    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+    - name: Set up Python 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: |-
@@ -23,6 +23,7 @@ jobs:
           3.12
           3.13
           3.14
+          3.14t
     - env:
         BASE_REF: ${{ github.event.inputs.base_ref }}
         BUILD_COMMIT: ${{ github.event.inputs.build_commit }}
