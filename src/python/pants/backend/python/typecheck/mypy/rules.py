@@ -274,12 +274,14 @@ async def mypy_typecheck_partition(
 
     if mypy.cache_mode == MyPyCacheMode.none:
         script_content = dedent(f"""\
+            #!/bin/sh
             {mypy_command}
         """)
     else:
         sandbox_cache_dir = f"{run_cache_dir}/{py_version}"
 
         script_content = dedent(f"""\
+            #!/bin/sh
             # We want to leverage the MyPy cache for fast incremental runs of MyPy.
             # Pants exposes "append_only_caches" we can leverage, but with the caveat
             # that it requires either only appending files, or multiprocess-safe access.
