@@ -146,6 +146,11 @@ func saveCgo(filename string, pkg *Package, cg *ast.CommentGroup, buildContext *
 			continue
 		}
 
+		// #cgo (nocallback|noescape) <function name>
+		if fields := strings.Fields(line); len(fields) == 3 && (fields[1] == "nocallback" || fields[1] == "noescape") {
+			continue
+		}
+
 		// Split at colon.
 		line, argstr, ok := stringsCut(strings.TrimSpace(line[4:]), ":")
 		if !ok {
