@@ -69,7 +69,13 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest]),
             QueryRule(CGoCompileResult, [CGoCompileRequest]),
             QueryRule(ProcessResult, (Process,)),
-            QueryRule(FallibleProcessResult, (EnvironmentName, Process,)),
+            QueryRule(
+                FallibleProcessResult,
+                (
+                    EnvironmentName,
+                    Process,
+                ),
+            ),
         ],
         target_types=[
             GoModTarget,
@@ -962,4 +968,7 @@ def test_cgo_nocallback_noescape_directives(rule_runner: RuleRunner) -> None:
         ],
     )
     assert result.exit_code != 0
-    assert "panic: runtime: function marked with #cgo nocallback called back into Go" in result.stderr.decode()
+    assert (
+        "panic: runtime: function marked with #cgo nocallback called back into Go"
+        in result.stderr.decode()
+    )
