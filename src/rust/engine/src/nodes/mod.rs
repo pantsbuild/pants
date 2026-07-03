@@ -76,19 +76,21 @@ pub fn task_get_context() -> Context {
     TASK_CONTEXT.with(|c| (**c).clone())
 }
 
-pub async fn task_context<T, F: future::Future<Output = T>>(
+pub fn task_context<T, F: future::Future<Output = T>>(
     context: Context,
     is_side_effecting: bool,
     side_effected: &Arc<AtomicBool>,
     f: F,
-) -> T {
+) -> impl future::Future<Output = T> {
+    // NB: Not an `async fn`: a coroutine would additionally retain the moved `f` in its own
+    // layout, doubling the size of every rule body scoped through here.
     let context = Arc::new(context);
     if is_side_effecting {
-        TASK_SIDE_EFFECTED
-            .scope(side_effected.clone(), TASK_CONTEXT.scope(context, f))
-            .await
+        future::Either::Left(
+            TASK_SIDE_EFFECTED.scope(side_effected.clone(), TASK_CONTEXT.scope(context, f)),
+        )
     } else {
-        TASK_CONTEXT.scope(context, f).await
+        future::Either::Right(TASK_CONTEXT.scope(context, f))
     }
 }
 
