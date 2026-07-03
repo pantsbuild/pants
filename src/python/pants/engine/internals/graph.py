@@ -1329,6 +1329,13 @@ async def find_owners(
             ):
                 continue
 
+
+            # If we have block-level change information (`sources_blocks`) for this BUILD file,
+            # we skip adding all its targets indiscriminately. The precise targets affected
+            # by the line changes are already captured by the `block_owners` calculation.
+            if not matching_files and bfa.rel_path in owners_request.sources_blocks:
+                continue
+
             unmatched_sources -= matching_files
             result.add(candidate_tgt.address)
 
