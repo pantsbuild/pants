@@ -903,6 +903,17 @@ class BootstrapOptions:
             """
         ),
     )
+    pants_free_threaded = BoolOption(
+        advanced=True,
+        default=True,
+        help=softwrap(
+            f"""
+            Run Pants on a free-threaded CPython interpreter. Like `pants_version`, this is
+            consumed by the `{bin_name()}` launcher to select which Pants distribution to
+            install and has no effect once Pants is running.
+            """
+        ),
+    )
     pants_bin_name = StrOption(
         advanced=True,
         default="pants",
