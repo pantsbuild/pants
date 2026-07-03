@@ -67,7 +67,9 @@ pex_binary(
     scie_bind_resource_path=["PANTS_NATIVE_CLIENT=pants/bin/native_client"],
     scie_exe="{scie.env.PANTS_NATIVE_CLIENT}",
     scie_env=["NO_SCIE_WARNING=true", "_PANTS_SERVER_EXE={scie.env.VIRTUAL_ENV}/bin/pants"],
-    scie_pbs_free_threaded=True,
+    # The scie interpreter must match the wheels: each release lane builds one
+    # parametrization with the corresponding CPython (PY=python3.14t or python3.14).
+    scie_pbs_free_threaded=parametrize(cp314t=True, cp314=False),
 )
 
 # NB: we use `dummy.c` to avoid clang/gcc complaining `error: no input files` when building

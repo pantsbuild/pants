@@ -4,7 +4,7 @@
 
 
 jobs:
-  build_wheels_linux_arm64:
+  build_wheels_cp314_linux_arm64:
     container:
       image: quay.io/pypa/manylinux_2_28_aarch64:latest
     env:
@@ -12,7 +12,7 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
-    name: Build wheels (Linux-ARM64)
+    name: Build wheels (Linux-ARM64, cp314)
     needs:
     - release_info
     permissions:
@@ -56,6 +56,7 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp314-cp314t/bin" >> $GITHUB_PATH
     - name: Install Protoc
       uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
@@ -63,6 +64,15 @@ jobs:
         version: 23.x
     - name: Install Python headers
       run: echo 'no-op'
+    - name: Select the distribution interpreter
+      run: |
+        curl -fL -o /tmp/pex.pex \
+        https://github.com/pex-tool/pex/releases/download/v2.97.1/pex
+        echo "7aa97828d587883ddacc7cb1bdef71ed101b4d90e694a397a1cceaeac08e80b7  /tmp/pex.pex" | sha256sum -c -
+        PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[gil]==3.14.*' \
+        -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+        echo "PY=$PY" >> "$GITHUB_ENV"
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['CPython[gil]==3.14.*']" >> "$GITHUB_ENV"
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
@@ -72,7 +82,461 @@ jobs:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
+      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      with:
+        name: logs-wheels-and-pex-Linux-ARM64
+        overwrite: 'true'
+        path: .pants.d/workdir/*.log
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Attest the pantsbuild.pants wheel
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Rename the Pants Pex to its final name for upload
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+        PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+        echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Attest the Pants Pex artifact
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-path: dist/src.python.pants/*
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload Wheel and Pex
+      run: |
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
+
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
+            --data-binary "@$WHL";
+    timeout-minutes: 90
+  build_wheels_cp314_linux_x86_64:
+    container:
+      image: quay.io/pypa/manylinux_2_28_x86_64:latest
+      volumes:
+      - /:/mnt/host-root
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: github.repository_owner == 'pantsbuild'
+    name: Build wheels (Linux-x86_64, cp314)
+    needs:
+    - release_info
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    runs-on:
+    - depot-ubuntu-22.04-8
+    steps:
+    - name: Free up disk space
+      run: |-
+        df -h
+        rm -rf /mnt/host-root/usr/share/dotnet || true
+        rm -rf /mnt/host-root/usr/local/lib/android || true
+        rm -rf /mnt/host-root/opt/ghc || true
+        rm -rf /mnt/host-root/usr/local/.ghcup || true
+        df -h
+    - name: Check out code
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        fetch-depth: 10
+        ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Configure Git
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
+    - name: Install rustup
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+    - name: Install Rust toolchain
+      run: |
+        # Set the default toolchain. Installs the toolchain if it is not already installed.
+        rustup default 1.97.0
+        cargo version
+    - name: Expose Pythons
+      run: |
+        echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp314-cp314t/bin" >> $GITHUB_PATH
+    - name: Install Protoc
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      with:
+        cache: false
+        go-version: 1.25.3
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      with:
+        cache: false
+        go-version: 1.24.9
+    - name: Select the distribution interpreter
+      run: |
+        curl -fL -o /tmp/pex.pex \
+        https://github.com/pex-tool/pex/releases/download/v2.97.1/pex
+        echo "7aa97828d587883ddacc7cb1bdef71ed101b4d90e694a397a1cceaeac08e80b7  /tmp/pex.pex" | sha256sum -c -
+        PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[gil]==3.14.*' \
+        -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+        echo "PY=$PY" >> "$GITHUB_ENV"
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['CPython[gil]==3.14.*']" >> "$GITHUB_ENV"
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+      name: Build wheels
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      with:
+        name: logs-wheels-and-pex-Linux-x86_64
+        overwrite: 'true'
+        path: .pants.d/workdir/*.log
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Attest the pantsbuild.pants wheel
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Rename the Pants Pex to its final name for upload
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+        PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+        echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Attest the Pants Pex artifact
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-path: dist/src.python.pants/*
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload Wheel and Pex
+      run: |
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
+
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
+            --data-binary "@$WHL";
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Attest the pantsbuild.pants.testutil wheel
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants_testutil*.whl
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload testutil Wheel
+      run: |
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants_testutil*.whl")
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
+            --data-binary "@$WHL";
+    timeout-minutes: 90
+  build_wheels_cp314_macos14_arm64:
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: github.repository_owner == 'pantsbuild'
+    name: Build wheels (macOS14-ARM64, cp314)
+    needs:
+    - release_info
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    runs-on:
+    - depot-macos-14
+    steps:
+    - name: Free up disk space
+      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+      with:
+        android: true
+        docker-images: false
+        dotnet: true
+        haskell: true
+        large-packages: false
+        swap-storage: false
+        tool-cache: false
+    - name: Check out code
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        fetch-depth: 10
+        ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Set up Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.14t
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      with:
+        python-version: |-
+          3.9
+          3.10
+          3.11
+          3.12
+          3.13
+          3.14
+          3.14t
+    - name: Install Protoc
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Set rustup profile
+      run: rustup set profile default
+    - name: Cache Rust toolchain
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
+        path: |
+          ~/.rustup/toolchains/1.97.0-*
+          ~/.rustup/update-hashes
+          ~/.rustup/settings.toml
+    - name: Cache Cargo
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4
+      with:
+        cache-bin: 'false'
+        shared-key: engine
+        workspaces: src/rust
+    - name: Install Protoc
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Install Go 1.25.3
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      with:
+        cache: false
+        go-version: 1.25.3
+    - name: Install Go 1.24.9
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      with:
+        cache: false
+        go-version: 1.24.9
+    - name: Select the distribution interpreter
+      run: |
+        curl -fL -o /tmp/pex.pex \
+        https://github.com/pex-tool/pex/releases/download/v2.97.1/pex
+        echo "7aa97828d587883ddacc7cb1bdef71ed101b4d90e694a397a1cceaeac08e80b7  /tmp/pex.pex" | shasum -a 256 -c -
+        PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[gil]==3.14.*' \
+        -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+        echo "PY=$PY" >> "$GITHUB_ENV"
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['CPython[gil]==3.14.*']" >> "$GITHUB_ENV"
+    - env:
+        ARCHFLAGS: -arch arm64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
+      name: Build wheels
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        ARCHFLAGS: -arch arm64
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+        _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314
+    - continue-on-error: true
+      if: always()
+      name: Upload pants.log
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      with:
+        name: logs-wheels-and-pex-macOS14-ARM64
+        overwrite: 'true'
+        path: .pants.d/workdir/*.log
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Attest the pantsbuild.pants wheel
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants-*.whl
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Rename the Pants Pex to its final name for upload
+      run: |
+        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
+        PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
+
+        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
+        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
+        echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Attest the Pants Pex artifact
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-path: dist/src.python.pants/*
+    - if: needs.release_info.outputs.is-release == 'true'
+      name: Upload Wheel and Pex
+      run: |
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_FILENAME"
+
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            ${{ needs.release_info.outputs.release-asset-upload-url }}?name=$PEX_SCIE_FILENAME \
+            --data-binary "@dist/src.python.pants/$PEX_SCIE_FILENAME"
+
+        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants-*.whl")
+        curl -L --fail \
+            -X POST \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Content-Type: application/octet-stream" \
+            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
+            --data-binary "@$WHL";
+    timeout-minutes: 90
+  build_wheels_linux_arm64:
+    container:
+      image: quay.io/pypa/manylinux_2_28_aarch64:latest
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      PANTS_REMOTE_CACHE_READ: 'false'
+      PANTS_REMOTE_CACHE_WRITE: 'false'
+    if: github.repository_owner == 'pantsbuild'
+    name: Build wheels (Linux-ARM64, cp314t)
+    needs:
+    - release_info
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    runs-on:
+    - depot-ubuntu-24.04-arm-8
+    steps:
+    - name: Free up disk space
+      run: |-
+        df -h
+        rm -rf /mnt/host-root/usr/share/dotnet || true
+        rm -rf /mnt/host-root/usr/local/lib/android || true
+        rm -rf /mnt/host-root/opt/ghc || true
+        rm -rf /mnt/host-root/usr/local/.ghcup || true
+        df -h
+    - name: Check out code
+      uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        fetch-depth: 10
+        ref: ${{ needs.release_info.outputs.build-ref }}
+    - name: Configure Git
+      run: git config --global safe.directory "$GITHUB_WORKSPACE"
+    - name: Install rustup
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -v -y --default-toolchain none
+        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+    - name: Install Rust toolchain
+      run: |
+        # Set the default toolchain. Installs the toolchain if it is not already installed.
+        rustup default 1.97.0
+        cargo version
+    - name: Expose Pythons
+      run: |
+        echo "/opt/python/cp37-cp37m/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp38-cp38/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp39-cp39/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp310-cp310/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp311-cp311/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp314-cp314t/bin" >> $GITHUB_PATH
+    - name: Install Protoc
+      uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        version: 23.x
+    - name: Install Python headers
+      run: echo 'no-op'
+    - name: Select the distribution interpreter
+      run: |
+        curl -fL -o /tmp/pex.pex \
+        https://github.com/pex-tool/pex/releases/download/v2.97.1/pex
+        echo "7aa97828d587883ddacc7cb1bdef71ed101b4d90e694a397a1cceaeac08e80b7  /tmp/pex.pex" | sha256sum -c -
+        PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[free-threaded]==3.14.*' \
+        -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+        echo "PY=$PY" >> "$GITHUB_ENV"
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['CPython[free-threaded]==3.14.*']" >> "$GITHUB_ENV"
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+      name: Build wheels
+      run: ./pants run src/python/pants_release/release.py -- build-wheels
+    - env:
+        HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
+        PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
+      name: Build Pants PEX
+      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314t
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -139,7 +603,7 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
-    name: Build wheels (Linux-x86_64)
+    name: Build wheels (Linux-x86_64, cp314t)
     needs:
     - release_info
     permissions:
@@ -183,6 +647,7 @@ jobs:
         echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
         echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
         echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
+        echo "/opt/python/cp314-cp314t/bin" >> $GITHUB_PATH
     - name: Install Protoc
       uses: benjyw/setup-protoc@fa4f90fddf8838036cbdeadf1262b9755f6cfb85
       with:
@@ -198,6 +663,15 @@ jobs:
       with:
         cache: false
         go-version: 1.24.9
+    - name: Select the distribution interpreter
+      run: |
+        curl -fL -o /tmp/pex.pex \
+        https://github.com/pex-tool/pex/releases/download/v2.97.1/pex
+        echo "7aa97828d587883ddacc7cb1bdef71ed101b4d90e694a397a1cceaeac08e80b7  /tmp/pex.pex" | sha256sum -c -
+        PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[free-threaded]==3.14.*' \
+        -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+        echo "PY=$PY" >> "$GITHUB_ENV"
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['CPython[free-threaded]==3.14.*']" >> "$GITHUB_ENV"
     - env:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
@@ -209,7 +683,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
+      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314t
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -287,7 +761,7 @@ jobs:
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
-    name: Build wheels (macOS14-ARM64)
+    name: Build wheels (macOS14-ARM64, cp314t)
     needs:
     - release_info
     permissions:
@@ -359,6 +833,15 @@ jobs:
       with:
         cache: false
         go-version: 1.24.9
+    - name: Select the distribution interpreter
+      run: |
+        curl -fL -o /tmp/pex.pex \
+        https://github.com/pex-tool/pex/releases/download/v2.97.1/pex
+        echo "7aa97828d587883ddacc7cb1bdef71ed101b4d90e694a397a1cceaeac08e80b7  /tmp/pex.pex" | shasum -a 256 -c -
+        PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[free-threaded]==3.14.*' \
+        -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+        echo "PY=$PY" >> "$GITHUB_ENV"
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['CPython[free-threaded]==3.14.*']" >> "$GITHUB_ENV"
     - env:
         ARCHFLAGS: -arch arm64
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
@@ -372,7 +855,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex
+      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314t
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -437,6 +920,9 @@ jobs:
     - build_wheels_linux_x86_64
     - build_wheels_linux_arm64
     - build_wheels_macos14_arm64
+    - build_wheels_cp314_linux_x86_64
+    - build_wheels_cp314_linux_arm64
+    - build_wheels_cp314_macos14_arm64
     - release_info
     runs-on: ubuntu-22.04
     steps:
