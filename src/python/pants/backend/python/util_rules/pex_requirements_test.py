@@ -23,6 +23,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     strip_comments_from_pex_json_lockfile,
     validate_metadata,
 )
+from pants.backend.python.util_rules.uv import generate_pyproject_toml
 from pants.core.util_rules.lockfile_metadata import (
     BEGIN_LOCKFILE_HEADER,
     END_LOCKFILE_HEADER,
@@ -457,6 +458,7 @@ def _uv_config(
     indexes=None,
     find_links=None,
     extra_find_links=(),
+    sources=None,
     only_binary=None,
     no_binary=None,
     uploaded_prior_to=None,
@@ -466,11 +468,11 @@ def _uv_config(
         find_links=find_links or [],
         manylinux=None,
         constraints_file=None,
-        no_binary=FrozenOrderedSet(no_binary) if no_binary else FrozenOrderedSet(),
-        only_binary=FrozenOrderedSet(only_binary) if only_binary else FrozenOrderedSet(),
+        no_binary=FrozenOrderedSet(no_binary or []),
+        only_binary=FrozenOrderedSet(only_binary or []),
         excludes=FrozenOrderedSet(),
         overrides=FrozenOrderedSet(),
-        sources=FrozenOrderedSet(),
+        sources=FrozenOrderedSet(sources or []),
         path_mappings=[],
         lock_style="universal",
         complete_platforms=(),
@@ -480,24 +482,39 @@ def _uv_config(
 
 
 def test_uv_config_indexes():
-    parsed = _uv_config(indexes=[])
-    assert parsed.get("no-index") is True
-    assert "index" not in parsed
+    ics = InterpreterConstraints([">=3.8"])
 
-    parsed = _uv_config(indexes=["https://example.com/simple"])
-    assert len(parsed["index"]) == 1
-    assert parsed["index"][0]["url"] == "https://example.com/simple"
-    assert parsed["index"][0]["default"] is True
+    parsed = tomllib.loads(generate_pyproject_toml("test", ics, [], indexes=[]))
+    assert parsed["tool"]["uv"].get("no-index") is True
+    assert "index" not in parsed["tool"]["uv"]
 
-    parsed = _uv_config(
-        indexes=["https://primary.example.com/simple", "https://secondary.example.com/simple"]
+    parsed = tomllib.loads(
+        generate_pyproject_toml("test", ics, [], indexes=["https://example.com/simple"])
     )
-    indexes = parsed["index"]
+    indexes = parsed["tool"]["uv"]["index"]
+    assert len(indexes) == 1
+    assert indexes[0]["url"] == "https://example.com/simple"
+    assert indexes[0]["default"] is True
+
+    parsed = tomllib.loads(
+        generate_pyproject_toml(
+            "test",
+            ics,
+            [],
+            indexes=[
+                "https://primary.example.com/simple",
+                "fallback=https://secondary.example.com/simple",
+            ],
+        )
+    )
+    indexes = parsed["tool"]["uv"]["index"]
     assert len(indexes) == 2
     assert indexes[0]["url"] == "https://primary.example.com/simple"
-    assert indexes[0]["default"] is True
+    assert "name" not in indexes[0]
+    assert "default" not in indexes[0]
     assert indexes[1]["url"] == "https://secondary.example.com/simple"
-    assert indexes[1].get("name") == "extra-1"
+    assert indexes[1].get("name") == "fallback"
+    assert indexes[1]["default"] is True
 
 
 def test_uv_config_find_links():
@@ -512,6 +529,37 @@ def test_uv_config_find_links():
         "https://a.example.com/wheels",
         "https://b.example.com/wheels",
     ]
+
+
+def test_uv_config_sources():
+    ics = InterpreterConstraints([">=3.8"])
+
+    parsed = tomllib.loads(generate_pyproject_toml("test", ics, ["requests"], sources=tuple()))
+    assert "sources" not in parsed.get("tool", {}).get("uv", {})
+
+    parsed = tomllib.loads(
+        generate_pyproject_toml("test", ics, ["requests"], sources=["myindex=requests>=2.0"])
+    )
+    assert parsed["tool"]["uv"]["sources"] == {"requests": {"index": "myindex"}}
+
+    parsed = tomllib.loads(
+        generate_pyproject_toml(
+            "test", ics, ["requests"], sources=['myindex=requests>=2.0; python_version > "3.8"']
+        )
+    )
+    assert parsed["tool"]["uv"]["sources"]["requests"]["index"] == "myindex"
+    assert "python_version" in parsed["tool"]["uv"]["sources"]["requests"]["marker"]
+
+    parsed = tomllib.loads(
+        generate_pyproject_toml(
+            "test",
+            ics,
+            ["requests", "boto3"],
+            sources=["indexa=requests>=2.0", "indexb=boto3>=1.0"],
+        )
+    )
+    assert parsed["tool"]["uv"]["sources"]["requests"] == {"index": "indexa"}
+    assert parsed["tool"]["uv"]["sources"]["boto3"] == {"index": "indexb"}
 
 
 def test_uv_config_no_binary():

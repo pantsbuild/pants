@@ -331,7 +331,7 @@ fn maybe_enrich_notify_error(path: &Path, e: notify::Error) -> String {
             format!(
                 "\n\nOn Linux, this can be caused by a `max_user_watches` setting that is lower \
               than the number of files and directories in your repository ({limit_value}). Please see \
-              https://www.pantsbuild.org/docs/troubleshooting#no-space-left-on-device-error-while-watching-files \
+              https://www.pantsbuild.org/stable/docs/using-pants/troubleshooting-common-issues#no-space-left-on-device-error-while-watching-files \
               for more information."
             )
         }

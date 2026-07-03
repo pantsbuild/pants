@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import Any
 
-from pants.backend.codegen.protobuf.lint.buf.skip_field import SkipBufLintField
-from pants.backend.codegen.protobuf.lint.buf.subsystem import BufSubsystem
+from pants.backend.codegen.protobuf.buf.skip_field import SkipBufLintField
+from pants.backend.codegen.protobuf.buf.subsystem import BufSubsystem
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufDependenciesField,
     ProtobufSourceField,

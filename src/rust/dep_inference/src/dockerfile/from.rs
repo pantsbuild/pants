@@ -7,7 +7,8 @@ use crate::dockerfile::{ChildBehavior, Visitor};
 
 pub(crate) struct TagCollector<'a> {
     pub tag: Tag<'a>,
-    is_arg: bool,
+    pub image_arg: Option<&'a str>,
+    image_name: Option<&'a str>,
     code: &'a str,
 }
 
@@ -15,7 +16,8 @@ impl<'a> TagCollector<'a> {
     pub fn new(code: &'a str) -> Self {
         Self {
             tag: Tag::None,
-            is_arg: false,
+            image_arg: None,
+            image_name: None,
             code,
         }
     }
@@ -31,20 +33,27 @@ pub(crate) enum Tag<'a> {
 
 impl Visitor for TagCollector<'_> {
     fn visit_variable(&mut self, node: Node) -> ChildBehavior {
-        if self.is_arg {
-            self.tag = Tag::BuildArg(code::at(self.code, node));
+        if let Some(image_name) = self.image_name {
+            let var = code::at(self.code, node);
+            let is_var = |s: &str| {
+                s.strip_prefix('$') == Some(var)
+                    || s.strip_prefix("${").and_then(|b| b.strip_suffix('}')) == Some(var)
+            };
+            // Whole image name is a build arg: an inferred dependency.
+            if is_var(image_name) {
+                self.image_arg = Some(var);
+            }
+            // Final path segment is a build arg: the base image tag.
+            let last_segment = image_name.rsplit('/').next().unwrap_or(image_name);
+            if is_var(last_segment) {
+                self.tag = Tag::BuildArg(var);
+            }
         }
         ChildBehavior::Ignore
     }
 
-    fn visit_image_spec(&mut self, node: Node) -> ChildBehavior {
-        if code::at(self.code, node).trim().starts_with('$') {
-            self.is_arg = true;
-        }
-        ChildBehavior::Visit
-    }
-
-    fn visit_image_name(&mut self, _: Node) -> ChildBehavior {
+    fn visit_image_name(&mut self, node: Node) -> ChildBehavior {
+        self.image_name = Some(code::at(self.code, node));
         if self.tag == Tag::None {
             self.tag = Tag::Default
         }
@@ -52,6 +61,7 @@ impl Visitor for TagCollector<'_> {
     }
 
     fn visit_image_tag(&mut self, node: Node) -> ChildBehavior {
+        self.image_arg = None;
         self.tag = code::at(self.code, node)
             .strip_prefix(':')
             .map(Tag::Explicit)
@@ -60,7 +70,8 @@ impl Visitor for TagCollector<'_> {
     }
 
     fn visit_image_digest(&mut self, _node: Node) -> ChildBehavior {
-        if self.tag == Tag::Default {
+        self.image_arg = None;
+        if matches!(self.tag, Tag::Default | Tag::BuildArg(_)) {
             self.tag = Tag::None
         }
         ChildBehavior::Ignore

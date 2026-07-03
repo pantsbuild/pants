@@ -17,6 +17,7 @@ from pants.engine.goal import GoalSubsystem
 from pants.engine.rules import Rule, RuleIndex, collect_rules, rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
+from pants.ng.goal import GoalSubsystemNg
 from pants.option.alias import CliOptions
 from pants.option.global_options import GlobalOptions
 from pants.option.scope import OptionsParsingSettings, ScopeInfo, normalize_scope
@@ -143,6 +144,7 @@ class BuildConfiguration:
         )
         _allow_unknown_options: bool = False
         _remote_auth_plugin: Callable | None = None
+        _pants_ng: bool = False
 
         def registered_aliases(self) -> BuildFileAliases:
             """Return the registered aliases exposed in BUILD files.
@@ -217,6 +219,15 @@ class BuildConfiguration:
                 )
 
             for subsystem in subsystems:
+                if (
+                    issubclass(subsystem, GoalSubsystem)
+                    and issubclass(subsystem, GoalSubsystemNg) != self._pants_ng
+                ):
+                    # Don't register goal subsystems that aren't pertinent to our og/ng state.
+                    # This allows GoalSubsystemNgs to use the same scopes as og GoalSubsystems
+                    # without collision. Note that the @rules that consume these subsystems
+                    # can still be registered, but the subsystems cannot be configured.
+                    continue
                 self._subsystem_to_providers[subsystem].append(plugin_or_backend)
 
         def register_rules(self, plugin_or_backend: str, rules: Iterable[Rule | UnionRule]):

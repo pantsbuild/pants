@@ -11,7 +11,7 @@ from threading import Lock
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, ExitCode
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.engine.env_vars import CompleteEnvironmentVars
-from pants.engine.internals.native_engine import PySessionCancellationLatch
+from pants.engine.internals.native_engine import PyNgInvocation, PySessionCancellationLatch
 from pants.init.logging import stdio_destination
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
@@ -107,6 +107,10 @@ class DaemonPantsRunner:
         method should not need any special handling for the fact that it's running in a proxied
         environment.
         """
+        # Create a transient OptionsBootstrapper with no args, to read the value of pants_ng from
+        # config and env. We can't parse args until we know if we're ng or og.
+        options_bootstrapper = OptionsBootstrapper.create(args=[], env=env, allow_pantsrc=True)
+        pants_ng = options_bootstrapper.bootstrap_options.for_global_scope().pants_ng
 
         try:
             logger.debug("Connected to pantsd")
@@ -123,9 +127,21 @@ class DaemonPantsRunner:
                 )
             start_time = float(env_start_time) if env_start_time else time.time()
 
-            options_bootstrapper = OptionsBootstrapper.create(
-                args=args, env=env, allow_pantsrc=True
-            )
+            if pants_ng:
+                logger.info("DaemonPantsRunner running as pants_ng")
+                ng_invocation = PyNgInvocation.from_args(args[1:])
+                # Allow the existing logic to read flags in global position (note, these can be
+                # prefixed with a scope so they are not necessarily just global options), so
+                # that the engine can configure itself.
+                global_flags = ng_invocation.global_flag_strings()
+                options_bootstrapper = OptionsBootstrapper.create(
+                    args=[args[0], *global_flags], env=env, allow_pantsrc=True
+                )
+            else:
+                ng_invocation = None
+                options_bootstrapper = OptionsBootstrapper.create(
+                    args=args, env=env, allow_pantsrc=True
+                )
 
             # Run using the pre-warmed Session.
             complete_env = CompleteEnvironmentVars(env)
@@ -137,6 +153,7 @@ class DaemonPantsRunner:
                 scheduler=scheduler,
                 options_initializer=options_initializer,
                 cancellation_latch=cancellation_latch,
+                ng_invocation=ng_invocation,
             )
             return runner.run(start_time)
         except Exception as e:

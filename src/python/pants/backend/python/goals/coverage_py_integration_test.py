@@ -14,7 +14,12 @@ import pytest
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_integration_test import PantsResult, run_pants, setup_tmpdir
-from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
+from pants.testutil.python_interpreter_selection import (
+    all_major_minor_python_versions,
+    skip_unless_python39_present,
+    skip_unless_python310_present,
+)
+from pants.util.resources import read_sibling_resource
 
 
 def sources(batched: bool) -> dict[str, str]:
@@ -368,7 +373,9 @@ def test_coverage_html_xml_json_lcov(batched: bool) -> None:
     assert json_coverage.exists() is True
 
 
-def test_default_coverage_issues_12390() -> None:
+def _assert_coverage_12390(
+    interpreter: str, pyside_version: str, tool_lock: str | None = None
+) -> None:
     # N.B.: This ~replicates the repo used to reproduce this issue at
     # https://github.com/alexey-tereshenkov-oxb/monorepo-coverage-pants.
     if platform.system() == "Darwin" and platform.machine() == "arm64":
@@ -376,7 +383,7 @@ def test_default_coverage_issues_12390() -> None:
     if platform.system() == "Linux" and platform.machine() == "aarch64":
         pytest.skip(reason="No PySide2 wheels available for Linux ARM")
     files = {
-        "requirements.txt": "PySide2==5.15.2",
+        "requirements.txt": f"PySide2=={pyside_version}",
         "BUILD": dedent(
             """\
             python_requirements(
@@ -400,14 +407,27 @@ def test_default_coverage_issues_12390() -> None:
         ),
         "minimalcov/minimalcov/tests/BUILD": "python_tests()",
     }
+    if tool_lock is not None:
+        lock_content = read_sibling_resource(__name__, tool_lock).decode()
+        files[tool_lock] = lock_content.replace("{", "{{").replace("}", "}}")
     with setup_tmpdir(files) as tmpdir:
+        extra_args: list[str] = []
+        if tool_lock is not None:
+            resolve = tool_lock.removesuffix(".lock")
+            extra_args = [
+                f"--python-resolves={{'{resolve}': '{tmpdir}/{tool_lock}'}}",
+                f"--pytest-install-from-resolve={resolve}",
+                f"--coverage-py-install-from-resolve={resolve}",
+            ]
         command = [
             "--backend-packages=pants.backend.python",
+            f"--python-interpreter-constraints=['=={interpreter}.*']",
             "test",
             "--use-coverage",
             "::",
             f"--source-root-patterns=['/{tmpdir}/minimalcov']",
             "--coverage-py-report=raw",
+            *extra_args,
         ]
         result = run_pants(command)
         result.assert_success()
@@ -425,6 +445,18 @@ def test_default_coverage_issues_12390() -> None:
         )
         in result.stderr
     ), result.stderr
+
+
+# PySide2 5.15.2 supports <3.10, while the 5.15.2.1 post-release adds 3.10 but
+# nothing newer.
+@skip_unless_python39_present
+def test_default_coverage_issues_12390_py39() -> None:
+    _assert_coverage_12390("3.9", "5.15.2", tool_lock="coverage-py39-testing.lock")
+
+
+@skip_unless_python310_present
+def test_default_coverage_issues_12390_py310() -> None:
+    _assert_coverage_12390("3.10", "5.15.2.1")
 
 
 def test_coverage_filter_issue_18057() -> None:

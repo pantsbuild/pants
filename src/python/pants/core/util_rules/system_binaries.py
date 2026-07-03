@@ -613,7 +613,9 @@ async def _find_candidate_paths_via_path_metadata_lookups(
     search_path = [os.path.abspath(path) for path in request.search_path]
 
     metadata_results = await concurrently(
-        path_metadata_request(PathMetadataRequest(path=path, namespace=PathNamespace.SYSTEM))
+        path_metadata_request(
+            PathMetadataRequest(path=path, namespace=PathNamespace.SYSTEM, follow_symlinks=True)
+        )
         for path in search_path
     )
 
@@ -625,7 +627,7 @@ async def _find_candidate_paths_via_path_metadata_lookups(
         if not metadata:
             continue
 
-        if metadata.kind in (PathMetadataKind.DIRECTORY, PathMetadataKind.SYMLINK):
+        if metadata.kind == PathMetadataKind.DIRECTORY:
             file_metadata_request = PathMetadataRequest(
                 path=os.path.join(metadata.path, request.binary_name),
                 namespace=PathNamespace.SYSTEM,

@@ -11,6 +11,7 @@ from pants.core.util_rules.external_tool import (
     TemplatedExternalTool,
     download_external_tool,
 )
+from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP
 from pants.engine.fs import Digest
 from pants.engine.internals.native_engine import FrozenDict
 from pants.engine.platform import Platform
@@ -63,6 +64,18 @@ class Uv(TemplatedExternalTool):
             ),
             advanced=True,
             metavar="<binary-paths>",
+        )
+
+        extra_env_vars = StrListOption(
+            help=softwrap(
+                f"""
+                Additional environment variables to pass to `uv` subprocesses.
+                Can be used to pass `UV_KEYRING_PROVIDER`, or private-index credentials such as
+                `UV_INDEX_<NAME>_USERNAME`/`UV_INDEX_<NAME>_PASSWORD`.
+
+                {EXTRA_ENV_VARS_USAGE_HELP}
+                """
+            ),
         )
 
         @memoized_property

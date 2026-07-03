@@ -3,18 +3,19 @@
 
 from __future__ import annotations
 
-from pants.backend.go.util_rules.build_pkg import required_built_go_package
+from pants.backend.go.util_rules.build_pkg import (
+    MergeBuiltGoPackageArchivesRequest,
+    merge_built_go_package_archives,
+    required_built_go_package,
+)
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageRequestForStdlibRequest
 from pants.backend.go.util_rules.link_defs import (
     ImplicitLinkerDependencies,
     ImplicitLinkerDependenciesHook,
 )
-from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import merge_digests
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 
 
 class SdkImplicitLinkerDependenciesHook(ImplicitLinkerDependenciesHook):
@@ -49,17 +50,13 @@ async def provide_sdk_implicit_linker_dependencies(
         for dep_import_path in implicit_deps_import_paths
     )
 
-    implicit_dep_digests = []
-    import_paths_to_pkg_a_files: dict[str, str] = {}
-    for built_implicit_linker_dep in built_implicit_linker_deps:
-        import_paths_to_pkg_a_files.update(built_implicit_linker_dep.import_paths_to_pkg_a_files)
-        implicit_dep_digests.append(built_implicit_linker_dep.digest)
-
-    digest = await merge_digests(MergeDigests(implicit_dep_digests))
+    merged = await merge_built_go_package_archives(
+        MergeBuiltGoPackageArchivesRequest(tuple(built_implicit_linker_deps))
+    )
 
     return ImplicitLinkerDependencies(
-        digest=digest,
-        import_paths_to_pkg_a_files=FrozenDict(import_paths_to_pkg_a_files),
+        digest=merged.digest,
+        import_paths_to_pkg_a_files=merged.import_paths_to_pkg_a_files,
     )
 
 

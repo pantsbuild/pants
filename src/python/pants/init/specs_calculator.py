@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from typing import cast
+from typing import Iterable, cast
 
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import AddressLiteralSpec, FileLiteralSpec, RawSpecs, Specs
@@ -31,6 +31,7 @@ class InvalidSpecConstraint(Exception):
 
 
 def calculate_specs(
+    specs_strs: Iterable[str],
     options_bootstrapper: OptionsBootstrapper,
     options: Options,
     session: SchedulerSession,
@@ -40,7 +41,7 @@ def calculate_specs(
     global_options = options.for_global_scope()
     unmatched_cli_globs = global_options.unmatched_cli_globs
     specs = SpecsParser(working_dir=working_dir).parse_specs(
-        options.specs,
+        specs_strs,
         description_of_origin="CLI arguments",
         unmatched_glob_behavior=unmatched_cli_globs,
     )

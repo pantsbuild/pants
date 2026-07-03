@@ -332,7 +332,7 @@ def test_multiple_resolves() -> None:
         GeneratePexLockfile(
             requirements=FrozenOrderedSet(["a"]),
             find_links=FrozenOrderedSet([]),
-            interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.10,<3.15"]),
             resolve_name="a",
             lockfile_dest="a.lock",
             diff=False,
@@ -402,6 +402,69 @@ def test_find_links_scoped_to_resolve() -> None:
 
     assert result_by_resolve["a"].find_links == FrozenOrderedSet(["https://example.com/wheels"])
     assert result_by_resolve["b"].find_links == FrozenOrderedSet([])
+
+
+def test_sync_strips_embedded_metadata_header(rule_runner: PythonRuleRunner) -> None:
+    """Regression test for https://github.com/pantsbuild/pants/issues/23398."""
+    rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-resolver=pex",
+            "--no-python-separate-lockfile-metadata-file",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GeneratePexLockfile(
+                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=InterpreterConstraints(),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+                lock_style="universal",
+                complete_platforms=(),
+            )
+        ],
+    )
+    rule_runner.write_digest(result.digest)
+
+    rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-resolver=pex",
+            "--no-python-separate-lockfile-metadata-file",
+            "--generate-lockfiles-sync",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    sync_result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GeneratePexLockfile(
+                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=InterpreterConstraints(),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+                lock_style="universal",
+                complete_platforms=(),
+            )
+        ],
+    )
+    sync_digest_contents = rule_runner.request(DigestContents, [sync_result.digest])
+    assert len(sync_digest_contents) == 1
+    content = sync_digest_contents[0].content.decode()
+    header, _, body = content.partition("\n\n")
+    assert header.strip() != ""
+    lock_content = json.loads(body)
+    reqs = lock_content["locked_resolves"][0]["locked_requirements"]
+    assert len(reqs) == 1
+    assert reqs[0]["project_name"] == "ansicolors"
 
 
 def test_empty_requirements(rule_runner: PythonRuleRunner) -> None:
@@ -663,3 +726,38 @@ def test_uv_lockfile_generation(
     expected_only_binary = ["ansicolors"] if only_binary else []
     assert sorted(metadata.get("no_binary", [])) == expected_no_binary
     assert sorted(metadata.get("only_binary", [])) == expected_only_binary
+
+
+def test_uv_lockfile_generation_with_sources(rule_runner: PythonRuleRunner) -> None:
+    # Regression test for https://github.com/pantsbuild/pants/issues/23442.
+    rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-repos-indexes=['alt=https://pypi.org/simple/']",
+            "--python-resolves-to-sources={'test': ['alt=ansicolors>=1.0']}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GenerateUvLockfile(
+                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+            )
+        ],
+    )
+    digest_contents = rule_runner.request(DigestContents, [result.digest])
+
+    by_path = {fc.path: fc for fc in digest_contents}
+    assert "test.lock" in by_path
+
+    lock_data = tomllib.loads(by_path["test.lock"].content.decode())
+    packages = {pkg["name"]: pkg for pkg in lock_data.get("package", []) if "version" in pkg}
+    assert "ansicolors" in packages
+    assert packages["ansicolors"]["version"] == "1.1.8"

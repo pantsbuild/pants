@@ -15,12 +15,12 @@ class BufSubsystem(TemplatedExternalTool):
     name = "Buf"
     help = "A linter and formatter for Protocol Buffers (https://github.com/bufbuild/buf)."
 
-    default_version = "v1.3.0"
+    default_version = "v1.69.0"
     default_known_versions = [
-        "v1.3.0|linux_arm64 |fbfd53c501451b36900247734bfa4cbe86ae05d0f51bc298de8711d5ee374ee5|13940828",
-        "v1.3.0|linux_x86_64|e29c4283b1cd68ada41fa493171c41d7605750d258fcd6ecdf692a63fae95213|15267162",
-        "v1.3.0|macos_arm64 |147985d7f2816a545792e38b26178ff4027bf16cd3712f6e387a4e3692a16deb|15391890",
-        "v1.3.0|macos_x86_64|3b6bd2e5a5dd758178aee01fb067261baf5d31bfebe93336915bfdf7b21928c4|15955291",
+        "v1.69.0|linux_arm64 |28b258cb4ee7a1224a61e1dd91ae5935f1c86c23e8e67bcfa23c8b096b0ad478|33862042",
+        "v1.69.0|linux_x86_64|2b1f9cfb5e17d50c10dea9202979ffd28ca7ff7a6f4e51e801a9463986690b03|37497898",
+        "v1.69.0|macos_arm64 |246534674239f326dd1ad2642e57865dd56dc4e98c4857d13da6eca4d3a168ad|35754114",
+        "v1.69.0|macos_x86_64|570458723a1e400d654e916cc54a98e78a9c23d72775afde9ef12abcdebd37a1|38439569",
     ]
     default_url_template = (
         "https://github.com/bufbuild/buf/releases/download/{version}/buf-{platform}.tar.gz"

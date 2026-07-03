@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.bsp.context import BSPContext
@@ -10,11 +11,11 @@ from pants.bsp.spec.log import LogMessageParams, MessageType
 from pants.bsp.spec.task import TaskProgressParams
 from pants.bsp.util_rules.targets import BSPCompileRequest, BSPCompileResult
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, MergeDigests
+from pants.engine.fs import AddPrefix, CreateDigest, FileEntry
 from pants.engine.internals.graph import resolve_coarsened_targets
-from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.internals.native_engine import EMPTY_DIGEST, Digest
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import add_prefix, merge_digests
+from pants.engine.intrinsics import add_prefix, create_digest, get_digest_entries
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.jvm import classpath
 from pants.jvm.compile import (
@@ -71,6 +72,49 @@ async def notify_for_classpath_entry(
     return entry
 
 
+def _first_occurrence_file_entries(
+    per_classpath_entries: Iterable[Iterable[object]],
+) -> list[FileEntry]:
+    """Walk per-classpath-entry digest contents (each a
+    sequence of ``FileEntry`` / ``SymlinkEntry`` / ``Directory``) and return a
+    flat list of ``FileEntry`` values keeping the first occurrence per path.
+    Non-``FileEntry`` items are dropped — they're either implicit directory
+    parents (re-created by ``CreateDigest``) or symlinks not produced by the
+    JVM compile path.
+    """
+    seen_paths: set[str] = set()
+    kept: list[FileEntry] = []
+    for entries in per_classpath_entries:
+        for entry in entries:
+            if not isinstance(entry, FileEntry):
+                continue
+            if entry.path in seen_paths:
+                continue
+            seen_paths.add(entry.path)
+            kept.append(entry)
+    return kept
+
+
+async def _dedupe_loose_classfiles(
+    loose_classfiles: tuple[classpath.LooseClassfiles, ...],
+) -> Digest:
+    """Merge the loose-classfile digests from a BSP compile closure, keeping the
+    first-occurrence entry per file path on path collisions.
+
+    Multiple compile-closure members can contribute the same path to the merged
+    BSP output (e.g. two different first-party modules each shipping a
+    `logback.xml` resource in their classpath jar, both ending up in the same
+    BSP target's class directory). The plain ``merge_digests(MergeDigests(...))``
+    call raises ``IntrinsicError: Can only merge Directories with no duplicates``
+    in that case. JVM classpath semantics tolerate duplicate paths by picking
+    the first occurrence; we mirror that here so BSP compile of a multi-module
+    target succeeds rather than failing on collisions.
+    """
+    per_entry = await concurrently(get_digest_entries(lc.digest) for lc in loose_classfiles)
+    kept = _first_occurrence_file_entries([list(entries) for entries in per_entry])
+    return await create_digest(CreateDigest(kept))
+
+
 async def _jvm_bsp_compile(
     request: BSPCompileRequest, classpath_entry_request: ClasspathEntryRequestFactory
 ) -> BSPCompileResult:
@@ -116,7 +160,7 @@ async def _jvm_bsp_compile(
     loose_clsfiles = await concurrently(
         classpath.loose_classfiles(entry, **implicitly()) for entry in entries
     )
-    merged_loose_classfiles = await merge_digests(MergeDigests(lc.digest for lc in loose_clsfiles))
+    merged_loose_classfiles = await _dedupe_loose_classfiles(tuple(loose_clsfiles))
     output_digest = await add_prefix(
         AddPrefix(merged_loose_classfiles, jvm_classes_directory(request.bsp_target.bsp_target_id)),
     )

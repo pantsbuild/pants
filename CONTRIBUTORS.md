@@ -51,6 +51,7 @@ Created as part of the release process.
 + Caitie McCaffrey
 + Caleb Lloyd
 + Carina C. Zona
++ Casey
 + Caspar Krieger
 + Chiara
 + Chris Aniszczyk
@@ -143,6 +144,7 @@ Created as part of the release process.
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
++ Hussein Awala
 + Hwasung Lee
 + Ian Tabolt
 + Idan Attias
@@ -168,6 +170,7 @@ Created as part of the release process.
 + Jan Berkel
 + Jan Paul Erkelens
 + Jason Barnett
++ Jason D'Amour
 + Jason Jackson
 + Jason Song
 + Jay Crumb
@@ -194,6 +197,7 @@ Created as part of the release process.
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
++ Joseph Bylund
 + Joseph Tilahun
 + Josh Reed
 + Josh Soref
@@ -263,6 +267,7 @@ Created as part of the release process.
 + Maxim Khutornenko
 + Maxim Popenko
 + Michael Doherty
++ Michael Fairley
 + Michael Glass
 + Michal Bryc
 + Mikael Souza
@@ -318,8 +323,10 @@ Created as part of the release process.
 + Roger Jiang
 + Roman Andriadi
 + Rushal Verma
++ Rutger de Knijf
 + Ryan Despain
 + Ryan King
++ Ryan Loader
 + Ryan Scott Brown
 + Ryan Williams
 + Sameer Arora
@@ -355,6 +362,7 @@ Created as part of the release process.
 + Thales Menato
 + Thani Ath Nain Khurshid
 + Theo Ribeiro
++ Thiago Riemma Carbonera
 + Tianshuo Deng
 + Tien Nguyen
 + Tim Gates
@@ -409,6 +417,7 @@ Created as part of the release process.
 + hephex
 + jgartdele/del
 + lukevmorris
++ mattalbr
 + nikhila-dwarakanath-zocdoc
 + offsetcyan
 + okcleary

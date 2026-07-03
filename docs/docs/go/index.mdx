@@ -83,6 +83,15 @@ pkg/runner:runner
 Pants does not yet update your `go.mod` and `go.sum` for you; it only reads these files when downloading modules. Run `go mod download all` to make sure these files are correct.
 :::
 
+### Toolchain selection
+
+Pants always builds with the Go SDK it discovers via `[golang].go_search_paths`. Inside every sandbox, `GOTOOLCHAIN=local` is set unconditionally, which disables Go's automatic toolchain download feature (introduced in Go 1.21). This means:
+
+- If your `go.mod` or `go.work` file contains a `go` or `toolchain` directive that demands a newer version than the locally installed SDK, the build fails fast with a clear message: `go: go.mod requires go >= X.Y.Z (running go A.B.C; GOTOOLCHAIN=local)`.
+- There is no silent background download of a different toolchain that Pants has not fingerprinted and cannot cache correctly.
+
+To resolve such a failure, either install a newer Go SDK that is discoverable via `[golang].go_search_paths` (and raise `[golang].minimum_expected_version` to match), or lower the `go` directive in the offending `go.mod`.
+
 ### The `embed` directive and `resource` targets
 
 To use the [`embed` directive](https://pkg.go.dev/embed), you must first teach Pants about the [files](../using-pants/assets-and-archives.mdx) with the `resource` / `resources` targets:

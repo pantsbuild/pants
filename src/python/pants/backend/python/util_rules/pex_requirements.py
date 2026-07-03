@@ -488,37 +488,37 @@ class ResolveConfig:
         """
         config_lines: list[str] = []
 
-        if not self.indexes:
-            config_lines.append("no-index = true")
-
         all_find_links = (*self.find_links, *extra_find_links)
         if all_find_links:
-            entries = "\n".join(f'    "{fl}",' for fl in all_find_links)
-            config_lines.append(f"find-links = [\n{entries}\n]")
+            config_lines.append("find-links = [")
+            for fl in all_find_links:
+                config_lines.append(f'    "{fl}",')
+            config_lines.append("]")
+            config_lines.append("")
 
         if self.no_binary:
             if ":all:" in self.no_binary:
                 config_lines.append("no-binary = true")
             elif ":none:" not in self.no_binary:
-                entries = "\n".join(f'    "{pkg}",' for pkg in self.no_binary)
-                config_lines.append(f"no-binary-package = [\n{entries}\n]")
+                config_lines.append("no-binary-package = [")
+                for pkg in self.no_binary:
+                    config_lines.append(f'    "{pkg}",')
+                config_lines.append("]")
+            config_lines.append("")
 
         if self.only_binary:
             if ":all:" in self.only_binary:
                 config_lines.append("no-build = true")
             elif ":none:" not in self.only_binary:
-                entries = "\n".join(f'    "{pkg}",' for pkg in self.only_binary)
-                config_lines.append(f"no-build-package = [\n{entries}\n]")
+                config_lines.append("no-build-package = [")
+                for pkg in self.only_binary:
+                    config_lines.append(f'    "{pkg}",')
+                config_lines.append("]")
+            config_lines.append("")
 
         if self.uploaded_prior_to:
             config_lines.append(f'exclude-newer = "{self.uploaded_prior_to}"')
-
-        for i, index_url in enumerate(self.indexes):
-            # The first index gets `default = true`, replacing uv's built-in PyPI default.
-            # Subsequent indexes are additional sources.
-            block = f'[[index]]\nurl = "{index_url}"\n'
-            block += "default = true\n" if i == 0 else f'name = "extra-{i}"\n'
-            config_lines.append(block)
+            config_lines.append("")
 
         return "\n".join(config_lines) + "\n" if config_lines else ""
 
@@ -533,8 +533,6 @@ class ResolveConfig:
             pex_specific.append("`[python].resolves_to_excludes`")
         if self.overrides:
             pex_specific.append("`[python].resolves_to_overrides`")
-        if self.sources:
-            pex_specific.append("`[python].resolves_to_sources`")
         if self.lock_style != "universal":
             pex_specific.append("`[python]._resolves_to_lock_style`")
         if self.path_mappings:

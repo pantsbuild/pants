@@ -39,6 +39,7 @@ class PythonRepos(Subsystem):
             """
         )
     )
+
     _repos = StrListOption(
         help=softwrap(
             """
@@ -50,6 +51,7 @@ class PythonRepos(Subsystem):
         removal_version="3.0.0.dev0",
         removal_hint="A deprecated alias for `[python-repos].find_links`.",
     )
+
     indexes = StrListOption(
         default=[pypi_index],
         help=softwrap(
