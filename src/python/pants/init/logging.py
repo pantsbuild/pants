@@ -112,7 +112,9 @@ def _python_logging_setup(
         if self.isEnabledFor(LogLevel.TRACE.level):
             self._log(LogLevel.TRACE.level, message, *args, **kwargs)
 
-    with _python_logging_lock:
+    if not _python_logging_lock.acquire(blocking=False):
+        raise RuntimeError("Python logging is already configured by another thread.")
+    try:
         logging.Logger.trace = trace_fn  # type: ignore[attr-defined]
         logger = logging.getLogger(None)
 
@@ -150,6 +152,8 @@ def _python_logging_setup(
         finally:
             clear_logging_handlers()
             set_logging_handlers(handlers)
+    finally:
+        _python_logging_lock.release()
 
 
 @contextmanager
@@ -197,7 +201,9 @@ def initialize_stdio_raw(
         else:
             literal_filters.append(filt)
 
-    with _stdio_init_lock:
+    if not _stdio_init_lock.acquire(blocking=False):
+        raise RuntimeError("stdio is already being initialized by another thread.")
+    try:
         # Set the pants log destination.
         log_path = str(pants_log_path(PurePath(pants_workdir)))
         safe_mkdir_for(log_path)
@@ -231,6 +237,8 @@ def initialize_stdio_raw(
         finally:
             sys.stdin, sys.stdout, sys.stderr = original_stdin, original_stdout, original_stderr
             sys.__stdin__, sys.__stdout__, sys.__stderr__ = sys.stdin, sys.stdout, sys.stderr  # type: ignore[misc,assignment]
+    finally:
+        _stdio_init_lock.release()
 
 
 def pants_log_path(workdir: PurePath) -> PurePath:
