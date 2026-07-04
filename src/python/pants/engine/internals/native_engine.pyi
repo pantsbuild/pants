@@ -1041,6 +1041,9 @@ class ProcessExecutionEnvironment:
 # ------------------------------------------------------------------------------
 
 def all_counter_names() -> list[str]: ...
+def decode_observation_histogram(
+    encoded: bytes, percentiles: Sequence[float]
+) -> dict[str, int | float]: ...
 
 # ------------------------------------------------------------------------------
 # Nailgun
