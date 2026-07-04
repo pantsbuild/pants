@@ -10,8 +10,7 @@ import signal
 import sys
 import threading
 import traceback
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 
 import psutil
 import setproctitle
@@ -40,25 +39,13 @@ class SignalHandler:
         # instead just iterating over the registered signals to set handlers, so a dict is probably
         # better.
         return {
-            signal.SIGINT: self._handle_sigint_if_enabled,
+            signal.SIGINT: self.handle_sigint,
             signal.SIGQUIT: self.handle_sigquit,
             signal.SIGTERM: self.handle_sigterm,
         }
 
     def __init__(self, *, pantsd_instance: bool):
-        self._ignore_sigint_lock = threading.Lock()
-        self._ignoring_sigint = False
         self._pantsd_instance = pantsd_instance
-
-    def _handle_sigint_if_enabled(self, signum: int, _frame):
-        with self._ignore_sigint_lock:
-            if not self._ignoring_sigint:
-                self.handle_sigint(signum, _frame)
-
-    def _toggle_ignoring_sigint(self, toggle: bool) -> None:
-        if not self._pantsd_instance:
-            with self._ignore_sigint_lock:
-                self._ignoring_sigint = toggle
 
     def _send_signal_to_children(self, received_signal: int, signame: str) -> None:
         """Send a signal to any children of this process in order.
@@ -301,39 +288,6 @@ class ExceptionSink:
             cls._signal_handler = signal_handler
 
             return previous_signal_handler
-
-    @classmethod
-    @contextmanager
-    def trapped_signals(cls, new_signal_handler: SignalHandler) -> Iterator[None]:
-        """A contextmanager which temporarily overrides signal handling.
-
-        NB: This method calls signal.signal(), which will crash if not called from the main thread!
-        """
-        with cls._lock:
-            previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
-            try:
-                yield
-            finally:
-                cls.reset_signal_handler(previous_signal_handler)
-
-    @classmethod
-    @contextmanager
-    def ignoring_sigint(cls) -> Iterator[None]:
-        """This method provides a context that temporarily disables responding to the SIGINT signal
-        sent by a Ctrl-C in the terminal.
-
-        We currently only use this to implement disabling catching SIGINT while an
-        InteractiveProcess is running (where we want that process to catch it), and only when pantsd
-        is not enabled. If pantsd is enabled, the client will actually catch SIGINT and forward it
-        to the server, so we don't want the server process to ignore it.
-        """
-
-        with cls._lock:
-            try:
-                cls._signal_handler._toggle_ignoring_sigint(True)
-                yield
-            finally:
-                cls._signal_handler._toggle_ignoring_sigint(False)
 
     @classmethod
     def _iso_timestamp_for_now(cls):
