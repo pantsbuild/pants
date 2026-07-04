@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import threading
 import time
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
@@ -27,8 +28,15 @@ def test_singleton_concurrent_construction() -> None:
             time.sleep(0.01)
             constructions += 1
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        instances = list(executor.map(lambda _: One(), range(8)))
+    num_threads = 8
+    barrier = threading.Barrier(num_threads)
+
+    def construct(_) -> One:
+        barrier.wait()
+        return One()
+
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        instances = list(executor.map(construct, range(num_threads)))
 
     assert len({id(instance) for instance in instances}) == 1
     assert constructions == 1

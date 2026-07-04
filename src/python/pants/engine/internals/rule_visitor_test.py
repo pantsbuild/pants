@@ -7,6 +7,7 @@ import importlib.util
 import inspect
 import sys
 import textwrap
+import threading
 import time
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -212,8 +213,15 @@ def test_get_module_scope_rules_concurrent_init(tmp_path: Path, monkeypatch) -> 
             return original_getsource(obj)
 
         monkeypatch.setattr(inspect, "getsource", slow_getsource)
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            results = list(executor.map(lambda _: get_module_scope_rules(module), range(8)))
+        num_threads = 8
+        barrier = threading.Barrier(num_threads)
+
+        def get_rules(_):
+            barrier.wait()
+            return get_module_scope_rules(module)
+
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            results = list(executor.map(get_rules, range(num_threads)))
 
         assert all(result is results[0] for result in results)
         assert getattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY) is results[0]

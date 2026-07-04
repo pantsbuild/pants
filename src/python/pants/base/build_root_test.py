@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import threading
 import time
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
@@ -65,7 +66,10 @@ def test_concurrent_temporary_and_reset(tmp_build_root) -> None:
     build_root, original_path, _ = tmp_build_root
     paths = [os.path.realpath(safe_mkdtemp()) for _ in range(8)]
 
+    barrier = threading.Barrier(len(paths))
+
     def use_path(path: str) -> None:
+        barrier.wait()
         with build_root.temporary(path):
             time.sleep(0.01)
             assert build_root.path == path
