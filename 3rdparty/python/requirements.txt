@@ -8,51 +8,51 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.20.0
 freezegun==1.5.5
-ijson==3.4.0.post0
-packaging==26.0
+ijson==3.5.0
+packaging==26.2
 psutil==7.2.2
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
-pytest>=7,<9,!=7.1.0,!=7.1.1
+pytest!=7.1.0,!=7.1.1,>=9.1.1,<10
 python-lsp-jsonrpc==1.1.2
-PyYAML>=6.0,<7.0
-requests[security]==2.32.5
+PyYAML>=6.0.3,<7.0
+requests[security]==2.34.2
 setproctitle==1.3.7
-setuptools>=63.1.0,<82.0
+setuptools>=82.0.1,<83.0
 toml==0.10.2
-types-PyYAML==6.0.12.20250915
-types-requests==2.32.4.20260107
-types-setuptools==82.0.0.20260210
-types-toml==0.10.8.20240310
+types-PyYAML==6.0.12.20260518
+types-requests==2.33.0.20260518
+types-setuptools==82.0.0.20260518
+types-toml==0.10.8.20260518
 typing-extensions==4.15
-mypy~=1.19.1
+mypy~=2.1.0
 mypy-typing-asserts==0.1.1
-node-semver==0.9.0
+node-semver==0.9.1
 
 # OpenTelemetry backend dependencies
-opentelemetry-api==1.41.0
-opentelemetry-exporter-otlp-proto-http==1.41.0
-opentelemetry-sdk==1.41.0
+opentelemetry-api==1.43.0
+opentelemetry-exporter-otlp-proto-http==1.43.0
+opentelemetry-sdk==1.43.0
 
 # OpenTelemetry backend test dependencies
-opentelemetry-proto==1.41.0
+opentelemetry-proto==1.43.0
 
 # These dependencies are for scripts that rules run in an external process (and for script tests).
-elfdeps==0.2.0  # see: pants.backends.nfpm.native_libs.elfdeps
+elfdeps==0.4.0  # see: pants.backends.nfpm.native_libs.elfdeps
 # These dependencies are only for debugging Pants itself (in VSCode/PyCharm respectively),
 # and should never be imported.
-debugpy==1.8.20
-pydevd-pycharm==261.20362.36
+debugpy==1.8.21
+pydevd-pycharm==262.8377.41
 
 # These dependencies must only be used from the explorer backend, and no code outside that backend
 # may import anything from it, so these libraries are not ending up as requirements of Pants itself.
-fastapi==0.120.1
-starlette==0.49.1
-strawberry-graphql[fastapi]==0.284.1
-uvicorn[standard]==0.38.0
+fastapi==0.138.1
+starlette==1.3.1
+strawberry-graphql[fastapi]==0.319.0
+uvicorn[standard]==0.49.0
 
-beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
-python-gnupg==0.5.5 # For validating signatures
+beautifulsoup4==4.15.0 # Util for webcrawling for pulling in tool versions
+python-gnupg==0.5.6 # For validating signatures
 
 # Only used for release management
-PyGithub==2.8.1
+PyGithub==2.9.1
