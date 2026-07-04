@@ -4,13 +4,42 @@
 use std::cell::Cell;
 use std::time::Duration;
 
+use parking_lot::RwLock;
 use pyo3::exceptions::PyException;
 use pyo3::ffi;
 use pyo3::prelude::*;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyExecutor>()?;
+    // LIFO: registering at import time makes this run last among `atexit` callbacks.
+    m.py()
+        .import("atexit")?
+        .call_method1("register", (wrap_pyfunction!(python_exiting, m)?,))?;
     Ok(())
+}
+
+/// Whether engine threads may still attach to the interpreter. `python_exiting` flips this from
+/// `atexit`, which `Py_FinalizeEx` runs before marking the runtime finalizing and after all
+/// later-registered callbacks (such as executor shutdowns). The thread hooks attach under the
+/// read lock, so they can never race finalization and hang or touch a freed state.
+static PYTHON_ALIVE: RwLock<bool> = RwLock::new(true);
+
+#[pyfunction]
+fn python_exiting(py: Python) {
+    py.detach(|| {
+        *PYTHON_ALIVE.write() = false;
+    });
+}
+
+/// Runs `f`, which may attach to the interpreter, under the `PYTHON_ALIVE` gate. Skips `f`
+/// once Python is shutting down, or when the interpreter is not initialized.
+fn with_python_alive(f: impl FnOnce()) {
+    let alive = PYTHON_ALIVE.read();
+    // SAFETY: `Py_IsInitialized` only reads a runtime flag and may be called from any thread at
+    // any time, even before initialization or after finalization.
+    if *alive && unsafe { ffi::Py_IsInitialized() != 0 } {
+        f()
+    }
 }
 
 thread_local! {
@@ -33,23 +62,22 @@ thread_local! {
 /// every attach. `PyEval_SaveThread` then detaches, leaving the thread parked without a state
 /// attached (which would otherwise block free-threaded stop-the-world pauses).
 fn thread_state_create() {
-    if unsafe { ffi::Py_IsInitialized() } == 0 {
-        return;
-    }
-    // SAFETY: This hook runs first on a fresh runtime thread, which is not attached and has no
-    // gilstate yet: `PyGILState_Ensure` creates this thread's state and attaches, and
-    // `PyEval_SaveThread` detaches and returns that state. Both stay valid until the matching
-    // `PyGILState_Release` in `thread_state_destroy` drops the last gilstate reference.
-    unsafe {
-        let gilstate = ffi::PyGILState_Ensure();
-        let tstate = ffi::PyEval_SaveThread();
-        THREAD_STATE.set(Some((tstate, gilstate)));
-    }
-    if std::env::var("PANTS_DEBUG").is_ok() {
-        Python::attach(|py| {
-            let _ = py.eval(c"__import__('debugpy').debug_this_thread()", None, None);
-        });
-    }
+    with_python_alive(|| {
+        // SAFETY: A fresh runtime thread is not attached and has no gilstate yet:
+        // `PyGILState_Ensure` creates this thread's state and attaches, `PyEval_SaveThread`
+        // detaches and returns it, and both stay valid until the matching `PyGILState_Release`
+        // in `thread_state_destroy`.
+        unsafe {
+            let gilstate = ffi::PyGILState_Ensure();
+            let tstate = ffi::PyEval_SaveThread();
+            THREAD_STATE.set(Some((tstate, gilstate)));
+        }
+        if std::env::var("PANTS_DEBUG").is_ok() {
+            Python::attach(|py| {
+                let _ = py.eval(c"__import__('debugpy').debug_this_thread()", None, None);
+            });
+        }
+    });
 }
 
 /// Release the thread state created by `thread_state_create`. Tokio recycles blocking-pool
@@ -57,20 +85,20 @@ fn thread_state_create() {
 /// accumulate for the life of the process. Re-attaching and then releasing the last gilstate
 /// reference has CPython clear and delete the state.
 fn thread_state_destroy() {
-    if let Some((tstate, gilstate)) = THREAD_STATE.take() {
-        // SAFETY: `tstate` and `gilstate` come from the paired `PyGILState_Ensure`/
-        // `PyEval_SaveThread` in `thread_state_create` on this same thread, and the thread is
-        // detached here (hooks run outside any `Python::attach` scope). `PyEval_RestoreThread`
-        // re-attaches the still-valid state, and releasing the last gilstate reference has
-        // CPython clear and delete it. If the interpreter has already been finalized,
-        // re-attaching would abort the process, so the state is leaked instead.
+    let Some((tstate, gilstate)) = THREAD_STATE.take() else {
+        return;
+    };
+    // Leak the state if Python is shutting down.
+    with_python_alive(|| {
+        // SAFETY: `tstate` and `gilstate` come from the paired calls in `thread_state_create` on
+        // this same thread, which is detached here; the `PYTHON_ALIVE` read lock keeps the
+        // interpreter alive across the attach. Releasing the last gilstate reference has CPython
+        // clear and delete the state.
         unsafe {
-            if ffi::Py_IsInitialized() != 0 {
-                ffi::PyEval_RestoreThread(tstate);
-                ffi::PyGILState_Release(gilstate);
-            }
+            ffi::PyEval_RestoreThread(tstate);
+            ffi::PyGILState_Release(gilstate);
         }
-    }
+    });
 }
 
 #[pyclass]
