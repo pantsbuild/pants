@@ -93,10 +93,24 @@ impl PyExecutor {
 
 impl Drop for PyExecutor {
     fn drop(&mut self) {
-        if !self.0.is_shutdown() {
-            // This can lead to hangs, since `Drop` will run on an arbitrary thread under arbitrary
-            // locks. See #18211.
-            log::warn!("Executor was not shut down explicitly.");
+        if self.0.is_shutdown() {
+            return;
+        }
+        log::warn!("Executor was not shut down explicitly.");
+        // Dropping the Runtime joins its threads, and each thread attaches to Python in
+        // `thread_state_destroy` before exiting. `Drop` runs attached (via garbage collection),
+        // so shut down with this thread detached or the joins deadlock on the GIL.
+        //
+        // Shutting down from within a runtime would panic, and attaching from a detached thread
+        // acquires the GIL, which can deadlock under arbitrary Python-side locks (see #18211):
+        // leak it in both cases.
+        //
+        // When already attached, `Python::attach` acquires nothing and `py.detach` only releases.
+        //
+        // SAFETY: `PyGILState_Check` may be called from any thread at any time.
+        if tokio::runtime::Handle::try_current().is_err() && unsafe { ffi::PyGILState_Check() } == 1
+        {
+            Python::attach(|py| py.detach(|| self.0.shutdown(Duration::from_secs(3))));
         }
     }
 }
