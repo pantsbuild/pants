@@ -342,6 +342,8 @@ def test_remote_cache_roundtrips_file_and_directory_outputs() -> None:
                     description="Create file and directory outputs",
                     output_files=["file.txt"],
                     output_directories=["out"],
+                    # Ensure the cache lookup wins over this very fast local process.
+                    remote_cache_speculation_delay_millis=1000,
                     level=LogLevel.INFO,
                 )
             ],
