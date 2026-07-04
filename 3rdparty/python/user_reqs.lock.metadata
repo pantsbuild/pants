@@ -14,7 +14,6 @@
     "fastapi==0.120.1",
     "fasteners==0.20.0",
     "freezegun==1.5.5",
-    "hdrhistogram==0.10.7",
     "ijson==3.4.0.post0",
     "mypy-typing-asserts==0.1.1",
     "mypy~=1.19.1",
