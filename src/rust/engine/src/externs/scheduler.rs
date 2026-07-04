@@ -33,6 +33,10 @@ thread_local! {
 /// every attach. `PyEval_SaveThread` then detaches, leaving the thread parked without a state
 /// attached (which would otherwise block free-threaded stop-the-world pauses).
 fn thread_state_create() {
+    // SAFETY: This hook runs first on a fresh runtime thread, which is not attached and has no
+    // gilstate yet: `PyGILState_Ensure` creates this thread's state and attaches, and
+    // `PyEval_SaveThread` detaches and returns that state. Both stay valid until the matching
+    // `PyGILState_Release` in `thread_state_destroy` drops the last gilstate reference.
     unsafe {
         let gilstate = ffi::PyGILState_Ensure();
         let tstate = ffi::PyEval_SaveThread();
@@ -51,6 +55,12 @@ fn thread_state_create() {
 /// reference has CPython clear and delete the state.
 fn thread_state_destroy() {
     if let Some((tstate, gilstate)) = THREAD_STATE.take() {
+        // SAFETY: `tstate` and `gilstate` come from the paired `PyGILState_Ensure`/
+        // `PyEval_SaveThread` in `thread_state_create` on this same thread, and the thread is
+        // detached here (hooks run outside any `Python::attach` scope). `PyEval_RestoreThread`
+        // re-attaches the still-valid state, and releasing the last gilstate reference has
+        // CPython clear and delete it. If the interpreter has already been finalized,
+        // re-attaching would abort the process, so the state is leaked instead.
         unsafe {
             if ffi::Py_IsInitialized() != 0 {
                 ffi::PyEval_RestoreThread(tstate);
