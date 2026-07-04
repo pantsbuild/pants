@@ -999,16 +999,16 @@ struct MetricsData {
 ///
 /// Propagate the given WorkunitStoreHandle to a Future representing a newly spawned Task.
 ///
-pub async fn scope_task_workunit_store_handle<F>(
+pub fn scope_task_workunit_store_handle<F>(
     workunit_store_handle: Option<WorkunitStoreHandle>,
     f: F,
-) -> F::Output
+) -> impl Future<Output = F::Output>
 where
     F: Future,
 {
-    TASK_WORKUNIT_STORE_HANDLE
-        .scope(workunit_store_handle, f)
-        .await
+    // NB: Not an `async fn`: a coroutine would additionally retain the moved `f` in its own
+    // layout, doubling the size of every future scoped through here.
+    TASK_WORKUNIT_STORE_HANDLE.scope(workunit_store_handle, f)
 }
 
 #[cfg(test)]

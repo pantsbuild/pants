@@ -5,6 +5,8 @@ python_sources()
 
 resource(name="test_lockfile", source="pytest_extra_output_test.lock")
 
+resources(name="coverage_py39_testing_lockfile", sources=["coverage-py39-testing.lock*"])
+
 python_test_utils(name="test_utils")
 
 python_tests(
@@ -12,6 +14,7 @@ python_tests(
     overrides={
         "coverage_py_test.py": {"timeout": 20},
         "coverage_py_integration_test.py": {
+            "dependencies": [":coverage_py39_testing_lockfile"],
             "tags": ["platform_specific_behavior"],
             "timeout": 540,
         },

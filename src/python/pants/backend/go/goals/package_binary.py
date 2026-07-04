@@ -20,7 +20,11 @@ from pants.backend.go.util_rules.build_opts import (
     GoBuildOptionsFromTargetRequest,
     go_extract_build_options_from_target,
 )
-from pants.backend.go.util_rules.build_pkg import required_built_go_package
+from pants.backend.go.util_rules.build_pkg import (
+    MergeBuiltGoPackageArchivesRequest,
+    merge_built_go_package_archives,
+    required_built_go_package,
+)
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
 from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgAnalysisRequest,
@@ -45,7 +49,6 @@ from pants.engine.internals.selectors import concurrently
 from pants.engine.intrinsics import add_prefix
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 
@@ -109,16 +112,17 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
             BuildGoPackageTargetRequest(main_pkg.address, is_main=True, build_opts=build_opts)
         ),
     )
-
-    main_pkg_a_file_path = built_package.import_paths_to_pkg_a_files["main"]
+    merged = await merge_built_go_package_archives(
+        MergeBuiltGoPackageArchivesRequest((built_package,))
+    )
 
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
     binary = await link_go_binary(
         LinkGoBinaryRequest(
-            input_digest=built_package.digest,
-            archives=(main_pkg_a_file_path,),
+            input_digest=merged.digest,
+            archives=(built_package.pkg_archive_path,),
             build_opts=build_opts,
-            import_paths_to_pkg_a_files=FrozenDict(built_package.import_paths_to_pkg_a_files),
+            import_paths_to_pkg_a_files=merged.import_paths_to_pkg_a_files,
             output_filename=f"./{output_filename.name}",
             description=f"Link Go binary for {field_set.address}",
         ),

@@ -19,7 +19,8 @@ use workunit_store::RunId;
 
 use crate::{
     CacheName, Platform, Process, ProcessExecutionEnvironment, ProcessExecutionStrategy,
-    ProcessResultMetadata, ProcessResultSource, local::KeepSandboxes, maybe_make_wrapper_script,
+    ProcessResultMetadata, ProcessResultSource, extract_output_files, local::KeepSandboxes,
+    maybe_make_wrapper_script,
 };
 
 #[test]
@@ -238,6 +239,37 @@ async fn wrapper_script_supports_append_only_caches() {
     assert!(
         test_file_metadata.is_file(),
         "script wrote a file into a sudirectory (since script changed the working directory)"
+    );
+}
+
+// Unit test for to verify that extract_output_files() with a malicious "../outside.txt" path
+// in output_files[].path returns an error.
+// Lower-level than the cache_read_* integration tests in remote_cache_tests.rs, which test the
+// full runner stack including fallback to local execution and filesystem materialization.
+#[tokio::test]
+async fn remote_output_file_paths_must_not_escape_materialization_root() {
+    let store_dir = TempDir::new().unwrap();
+    let store = store::Store::local_only(task_executor::Executor::new(), store_dir.path()).unwrap();
+    let digest = store
+        .store_file_bytes("PANTS_REMOTE_CACHE_HOST_WRITE\n".into(), false)
+        .await
+        .unwrap();
+
+    let action_result = remexec::ActionResult {
+        output_files: vec![remexec::OutputFile {
+            path: "../outside.txt".to_owned(),
+            digest: Some(digest.into()),
+            is_executable: false,
+            ..remexec::OutputFile::default()
+        }],
+        ..remexec::ActionResult::default()
+    };
+
+    assert!(
+        extract_output_files(store.clone(), &action_result, false)
+            .await
+            .is_err(),
+        "remote ActionResult output_files path escaped validation"
     );
 }
 

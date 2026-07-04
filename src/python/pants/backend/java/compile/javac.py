@@ -23,7 +23,7 @@ from pants.engine.intrinsics import (
     execute_process,
     merge_digests,
 )
-from pants.engine.process import Process, ProcessCacheScope, execute_process_or_raise
+from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
@@ -216,7 +216,8 @@ async def compile_java_source(
                     output_files=output_files,
                     description=f"Capture outputs of {request.component} for javac",
                     level=LogLevel.TRACE,
-                    cache_scope=ProcessCacheScope.LOCAL_SUCCESSFUL,
+                    cache_scope=jvm.intermediate_jar_cache_scope,
+                    remote_cache_speculation_delay_millis=jvm.intermediate_jars_remote_cache_speculation_delay,
                 )
             )
         )

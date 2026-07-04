@@ -259,6 +259,25 @@ class GolangSubsystem(Subsystem):
         ),
     )
 
+    use_prebuilt_stdlib_archives = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            If true, pre-compile the entire Go standard library once per Go toolchain configuration
+            (via `go install std`) and link against those archives, instead of compiling each
+            standard library package as a separate build action.
+
+            This is usually significantly faster. Pants automatically falls back to compiling the
+            standard library from source for build configurations that are incompatible with the
+            pre-built archives, such as when using the race detector or other sanitizers, code
+            coverage, or custom compiler/assembler flags.
+
+            Set this to false to always compile standard library packages from source.
+            """
+        ),
+        advanced=True,
+    )
+
     asdf_tool_name = StrOption(
         default="go-sdk",
         help=softwrap(

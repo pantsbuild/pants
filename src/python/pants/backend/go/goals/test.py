@@ -29,7 +29,9 @@ from pants.backend.go.util_rules.build_opts import (
 )
 from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
+    MergeBuiltGoPackageArchivesRequest,
     build_go_package,
+    merge_built_go_package_archives,
     required_built_go_package,
 )
 from pants.backend.go.util_rules.build_pkg_target import (
@@ -528,14 +530,16 @@ async def prepare_go_test_binary(
         )
     built_main_pkg = maybe_built_main_pkg.output
 
-    main_pkg_a_file_path = built_main_pkg.import_paths_to_pkg_a_files["main"]
+    merged = await merge_built_go_package_archives(
+        MergeBuiltGoPackageArchivesRequest((built_main_pkg,))
+    )
 
     binary = await link_go_binary(
         LinkGoBinaryRequest(
-            input_digest=built_main_pkg.digest,
-            archives=(main_pkg_a_file_path,),
+            input_digest=merged.digest,
+            archives=(built_main_pkg.pkg_archive_path,),
             build_opts=build_opts,
-            import_paths_to_pkg_a_files=built_main_pkg.import_paths_to_pkg_a_files,
+            import_paths_to_pkg_a_files=merged.import_paths_to_pkg_a_files,
             output_filename="./test_runner",  # TODO: Name test binary the way that `go` does?
             description=f"Link Go test binary for {request.field_set.address}",
         ),
