@@ -33,6 +33,9 @@ thread_local! {
 /// every attach. `PyEval_SaveThread` then detaches, leaving the thread parked without a state
 /// attached (which would otherwise block free-threaded stop-the-world pauses).
 fn thread_state_create() {
+    if unsafe { ffi::Py_IsInitialized() } == 0 {
+        return;
+    }
     // SAFETY: This hook runs first on a fresh runtime thread, which is not attached and has no
     // gilstate yet: `PyGILState_Ensure` creates this thread's state and attaches, and
     // `PyEval_SaveThread` detaches and returns that state. Both stay valid until the matching
