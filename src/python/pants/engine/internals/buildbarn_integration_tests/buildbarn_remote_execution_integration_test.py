@@ -183,10 +183,6 @@ def test_buildbarn_remote_execution_runs_process() -> None:
     assert run.process_workunit["metadata"]["exit_code"] == 0
 
 
-@pytest.mark.xfail(
-    reason="Root output directories from Buildbarn remote execution require REAPI output_paths.",
-    strict=True,
-)
 def test_buildbarn_remote_execution_root_output_directory() -> None:
     expected_contents = {
         "root.txt": b"root\n",
