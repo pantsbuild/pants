@@ -334,11 +334,11 @@ def test_remote_cache_roundtrips_file_and_directory_outputs() -> None:
             ProcessResult,
             [
                 Process(
-                        [
-                            "/bin/bash",
-                            "-c",
-                            "/bin/echo file-output > file.txt && /bin/mkdir -p out && /bin/echo nested-output > out/nested.txt",
-                        ],
+                    [
+                        "/bin/bash",
+                        "-c",
+                        "/bin/echo file-output > file.txt && /bin/mkdir -p out && /bin/echo nested-output > out/nested.txt",
+                    ],
                     description="Create file and directory outputs",
                     output_files=["file.txt"],
                     output_directories=["out"],
