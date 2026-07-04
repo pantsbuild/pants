@@ -35,12 +35,14 @@ from pants.backend.go.util_rules.build_pkg import (
     FallibleBuildGoPackageRequest,
     FallibleBuiltGoPackage,
 )
-from pants.backend.go.util_rules.build_pkg_target import (
+from pants.backend.go.util_rules.build_pkg_stdlib import (
     BuildGoPackageRequestForStdlibRequest,
+    setup_build_go_package_target_request_for_stdlib,
+)
+from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
     setup_build_go_package_target_request,
-    setup_build_go_package_target_request_for_stdlib,
 )
 from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
 from pants.backend.go.util_rules.import_analysis import (

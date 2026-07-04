@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.go.dependency_inference import (
@@ -15,7 +16,11 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMappingsHook,
     get_go_module_import_paths_mapping,
 )
+from pants.backend.go.subsystems.golang import GolangSubsystem, ThirdPartyTargetGranularity
 from pants.backend.go.target_types import (
+    GoBinaryDependenciesField,
+    GoBinaryMainImportPathField,
+    GoBinaryMainPackageField,
     GoImportPathField,
     GoModSourcesField,
     GoModTarget,
@@ -24,6 +29,7 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import build_opts, first_party_pkg, import_analysis
+from pants.backend.go.util_rules.binary import GoBinaryMainPackage
 from pants.backend.go.util_rules.build_opts import (
     GoBuildOptions,
     GoBuildOptionsFromTargetRequest,
@@ -47,7 +53,6 @@ from pants.backend.go.util_rules.import_analysis import (
 )
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackagesRequest,
-    ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
     download_and_analyze_third_party_packages,
     extract_package_info,
@@ -58,6 +63,7 @@ from pants.core.target_types import (
 )
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
@@ -68,6 +74,8 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InferDependenciesRequest,
     InferredDependencies,
+    InvalidFieldException,
+    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
 from pants.util.frozendict import FrozenDict
@@ -84,6 +92,40 @@ class GoImportPathMappingRequest(EngineAwareParameter):
         return str(self.go_mod_address)
 
 
+@dataclass(frozen=True)
+class ModuleImportPathsExpansionRequest(EngineAwareParameter):
+    go_mod_address: Address
+
+    def debug_hint(self) -> str | None:
+        return str(self.go_mod_address)
+
+
+class ModuleImportPathsExpansion(FrozenDict[str, Address]):
+    """Maps each third-party package import path to its module's target address."""
+
+
+@rule(desc="Map package import paths to third-party Go module targets", level=LogLevel.DEBUG)
+async def expand_module_import_paths(
+    request: ModuleImportPathsExpansionRequest,
+) -> ModuleImportPathsExpansion:
+    go_mod_info = await determine_go_mod_info(GoModInfoRequest(request.go_mod_address))
+    all_packages = await download_and_analyze_third_party_packages(
+        AllThirdPartyPackagesRequest(
+            request.go_mod_address,
+            go_mod_info.digest,
+            go_mod_info.mod_path,
+            # Matches target generation (see `generate_targets_from_go_mod`).
+            build_opts=GoBuildOptions(),
+        )
+    )
+    return ModuleImportPathsExpansion(
+        {
+            import_path: request.go_mod_address.create_generated(pkg_info.module_import_path)
+            for import_path, pkg_info in all_packages.import_paths_to_pkg_info.items()
+        }
+    )
+
+
 class FirstPartyGoModuleImportPathsMappingsHook(GoModuleImportPathsMappingsHook):
     pass
 
@@ -92,6 +134,7 @@ class FirstPartyGoModuleImportPathsMappingsHook(GoModuleImportPathsMappingsHook)
 async def go_map_import_paths_by_module(
     _request: FirstPartyGoModuleImportPathsMappingsHook,
     all_targets: AllTargets,
+    golang: GolangSubsystem,
 ) -> GoModuleImportPathsMappings:
     import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
         lambda: defaultdict(set)
@@ -126,6 +169,23 @@ async def go_map_import_paths_by_module(
         first_party_import_paths, first_party_gets_metadata
     ):
         import_paths_by_module[owning_go_mod.address][import_path_info.import_path].add(addr)
+
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.module:
+        # Map every package import path to its owning module's target.
+        module_granularity_go_mods = sorted(
+            {
+                owning_go_mod.address
+                for tgt, owning_go_mod in zip(candidate_go_source_targets, owning_go_mod_targets)
+                if tgt.has_field(GoThirdPartyPackageDependenciesField)
+            }
+        )
+        module_expansions = await concurrently(
+            expand_module_import_paths(ModuleImportPathsExpansionRequest(go_mod_addr))
+            for go_mod_addr in module_granularity_go_mods
+        )
+        for go_mod_addr, expansion in zip(module_granularity_go_mods, module_expansions):
+            for import_path, module_addr in expansion.items():
+                import_paths_by_module[go_mod_addr][import_path].add(module_addr)
 
     return GoModuleImportPathsMappings(
         FrozenDict(
@@ -211,6 +271,86 @@ async def map_import_paths_to_packages(
     module_import_path_mappings: AllGoModuleImportPathsMappings,
 ) -> GoModuleImportPathsMapping:
     return module_import_path_mappings.modules[request.go_mod_address]
+
+
+@dataclass(frozen=True)
+class GoBinaryMainImportPathRequest(EngineAwareParameter):
+    address: Address
+
+    def debug_hint(self) -> str:
+        return str(self.address)
+
+
+@rule(desc="Resolve `main_import_path` for `go_binary` target", level=LogLevel.DEBUG)
+async def resolve_go_binary_main_import_path(
+    request: GoBinaryMainImportPathRequest,
+) -> GoBinaryMainPackage:
+    wrapped_tgt = await resolve_target(
+        WrappedTargetRequest(
+            request.address,
+            description_of_origin=f"the `{GoBinaryMainImportPathField.alias}` field from the target {request.address}",
+        ),
+        **implicitly(),
+    )
+    target = wrapped_tgt.target
+    import_path = target[GoBinaryMainImportPathField].value
+    assert import_path
+
+    owning_go_mod = await find_owning_go_mod(OwningGoModRequest(request.address), **implicitly())
+    mapping = await map_import_paths_to_packages(
+        GoImportPathMappingRequest(owning_go_mod.address), **implicitly()
+    )
+    candidates = mapping.mapping.get(import_path)
+    addresses = candidates.addresses if candidates else ()
+    if not addresses:
+        raise InvalidFieldException(
+            f"The `{GoBinaryMainImportPathField.alias}` field in target {request.address} is "
+            f"set to `{import_path}`, but no package with that import path exists in the "
+            "`go.mod` for this target.\n\n"
+            "Verify the import path, and check that its module is required by the `go.mod`."
+        )
+    if len(addresses) > 1:
+        raise InvalidFieldException(
+            f"The `{GoBinaryMainImportPathField.alias}` field in target {request.address} is "
+            f"set to `{import_path}`, which maps ambiguously to multiple targets: "
+            f"{sorted(a.spec for a in addresses)}.\n\n"
+            f"Use the `{GoBinaryMainPackageField.alias}` field to select one by address."
+        )
+    wrapped_main_tgt = await resolve_target(
+        WrappedTargetRequest(
+            addresses[0],
+            description_of_origin=f"the `{GoBinaryMainImportPathField.alias}` field from the target {request.address}",
+        ),
+        **implicitly(),
+    )
+    if wrapped_main_tgt.target.has_field(GoPackageSourcesField):
+        return GoBinaryMainPackage(wrapped_main_tgt.target.address, is_third_party=False)
+    return GoBinaryMainPackage(
+        wrapped_main_tgt.target.address, is_third_party=True, import_path=import_path
+    )
+
+
+@dataclass(frozen=True)
+class GoBinaryMainImportPathInferenceFieldSet(FieldSet):
+    required_fields = (GoBinaryDependenciesField, GoBinaryMainImportPathField)
+
+    main_import_path: GoBinaryMainImportPathField
+
+
+class InferGoBinaryMainImportPathDependencyRequest(InferDependenciesRequest):
+    infer_from = GoBinaryMainImportPathInferenceFieldSet
+
+
+@rule
+async def infer_go_binary_main_import_path_dependency(
+    request: InferGoBinaryMainImportPathDependencyRequest,
+) -> InferredDependencies:
+    if not request.field_set.main_import_path.value:
+        return InferredDependencies(())
+    main_pkg = await resolve_go_binary_main_import_path(
+        GoBinaryMainImportPathRequest(request.field_set.address), **implicitly()
+    )
+    return InferredDependencies([main_pkg.address])
 
 
 @dataclass(frozen=True)
@@ -308,7 +448,12 @@ class InferGoThirdPartyPackageDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Infer dependencies for third-party Go packages", level=LogLevel.DEBUG)
 async def infer_go_third_party_package_dependencies(
     request: InferGoThirdPartyPackageDependenciesRequest,
+    golang: GolangSubsystem,
 ) -> InferredDependencies:
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.module:
+        # Module targets carry no inter-module edges: Go module graphs may contain cycles.
+        return InferredDependencies(())
+
     addr = request.field_set.address
     go_mod_address = addr.maybe_convert_to_target_generator()
 
@@ -328,7 +473,8 @@ async def infer_go_third_party_package_dependencies(
                 go_mod_info.digest,
                 go_mod_info.mod_path,
                 build_opts=build_opts,
-            )
+            ),
+            **implicitly(),
         ),
         analyze_go_stdlib_packages(
             GoStdLibPackagesRequest(with_race_detector=build_opts.with_race_detector)
@@ -376,6 +522,7 @@ class GenerateTargetsFromGoModRequest(GenerateTargetsRequest):
 async def generate_targets_from_go_mod(
     request: GenerateTargetsFromGoModRequest,
     union_membership: UnionMembership,
+    golang: GolangSubsystem,
 ) -> GeneratedTargets:
     generator_addr = request.generator.address
     go_mod_sources = request.generator[GoModSourcesField]
@@ -404,22 +551,30 @@ async def generate_targets_from_go_mod(
     if go_mod_sources.go_sum_path in go_mod_snapshot.files:
         file_tgts.append(gen_file_tgt("go.sum"))
 
-    def create_tgt(pkg_info: ThirdPartyPkgAnalysis) -> GoThirdPartyPackageTarget:
+    def create_tgt(import_path: str) -> GoThirdPartyPackageTarget:
         return GoThirdPartyPackageTarget(
             {
                 **request.template,
-                GoImportPathField.alias: pkg_info.import_path,
+                GoImportPathField.alias: import_path,
                 Dependencies.alias: [t.address.spec for t in file_tgts],
             },
             # E.g. `src/go:mod#github.com/google/uuid`.
-            generator_addr.create_generated(pkg_info.import_path),
+            generator_addr.create_generated(import_path),
             union_membership,
             residence_dir=generator_addr.spec_path,
         )
 
-    result = tuple(
-        create_tgt(pkg_info) for pkg_info in all_packages.import_paths_to_pkg_info.values()
-    ) + tuple(file_tgts)
+    import_paths: Iterable[str] = all_packages.import_paths_to_pkg_info.keys()
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.module:
+        # One target per module, addressed by module path.
+        import_paths = sorted(
+            {
+                pkg_info.module_import_path
+                for pkg_info in all_packages.import_paths_to_pkg_info.values()
+            }
+        )
+
+    result = tuple(create_tgt(import_path) for import_path in import_paths) + tuple(file_tgts)
     return GeneratedTargets(request.generator, result)
 
 
@@ -429,6 +584,7 @@ def rules():
         *build_opts.rules(),
         *first_party_pkg.rules(),
         *import_analysis.rules(),
+        UnionRule(InferDependenciesRequest, InferGoBinaryMainImportPathDependencyRequest),
         UnionRule(InferDependenciesRequest, InferGoPackageDependenciesRequest),
         UnionRule(InferDependenciesRequest, InferGoThirdPartyPackageDependenciesRequest),
         UnionRule(GenerateTargetsRequest, GenerateTargetsFromGoModRequest),

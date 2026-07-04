@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
     GoBinaryDependenciesField,
+    GoBinaryMainImportPathField,
     GoBinaryMainPackageField,
     GoImportPathField,
     GoPackageSourcesField,
@@ -121,6 +122,7 @@ class GoBinaryMainDependencyInferenceFieldSet(FieldSet):
 
     dependencies: GoBinaryDependenciesField
     main_package: GoBinaryMainPackageField
+    main_import_path: GoBinaryMainImportPathField
 
 
 class InferGoBinaryMainDependencyRequest(InferDependenciesRequest):
@@ -131,6 +133,9 @@ class InferGoBinaryMainDependencyRequest(InferDependenciesRequest):
 async def infer_go_binary_main_dependency(
     request: InferGoBinaryMainDependencyRequest,
 ) -> InferredDependencies:
+    if request.field_set.main_import_path.value:
+        # Inferred by `infer_go_binary_main_import_path_dependency` instead.
+        return InferredDependencies(())
     main_pkg = await determine_main_pkg_for_go_binary(
         GoBinaryMainPackageRequest(request.field_set.main_package)
     )

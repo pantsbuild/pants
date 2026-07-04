@@ -92,7 +92,8 @@ async def go_show_package_analysis(targets: Targets, console: Console) -> ShowGo
                         go_mod_info.digest,
                         go_mod_info.mod_path,
                         build_opts=build_opts,
-                    )
+                    ),
+                    **implicitly(),
                 )
             )
 

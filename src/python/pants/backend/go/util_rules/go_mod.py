@@ -17,10 +17,6 @@ from pants.backend.go.target_types import (
     GoThirdPartyPackageDependenciesField,
 )
 from pants.backend.go.util_rules import binary
-from pants.backend.go.util_rules.binary import (
-    GoBinaryMainPackageRequest,
-    determine_main_pkg_for_go_binary,
-)
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.base.specs import AncestorGlobSpec, RawSpecs
 from pants.build_graph.address import Address, AddressInput
@@ -190,13 +186,20 @@ async def find_owning_go_mod(
         return OwningGoMod(generator_address)
 
     if target.has_field(GoBinaryMainPackageField):
-        main_pkg = await determine_main_pkg_for_go_binary(
-            GoBinaryMainPackageRequest(target.get(GoBinaryMainPackageField))
+        main_field = target.get(GoBinaryMainPackageField)
+        if main_field.value:
+            address_input = AddressInput.parse(
+                main_field.value,
+                relative_to=target.address.spec_path,
+                description_of_origin=f"the `{GoBinaryMainPackageField.alias}` field from the target {target.address}",
+            )
+            main_address = await resolve_address(**implicitly({address_input: AddressInput}))
+            return await find_owning_go_mod(OwningGoModRequest(main_address), **implicitly())
+        # Import-path and default mains resolve within the binary's own `go.mod`.
+        nearest_go_mod_result = await find_nearest_ancestor_go_mod(
+            NearestAncestorGoModRequest(request.address)
         )
-        owning_go_mod_for_main_pkg = await find_owning_go_mod(
-            OwningGoModRequest(main_pkg.address), **implicitly()
-        )
-        return owning_go_mod_for_main_pkg
+        return OwningGoMod(nearest_go_mod_result.address)
 
     if target.has_field(GoOwningGoModAddressField):
         # Otherwise, find any explicitly defined go_mod address (e.g., for `protobuf_sources` targets).

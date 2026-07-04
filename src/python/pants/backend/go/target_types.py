@@ -236,6 +236,9 @@ class GoThirdPartyPackageTarget(Target):
         target where you have your `go.mod` file, which will generate
         `go_third_party_package` targets for you.
 
+        Under `[golang].third_party_target_granularity = "module"`, one target is generated
+        per third-party module instead, addressed by the module's import path.
+
         Make sure that your `go.mod` and `go.sum` files include this package's module.
         """
     )
@@ -427,9 +430,24 @@ class GoBinaryMainPackageField(StringField, AsyncFieldMixin):
 
         If not specified, will default to the `go_package` for the same
         directory as this target's BUILD file. You should usually rely on this default.
+
+        Mutually exclusive with `main_import_path`.
         """
     )
     value: str
+
+
+class GoBinaryMainImportPathField(StringField, AsyncFieldMixin):
+    alias = "main_import_path"
+    help = help_text(
+        """
+        Import path of the package with the `main` for this binary, e.g.
+        `main_import_path="github.com/some/tool/cmd/tool"`. Resolved against this target's
+        `go.mod`; use it to build a binary from a third-party package.
+
+        Mutually exclusive with `main`.
+        """
+    )
 
 
 class GoBinaryDependenciesField(Dependencies):
@@ -444,6 +462,7 @@ class GoBinaryTarget(Target):
         *COMMON_TARGET_FIELDS,
         OutputPathField,
         GoBinaryMainPackageField,
+        GoBinaryMainImportPathField,
         GoBinaryDependenciesField,
         GoCgoEnabledField,
         GoRaceDetectorEnabledField,
@@ -456,6 +475,14 @@ class GoBinaryTarget(Target):
         EnvironmentField,
     )
     help = "A Go binary."
+
+    def validate(self) -> None:
+        if self[GoBinaryMainPackageField].value and self[GoBinaryMainImportPathField].value:
+            raise InvalidTargetException(
+                f"The `{GoBinaryMainPackageField.alias}` and "
+                f"`{GoBinaryMainImportPathField.alias}` fields are both set on target "
+                f"{self.address}, but they are mutually exclusive."
+            )
 
 
 # -----------------------------------------------------------------------------------------------
