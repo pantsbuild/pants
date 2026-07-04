@@ -152,9 +152,29 @@ impl Task {
         entry: Intern<rule_graph::Entry<Rule>>,
         items: Vec<externs::AllItem>,
     ) -> NodeResult<Vec<Value>> {
-        let futures = items
-            .into_iter()
-            .map(|item| Self::gen_all_item(context, params.clone(), entry, item));
+        // NB: Use a semaphore rather than all at once: every eagerly requested item pins the futures
+        // of its entire in-flight subgraph in memory until it completes.
+        // The semaphore must be scoped to this call: a shared pool would deadlock when the
+        // items of nested `concurrently(..)` groups held permits while waiting for their children to acquire.
+        let window = std::cmp::max(
+            64,
+            std::cmp::max(
+                context.core.local_parallelism * 4,
+                context.core.remote_parallelism.unwrap_or(0) * 2,
+            ),
+        );
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(window));
+        let futures = items.into_iter().map(|item| {
+            let semaphore = semaphore.clone();
+            let params = params.clone();
+            async move {
+                let _permit = semaphore
+                    .acquire()
+                    .await
+                    .expect("The semaphore is never closed.");
+                Self::gen_all_item(context, params, entry, item).await
+            }
+        });
         future::try_join_all(futures).await
     }
 
