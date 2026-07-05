@@ -34,6 +34,7 @@ from pants.engine.fs import (
 )
 from pants.engine.intrinsics import (
     create_digest,
+    digest_subset_to_digest,
     digest_to_snapshot,
     execute_process,
     get_digest_contents,
@@ -93,6 +94,29 @@ class ThirdPartyPkgAnalysis:
     xtest_embed_config: EmbedConfig | None = None
 
     error: GoThirdPartyPkgError | None = None
+
+
+async def third_party_pkg_sources_digest(pkg_info: ThirdPartyPkgAnalysis) -> Digest:
+    """Slice the whole-module analysis digest down to the files this package's compilation
+    consumes.
+
+    Native-code packages keep the whole module: their include closure is not knowable from
+    `go list` metadata.
+    """
+    if (
+        pkg_info.cgo_files
+        or pkg_info.c_files
+        or pkg_info.cxx_files
+        or pkg_info.m_files
+        or pkg_info.f_files
+        or pkg_info.s_files
+        or pkg_info.h_files
+        or pkg_info.syso_files
+    ):
+        return pkg_info.digest
+
+    glob = f"{pkg_info.dir_path}/**" if pkg_info.embed_config else f"{pkg_info.dir_path}/*"
+    return await digest_subset_to_digest(DigestSubset(pkg_info.digest, PathGlobs([glob])))
 
 
 @dataclass(frozen=True)
