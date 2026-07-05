@@ -145,7 +145,7 @@ async fn scandir_empty() {
             .scandir(Dir(path), GitignoreStack::empty())
             .await
             .unwrap(),
-        DirectoryListing(vec![], GitignoreStack::empty())
+        DirectoryListing(vec![])
     );
 }
 
@@ -185,28 +185,25 @@ async fn scandir() {
             .scandir(Dir(path.clone()), GitignoreStack::empty())
             .await
             .unwrap(),
-        DirectoryListing(
-            vec![
-                Stat::File(File {
-                    path: a_marmoset.clone(),
-                    is_executable: false,
-                }),
-                Stat::File(File {
-                    path: feed.clone(),
-                    is_executable: true,
-                }),
-                Stat::Dir(Dir(hammock.clone())),
-                Stat::Link(Link {
-                    path: remarkably_similar_marmoset.clone(),
-                    target: dir.path().join(&path).join(&a_marmoset)
-                }),
-                Stat::File(File {
-                    path: sneaky_marmoset.clone(),
-                    is_executable: false,
-                }),
-            ],
-            GitignoreStack::empty()
-        )
+        DirectoryListing(vec![
+            Stat::File(File {
+                path: a_marmoset.clone(),
+                is_executable: false,
+            }),
+            Stat::File(File {
+                path: feed.clone(),
+                is_executable: true,
+            }),
+            Stat::Dir(Dir(hammock.clone())),
+            Stat::Link(Link {
+                path: remarkably_similar_marmoset.clone(),
+                target: dir.path().join(&path).join(&a_marmoset)
+            }),
+            Stat::File(File {
+                path: sneaky_marmoset.clone(),
+                is_executable: false,
+            }),
+        ])
     );
 
     // Symlink oblivious.
@@ -215,28 +212,25 @@ async fn scandir() {
             .scandir(Dir(path), GitignoreStack::empty())
             .await
             .unwrap(),
-        DirectoryListing(
-            vec![
-                Stat::File(File {
-                    path: a_marmoset,
-                    is_executable: false,
-                }),
-                Stat::File(File {
-                    path: feed,
-                    is_executable: true,
-                }),
-                Stat::Dir(Dir(hammock)),
-                Stat::File(File {
-                    path: remarkably_similar_marmoset,
-                    is_executable: false,
-                }),
-                Stat::File(File {
-                    path: sneaky_marmoset,
-                    is_executable: false,
-                }),
-            ],
-            GitignoreStack::empty()
-        )
+        DirectoryListing(vec![
+            Stat::File(File {
+                path: a_marmoset,
+                is_executable: false,
+            }),
+            Stat::File(File {
+                path: feed,
+                is_executable: true,
+            }),
+            Stat::Dir(Dir(hammock)),
+            Stat::File(File {
+                path: remarkably_similar_marmoset,
+                is_executable: false,
+            }),
+            Stat::File(File {
+                path: sneaky_marmoset,
+                is_executable: false,
+            }),
+        ])
     );
 }
 
@@ -251,6 +245,53 @@ async fn scandir_missing() {
         )
         .await
         .expect_err("Want error");
+}
+
+#[tokio::test]
+async fn push_gitignore_file_reads_regular_files() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let root = dir.path();
+    std::fs::create_dir(root.join("a")).unwrap();
+    make_file(&root.join("a/.gitignore"), b"ignored.txt\n", 0o600);
+    make_file(&root.join("a/ignored.txt"), b"", 0o600);
+    make_file(&root.join("a/kept.txt"), b"", 0o600);
+
+    let posix_fs = new_posixfs(root);
+    let stack = posix_fs
+        .push_gitignore_file(&Dir(PathBuf::from("a")), GitignoreStack::empty())
+        .await
+        .unwrap();
+    assert!(stack.is_path_ignored(Path::new("a/ignored.txt"), false));
+    assert!(!stack.is_path_ignored(Path::new("a/kept.txt"), false));
+
+    let listing = posix_fs
+        .scandir(Dir(PathBuf::from("a")), stack)
+        .await
+        .unwrap();
+    let paths: Vec<_> = listing.0.iter().map(|s| s.path().to_path_buf()).collect();
+    assert_eq!(
+        paths,
+        vec![PathBuf::from(".gitignore"), PathBuf::from("kept.txt")]
+    );
+}
+
+#[tokio::test]
+async fn push_gitignore_file_skips_non_files() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let root = dir.path();
+    std::fs::create_dir_all(root.join("a/.gitignore")).unwrap();
+    std::fs::create_dir(root.join("b")).unwrap();
+    std::os::unix::fs::symlink("does-not-exist", root.join("b/.gitignore")).unwrap();
+    std::fs::create_dir(root.join("c")).unwrap();
+
+    let posix_fs = new_posixfs(root);
+    for subdir in ["a", "b", "c"] {
+        let stack = posix_fs
+            .push_gitignore_file(&Dir(PathBuf::from(subdir)), GitignoreStack::empty())
+            .await
+            .unwrap();
+        assert_eq!(stack, GitignoreStack::empty());
+    }
 }
 
 #[tokio::test]

@@ -73,11 +73,9 @@ impl PosixFS {
     fn scandir_sync(
         &self,
         dir_relative_to_root: &Dir,
-        mut gitignore_stack: GitignoreStack,
+        gitignore_stack: GitignoreStack,
     ) -> Result<DirectoryListing, io::Error> {
         let dir_abs = self.root.join(dir_relative_to_root);
-
-        let mut gitignore = None;
         let mut stats: Vec<Stat> = dir_abs
             .read_dir()?
             .map(|readdir| {
@@ -95,13 +93,7 @@ impl PosixFS {
                             (metadata.file_type(), Box::new(|| Ok(metadata)))
                         }
                     };
-                let stat = PosixFS::stat_internal(&path_to_stat, file_type, compute_metadata);
-                if gitignore_stack.use_nested_gitignore
-                    && path_to_stat.file_name() == Some(".gitignore".as_ref())
-                {
-                    gitignore = Some(path_to_stat);
-                }
-                stat
+                PosixFS::stat_internal(&path_to_stat, file_type, compute_metadata)
             })
             .filter_map(Result::transpose)
             .collect::<Result<Vec<_>, io::Error>>()
@@ -111,11 +103,6 @@ impl PosixFS {
                     format!("Failed to scan directory {dir_abs:?}: {e}"),
                 )
             })?;
-        if let Some(path) = gitignore {
-            gitignore_stack = gitignore_stack
-                .push(dir_relative_to_root, &path)
-                .map_err(io::Error::other)?
-        }
         stats.retain(|s| {
             !gitignore_stack.is_path_ignored(
                 &dir_relative_to_root.join(s.path()),
@@ -123,8 +110,7 @@ impl PosixFS {
             )
         });
         stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
-
-        Ok(DirectoryListing(stats, gitignore_stack))
+        Ok(DirectoryListing(stats))
     }
 
     ///
@@ -193,6 +179,30 @@ impl PosixFS {
 
     pub fn read_gitignore_files(&self) -> bool {
         self.root_ignore.use_nested_gitignore
+    }
+
+    pub async fn push_gitignore_file(
+        &self,
+        dir: &Dir,
+        parent_stack: GitignoreStack,
+    ) -> Result<GitignoreStack, io::Error> {
+        let dir = dir.clone();
+        let gitignore_abs = self.root.join(&dir).join(".gitignore");
+        self.executor
+            .spawn_blocking(move || match std::fs::metadata(&gitignore_abs) {
+                Ok(metadata) if metadata.is_file() => {
+                    parent_stack.push(&dir, &gitignore_abs).map_err(|e| {
+                        io::Error::other(format!("Failed to read {gitignore_abs:?}: {e}"))
+                    })
+                }
+                Ok(_) => Ok(parent_stack),
+                Err(e) if e.kind() == ErrorKind::NotFound => Ok(parent_stack),
+                Err(e) => Err(io::Error::new(
+                    e.kind(),
+                    format!("Failed to stat {gitignore_abs:?}: {e}"),
+                )),
+            })
+            .await?
     }
 
     pub fn is_ignored(&self, stat: &Stat) -> bool {

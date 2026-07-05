@@ -36,7 +36,6 @@ pub use crate::gitignore::GitignoreStyleExcludes;
 pub use crate::glob_matching::{
     DOUBLE_STAR_GLOB, FilespecMatcher, GlobMatching, PathGlob, PreparedPathGlobs, SINGLE_STAR_GLOB,
 };
-use crate::gitignore_stack::GitignoreStack;
 #[cfg(unix)]
 use crate::posixfs::PosixFS;
 
@@ -300,7 +299,7 @@ pub struct PathMetadata {
 }
 
 #[derive(Debug, DeepSizeOf, Eq, PartialEq)]
-pub struct DirectoryListing(pub Vec<Stat>, pub GitignoreStack);
+pub struct DirectoryListing(pub Vec<Stat>);
 
 #[derive(Debug, DeepSizeOf, Clone, Eq, Hash, PartialEq)]
 pub enum StrictGlobMatching {
@@ -470,7 +469,6 @@ impl Vfs<String> for DigestTrie {
                     directory::Entry::Directory(d) => Stat::Dir(Dir(d.name().as_ref().into())),
                 })
                 .collect(),
-            GitignoreStack::empty(),
         )))
     }
 

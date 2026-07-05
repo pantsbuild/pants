@@ -1,8 +1,10 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use crate::nodes::GitignoreStackForDir;
+use crate::python::throw;
 use crate::session::WeakSession;
 use crate::{Failure, Session};
-use fs::{Dir, Vfs};
+use fs::Dir;
 use std::path::Path;
 use watch::GitIgnoreProvider;
 
@@ -24,15 +26,16 @@ impl GitIgnoreSession {
         session: Session,
         parent_dir: &Path,
     ) -> Result<bool, Failure> {
-        let listing = session.core().executor.enter(|| {
+        let stack_node =
+            GitignoreStackForDir::for_dir(Dir(parent_dir.to_path_buf())).map_err(throw)?;
+        let gitignore_stack = session.core().executor.enter(|| {
             session.workunit_store().init_thread_state(None);
-            session.core().executor.block_on(
-                session
-                    .graph_context()
-                    .scandir(Dir(parent_dir.to_path_buf())),
-            )
+            session
+                .core()
+                .executor
+                .block_on(session.graph_context().get(stack_node))
         })?;
-        Ok(listing.1.is_path_ignored_or_any_parent(path, is_dir))
+        Ok(gitignore_stack.is_path_ignored_or_any_parent(path, is_dir))
     }
 }
 
