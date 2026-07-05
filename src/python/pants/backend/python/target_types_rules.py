@@ -16,6 +16,10 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import DefaultDict, cast
 
+import toml
+from packaging.requirements import InvalidRequirement
+from toml import TomlDecodeError
+
 from pants.backend.python.dependency_inference.module_mapper import (
     PythonModuleOwners,
     PythonModuleOwnersRequest,
@@ -47,21 +51,24 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
     ResolvePythonDistributionEntryPointsRequest,
 )
-from pants.backend.python.util_rules.interpreter_constraints import interpreter_constraints_contains
+from pants.backend.python.util_rules.interpreter_constraints import (
+    InterpreterConstraints,
+    interpreter_constraints_contains,
+)
 from pants.core.target_types import ResolveLikeFieldToValueRequest, ResolveLikeFieldToValueResult
 from pants.core.util_rules.unowned_dependency_behavior import (
     UnownedDependencyError,
     UnownedDependencyUsage,
 )
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs
+from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.graph import (
     determine_explicitly_provided_dependencies,
     resolve_target,
     resolve_targets,
     resolve_unparsed_address_inputs,
 )
-from pants.engine.intrinsics import path_globs_to_paths
+from pants.engine.intrinsics import get_digest_contents, path_globs_to_paths
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     DependenciesRequest,
@@ -74,6 +81,7 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
+    Target,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
     ValidatedDependencies,
@@ -625,6 +633,92 @@ class DependencyValidationFieldSet(FieldSet):
     interpreter_constraints: InterpreterConstraintsField
 
 
+@dataclass(frozen=True)
+class PythonDistributionEffectiveInterpreterConstraintsRequest:
+    target: Target
+
+
+@dataclass(frozen=True)
+class PythonDistributionEffectiveInterpreterConstraints:
+    value: InterpreterConstraints
+
+
+def _pyproject_requires_python(contents: DigestContents, address: Address) -> str | None:
+    """Extract `[project].requires-python` from a target's sibling `pyproject.toml`, if any.
+
+    Returns `None` if there is no `pyproject.toml`, or it has no `[project].requires-python`.
+    """
+    if not contents:
+        return None
+    file_content = next(iter(contents))
+    try:
+        pyproject = toml.loads(file_content.content.decode())
+    except (TomlDecodeError, UnicodeDecodeError) as e:
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                Failed to parse {file_content.path}, used to infer `interpreter_constraints` for the
+                `python_distribution` target {address}: {e}
+                """
+            )
+        )
+    project = pyproject.get("project")
+    if not isinstance(project, dict):
+        return None
+    requires_python = project.get("requires-python")
+    if requires_python is None:
+        return None
+    if not isinstance(requires_python, str):
+        raise InvalidFieldException(
+            softwrap(
+                f"""
+                The `[project].requires-python` field in {file_content.path}, used to infer
+                `interpreter_constraints` for the `python_distribution` target {address}, must be
+                a string, but was {requires_python!r}.
+                """
+            )
+        )
+    return requires_python
+
+
+@rule
+async def resolve_python_distribution_effective_interpreter_constraints(
+    request: PythonDistributionEffectiveInterpreterConstraintsRequest,
+    python_setup: PythonSetup,
+) -> PythonDistributionEffectiveInterpreterConstraints:
+    target = request.target
+    interpreter_constraints = target[InterpreterConstraintsField]
+    resolve = target[PythonResolveField] if target.has_field(PythonResolveField) else None
+    if interpreter_constraints.value is None:
+        pyproject_path = os.path.join(target.address.spec_path, "pyproject.toml")
+        digest_contents = await get_digest_contents(
+            **implicitly(
+                PathGlobs([pyproject_path], glob_match_error_behavior=GlobMatchErrorBehavior.ignore)
+            )
+        )
+        requires_python = _pyproject_requires_python(digest_contents, target.address)
+        if requires_python is not None:
+            try:
+                inferred = InterpreterConstraints([requires_python])
+            except InvalidRequirement as e:
+                raise InvalidFieldException(
+                    softwrap(
+                        f"""
+                        Failed to infer `interpreter_constraints` for the `python_distribution`
+                        target {target.address} from `[project].requires-python` in
+                        {pyproject_path}: {e}
+                        """
+                    )
+                )
+            return PythonDistributionEffectiveInterpreterConstraints(inferred)
+
+    return PythonDistributionEffectiveInterpreterConstraints(
+        InterpreterConstraints(
+            interpreter_constraints.value_or_configured_default(python_setup, resolve)
+        )
+    )
+
+
 class PythonValidateDependenciesRequest(ValidateDependenciesRequest):
     field_set_type = DependencyValidationFieldSet
 
@@ -653,13 +747,22 @@ async def validate_python_dependencies(
         ),
     )
 
-    # Validate that the ICs for dependencies are all compatible with our own.
-    target_ics = request.field_set.interpreter_constraints.value_or_configured_default(
-        python_setup,
-        root_target.target[PythonResolveField]
-        if root_target.target.has_field(PythonResolveField)
-        else None,
-    )
+    # Validate that the ICs for dependencies are all compatible with our own. For a
+    # `python_distribution` the constraints may be inferred from a sibling `pyproject.toml`, so
+    # consult the effective constraints rather than the field value alone.
+    if root_target.target.has_field(PythonProvidesField):
+        effective_ics = await resolve_python_distribution_effective_interpreter_constraints(
+            PythonDistributionEffectiveInterpreterConstraintsRequest(root_target.target),
+            **implicitly(),
+        )
+        target_ics = tuple(str(ic) for ic in effective_ics.value)
+    else:
+        target_ics = request.field_set.interpreter_constraints.value_or_configured_default(
+            python_setup,
+            root_target.target[PythonResolveField]
+            if root_target.target.has_field(PythonResolveField)
+            else None,
+        )
     non_subset_items = []
     for dep in dependencies:
         if not dep.target.has_field(InterpreterConstraintsField):

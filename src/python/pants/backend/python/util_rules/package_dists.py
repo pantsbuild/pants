@@ -36,7 +36,9 @@ from pants.backend.python.target_types import (
     WheelField,
 )
 from pants.backend.python.target_types_rules import (
+    PythonDistributionEffectiveInterpreterConstraintsRequest,
     SetupPyError,
+    resolve_python_distribution_effective_interpreter_constraints,
     resolve_python_distribution_entry_points,
 )
 from pants.backend.python.util_rules.dists import (
@@ -417,9 +419,19 @@ async def create_dist_build_request(
     else:
         extra_build_time_env = EnvironmentVars()
 
-    interpreter_constraints = InterpreterConstraints.create_from_targets(
-        transitive_targets.closure, python_setup
-    ) or InterpreterConstraints(python_setup.interpreter_constraints)
+    dependency_interpreter_constraints = InterpreterConstraints.create_from_targets(
+        (tgt for tgt in transitive_targets.closure if tgt.address != dist_tgt.address), python_setup
+    )
+    dist_interpreter_constraints = (
+        await resolve_python_distribution_effective_interpreter_constraints(
+            PythonDistributionEffectiveInterpreterConstraintsRequest(dist_tgt),
+            **implicitly(),
+        )
+    )
+    interpreter_constraints_to_merge = [dist_interpreter_constraints.value]
+    if dependency_interpreter_constraints:
+        interpreter_constraints_to_merge.append(dependency_interpreter_constraints)
+    interpreter_constraints = InterpreterConstraints.merge(interpreter_constraints_to_merge)
     chroot = await generate_chroot(
         DistBuildChrootRequest(
             exported_target,
