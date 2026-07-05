@@ -101,8 +101,8 @@ impl InvalidationWatcher {
     }
 
     ///
-    /// Starts the background task that monitors watch events. Panics if called more than once.
-    /// Passing an ignore_provider will override the default ignorer.
+    /// Starts the background task that monitors watch events. The first caller starts the task,
+    /// and its ignore_provider (if any) overrides the default ignorer: later calls are no-ops.
     ///
     pub fn start<I: Invalidatable, G: GitIgnoreProvider + Debug>(
         &self,
@@ -110,10 +110,12 @@ impl InvalidationWatcher {
         ignore_provider: Option<G>,
     ) -> Result<(), String> {
         let mut inner = self.0.lock();
-        let (ignorer, canonical_build_root, liveness_sender, watch_receiver) = inner
-            .background_task_inputs
-            .take()
-            .expect("An InvalidationWatcher can only be started once.");
+        let Some((ignorer, canonical_build_root, liveness_sender, watch_receiver)) =
+            inner.background_task_inputs.take()
+        else {
+            debug!("InvalidationWatcher is already started.");
+            return Ok(());
+        };
         if let Some(ignorer) = ignore_provider {
             log::debug!(
                 "Starting InvalidationWatcher with ignore provider {:?}",
