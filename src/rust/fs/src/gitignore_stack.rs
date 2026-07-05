@@ -70,6 +70,22 @@ impl GitignoreStack {
         })
     }
 
+    pub fn match_configured_patterns_or_any_parents(
+        &self,
+        path: &Path,
+        is_dir: bool,
+    ) -> Option<bool> {
+        match self
+            .configured_patterns
+            .gitignore
+            .matched_path_or_any_parents(path, is_dir)
+        {
+            ::ignore::Match::Ignore(_) => Some(true),
+            ::ignore::Match::Whitelist(_) => Some(false),
+            ::ignore::Match::None => None,
+        }
+    }
+
     #[inline]
     fn is_path_ignored_for_method<F>(&self, path: &Path, is_dir: bool, method: F) -> bool
     where

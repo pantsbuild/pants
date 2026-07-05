@@ -5,18 +5,21 @@ use crate::python::throw;
 use crate::session::WeakSession;
 use crate::{Failure, Session};
 use fs::Dir;
+use fs::gitignore_stack::GitignoreStack;
 use std::path::Path;
 use watch::GitIgnoreProvider;
 
 #[derive(Clone, Debug)]
 pub struct GitIgnoreSession {
     session: WeakSession,
+    root_stack: GitignoreStack,
 }
 
 impl GitIgnoreSession {
     pub fn new(session: &Session) -> Self {
         GitIgnoreSession {
             session: session.downgrade(),
+            root_stack: session.core().vfs.root_ignore().clone(),
         }
     }
 
@@ -45,10 +48,19 @@ impl GitIgnoreProvider for GitIgnoreSession {
         if path.file_name() == Some(".gitignore".as_ref()) {
             return false;
         }
+        if path.is_absolute() {
+            return false;
+        }
+        if let Some(ignored) = self
+            .root_stack
+            .match_configured_patterns_or_any_parents(path, is_dir)
+        {
+            return ignored;
+        }
         if let Some(session) = self.session.upgrade() {
             return if let Some(parent_dir) = path.parent() {
                 Self::test_path(path, is_dir, session, parent_dir).unwrap_or_else(|err| {
-                    log::error!("Error testing {}: {}", path.display(), err);
+                    log::debug!("Failed to test {}, not ignoring: {}", path.display(), err);
                     false
                 })
             } else {
@@ -56,7 +68,7 @@ impl GitIgnoreProvider for GitIgnoreSession {
                 false
             };
         };
-        log::info!("Session has been freed, not testing path.");
+        log::trace!("Session has been freed, not testing path.");
         false
     }
 }
