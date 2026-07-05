@@ -194,6 +194,7 @@ impl GitignoreStyleExcludes {
             let read_line = line
                 .map_err(|e| format!("Reading line {}:{} caused error {}", path.display(), i, e))?;
             hasher.update(read_line.as_bytes());
+            hasher.update(b"\n");
             ignore_builder.add_line(Some(path.clone()), &read_line)?;
         }
         Ok(hasher.finish())
@@ -215,6 +216,23 @@ mod tests {
             .iter()
             .map(|p| fs.stat_sync(p).unwrap().unwrap())
             .collect()
+    }
+
+    #[test]
+    fn test_digest_distinguishes_moved_line_breaks() {
+        let root = tempfile::TempDir::new().unwrap();
+        let path = root.path().join(".gitignore");
+
+        let create_excludes = |content| {
+            make_file(&path, content, 0o700);
+            GitignoreStyleExcludes::create_with_gitignore_files(vec![], vec![path.clone()])
+                .unwrap()
+                .files
+        };
+
+        let two_lines = create_excludes(b"foo\nbar\n");
+        let one_line = create_excludes(b"foobar\n");
+        assert_ne!(two_lines, one_line);
     }
 
     #[tokio::test]
