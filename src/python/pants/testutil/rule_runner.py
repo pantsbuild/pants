@@ -367,9 +367,7 @@ class RuleRunner:
             is_bootstrap=is_bootstrap,
         ).scheduler
         self._set_new_session(scheduler)
-        scheduler.attach_session_to_invalidation_watcher(
-            scheduler.new_session(build_id="scheduler_session_for_testing")
-        )
+        scheduler.attach_session_to_invalidation_watcher(self.scheduler)
 
     def __repr__(self) -> str:
         return f"RuleRunner(build_root={self.build_root})"
