@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from packaging.requirements import Requirement
-
 from pants.backend.python.subsystems.repos import PythonRepos
 from pants.backend.python.subsystems.setup import InvalidLockfileBehavior, PythonSetup
 from pants.backend.python.target_types import PythonRequirementsField
@@ -498,16 +496,6 @@ class ResolveConfig:
             config_lines.append("]")
             config_lines.append("")
 
-        if self.sources:
-            config_lines.append("[sources]")
-            for source in self.sources:
-                index_name, _, scope = source.partition("=")
-                req = Requirement(scope)
-                # Markers may contain double-quotes, so we use single quotes in the TOML.
-                marker = f", marker = '{req.marker}'" if req.marker else ""
-                config_lines.append(f'{req.name} = {{ index = "{index_name}"{marker} }}')
-            config_lines.append("")
-
         if self.no_binary:
             if ":all:" in self.no_binary:
                 config_lines.append("no-binary = true")
@@ -530,34 +518,6 @@ class ResolveConfig:
 
         if self.uploaded_prior_to:
             config_lines.append(f'exclude-newer = "{self.uploaded_prior_to}"')
-            config_lines.append("")
-
-        indexes = []
-        for index in self.indexes:
-            part1, _, part2 = index.partition("=")
-            (name, url) = (part1, part2) if part2 else ("", part1)
-            index_data = {"url": url}
-            if name:
-                index_data["name"] = name
-            indexes.append(index_data)
-        if indexes:
-            # To turn off uv's fallback to PyPI we must set some other index to be the default.
-            # In uv the default index has the lowest priority, regardless of its position in the
-            # list of indexes, so we set the last index to be that default, to match user intent.
-            indexes[-1]["default"] = "true"
-            for index_data in indexes:
-                name = index_data.get("name", "")
-                url = index_data.get("url", "")
-                default = index_data.get("default", False)
-                config_lines.append("[[index]]")
-                if name:
-                    config_lines.append(f'name = "{name}"')
-                config_lines.append(f'url = "{url}"')
-                if default:
-                    config_lines.append("default = true")
-                config_lines.append("")
-        else:
-            config_lines.append("no-index = true")
             config_lines.append("")
 
         return "\n".join(config_lines) + "\n" if config_lines else ""

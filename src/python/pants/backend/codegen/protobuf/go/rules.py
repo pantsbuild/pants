@@ -46,12 +46,18 @@ from pants.backend.go.util_rules.build_pkg import (
     FallibleBuildGoPackageRequest,
 )
 from pants.backend.go.util_rules.build_pkg_target import (
+    BuildGoPackageRequestForStdlibRequest,
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
     required_build_go_package_request,
+    setup_build_go_package_target_request_for_stdlib,
 )
 from pants.backend.go.util_rules.first_party_pkg import FallibleFirstPartyPkgAnalysis
 from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
+from pants.backend.go.util_rules.import_analysis import (
+    GoStdLibPackagesRequest,
+    analyze_go_stdlib_packages,
+)
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.python.util_rules import pex
@@ -371,10 +377,28 @@ async def setup_full_package_build_request(
         )
     analysis = fallible_analysis.analysis
 
-    # Obtain build requests for third-party dependencies.
+    stdlib_packages = await analyze_go_stdlib_packages(
+        GoStdLibPackagesRequest(
+            with_race_detector=request.build_opts.with_race_detector,
+            cgo_enabled=request.build_opts.cgo_enabled,
+        )
+    )
+
+    # Obtain build requests for standard-library and third-party dependencies.
     # TODO: Consider how to merge this code with existing dependency inference code.
     dep_build_request_addrs: set[Address] = set()
+    stdlib_dep_import_paths: set[str] = set()
     for dep_import_path in (*analysis.imports, *analysis.test_imports, *analysis.xtest_imports):
+        if dep_import_path in ("C", "unsafe", "builtin"):
+            continue
+
+        # The generated code imports standard-library packages directly (e.g., `reflect` and
+        # `sync`). They must be declared as direct dependencies: the compile sandbox/importcfg
+        # contains only direct dependencies' export data.
+        if dep_import_path in stdlib_packages:
+            stdlib_dep_import_paths.add(dep_import_path)
+            continue
+
         # Infer dependencies on other Go packages.
         candidate_addresses = package_mapping.mapping.get(dep_import_path)
         if candidate_addresses:
@@ -404,6 +428,21 @@ async def setup_full_package_build_request(
         for addr in sorted(dep_build_request_addrs)
     )
 
+    fallible_stdlib_dep_build_requests = await concurrently(
+        setup_build_go_package_target_request_for_stdlib(
+            BuildGoPackageRequestForStdlibRequest(
+                import_path=dep_import_path,
+                build_opts=request.build_opts,
+            ),
+            **implicitly(),
+        )
+        for dep_import_path in sorted(stdlib_dep_import_paths)
+    )
+    stdlib_dep_build_requests: list[BuildGoPackageRequest] = []
+    for fallible_stdlib_dep in fallible_stdlib_dep_build_requests:
+        assert fallible_stdlib_dep.request is not None
+        stdlib_dep_build_requests.append(fallible_stdlib_dep.request)
+
     return FallibleBuildGoPackageRequest(
         request=BuildGoPackageRequest(
             import_path=request.import_path,
@@ -412,7 +451,7 @@ async def setup_full_package_build_request(
             dir_path=analysis.dir_path,
             go_files=analysis.go_files,
             s_files=analysis.s_files,
-            direct_dependencies=dep_build_requests,
+            direct_dependencies=(*dep_build_requests, *stdlib_dep_build_requests),
             minimum_go_version=analysis.minimum_go_version,
             build_opts=request.build_opts,
         ),

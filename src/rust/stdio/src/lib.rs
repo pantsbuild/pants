@@ -470,11 +470,16 @@ pub fn set_thread_destination(destination: Arc<Destination>) {
 ///
 /// See InnerDestination for more info.
 ///
-pub async fn scope_task_destination<F>(destination: Arc<Destination>, f: F) -> F::Output
+pub fn scope_task_destination<F>(
+    destination: Arc<Destination>,
+    f: F,
+) -> impl Future<Output = F::Output>
 where
     F: Future,
 {
-    TASK_DESTINATION.scope(destination, f).await
+    // NB: Not an `async fn`: a coroutine would additionally retain the moved `f` in its own
+    // layout, doubling the size of every future scoped through here.
+    TASK_DESTINATION.scope(destination, f)
 }
 
 ///

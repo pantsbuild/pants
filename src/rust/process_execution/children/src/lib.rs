@@ -37,13 +37,7 @@ impl ManagedChild {
 
         // Adjust the Command to create its own PGID as it starts, to make it safe to kill the PGID
         // later.
-        unsafe {
-            command.pre_exec(|| {
-                nix::unistd::setsid()
-                    .map(|_pgid| ())
-                    .map_err(|e| std::io::Error::other(format!("Could not create new pgid: {e}")))
-            });
-        };
+        command.process_group(0);
 
         // Then spawn.
         let child = command.spawn()?;

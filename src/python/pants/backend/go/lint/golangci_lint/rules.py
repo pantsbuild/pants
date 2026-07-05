@@ -179,6 +179,7 @@ async def run_golangci_lint(
             export GOCACHE="${{sandbox_root}}/gocache"
             export GOLANGCI_LINT_CACHE="$GOCACHE"
             export CGO_ENABLED={1 if cgo_enabled else 0}
+            export GOTOOLCHAIN=local
             /bin/mkdir -p "$GOPATH" "$GOCACHE"
             exec "$@"
             """

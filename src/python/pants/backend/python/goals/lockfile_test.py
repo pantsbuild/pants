@@ -332,7 +332,7 @@ def test_multiple_resolves() -> None:
         GeneratePexLockfile(
             requirements=FrozenOrderedSet(["a"]),
             find_links=FrozenOrderedSet([]),
-            interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
+            interpreter_constraints=InterpreterConstraints(["CPython>=3.10,<3.15"]),
             resolve_name="a",
             lockfile_dest="a.lock",
             diff=False,
@@ -726,3 +726,38 @@ def test_uv_lockfile_generation(
     expected_only_binary = ["ansicolors"] if only_binary else []
     assert sorted(metadata.get("no_binary", [])) == expected_no_binary
     assert sorted(metadata.get("only_binary", [])) == expected_only_binary
+
+
+def test_uv_lockfile_generation_with_sources(rule_runner: PythonRuleRunner) -> None:
+    # Regression test for https://github.com/pantsbuild/pants/issues/23442.
+    rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-repos-indexes=['alt=https://pypi.org/simple/']",
+            "--python-resolves-to-sources={'test': ['alt=ansicolors>=1.0']}",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+
+    result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GenerateUvLockfile(
+                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+            )
+        ],
+    )
+    digest_contents = rule_runner.request(DigestContents, [result.digest])
+
+    by_path = {fc.path: fc for fc in digest_contents}
+    assert "test.lock" in by_path
+
+    lock_data = tomllib.loads(by_path["test.lock"].content.decode())
+    packages = {pkg["name"]: pkg for pkg in lock_data.get("package", []) if "version" in pkg}
+    assert "ansicolors" in packages
+    assert packages["ansicolors"]["version"] == "1.1.8"

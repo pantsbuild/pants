@@ -40,8 +40,6 @@ module = [
   "fasteners",
   "freezegun",
   "gnupg",
-  "hdrh",
-  "hdrh.histogram",
   "ijson.*",
   "nodesemver",
   "pex.*",

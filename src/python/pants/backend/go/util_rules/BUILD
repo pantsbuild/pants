@@ -8,5 +8,6 @@ python_tests(
     overrides={
         "embed_integration_test.py": {"timeout": 240},
         "cgo_test.py": {"timeout": 240},
+        "stdlib_archives_test.py": {"timeout": 240},
     },
 )

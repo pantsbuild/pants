@@ -573,6 +573,19 @@ class PexIgnoreErrorsField(BoolField):
     help = "Should PEX ignore errors when it cannot resolve dependencies?"
 
 
+class PexValidateEntryPointField(BoolField):
+    alias = "validate_entry_point"
+    default = False
+    help = help_text(
+        """
+        Validate the entry point by importing it in a separate process when building the PEX.
+
+        Warning: this could have side effects. For example, the entry point `a.b.c:m` will
+        translate to `from a.b.c import m` during validation. (Pex default: False)
+        """
+    )
+
+
 class PexShBootField(BoolField):
     alias = "sh_boot"
     default = False
@@ -1043,6 +1056,7 @@ _PEX_BINARY_COMMON_FIELDS = (
     PexInheritPathField,
     PexStripEnvField,
     PexIgnoreErrorsField,
+    PexValidateEntryPointField,
     PexShBootField,
     PexShebangField,
     PexEmitWarningsField,

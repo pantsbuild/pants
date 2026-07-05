@@ -25,6 +25,7 @@ class GoStdLibPackage:
     import_path: str
     pkg_source_path: str
     imports: tuple[str, ...]
+    deps: tuple[str, ...]
     import_map: FrozenDict[str, str]
 
     # Analysis for when Pants is able to compile the SDK directly.
@@ -64,7 +65,6 @@ async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdL
     list_result = await execute_process_or_raise(
         **implicitly(
             GoSdkProcess(
-                # "-find" skips determining dependencies and imports for each package.
                 command=("list", *maybe_race_arg, "-json", "std"),
                 env={"CGO_ENABLED": "1" if request.cgo_enabled else "0"},
                 description="Ask Go for its available import paths",
@@ -84,6 +84,7 @@ async def analyze_go_stdlib_packages(request: GoStdLibPackagesRequest) -> GoStdL
             import_path=import_path,
             pkg_source_path=pkg_source_path,
             imports=tuple(pkg_json.get("Imports", ())),
+            deps=tuple(pkg_json.get("Deps", ())),
             import_map=FrozenDict(pkg_json.get("ImportMap", {})),
             go_files=tuple(pkg_json.get("GoFiles", ())),
             cgo_files=tuple(pkg_json.get("CgoFiles", ())),
