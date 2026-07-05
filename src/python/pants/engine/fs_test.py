@@ -862,7 +862,7 @@ def test_digest_subset_rejects_malformed_request(rule_runner: RuleRunner) -> Non
     digest_subset = object.__new__(DigestSubset)
     object.__setattr__(digest_subset, "digest", EMPTY_DIGEST)
     object.__setattr__(digest_subset, "globs", object())
-    with pytest.raises(ExecutionError, match="Failed to get `globs`"):
+    with pytest.raises(ExecutionError, match="Expected a PathGlobs instance"):
         rule_runner.request(Snapshot, [digest_subset])
 
 
