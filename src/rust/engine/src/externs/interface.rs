@@ -55,7 +55,6 @@ use workunit_store::{
 
 use crate::externs::fs::{PyFileDigest, possible_store_missing_digest};
 use crate::externs::process::PyProcessExecutionEnvironment;
-use crate::git_ignore_session::GitIgnoreSession;
 use crate::intrinsics;
 use crate::{
     Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure, Function, Key,
@@ -1419,15 +1418,12 @@ fn start_invalidation_watcher(py_session: &Bound<'_, PySession>) -> PyO3Result<(
     let session = &py_session.borrow().0;
     let core = session.core();
     if let Some(watcher) = core.watcher.as_ref() {
-        let provider = {
-            if core.vfs.read_gitignore_files() {
-                Some(GitIgnoreSession::new(session))
-            } else {
-                None
-            }
-        };
+        let provider = core.gitignore_session.as_ref().map(|gitignore_session| {
+            gitignore_session.set_session(session);
+            gitignore_session.clone()
+        });
         watcher
-            .start(&session.core().graph, provider)
+            .start(&core.graph, provider)
             .map_err(PyException::new_err)?;
     }
     Ok(())

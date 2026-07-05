@@ -367,7 +367,6 @@ class RuleRunner:
             is_bootstrap=is_bootstrap,
         ).scheduler
         self._set_new_session(scheduler)
-        scheduler.attach_session_to_invalidation_watcher(self.scheduler)
 
     def __repr__(self) -> str:
         return f"RuleRunner(build_root={self.build_root})"
@@ -385,6 +384,7 @@ class RuleRunner:
             ),
             max_workunit_level=self.max_workunit_verbosity,
         )
+        scheduler.attach_session_to_invalidation_watcher(self.scheduler)
 
     @property
     def pants_workdir(self) -> str:

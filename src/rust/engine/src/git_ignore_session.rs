@@ -6,21 +6,27 @@ use crate::session::WeakSession;
 use crate::{Failure, Session};
 use fs::Dir;
 use fs::gitignore_stack::GitignoreStack;
+use parking_lot::RwLock;
 use std::path::Path;
+use std::sync::Arc;
 use watch::GitIgnoreProvider;
 
 #[derive(Clone, Debug)]
 pub struct GitIgnoreSession {
-    session: WeakSession,
+    session: Arc<RwLock<Option<WeakSession>>>,
     root_stack: GitignoreStack,
 }
 
 impl GitIgnoreSession {
-    pub fn new(session: &Session) -> Self {
+    pub fn new(root_stack: GitignoreStack) -> Self {
         GitIgnoreSession {
-            session: session.downgrade(),
-            root_stack: session.core().vfs.root_ignore().clone(),
+            session: Arc::new(RwLock::new(None)),
+            root_stack,
         }
+    }
+
+    pub fn set_session(&self, session: &Session) {
+        *self.session.write() = Some(session.downgrade());
     }
 
     fn test_path(
@@ -57,7 +63,8 @@ impl GitIgnoreProvider for GitIgnoreSession {
         {
             return ignored;
         }
-        if let Some(session) = self.session.upgrade() {
+        let maybe_session = { self.session.read().as_ref().and_then(WeakSession::upgrade) };
+        if let Some(session) = maybe_session {
             return if let Some(parent_dir) = path.parent() {
                 Self::test_path(path, is_dir, session, parent_dir).unwrap_or_else(|err| {
                     log::debug!("Failed to test {}, not ignoring: {}", path.display(), err);
