@@ -30,14 +30,7 @@ from pants.backend.helm.subsystems.post_renderer import HelmPostRendererSubsyste
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
 from pants.backend.javascript.lint.prettier.subsystem import Prettier
-from pants.backend.javascript.package_manager import PackageManager
-from pants.backend.javascript.subsystems.nodejs import NodeJS
-from pants.backend.javascript.subsystems.nodejs_tool import (
-    NodeJSToolBase,
-    _lockfile_dest_for_resource,
-    _parse_package_name_and_version,
-    _tool_package_json_bytes,
-)
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.nfpm.native_libs.elfdeps.subsystem import Elfdeps
 from pants.backend.openapi.lint.openapi_format.subsystem import OpenApiFormatSubsystem
@@ -85,6 +78,11 @@ logger = logging.getLogger(__name__)
 
 
 default_python_interpreter_constraints = "CPython>=3.10,<3.15"
+
+
+def _lockfile_dest_for_resource(resource_pkg: str, filename: str) -> str:
+    """In-repo path for a bundled lockfile resource, relative to the Pants repo root."""
+    return os.path.join("src", "python", resource_pkg.replace(".", os.path.sep), filename)
 
 
 ToolBaseT = TypeVar("ToolBaseT")
@@ -187,7 +185,7 @@ all_jvm_tools = tuple(
 all_nodejs_tools = tuple(
     sorted(
         [
-            NodeJSTool(Prettier, "pants.backend.javascript.lint.prettier"),
+            NodeJSTool(Prettier, "pants.backend.experimental.javascript.lint.prettier"),
             NodeJSTool(Pyright, "pants.backend.experimental.python.typecheck.pyright"),
             NodeJSTool(SpectralSubsystem, "pants.backend.experimental.openapi.lint.spectral"),
             NodeJSTool(
@@ -336,63 +334,67 @@ def generate_nodejs_tool_lockfiles(
     tools: Sequence[NodeJSTool], dry_run: bool, keep_sandboxes: KeepSandboxes
 ) -> None:
     cleanup_tmp = keep_sandboxes == KeepSandboxes.never
-
-    assert NodeJS.package_managers is not None
-    pm_versions: dict[str, str] = NodeJS.package_managers.kwargs["default"]
-    package_managers = [
-        PackageManager.npm(pm_versions["npm"]),
-        PackageManager.yarn(pm_versions["yarn"]),
-        PackageManager.pnpm(pm_versions["pnpm"]),
-    ]
     pants_repo_root = get_buildroot()
+    # The tool-lockfile generation rules live in the core javascript backend; each tool's own
+    # backend only contributes its `ExportableTool` union rule.
+    backends = sorted({tool.backend for tool in tools} | {"pants.backend.experimental.javascript"})
+    custom_cmd = "./pants run build-support/bin/generate_builtin_lockfiles.py"
 
-    for tool in tools:
-        pkg_name, pkg_version = _parse_package_name_and_version(tool.cls.default_version)
+    # `generate-lockfiles` only emits a lockfile for the configured package manager, so run it
+    # once per manager to produce all three bundled lockfiles.
+    pkg_manager_names = ("npm", "yarn", "pnpm")
 
-        lockfile_resources = tool.cls.default_lockfile_resources
-        if not lockfile_resources:
-            logger.warning(f"Skipping {tool.name}: no default_lockfile_resources configured.")
-            continue
+    # Generate in an isolated tmp buildroot so the Pants repo's own config and lockfiles can't
+    # influence the result.
+    with temporary_dir(cleanup=cleanup_tmp) as tmp_buildroot:
+        if not cleanup_tmp:
+            logger.info(f"Preserving temp buildroot: {tmp_buildroot}")
+        touch(os.path.join(tmp_buildroot, "pants.toml"))
 
-        for pm in package_managers:
-            if pm.name not in lockfile_resources:
+        for pm_name in pkg_manager_names:
+            tool_dests: dict[str, str] = {}
+            for tool in tools:
+                resources = tool.cls.default_lockfile_resources
+                if not resources or pm_name not in resources:
+                    logger.warning(
+                        f"Skipping {tool.name} for {pm_name}: no bundled lockfile resource configured."
+                    )
+                    continue
+                resource_pkg, resource_filename = resources[pm_name]
+                tool_dests[tool.name] = _lockfile_dest_for_resource(resource_pkg, resource_filename)
+            if not tool_dests:
                 continue
 
-            resource_pkg, resource_filename = lockfile_resources[pm.name]
-            dest = os.path.join(
-                pants_repo_root, _lockfile_dest_for_resource(resource_pkg, resource_filename)
-            )
-            cmd = [
-                "npx",
-                "--yes",
-                f"{pm.name}@{pm.version}",
-                *pm.generate_lockfile_args,
-                "--ignore-scripts",
+            args = [
+                os.path.join(pants_repo_root, "pants"),
+                "--concurrent",
+                f"--keep-sandboxes={keep_sandboxes.value}",
+                "--anonymous-telemetry-enabled=false",
+                f"--backend-packages={backends}",
+                f"--nodejs-package-manager={pm_name}",
+                # Point `[<tool>].lockfile` at a real path so the goal regenerates each file
+                # instead of skipping the tool (whose default is the bundled-lockfile sentinel).
+                *[f"--{name}-lockfile={dest}" for name, dest in sorted(tool_dests.items())],
+                f"--generate-lockfiles-custom-command={custom_cmd}",
+                "generate-lockfiles",
+                *[f"--resolve={name}" for name in sorted(tool_dests)],
             ]
 
             if dry_run:
-                logger.info(f"Would run: {' '.join(cmd)} -> {dest}")
+                logger.info("Would run: " + " ".join(repr(arg) for arg in args))
                 continue
 
-            with temporary_dir(cleanup=cleanup_tmp) as tmp_dir:
-                if not cleanup_tmp:
-                    logger.info(f"Preserving temp dir for {tool.name}/{pm.name}: {tmp_dir}")
+            logger.info(f"Generating {pm_name} lockfiles for: {', '.join(sorted(tool_dests))}")
+            logger.debug("Running: " + " ".join(repr(arg) for arg in args))
+            subprocess.run(args, cwd=tmp_buildroot, check=True)
 
-                with open(os.path.join(tmp_dir, "package.json"), "wb") as f:
-                    f.write(_tool_package_json_bytes(tool.name, pkg_name, pkg_version))
-
-                logger.info(f"Generating {pm.name} lockfile for {tool.name}...")
-                try:
-                    subprocess.run(cmd, cwd=tmp_dir, check=True, capture_output=True)
-                except subprocess.CalledProcessError as e:
-                    logger.error(
-                        f"Failed to generate {pm.name} lockfile for {tool.name}:\n"
-                        f"  stdout: {e.stdout.decode()}\n"
-                        f"  stderr: {e.stderr.decode()}"
-                    )
-                    raise
-                shutil.copy(os.path.join(tmp_dir, pm.lockfile_name), dest)
-                logger.debug(f"Copied {pm.lockfile_name} -> {dest}")
+            # The goal wrote each lockfile to its repo-relative path inside `tmp_buildroot`; copy
+            # each out to the real repo.
+            for name, rel in sorted(tool_dests.items()):
+                src = os.path.join(tmp_buildroot, rel)
+                dst = os.path.join(pants_repo_root, rel)
+                shutil.copy(src, dst)
+                logger.debug(f"Copied {rel}")
 
 
 def generate(
@@ -403,12 +405,7 @@ def generate(
     keep_sandboxes: KeepSandboxes,
 ) -> None:
     def lockfile_inrepo_dest(lockfile_pkg, lockfile_filename):
-        return os.path.join(
-            "src",
-            "python",
-            lockfile_pkg.replace(".", os.path.sep),
-            lockfile_filename,
-        )
+        return _lockfile_dest_for_resource(lockfile_pkg, lockfile_filename)
 
     def lockfile_buildroot_filename(lockfile_name):
         return os.path.join(buildroot, lockfile_name)

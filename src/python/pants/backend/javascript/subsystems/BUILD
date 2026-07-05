@@ -7,11 +7,18 @@ python_tests(
     name="tests",
     overrides={
         "nodejs_test.py": {"timeout": 240},
-        "nodejs_tool_test.py": {"timeout": 120, "dependencies": [":cowsay_lockfiles"]},
+        "nodejs_tool_test.py": {"timeout": 240, "dependencies": [":cowsay_lockfiles"]},
     },
 )
 
 resources(
     name="cowsay_lockfiles",
-    sources=["package-lock.json", "pnpm-lock.yaml", "yarn.lock", "cowsay.package-lock.json"],
+    sources=[
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "cowsay.package-lock.json",
+        "cowsay.yarn.lock",
+        "cowsay.pnpm-lock.yaml",
+    ],
 )

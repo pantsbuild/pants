@@ -17,11 +17,10 @@ class TypeScriptSubsystem(NodeJSToolBase):
     name = "TypeScript"
     help = """TypeScript type checker (tsc)."""
 
-    # TypeScript always uses resolve-based execution because it needs access to project
-    # dependencies for type checking. This means transitive deps
-    # are always pinned via the user's project lockfile.
+    # TypeScript always uses resolve-based execution (it needs project dependencies for type
+    # checking), so its transitive deps are pinned by the user's project lockfile and it ships
+    # no bundled lockfile (`default_lockfile_resources` stays `None`).
     default_version = "typescript@FROM_PACKAGE_JSON"
-    lockfile_required = False
 
     skip = SkipOption("check")
 

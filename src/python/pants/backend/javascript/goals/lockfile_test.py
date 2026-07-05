@@ -27,6 +27,7 @@ from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
 from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.core.goals.generate_lockfiles import (
+    DEFAULT_TOOL_LOCKFILE,
     GenerateLockfileResult,
     KnownUserResolveNames,
     UserGenerateLockfiles,
@@ -349,9 +350,13 @@ def nodejs_tool_lockfile_rule_runner() -> RuleRunner:
     )
 
 
-def test_generate_nodejs_tool_lockfile_end_to_end(
+def test_nodejs_tool_lockfile_skipped_when_using_bundled_default(
     nodejs_tool_lockfile_rule_runner: RuleRunner,
 ) -> None:
+    # A tool that ships a bundled lockfile (and whose `lockfile` option is left at its default)
+    # must NOT be regenerated: the request carries the `DEFAULT_TOOL_LOCKFILE` sentinel so
+    # `generate-lockfiles` skips it (or prints help for an explicit `--resolve`) rather than
+    # writing Pants' internal bundled path into the invoking repo.
     nodejs_tool_lockfile_rule_runner.set_options(
         [
             "--nodejs-package-managers={'npm': '11.6.2'}",
@@ -359,7 +364,72 @@ def test_generate_nodejs_tool_lockfile_end_to_end(
         ],
         env_inherit={"PATH"},
     )
+
+    resolves = nodejs_tool_lockfile_rule_runner.request(
+        KnownUserResolveNames, (KnownNodeJSToolResolveNamesRequest(),)
+    )
+    assert "cowsay-locked" in resolves.names
+
+    [request] = nodejs_tool_lockfile_rule_runner.request(
+        UserGenerateLockfiles,
+        (RequestedNodeJSToolResolveNames(("cowsay-locked",)),),
+    )
+    assert isinstance(request, GenerateNodeJSToolLockfile)
+    assert request.lockfile_dest == DEFAULT_TOOL_LOCKFILE
+
+
+def test_nodejs_tool_lockfile_requests_do_not_require_package_manager_version(
+    nodejs_tool_lockfile_rule_runner: RuleRunner,
+) -> None:
+    # Sentinel (skip) requests must be constructible with no configured package-manager
+    # versions, so a bare `generate-lockfiles` doesn't fail for unrelated resolves.
+    nodejs_tool_lockfile_rule_runner.set_options(
+        ["--nodejs-package-managers={}"],
+        env_inherit={"PATH"},
+    )
+    [request] = nodejs_tool_lockfile_rule_runner.request(
+        UserGenerateLockfiles,
+        (RequestedNodeJSToolResolveNames(("cowsay-locked",)),),
+    )
+    assert isinstance(request, GenerateNodeJSToolLockfile)
+    assert request.lockfile_dest == DEFAULT_TOOL_LOCKFILE
+    assert request.package_manager is None
+
+
+def test_nodejs_tool_with_install_from_resolve_is_not_a_tool_resolve(
+    nodejs_tool_lockfile_rule_runner: RuleRunner,
+) -> None:
+    # A tool installed from a named resolve has no standalone lockfile to generate, and its
+    # scope must not collide with that resolve's name in `generate-lockfiles`
+    # (e.g. `[<tool>].install_from_resolve = "<tool>"`).
+    nodejs_tool_lockfile_rule_runner.set_options(
+        [
+            "--nodejs-package-managers={'npm': '11.6.2'}",
+            "--nodejs-package-manager=npm",
+            "--cowsay-locked-install-from-resolve=cowsay-locked",
+        ],
+        env_inherit={"PATH"},
+    )
+    resolves = nodejs_tool_lockfile_rule_runner.request(
+        KnownUserResolveNames, (KnownNodeJSToolResolveNamesRequest(),)
+    )
+    assert "cowsay-locked" not in resolves.names
+
+
+def test_generate_nodejs_tool_lockfile_end_to_end(
+    nodejs_tool_lockfile_rule_runner: RuleRunner,
+) -> None:
     lockfile_dest = "src/python/pants/backend/javascript/subsystems/cowsay.package-lock.json"
+    nodejs_tool_lockfile_rule_runner.set_options(
+        [
+            "--nodejs-package-managers={'npm': '11.6.2'}",
+            "--nodejs-package-manager=npm",
+            # Generation only happens when `[<tool>].lockfile` names a real file; this is how the
+            # builtin-lockfile generator drives regeneration of the bundled lockfile in-repo.
+            f"--cowsay-locked-lockfile={lockfile_dest}",
+        ],
+        env_inherit={"PATH"},
+    )
 
     resolves = nodejs_tool_lockfile_rule_runner.request(
         KnownUserResolveNames, (KnownNodeJSToolResolveNamesRequest(),)
