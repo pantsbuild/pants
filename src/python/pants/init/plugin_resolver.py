@@ -129,6 +129,10 @@ class PluginResolver:
         self._scheduler = scheduler
         self._interpreter_constraints = interpreter_constraints
         self._inherit_existing_constraints = inherit_existing_constraints
+        self._watcher_session = self._scheduler.scheduler.new_session(
+            build_id="plugin_resolver_watcher"
+        )
+        self._scheduler.scheduler.attach_session_to_invalidation_watcher(self._watcher_session)
 
     def resolve(
         self,
@@ -176,7 +180,6 @@ class PluginResolver:
                 }
             ),
         )
-        self._scheduler.scheduler.attach_session_to_invalidation_watcher(session)
         params = Params(request, determine_bootstrap_environment(session))
         return cast(
             ResolvedPluginDistributions,
