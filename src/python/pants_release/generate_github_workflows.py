@@ -1097,7 +1097,7 @@ def build_wheels_job(
                             "run": dedent(
                                 """\
                                 PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
                                 PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
                                 PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
