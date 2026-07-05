@@ -37,7 +37,7 @@ from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
 
-_PY_TAG = "".join(map(str, sys.version_info[:2]))
+_PY_TAG = "".join(map(str, sys.version_info[:2])) + sys.abiflags
 _PY_OS = platform.system()  # Linux
 _PY_ARCH_TAG = platform.machine()  # x86_64
 
