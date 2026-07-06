@@ -162,7 +162,7 @@ fn process_result_metadata_time_saved_from_cache() {
     assert_eq!(metadata.saved_by_cache, None);
 }
 
-/// From a child process rather than this one to abvoid failing our own exec of the
+/// From a child process rather than this one to avoid failing our own exec of the
 /// script with ETXTBSY.
 /// The sandboxer solves the same hazard for real sandboxes (see sandboxer/src/lib.rs).
 async fn write_executable_script(path: &Path, content: &str) {
