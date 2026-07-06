@@ -394,6 +394,10 @@ class SchedulerSession:
             native_engine.session_isolated_shallow_clone(self._py_session, build_id),
         )
 
+    def enable_streaming_workunits(self) -> None:
+        """Enables queueing of workunit messages for `poll_workunits` consumers."""
+        native_engine.session_enable_streaming_workunits(self.py_session)
+
     def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
         result = native_engine.session_poll_workunits(
             self.py_scheduler, self.py_session, max_log_verbosity.level

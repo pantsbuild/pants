@@ -1009,7 +1009,7 @@ pub struct Context {
 impl Default for Context {
     fn default() -> Self {
         Context {
-            workunit_store: WorkunitStore::new(false, log::Level::Debug),
+            workunit_store: WorkunitStore::new(false, log::Level::Debug, true, true),
             build_id: String::default(),
             run_id: RunId(0),
             tail_tasks: TailTasks::new(),
