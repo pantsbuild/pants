@@ -28,7 +28,13 @@ from pants.base.build_root import BuildRoot
 from pants.build_graph.address import Address
 from pants.core.goals.check import CheckRequest, CheckResult, CheckResults, CheckSubsystem
 from pants.core.target_types import FileSourceField
-from pants.core.util_rules.system_binaries import CpBinary, FindBinary, MkdirBinary, TouchBinary
+from pants.core.util_rules.system_binaries import (
+    CpBinary,
+    FindBinary,
+    MkdirBinary,
+    TouchBinary,
+    find_sh,
+)
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
@@ -215,8 +221,7 @@ async def create_tsc_wrapper_script(
     package_dirs_str = " ".join(f'"{d}"' for d in package_dirs)
     output_dirs_str = " ".join(f'"{d}"' for d in package_output_dirs)
 
-    script_content = f"""#!/bin/sh
-# TypeScript incremental compilation cache wrapper
+    script_content = f"""# TypeScript incremental compilation cache wrapper
 
 # All source files in sandbox have mtime as at sandbox creation (e.g. when the process started).
 # Without any special handling, tsc will do a fast immediate rebuild (without checking tsbuildinfo metadata).
@@ -274,7 +279,6 @@ done
                 FileContent(
                     f"{project.root_dir}/{tsc_wrapper_filename}",
                     script_content.encode(),
-                    is_executable=True,
                 )
             ]
         ),
@@ -408,9 +412,10 @@ async def _prepare_tsc_build_process(
 
     process = await prepare_tool_process(tool_request_with_resolve, **implicitly())
 
+    sh = await find_sh(**implicitly())
     process_with_wrapper = replace(
         process,
-        argv=(f"./{tsc_wrapper_filename}",) + process.argv,
+        argv=(sh.path, f"./{tsc_wrapper_filename}") + process.argv,
         working_directory=project.root_dir,
         output_directories=package_output_dirs,
     )

@@ -53,6 +53,7 @@ from pants.core.util_rules.system_binaries import (
     MkdirBinary,
     MktempBinary,
     MvBinary,
+    ShBinary,
 )
 from pants.engine.collection import Collection
 from pants.engine.fs import CreateDigest, FileContent, MergeDigests, RemovePrefix
@@ -171,6 +172,7 @@ async def mypy_typecheck_partition(
     cp: CpBinary,
     mv: MvBinary,
     ln: LnBinary,
+    sh: ShBinary,
     global_options: GlobalOptions,
 ) -> CheckResult:
     # MyPy requires 3.5+ to run, but uses the typed-ast library to work with 2.7, 3.4, 3.5, 3.6,
@@ -274,14 +276,12 @@ async def mypy_typecheck_partition(
 
     if mypy.cache_mode == MyPyCacheMode.none:
         script_content = dedent(f"""\
-            #!/bin/sh
             {mypy_command}
         """)
     else:
         sandbox_cache_dir = f"{run_cache_dir}/{py_version}"
 
         script_content = dedent(f"""\
-            #!/bin/sh
             # We want to leverage the MyPy cache for fast incremental runs of MyPy.
             # Pants exposes "append_only_caches" we can leverage, but with the caveat
             # that it requires either only appending files, or multiprocess-safe access.
@@ -359,7 +359,6 @@ async def mypy_typecheck_partition(
                 FileContent(
                     "__mypy_runner.sh",
                     script_content.encode(),
-                    is_executable=True,
                 )
             ]
         )
@@ -414,7 +413,7 @@ async def mypy_typecheck_partition(
         ),
         **implicitly(),
     )
-    process = dataclasses.replace(process, argv=("./__mypy_runner.sh",))
+    process = dataclasses.replace(process, argv=(sh.path, "./__mypy_runner.sh"))
     result = await execute_process(process, **implicitly())
     report = await remove_prefix(RemovePrefix(result.output_digest, REPORT_DIR))
     return CheckResult.from_fallible_process_result(
