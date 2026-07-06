@@ -1133,6 +1133,7 @@ dependencies = [
  "graph",
  "grpc_util",
  "hashing",
+ "hdrhistogram",
  "indexmap 2.13.0",
  "internment",
  "itertools 0.14.0",
