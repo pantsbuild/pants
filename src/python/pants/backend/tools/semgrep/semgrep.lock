@@ -49,19 +49,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "3833e61c2f092d5aa0468fa2e6c6e990a306185abf763b6d122f0158e59c58a5",
-              "url": "https://files.pythonhosted.org/packages/f5/2e/68781b78e764e5ccc4af1e3d27e060069c73af90234853fa80000e7ee79d/bracex-3.0-py3-none-any.whl"
+              "hash": "025043774188f8a05db36de9e3d4f7d82a8509a41a115cc134c44a60c36375eb",
+              "url": "https://files.pythonhosted.org/packages/ba/24/67865d7a710d86de496c7984e06023aa3656b5fae16ee229a530b57c0491/bracex-2.7-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b73f718d6bd98d8419e45df02426c86e9967c179949f779340d6c3a8c83b9111",
-              "url": "https://files.pythonhosted.org/packages/d0/f5/4473ad9b48cd0420a2d762a3750fa0e078e23e060b1af72662e5987e5530/bracex-3.0.tar.gz"
+              "hash": "4cb5d415a707f6beeb2779099486090bf98cbd8b7edbdfcb7cbea2f5fe6bdb48",
+              "url": "https://files.pythonhosted.org/packages/37/7c/a2a8a52db0ee751007507ddad3a1ddf1b0f763de546c588e7a828579bdad/bracex-2.7.tar.gz"
             }
           ],
           "project_name": "bracex",
           "requires_dists": [],
           "requires_python": ">=3.10",
-          "version": "3.0"
+          "version": "2.7"
         },
         {
           "artifacts": [
