@@ -22,23 +22,20 @@ def completed_process(
     )
 
 
-def test_ensure_images_available_pulls_missing_image() -> None:
-    commands: list[tuple[tuple[str, ...], bool]] = []
+def test_load_configured_service_image_reads_compose_image_config(tmp_path: Path) -> None:
+    image_config = tmp_path / "docker-compose.images.yaml"
+    image_config.write_text(
+        "services:\n"
+        "  storage-image:\n"
+        '    profiles: ["image_refs"]\n'
+        "    image: ghcr.io/example/storage:tag@sha256:abc123\n",
+        encoding="utf-8",
+    )
 
-    def run_command(args: Sequence[str], check: bool) -> subprocess.CompletedProcess[str]:
-        commands.append((tuple(args), check))
-        if tuple(args[:3]) == ("docker", "image", "inspect"):
-            return completed_process(args, returncode=1)
-        return completed_process(args)
-
-    buildbarn.ensure_images_available(["ghcr.io/example/image:tag"], run_command=run_command)
-
-    assert commands == [
-        (("docker", "version", "--format", "{{.Server.Version}}"), True),
-        (("docker", "compose", "version"), True),
-        (("docker", "image", "inspect", "ghcr.io/example/image:tag"), False),
-        (("docker", "pull", "ghcr.io/example/image:tag"), True),
-    ]
+    assert (
+        buildbarn._load_configured_service_image(image_config, "storage-image")
+        == "ghcr.io/example/storage:tag@sha256:abc123"
+    )
 
 
 def test_prepare_remote_execution_dirs_creates_expected_paths(tmp_path: Path) -> None:
@@ -81,6 +78,7 @@ def test_write_compose_logs_uses_compose_command(tmp_path: Path) -> None:
     stack._runtime_root = tmp_path
     stack._env_file = tmp_path / "compose.env"
     stack._compose_file = tmp_path / "docker-compose.yaml"
+    stack._compose_profiles = ("cache",)
     (tmp_path / "logs").mkdir(parents=True, exist_ok=True)
 
     buildbarn._write_compose_logs(stack)
@@ -97,6 +95,8 @@ def test_write_compose_logs_uses_compose_command(tmp_path: Path) -> None:
                 str(tmp_path / "docker-compose.yaml"),
                 "--env-file",
                 str(tmp_path / "compose.env"),
+                "--profile",
+                "cache",
                 "logs",
                 "--no-color",
                 "--timestamps",

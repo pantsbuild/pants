@@ -1,6 +1,26 @@
+include:
+  - docker-compose.images.yaml
+
 services:
+  cache:
+    extends:
+      file: docker-compose.images.yaml
+      service: bb-storage-image
+    profiles: ["cache"]
+    command: ["/config/cache.jsonnet"]
+    ports:
+      - "127.0.0.1::8980"
+    volumes:
+      - ${BUILDBARN_ASSETS_ROOT}/cache.jsonnet:/config/cache.jsonnet:ro
+      - ${BUILDBARN_ASSETS_ROOT}/runtime.libsonnet:/config/runtime.libsonnet:ro
+      - ${BUILDBARN_RUNTIME_ROOT}/storage-cas:/storage-cas
+      - ${BUILDBARN_RUNTIME_ROOT}/storage-ac:/storage-ac
+
   storage:
-    image: ${BB_STORAGE_IMAGE}
+    extends:
+      file: docker-compose.images.yaml
+      service: bb-storage-image
+    profiles: ["remote_execution"]
     command: ["/config/storage.jsonnet"]
     volumes:
       - ${BUILDBARN_ASSETS_ROOT}/storage.jsonnet:/config/storage.jsonnet:ro
@@ -9,7 +29,10 @@ services:
       - ${BUILDBARN_RUNTIME_ROOT}/storage-fsac:/storage-fsac
 
   frontend:
-    image: ${BB_STORAGE_IMAGE}
+    extends:
+      file: docker-compose.images.yaml
+      service: bb-storage-image
+    profiles: ["remote_execution"]
     command: ["/config/frontend.jsonnet"]
     depends_on:
       - storage
@@ -20,7 +43,10 @@ services:
       - ${BUILDBARN_ASSETS_ROOT}/frontend.jsonnet:/config/frontend.jsonnet:ro
 
   scheduler:
-    image: ${BB_SCHEDULER_IMAGE}
+    extends:
+      file: docker-compose.images.yaml
+      service: bb-scheduler-image
+    profiles: ["remote_execution"]
     command: ["/config/scheduler.jsonnet"]
     depends_on:
       - storage
@@ -28,13 +54,19 @@ services:
       - ${BUILDBARN_ASSETS_ROOT}/scheduler.jsonnet:/config/scheduler.jsonnet:ro
 
   runner-installer:
-    image: ${BB_RUNNER_INSTALLER_IMAGE}
+    extends:
+      file: docker-compose.images.yaml
+      service: bb-runner-installer-image
+    profiles: ["remote_execution"]
     restart: "no"
     volumes:
       - ${BUILDBARN_RUNTIME_ROOT}/bb:/bb
 
   runner:
-    image: ${BB_EXECUTION_IMAGE}
+    extends:
+      file: docker-compose.images.yaml
+      service: execution-image
+    profiles: ["remote_execution"]
     command:
       - sh
       - -c
@@ -48,7 +80,10 @@ services:
       - ${BUILDBARN_RUNTIME_ROOT}/worker:/worker
 
   worker:
-    image: ${BB_WORKER_IMAGE}
+    extends:
+      file: docker-compose.images.yaml
+      service: bb-worker-image
+    profiles: ["remote_execution"]
     command: ["/config/worker.jsonnet"]
     depends_on:
       - storage
