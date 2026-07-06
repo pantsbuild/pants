@@ -8,10 +8,9 @@ ansicolors==1.1.8
 chevron==0.14.0
 fasteners==0.20.0
 freezegun==1.5.5
-hdrhistogram==0.10.7
 ijson==3.4.0.post0
 packaging==26.0
-psutil==5.9.8
+psutil==7.2.2
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
 pytest>=7,<9,!=7.1.0,!=7.1.1
