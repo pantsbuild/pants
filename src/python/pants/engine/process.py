@@ -107,6 +107,7 @@ class Process:
     description: str = dataclasses.field(compare=False)
     level: LogLevel
     input_digest: Digest
+    stdin: bytes | None
     immutable_input_digests: FrozenDict[str, Digest]
     use_nailgun: tuple[str, ...]
     working_directory: str | None
@@ -130,6 +131,7 @@ class Process:
         description: str,
         level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
+        stdin: bytes | None = None,
         immutable_input_digests: Mapping[str, Digest] | None = None,
         use_nailgun: Iterable[str] = (),
         working_directory: str | None = None,
@@ -158,6 +160,10 @@ class Process:
         512KB will be read-only unless they are globbed as part of either `output_files` or
         `output_directories`.
 
+        To provide data to the process's standard input, use the `stdin` parameter with a bytes
+        object. The bytes will be piped to the process's stdin. Note that stdin is only supported
+        for local and workspace execution; remote execution does not support stdin and will fail.
+
         Often, you will want to capture the files/directories created in the process. To do this,
         you can either set `output_files` or `output_directories`. The specified paths should be
         specified relative to the `working_directory`, if any, and will then be used to populate
@@ -181,6 +187,7 @@ class Process:
         object.__setattr__(self, "description", description)
         object.__setattr__(self, "level", level)
         object.__setattr__(self, "input_digest", input_digest)
+        object.__setattr__(self, "stdin", stdin)
         object.__setattr__(
             self, "immutable_input_digests", FrozenDict(immutable_input_digests or {})
         )
