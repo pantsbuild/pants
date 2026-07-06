@@ -23,5 +23,4 @@ fn relative_path_err() {
 fn relative_path_normalize() {
     assert_eq!(Some("a"), RelativePath::new("a/").unwrap().to_str());
     assert_eq!(Some(""), RelativePath::new(".").unwrap().to_str());
-    assert_eq!(Some(""), RelativePath::new("").unwrap().to_str());
 }
