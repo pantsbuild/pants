@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import socket
 import subprocess
@@ -22,7 +21,6 @@ DEFAULT_INSTANCE_NAME = "fuse"
 DEFAULT_GRPC_PORT = 8980
 DEFAULT_READINESS_TIMEOUT_SECONDS = 30.0
 
-_DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _CONFIG_ROOT = files(__package__).joinpath("config")
 _ASSET_FILE_NAMES = (
     "cache.jsonnet",
@@ -33,7 +31,26 @@ _ASSET_FILE_NAMES = (
     "scheduler.jsonnet",
     "storage.jsonnet",
     "worker.jsonnet",
-    "images.json",
+)
+_BB_STORAGE_IMAGE = (
+    "ghcr.io/buildbarn/bb-storage:20260609T094425Z-10acc76"
+    "@sha256:36201141f924865ddbea1bc518c4f98dd0dbb744181ef34f9f5e864d3dcf43f8"
+)
+_BB_SCHEDULER_IMAGE = (
+    "ghcr.io/buildbarn/bb-scheduler:20260527T162223Z-c48dcda"
+    "@sha256:95417d159b5b9f17a6c915fec43603be51c553f68de439a9affcfe811bd0c6da"
+)
+_BB_WORKER_IMAGE = (
+    "ghcr.io/buildbarn/bb-worker:20260527T162223Z-c48dcda"
+    "@sha256:4cc65f0dd716fd0942ccc0fdd770421065b7f3bf55062a184c4376e4c0a4a13e"
+)
+_BB_RUNNER_INSTALLER_IMAGE = (
+    "ghcr.io/buildbarn/bb-runner-installer:20260527T162223Z-c48dcda"
+    "@sha256:0f719066773c365ba902edebb9f7ea8e23b3b4a82002c6dbdbb0c74965bcc34d"
+)
+_EXECUTION_IMAGE = (
+    "ghcr.io/catthehacker/ubuntu:act-22.04"
+    "@sha256:b3098f231fa07cf5c2423b0f2c2e7dacf85c0c508c7f27687febe30bab8cfd3e"
 )
 
 RunCommand = Callable[[Sequence[str], bool], subprocess.CompletedProcess[str]]
@@ -41,24 +58,6 @@ RunCommand = Callable[[Sequence[str], bool], subprocess.CompletedProcess[str]]
 
 class FetchError(ValueError):
     pass
-
-
-@dataclass(frozen=True)
-class ImageReference:
-    repository: str
-    tag: str
-    digest: str
-
-
-@dataclass(frozen=True)
-class ImageSpec:
-    name: str
-    reference: str
-    required_for: tuple[str, ...]
-
-    @property
-    def repository(self) -> str:
-        return parse_image_reference(self.reference).repository
 
 
 @dataclass(frozen=True)
@@ -82,101 +81,34 @@ class RemoteExecutionBuildbarn:
     platform_properties: tuple[str, ...]
 
 
-def parse_image_reference(reference: str) -> ImageReference:
-    tagged_repository, separator, digest = reference.partition("@")
-    tag_separator_index = tagged_repository.rfind(":")
-    slash_index = tagged_repository.rfind("/")
-    if tag_separator_index <= slash_index:
-        raise FetchError(f"Image reference must include a tag before the digest: {reference}")
-
-    if separator != "@" or not _DIGEST_RE.match(digest):
-        raise FetchError(f"Image reference must be pinned by sha256 digest: {reference}")
-
-    repository = tagged_repository[:tag_separator_index]
-    tag = tagged_repository[tag_separator_index + 1 :]
-    if not repository or not tag:
-        raise FetchError(f"Image reference must include a repository and tag: {reference}")
-
-    return ImageReference(repository=repository, tag=tag, digest=digest)
-
-
-def load_manifest(manifest_path: Path | None = None) -> tuple[ImageSpec, ...]:
-    if manifest_path is None:
-        data = json.loads(_CONFIG_ROOT.joinpath("images.json").read_text(encoding="utf-8"))
-    else:
-        with manifest_path.open(encoding="utf-8") as fp:
-            data = json.load(fp)
-
-    if data.get("schema_version") != 1:
-        raise FetchError(
-            f"Unsupported Buildbarn image manifest schema version: {data.get('schema_version')!r}"
-        )
-
-    images = data.get("images")
-    if not isinstance(images, list) or not images:
-        raise FetchError("Buildbarn image manifest must contain a non-empty images list")
-
-    loaded: list[ImageSpec] = []
-    seen_names: set[str] = set()
-    for image_data in images:
-        name = image_data.get("name")
-        reference = image_data.get("reference")
-        required_for = image_data.get("required_for")
-        if not isinstance(name, str) or not name:
-            raise FetchError(f"Every Buildbarn image must have a non-empty name: {image_data!r}")
-        if name in seen_names:
-            raise FetchError(f"Buildbarn image names must be unique, but {name!r} is duplicated")
-        if not isinstance(reference, str):
-            raise FetchError(f"Buildbarn image {name!r} must provide a string reference")
-        if (
-            not isinstance(required_for, list)
-            or not required_for
-            or not all(isinstance(mode, str) and mode for mode in required_for)
-        ):
-            raise FetchError(
-                f"Buildbarn image {name!r} must provide a non-empty required_for list of strings"
-            )
-
-        parse_image_reference(reference)
-        loaded.append(ImageSpec(name=name, reference=reference, required_for=tuple(required_for)))
-        seen_names.add(name)
-
-    return tuple(loaded)
-
-
 def ensure_images_available(
-    images: Iterable[ImageSpec],
+    image_references: Iterable[str],
     *,
     pull: bool = True,
     docker_binary: str = "docker",
     run_command: RunCommand | None = None,
-) -> tuple[ImageSpec, ...]:
+) -> None:
     runner = run_command or _run_command
     _ensure_compose_available(docker_binary=docker_binary, run_command=runner)
 
-    pulled_images: list[ImageSpec] = []
-    for image in images:
-        if _image_exists(image.reference, docker_binary=docker_binary, run_command=runner):
+    for image_reference in image_references:
+        if _image_exists(image_reference, docker_binary=docker_binary, run_command=runner):
             continue
         if not pull:
-            raise FetchError(f"Docker image is not available locally: {image.reference}")
-        runner([docker_binary, "pull", image.reference], True)
-        pulled_images.append(image)
-    return tuple(pulled_images)
+            raise FetchError(f"Docker image is not available locally: {image_reference}")
+        runner([docker_binary, "pull", image_reference], True)
 
 
 class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
     def __init__(
         self,
         *,
-        manifest_path: Path | None = None,
         docker_binary: str = "docker",
         temp_dir: Path | None = None,
         instance_name: str = DEFAULT_INSTANCE_NAME,
         run_command: RunCommand | None = None,
         readiness_timeout_seconds: float = DEFAULT_READINESS_TIMEOUT_SECONDS,
     ) -> None:
-        self.manifest_path = manifest_path
         self.docker_binary = docker_binary
         self.temp_dir = temp_dir
         self.instance_name = instance_name
@@ -197,10 +129,8 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
         self.teardown()
 
     def launch_cache_only(self) -> CacheOnlyBuildbarn:
-        images = load_manifest(self.manifest_path)
-        cache_image = _select_image(images, "bb-storage")
         ensure_images_available(
-            [cache_image], docker_binary=self.docker_binary, run_command=self.run_command
+            [_BB_STORAGE_IMAGE], docker_binary=self.docker_binary, run_command=self.run_command
         )
 
         runtime_root = self._prepare_runtime_root("pants-buildbarn-cache-")
@@ -220,7 +150,7 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
             {
                 "BUILDBARN_ASSETS_ROOT": str(assets_root),
                 "BUILDBARN_RUNTIME_ROOT": str(runtime_root),
-                "BB_STORAGE_IMAGE": cache_image.reference,
+                "BB_STORAGE_IMAGE": _BB_STORAGE_IMAGE,
             },
         )
         compose_file = assets_root / "docker-compose.cache.yaml"
@@ -262,14 +192,14 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
         return launched
 
     def launch_remote_execution(self) -> RemoteExecutionBuildbarn:
-        images = load_manifest(self.manifest_path)
-        storage_image = _select_image(images, "bb-storage")
-        scheduler_image = _select_image(images, "bb-scheduler")
-        worker_image = _select_image(images, "bb-worker")
-        runner_installer_image = _select_image(images, "bb-runner-installer")
-        execution_image = _select_image(images, "ubuntu-act-22-04")
         ensure_images_available(
-            [storage_image, scheduler_image, worker_image, runner_installer_image, execution_image],
+            [
+                _BB_STORAGE_IMAGE,
+                _BB_SCHEDULER_IMAGE,
+                _BB_WORKER_IMAGE,
+                _BB_RUNNER_INSTALLER_IMAGE,
+                _EXECUTION_IMAGE,
+            ],
             docker_binary=self.docker_binary,
             run_command=self.run_command,
         )
@@ -282,7 +212,7 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
         _write_runtime_overlay(
             assets_root / "runtime.libsonnet",
             instance_name=self.instance_name,
-            execution_image_reference=execution_image.reference,
+            execution_image_reference=_EXECUTION_IMAGE,
         )
 
         project_name = f"pants-buildbarn-re-{uuid.uuid4().hex[:12]}"
@@ -291,11 +221,11 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
             {
                 "BUILDBARN_ASSETS_ROOT": str(assets_root),
                 "BUILDBARN_RUNTIME_ROOT": str(runtime_root),
-                "BB_STORAGE_IMAGE": storage_image.reference,
-                "BB_SCHEDULER_IMAGE": scheduler_image.reference,
-                "BB_WORKER_IMAGE": worker_image.reference,
-                "BB_RUNNER_INSTALLER_IMAGE": runner_installer_image.reference,
-                "BB_EXECUTION_IMAGE": execution_image.reference,
+                "BB_STORAGE_IMAGE": _BB_STORAGE_IMAGE,
+                "BB_SCHEDULER_IMAGE": _BB_SCHEDULER_IMAGE,
+                "BB_WORKER_IMAGE": _BB_WORKER_IMAGE,
+                "BB_RUNNER_INSTALLER_IMAGE": _BB_RUNNER_INSTALLER_IMAGE,
+                "BB_EXECUTION_IMAGE": _EXECUTION_IMAGE,
             },
         )
         compose_file = assets_root / "docker-compose.remote-execution.yaml"
@@ -345,7 +275,7 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
             logs_dir=runtime_root / "logs",
             platform_properties=(
                 "OSFamily=linux",
-                f"container-image=docker://{execution_image.reference}",
+                f"container-image=docker://{_EXECUTION_IMAGE}",
             ),
         )
         self._launched = launched
@@ -391,13 +321,6 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
             ],
             check,
         )
-
-
-def _select_image(images: Sequence[ImageSpec], name: str) -> ImageSpec:
-    for image in images:
-        if image.name == name:
-            return image
-    raise FetchError(f"Buildbarn image manifest does not define the required image {name!r}")
 
 
 def _prepare_storage_dirs(runtime_root: Path) -> None:

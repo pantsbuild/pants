@@ -3,12 +3,9 @@
 
 from __future__ import annotations
 
-import json
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
-
-import pytest
 
 from pants.engine.internals.buildbarn_integration_tests import stack as buildbarn
 
@@ -25,33 +22,23 @@ def completed_process(
     )
 
 
-def test_parse_image_reference_requires_digest() -> None:
-    with pytest.raises(buildbarn.FetchError, match="sha256 digest"):
-        buildbarn.parse_image_reference("ghcr.io/example/image:latest")
+def test_ensure_images_available_pulls_missing_image() -> None:
+    commands: list[tuple[tuple[str, ...], bool]] = []
 
+    def run_command(args: Sequence[str], check: bool) -> subprocess.CompletedProcess[str]:
+        commands.append((tuple(args), check))
+        if tuple(args[:3]) == ("docker", "image", "inspect"):
+            return completed_process(args, returncode=1)
+        return completed_process(args)
 
-def test_stack_fails_when_manifest_lacks_storage_image(tmp_path: Path) -> None:
-    manifest_path = tmp_path / "images.json"
-    manifest_path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "images": [
-                    {
-                        "name": "bb-worker",
-                        "reference": f"ghcr.io/buildbarn/bb-worker:latest@sha256:{'d' * 64}",
-                        "required_for": ["remote-execution"],
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
+    buildbarn.ensure_images_available(["ghcr.io/example/image:tag"], run_command=run_command)
 
-    stack = buildbarn.LocalBuildbarnStack(manifest_path=manifest_path, temp_dir=tmp_path)
-
-    with pytest.raises(buildbarn.FetchError, match="bb-storage"):
-        stack.launch_cache_only()
+    assert commands == [
+        (("docker", "version", "--format", "{{.Server.Version}}"), True),
+        (("docker", "compose", "version"), True),
+        (("docker", "image", "inspect", "ghcr.io/example/image:tag"), False),
+        (("docker", "pull", "ghcr.io/example/image:tag"), True),
+    ]
 
 
 def test_prepare_remote_execution_dirs_creates_expected_paths(tmp_path: Path) -> None:
