@@ -159,6 +159,9 @@ mypy = "3rdparty/python/mypy.lock"
 pytest = "3rdparty/python/pytest.lock"
 external-tool-upgrade = "3rdparty/python/external-tool-upgrade.lock"
 
+[python.resolves_to_uploaded_prior_to]
+__default__ = "P2D"
+
 [python-infer]
 assets = true
 unowned_dependency_behavior = "error"
