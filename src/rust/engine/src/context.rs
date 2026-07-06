@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use cache::PersistentCache;
 use docker::docker;
+use fs::gitignore_stack::GitignoreStack;
 use fs::{FS, GitignoreStyleExcludes};
 use futures::FutureExt;
 use graph::{Graph, InvalidationResult};
@@ -35,6 +36,7 @@ use tokio::sync::RwLock;
 use watch::{Invalidatable, InvalidateCaller, InvalidationWatcher};
 use workunit_store::{Metric, RunningWorkunit};
 
+use crate::git_ignore_session::GitIgnoreSession;
 use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::python::{Failure, throw};
 use crate::session::{Session, Sessions};
@@ -81,6 +83,7 @@ pub struct Core {
     pub vfs: FS,
     pub vfs_system: FS,
     pub watcher: Option<Arc<InvalidationWatcher>>,
+    pub gitignore_session: Option<GitIgnoreSession>,
     pub build_root: PathBuf,
     pub local_parallelism: usize,
     pub graceful_shutdown_timeout: Duration,
@@ -723,18 +726,24 @@ impl Core {
             vec![]
         };
 
-        let ignorer =
+        let ignorers =
             GitignoreStyleExcludes::create_with_gitignore_files(ignore_patterns, gitignore_files)
                 .map_err(|e| format!("Could not parse build ignore patterns: {e:?}"))?;
 
         let watcher = if watch_filesystem {
-            let w =
-                InvalidationWatcher::new(executor.clone(), build_root.clone(), ignorer.clone())?;
-            w.start(&graph)?;
+            let w = InvalidationWatcher::new(
+                executor.clone(),
+                build_root.clone(),
+                ignorers.patterns.clone(),
+            )?;
             Some(w)
         } else {
             None
         };
+
+        let root_ignore = GitignoreStack::root(ignorers.patterns, ignorers.files, use_gitignore);
+        let gitignore_session = (watcher.is_some() && use_gitignore)
+            .then(|| GitIgnoreSession::new(root_ignore.clone()));
 
         let sessions = Sessions::new(&executor)?;
 
@@ -749,12 +758,13 @@ impl Core {
             command_runners,
             http_client,
             local_cache,
-            vfs: FS::new(&build_root, ignorer, executor.clone())
+            vfs: FS::new(&build_root, root_ignore, executor.clone())
                 .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,
-            vfs_system: FS::new(Path::new("/"), GitignoreStyleExcludes::empty(), executor)
+            vfs_system: FS::new(Path::new("/"), GitignoreStack::empty(), executor)
                 .map_err(|e| format!("Could not initialize Vfs for local system: {e:?}"))?,
             build_root,
             watcher,
+            gitignore_session,
             local_parallelism: exec_strategy_opts.local_parallelism,
             graceful_shutdown_timeout: exec_strategy_opts.graceful_shutdown_timeout,
             sessions,

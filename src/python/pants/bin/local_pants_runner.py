@@ -159,6 +159,8 @@ class LocalPantsRunner:
             session_values=SessionValues(session_values_dict),
             cancellation_latch=cancellation_latch,
         )
+        if not is_pantsd_run:
+            scheduler.attach_invalidation_session(graph_session.scheduler_session)
 
         if ng_invocation:
             specs_strs = ng_invocation.specs()

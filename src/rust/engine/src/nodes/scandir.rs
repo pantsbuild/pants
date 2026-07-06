@@ -7,7 +7,7 @@ use deepsize::DeepSizeOf;
 use fs::{Dir, DirectoryListing};
 use graph::CompoundNode;
 
-use super::{NodeKey, NodeOutput, NodeResult, SubjectPath};
+use super::{GitignoreStackForDir, NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::context::Context;
 use crate::python::throw;
 
@@ -23,10 +23,17 @@ pub struct Scandir {
 
 impl Scandir {
     pub(super) async fn run_node(self, context: Context) -> NodeResult<Arc<DirectoryListing>> {
+        let gitignore_stack = if context.core.vfs.read_gitignore_files() {
+            context
+                .get(GitignoreStackForDir::for_dir(self.dir.clone()).map_err(throw)?)
+                .await?
+        } else {
+            context.core.vfs.root_ignore().clone()
+        };
         let directory_listing = context
             .core
             .vfs
-            .scandir(self.dir)
+            .scandir(self.dir, gitignore_stack)
             .await
             .map_err(|e| throw(format!("{e}")))?;
         Ok(Arc::new(directory_listing))

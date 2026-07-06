@@ -10,7 +10,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::directory::SymlinkBehavior;
-use crate::gitignore::GitignoreStyleExcludes;
+use crate::gitignore_stack::GitignoreStack;
 use crate::{Dir, DirectoryListing, File, Link, PathMetadata, PathMetadataKind, Stat, Vfs};
 
 ///
@@ -24,7 +24,7 @@ use crate::{Dir, DirectoryListing, File, Link, PathMetadata, PathMetadataKind, S
 #[derive(Clone)]
 pub struct PosixFS {
     root: Dir,
-    ignore: Arc<GitignoreStyleExcludes>,
+    root_ignore: GitignoreStack,
     executor: task_executor::Executor,
     symlink_behavior: SymlinkBehavior,
 }
@@ -33,7 +33,7 @@ pub struct PosixFS {
 impl PosixFS {
     pub fn new<P: AsRef<Path>>(
         root: P,
-        ignorer: Arc<GitignoreStyleExcludes>,
+        ignorer: GitignoreStack,
         executor: task_executor::Executor,
     ) -> Result<PosixFS, String> {
         Self::new_with_symlink_behavior(root, ignorer, executor, SymlinkBehavior::Aware)
@@ -41,7 +41,7 @@ impl PosixFS {
 
     pub fn new_with_symlink_behavior<P: AsRef<Path>>(
         root: P,
-        ignorer: Arc<GitignoreStyleExcludes>,
+        ignorer: GitignoreStack,
         executor: task_executor::Executor,
         symlink_behavior: SymlinkBehavior,
     ) -> Result<PosixFS, String> {
@@ -64,18 +64,23 @@ impl PosixFS {
 
         Ok(PosixFS {
             root: canonical_root,
-            ignore: ignorer,
+            root_ignore: ignorer,
             executor: executor,
             symlink_behavior: symlink_behavior,
         })
     }
 
-    fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
-        let dir_abs = self.root.0.join(&dir_relative_to_root.0);
+    fn scandir_sync(
+        &self,
+        dir_relative_to_root: &Dir,
+        gitignore_stack: GitignoreStack,
+    ) -> Result<DirectoryListing, io::Error> {
+        let dir_abs = self.root.join(dir_relative_to_root);
         let mut stats: Vec<Stat> = dir_abs
             .read_dir()?
             .map(|readdir| {
                 let dir_entry = readdir?;
+                let path_to_stat = dir_abs.join(dir_entry.file_name());
                 let (file_type, compute_metadata): (_, Box<dyn FnOnce() -> Result<_, _>>) =
                     match self.symlink_behavior {
                         SymlinkBehavior::Aware => {
@@ -84,30 +89,13 @@ impl PosixFS {
                         }
                         SymlinkBehavior::Oblivious => {
                             // Use an independent stat call to get metadata, which is symlink oblivious.
-                            let metadata = std::fs::metadata(dir_abs.join(dir_entry.file_name()))?;
+                            let metadata = std::fs::metadata(&path_to_stat)?;
                             (metadata.file_type(), Box::new(|| Ok(metadata)))
                         }
                     };
-                PosixFS::stat_internal(
-                    &dir_abs.join(dir_entry.file_name()),
-                    file_type,
-                    compute_metadata,
-                )
+                PosixFS::stat_internal(&path_to_stat, file_type, compute_metadata)
             })
-            .filter_map(|s| match s {
-                Ok(Some(s))
-                    if !self.ignore.is_ignored_path(
-                        &dir_relative_to_root.0.join(s.path()),
-                        matches!(s, Stat::Dir(_)),
-                    ) =>
-                {
-                    // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
-                    // git-style ignore patterns, we need to know whether a path represents a directory.
-                    Some(Ok(s))
-                }
-                Ok(_) => None,
-                Err(e) => Some(Err(e)),
-            })
+            .filter_map(Result::transpose)
             .collect::<Result<Vec<_>, io::Error>>()
             .map_err(|e| {
                 io::Error::new(
@@ -115,6 +103,12 @@ impl PosixFS {
                     format!("Failed to scan directory {dir_abs:?}: {e}"),
                 )
             })?;
+        stats.retain(|s| {
+            !gitignore_stack.is_path_ignored(
+                &dir_relative_to_root.join(s.path()),
+                matches!(s, Stat::Dir(_)),
+            )
+        });
         stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
         Ok(DirectoryListing(stats))
     }
@@ -171,16 +165,52 @@ impl PosixFS {
 
 // Public functions used externally.
 impl PosixFS {
-    pub async fn scandir(&self, dir_relative_to_root: Dir) -> Result<DirectoryListing, io::Error> {
+    pub async fn scandir(
+        &self,
+        dir_relative_to_root: Dir,
+        gitignore_stack: GitignoreStack,
+    ) -> Result<DirectoryListing, io::Error> {
         let vfs = self.clone();
         self.executor
-            .spawn_blocking(move || vfs.scandir_sync(&dir_relative_to_root))
+            .spawn_blocking(move || vfs.scandir_sync(&dir_relative_to_root, gitignore_stack))
             .await?
             .map_err(|e| io::Error::other(format!("Synchronous scandir failed: {e}")))
     }
 
+    pub fn read_gitignore_files(&self) -> bool {
+        self.root_ignore.use_nested_gitignore
+    }
+
+    pub async fn push_gitignore_file(
+        &self,
+        dir: &Dir,
+        parent_stack: GitignoreStack,
+    ) -> Result<GitignoreStack, io::Error> {
+        let dir = dir.clone();
+        let gitignore_abs = self.root.join(&dir).join(".gitignore");
+        self.executor
+            .spawn_blocking(move || match std::fs::metadata(&gitignore_abs) {
+                Ok(metadata) if metadata.is_file() => {
+                    parent_stack.push(&dir, &gitignore_abs).map_err(|e| {
+                        io::Error::other(format!("Failed to read {gitignore_abs:?}: {e}"))
+                    })
+                }
+                Ok(_) => Ok(parent_stack),
+                Err(e) if e.kind() == ErrorKind::NotFound => Ok(parent_stack),
+                Err(e) => Err(io::Error::new(
+                    e.kind(),
+                    format!("Failed to stat {gitignore_abs:?}: {e}"),
+                )),
+            })
+            .await?
+    }
+
     pub fn is_ignored(&self, stat: &Stat) -> bool {
-        self.ignore.is_ignored(stat)
+        self.root_ignore.is_stat_ignored(stat)
+    }
+
+    pub fn root_ignore(&self) -> &GitignoreStack {
+        &self.root_ignore
     }
 
     pub fn file_path(&self, file: &File) -> PathBuf {
@@ -299,7 +329,9 @@ impl Vfs<io::Error> for Arc<PosixFS> {
     }
 
     async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, io::Error> {
-        Ok(Arc::new(PosixFS::scandir(self, dir).await?))
+        Ok(Arc::new(
+            PosixFS::scandir(self, dir, self.root_ignore.clone()).await?,
+        ))
     }
 
     async fn path_metadata(

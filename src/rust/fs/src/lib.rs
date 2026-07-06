@@ -5,6 +5,7 @@ pub mod directory;
 #[cfg(test)]
 mod directory_tests;
 pub mod gitignore;
+pub mod gitignore_stack;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
@@ -188,6 +189,25 @@ pub struct Link {
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct Dir(pub PathBuf);
+
+impl Dir {
+    pub fn parent(&self) -> Option<Dir> {
+        self.0.parent().map(|p| Dir(p.to_path_buf()))
+    }
+}
+
+impl Deref for Dir {
+    type Target = PathBuf;
+    fn deref(&self) -> &PathBuf {
+        &self.0
+    }
+}
+
+impl AsRef<Path> for Dir {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
 
 #[derive(Clone, Debug, DeepSizeOf, Eq, Hash, PartialEq)]
 pub struct File {

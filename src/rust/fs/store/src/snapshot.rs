@@ -12,9 +12,10 @@ use deepsize::DeepSizeOf;
 use futures::FutureExt;
 use futures::future;
 
+use fs::gitignore_stack::GitignoreStack;
 use fs::{
-    DigestTrie, Dir, DirectoryDigest, EMPTY_DIGEST_TREE, Entry, FS, File, GitignoreStyleExcludes,
-    GlobMatching, PathStat, PreparedPathGlobs, SymlinkBehavior,
+    DigestTrie, Dir, DirectoryDigest, EMPTY_DIGEST_TREE, Entry, FS, File, GlobMatching, PathStat,
+    PreparedPathGlobs, SymlinkBehavior,
 };
 use hashing::{Digest, EMPTY_DIGEST};
 
@@ -161,7 +162,7 @@ impl Snapshot {
         } else {
             let fs = Arc::new(FS::new_with_symlink_behavior(
                 root_path,
-                GitignoreStyleExcludes::create(vec![])?,
+                GitignoreStack::empty(),
                 executor,
                 SymlinkBehavior::Oblivious,
             )?);

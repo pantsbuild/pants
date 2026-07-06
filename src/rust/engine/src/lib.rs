@@ -11,6 +11,7 @@ extern crate derivative;
 mod context;
 mod downloads;
 mod externs;
+mod git_ignore_session;
 mod interning;
 mod intrinsics;
 mod nodes;

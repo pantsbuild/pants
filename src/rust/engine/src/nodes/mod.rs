@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 use deepsize::DeepSizeOf;
+use fs::gitignore_stack::GitignoreStack;
 use fs::{
     self, Dir, DirectoryDigest, DirectoryListing, File, Link, PathMetadata, RelativePath, Vfs,
 };
@@ -33,6 +34,7 @@ use crate::tasks::Rule;
 mod digest_file;
 mod downloaded_file;
 mod execute_process;
+mod gitignore_stack;
 mod path_metadata;
 mod read_link;
 mod root;
@@ -46,6 +48,7 @@ mod task;
 pub use self::digest_file::DigestFile;
 pub use self::downloaded_file::DownloadedFile;
 pub use self::execute_process::{ExecuteProcess, ProcessResult};
+pub use self::gitignore_stack::GitignoreStackForDir;
 pub use self::path_metadata::PathMetadata as PathMetadataNode;
 pub use self::read_link::{LinkDest, ReadLink};
 pub use self::root::Root;
@@ -258,6 +261,7 @@ pub enum NodeKey {
     DigestFile(DigestFile),
     DownloadedFile(DownloadedFile),
     ExecuteProcess(Box<ExecuteProcess>),
+    GitignoreStackForDir(GitignoreStackForDir),
     ReadLink(ReadLink),
     Scandir(Scandir),
     PathMetadata(PathMetadataNode),
@@ -318,6 +322,7 @@ impl NodeKey {
     pub fn fs_subject(&self) -> Option<&SubjectPath> {
         match self {
             NodeKey::DigestFile(s) => Some(&s.subject_path),
+            NodeKey::GitignoreStackForDir(s) => Some(&s.subject_path),
             NodeKey::ReadLink(s) => Some(&s.subject_path),
             NodeKey::Scandir(s) => Some(&s.subject_path),
             NodeKey::PathMetadata(fs) => Some(&fs.subject_path),
@@ -351,6 +356,11 @@ impl NodeKey {
                 .clone()
                 .expect("Internal: Should always be able to get parent path."),
 
+            NodeKey::GitignoreStackForDir(s) => s
+                .subject_path
+                .parent()
+                .expect("Internal: Should always be able to get parent path."),
+
             // For all other node types, attach the watch to the actual path since the path is assumed or known to exist.
             _ => self.fs_subject().cloned(),
         }
@@ -381,6 +391,7 @@ impl NodeKey {
             NodeKey::Snapshot(..) => "snapshot",
             NodeKey::DigestFile(..) => "digest_file",
             NodeKey::DownloadedFile(..) => "downloaded_file",
+            NodeKey::GitignoreStackForDir(..) => "gitignore_stack",
             NodeKey::ReadLink(..) => "read_link",
             NodeKey::Scandir(..) => "scandir",
             NodeKey::PathMetadata(..) => "path_metadata",
@@ -435,6 +446,9 @@ impl NodeKey {
             }) => Some(format!("Reading link: {}", path.display())),
             NodeKey::Scandir(Scandir { dir: Dir(path), .. }) => {
                 Some(format!("Reading directory: {}", path.display()))
+            }
+            NodeKey::GitignoreStackForDir(GitignoreStackForDir { dir: Dir(path), .. }) => {
+                Some(format!("Reading .gitignore in: {}", path.display()))
             }
             NodeKey::PathMetadata(fs) => Some(format!("Checking path: {}", fs.path().display())),
             NodeKey::DownloadedFile(..)
@@ -536,6 +550,9 @@ impl Node for NodeKey {
                         n.run_node(context, workunit, backtrack_level)
                             .await
                             .map(|r| NodeOutput::ProcessResult(Box::new(r)))
+                    }
+                    NodeKey::GitignoreStackForDir(n) => {
+                        n.run_node(context).await.map(NodeOutput::GitignoreStack)
                     }
                     NodeKey::ReadLink(n) => n.run_node(context).await.map(NodeOutput::LinkDest),
                     NodeKey::Scandir(n) => {
@@ -654,6 +671,9 @@ impl Display for NodeKey {
             NodeKey::ExecuteProcess(s) => {
                 write!(f, "Process({})", s.process.description)
             }
+            NodeKey::GitignoreStackForDir(s) => {
+                write!(f, "GitignoreStackForDir({})", s.dir.0.display())
+            }
             NodeKey::ReadLink(s) => write!(f, "ReadLink({})", s.link.path.display()),
             NodeKey::Scandir(s) => write!(f, "Scandir({})", s.dir.0.display()),
             NodeKey::PathMetadata(s) => write!(f, "PathMetadata({})", s.path().display()),
@@ -696,6 +716,7 @@ pub enum NodeOutput {
     FileDigest(hashing::Digest),
     Snapshot(store::Snapshot),
     DirectoryListing(Arc<DirectoryListing>),
+    GitignoreStack(GitignoreStack),
     LinkDest(LinkDest),
     PathMetadata(Option<fs::PathMetadata>),
     ProcessResult(Box<ProcessResult>),
@@ -720,6 +741,7 @@ impl NodeOutput {
                 digests
             }
             NodeOutput::DirectoryListing(_)
+            | NodeOutput::GitignoreStack(_)
             | NodeOutput::LinkDest(_)
             | NodeOutput::Value(_)
             | NodeOutput::PathMetadata(_) => {

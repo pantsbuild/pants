@@ -10,16 +10,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use fs::gitignore_stack::GitignoreStack;
 use fs::{
-    DirectoryDigest, FS, File, GitignoreStyleExcludes, GlobExpansionConjunction, PathStat,
-    Permissions, PreparedPathGlobs, StrictGlobMatching,
+    DirectoryDigest, FS, File, GlobExpansionConjunction, PathStat, Permissions, PreparedPathGlobs,
+    StrictGlobMatching,
 };
 use hashing::EMPTY_DIGEST;
 use protos::pb::build::bazel::remote::execution::v2 as remexec;
+use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 use task_executor::Executor;
 use tempfile::TempDir;
-
-use store::{OneOffStoreFileByDigest, Snapshot, SnapshotOps, Store, SubsetParams};
 
 fn executor() -> Executor {
     Executor::new_owned(num_cpus::get(), num_cpus::get() * 4, || ()).unwrap()
@@ -88,14 +88,8 @@ pub fn criterion_benchmark_snapshot_capture(c: &mut Criterion) {
         let storedir = TempDir::new().unwrap();
         let store = Store::local_only(executor.clone(), storedir.path()).unwrap();
         let (tempdir, path_stats) = tempdir_containing(count, size);
-        let fs = Arc::new(
-            FS::new(
-                tempdir.path(),
-                GitignoreStyleExcludes::empty(),
-                executor.clone(),
-            )
-            .unwrap(),
-        );
+        let fs =
+            Arc::new(FS::new(tempdir.path(), GitignoreStack::empty(), executor.clone()).unwrap());
         cgroup
             .sample_size(10)
             .measurement_time(Duration::from_secs(30))
@@ -335,12 +329,7 @@ fn snapshot(
     let store2 = store.clone();
     let digest = executor
         .block_on(async move {
-            let fs = FS::new(
-                tempdir.path(),
-                GitignoreStyleExcludes::empty(),
-                executor.clone(),
-            )
-            .unwrap();
+            let fs = FS::new(tempdir.path(), GitignoreStack::empty(), executor.clone()).unwrap();
             Snapshot::from_path_stats(
                 OneOffStoreFileByDigest::new(store2, Arc::new(fs), true),
                 path_stats,

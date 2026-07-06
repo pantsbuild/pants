@@ -5,11 +5,12 @@ use std::sync::Arc;
 
 use hashing::EMPTY_DIGEST;
 
+use crate::gitignore_stack::GitignoreStack;
 use crate::posixfs::PosixFS;
 use crate::testutil::make_file;
 use crate::{
-    DigestTrie, Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction,
-    GlobMatching, Link, PathGlobs, PathStat, Stat, StrictGlobMatching, SymlinkBehavior, TypedPath,
+    DigestTrie, Dir, DirectoryListing, File, GlobExpansionConjunction, GlobMatching, Link,
+    PathGlobs, PathStat, Stat, StrictGlobMatching, SymlinkBehavior, TypedPath,
 };
 
 #[tokio::test]
@@ -140,7 +141,10 @@ async fn scandir_empty() {
     let path = PathBuf::from("empty_enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
     assert_eq!(
-        posix_fs.scandir(Dir(path)).await.unwrap(),
+        posix_fs
+            .scandir(Dir(path), GitignoreStack::empty())
+            .await
+            .unwrap(),
         DirectoryListing(vec![])
     );
 }
@@ -178,7 +182,7 @@ async fn scandir() {
     // Symlink aware.
     assert_eq!(
         new_posixfs(dir.path())
-            .scandir(Dir(path.clone()))
+            .scandir(Dir(path.clone()), GitignoreStack::empty())
             .await
             .unwrap(),
         DirectoryListing(vec![
@@ -205,7 +209,7 @@ async fn scandir() {
     // Symlink oblivious.
     assert_eq!(
         new_posixfs_symlink_oblivious(dir.path())
-            .scandir(Dir(path))
+            .scandir(Dir(path), GitignoreStack::empty())
             .await
             .unwrap(),
         DirectoryListing(vec![
@@ -235,9 +239,59 @@ async fn scandir_missing() {
     let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(dir.path());
     posix_fs
-        .scandir(Dir(PathBuf::from("no_marmosets_here")))
+        .scandir(
+            Dir(PathBuf::from("no_marmosets_here")),
+            GitignoreStack::empty(),
+        )
         .await
         .expect_err("Want error");
+}
+
+#[tokio::test]
+async fn push_gitignore_file_reads_regular_files() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let root = dir.path();
+    std::fs::create_dir(root.join("a")).unwrap();
+    make_file(&root.join("a/.gitignore"), b"ignored.txt\n", 0o600);
+    make_file(&root.join("a/ignored.txt"), b"", 0o600);
+    make_file(&root.join("a/kept.txt"), b"", 0o600);
+
+    let posix_fs = new_posixfs(root);
+    let stack = posix_fs
+        .push_gitignore_file(&Dir(PathBuf::from("a")), GitignoreStack::empty())
+        .await
+        .unwrap();
+    assert!(stack.is_path_ignored(Path::new("a/ignored.txt"), false));
+    assert!(!stack.is_path_ignored(Path::new("a/kept.txt"), false));
+
+    let listing = posix_fs
+        .scandir(Dir(PathBuf::from("a")), stack)
+        .await
+        .unwrap();
+    let paths: Vec<_> = listing.0.iter().map(|s| s.path().to_path_buf()).collect();
+    assert_eq!(
+        paths,
+        vec![PathBuf::from(".gitignore"), PathBuf::from("kept.txt")]
+    );
+}
+
+#[tokio::test]
+async fn push_gitignore_file_skips_non_files() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let root = dir.path();
+    std::fs::create_dir_all(root.join("a/.gitignore")).unwrap();
+    std::fs::create_dir(root.join("b")).unwrap();
+    std::os::unix::fs::symlink("does-not-exist", root.join("b/.gitignore")).unwrap();
+    std::fs::create_dir(root.join("c")).unwrap();
+
+    let posix_fs = new_posixfs(root);
+    for subdir in ["a", "b", "c"] {
+        let stack = posix_fs
+            .push_gitignore_file(&Dir(PathBuf::from(subdir)), GitignoreStack::empty())
+            .await
+            .unwrap();
+        assert_eq!(stack, GitignoreStack::empty());
+    }
 }
 
 #[tokio::test]
@@ -361,7 +415,10 @@ async fn memfs_expand_basic() {
 
 async fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
     let fs = new_posixfs(path);
-    let stats = fs.scandir(Dir(PathBuf::from("."))).await.unwrap();
+    let stats = fs
+        .scandir(Dir(PathBuf::from(".")), GitignoreStack::empty())
+        .await
+        .unwrap();
     assert_eq!(stats.0.len(), 1);
     match stats.0.first().unwrap() {
         &super::Stat::File(File {
@@ -374,7 +431,7 @@ async fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
 fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
     PosixFS::new(
         dir.as_ref(),
-        GitignoreStyleExcludes::empty(),
+        GitignoreStack::empty(),
         task_executor::Executor::new(),
     )
     .unwrap()
@@ -383,7 +440,7 @@ fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
 fn new_posixfs_symlink_oblivious<P: AsRef<Path>>(dir: P) -> PosixFS {
     PosixFS::new_with_symlink_behavior(
         dir.as_ref(),
-        GitignoreStyleExcludes::empty(),
+        GitignoreStack::empty(),
         task_executor::Executor::new(),
         SymlinkBehavior::Oblivious,
     )

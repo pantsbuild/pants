@@ -135,6 +135,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     m.add_function(wrap_pyfunction!(garbage_collect_store, m)?)?;
     m.add_function(wrap_pyfunction!(lease_files_in_graph, m)?)?;
     m.add_function(wrap_pyfunction!(check_invalidation_watcher_liveness, m)?)?;
+    m.add_function(wrap_pyfunction!(start_invalidation_watcher, m)?)?;
 
     m.add_function(wrap_pyfunction!(validate_reachability, m)?)?;
     m.add_function(wrap_pyfunction!(rule_graph_consumed_types, m)?)?;
@@ -1423,6 +1424,22 @@ fn check_invalidation_watcher_liveness(py_scheduler: &Bound<'_, PyScheduler>) ->
 }
 
 #[pyfunction]
+fn start_invalidation_watcher(py_session: &Bound<'_, PySession>) -> PyO3Result<()> {
+    let session = &py_session.borrow().0;
+    let core = session.core();
+    if let Some(watcher) = core.watcher.as_ref() {
+        let provider = core.gitignore_session.as_ref().map(|gitignore_session| {
+            gitignore_session.set_session(session);
+            gitignore_session.clone()
+        });
+        watcher
+            .start(&core.graph, provider)
+            .map_err(PyException::new_err)?;
+    }
+    Ok(())
+}
+
+#[pyfunction]
 fn graph_len(py: Python, py_scheduler: &Bound<'_, PyScheduler>) -> u64 {
     let core = &py_scheduler.borrow().0.core;
     core.executor
@@ -1947,17 +1964,17 @@ fn stdio_initialize(
     externs::stdio::PyStdioWrite,
 )> {
     let regex_filters = regex_filters
-    .iter()
-    .map(|re| {
-      Regex::new(re).map_err(|e| {
-        PyException::new_err(
-          format!(
-            "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{e}",
-          )
-        )
-      })
-    })
-    .collect::<Result<Vec<Regex>, _>>()?;
+        .iter()
+        .map(|re| {
+            Regex::new(re).map_err(|e| {
+                PyException::new_err(
+                    format!(
+                        "Failed to parse warning filter. Please check the global option `--ignore-warnings`.\n\n{e}",
+                    )
+                )
+            })
+        })
+        .collect::<Result<Vec<Regex>, _>>()?;
 
     Logger::init(
         level,
