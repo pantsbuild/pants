@@ -28,6 +28,7 @@ from pants.backend.python.util_rules.lockfile_metadata import (
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
+    generate_uv_index_config,
 )
 from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
@@ -145,39 +146,24 @@ def generate_pyproject_toml(
         """
     ).format(resolve=resolve, requires_python=requires_python, deps_lines=deps_lines)
 
-    if indexes is not None:
-        parsed_indexes = []
-        for index in indexes:
-            part1, _, part2 = index.partition("=")
-            (name, url) = (part1, part2) if part2 else ("", part1)
-            parsed_indexes.append((name, url))
-        if parsed_indexes:
-            # To turn off uv's fallback to PyPI we must set some other index to be the default.
-            # In uv the default index has the lowest priority, regardless of its position in the
-            # list of indexes, so we set the last index to be that default, to match user intent.
-            for i, (name, url) in enumerate(parsed_indexes):
-                is_default = i == len(parsed_indexes) - 1
-                content += "[[tool.uv.index]]\n"
-                if name:
-                    content += f'name = "{name}"\n'
-                content += f'url = "{url}"\n'
-                if is_default:
-                    content += "default = true\n"
-                content += "\n"
-        else:
-            content += "no-index = true\n\n"
+    # The indexes must be in pyproject.toml so uv can validate the index names in sources.
+    # (Technically we only need those referenced in sources and not all of them, but it's fine
+    # if the others are mentioned too).
+    extra_lines = list(generate_uv_index_config(indexes, "tool.uv.index"))
+    extra_lines.append("")
 
     sources = tuple(sources)
     if sources:
-        source_lines = ["[tool.uv.sources]"]
+        extra_lines.append("[tool.uv.sources]")
         for source in sources:
             index_name, _, scope = source.partition("=")
             req = Requirement(scope)
             # Markers may contain double-quotes, so we use single quotes in the TOML.
             marker = f", marker = '{req.marker}'" if req.marker else ""
-            source_lines.append(f'{req.name} = {{ index = "{index_name}"{marker} }}')
-        source_lines.append("")
-        content += "\n".join(source_lines) + "\n"
+            extra_lines.append(f'{req.name} = {{ index = "{index_name}"{marker} }}')
+        extra_lines.append("")
+
+    content += "\n".join(extra_lines)
 
     return content
 
