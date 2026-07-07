@@ -389,7 +389,9 @@ enum StoreMsg {
 pub struct WorkunitStore {
     log_starting_workunits: bool,
     max_level: Level,
-    senders: [UnboundedSender<StoreMsg>; 2],
+    streaming_sender: UnboundedSender<StoreMsg>,
+    streaming_enabled: Arc<AtomicBool>,
+    ui_sender: Option<UnboundedSender<StoreMsg>>,
     streaming_workunit_data: Arc<Mutex<StreamingWorkunitData>>,
     heavy_hitters_data: Arc<Mutex<HeavyHittersData>>,
     metrics_data: Arc<MetricsData>,
@@ -574,7 +576,20 @@ impl HeavyHittersData {
 }
 
 impl WorkunitStore {
-    pub fn new(log_starting_workunits: bool, max_level: Level) -> WorkunitStore {
+    ///
+    /// Creates a WorkunitStore. Messages are only queued for `latest_workunits` once
+    /// `streaming_consumers` is true or `enable_streaming_workunits` has been called (when a
+    /// polling consumer actually registers), and are only queued for
+    /// `heavy_hitters`/`straggling_workunits` when `ui_consumers` is true. The channels are
+    /// unbounded, so a session which queues messages that no consumer ever polls accumulates
+    /// them for its entire lifetime.
+    ///
+    pub fn new(
+        log_starting_workunits: bool,
+        max_level: Level,
+        streaming_consumers: bool,
+        ui_consumers: bool,
+    ) -> WorkunitStore {
         // NB: Although it would be nice not to have separate allocations per consumer, it is
         // difficult to use a channel like `tokio::sync::broadcast` due to that channel being bounded.
         // Subscribers receive messages at very different rates, and adjusting the workunit level
@@ -586,7 +601,9 @@ impl WorkunitStore {
             max_level,
             // TODO: Create one `StreamingWorkunitData` per subscriber, and zero if no subscribers are
             // installed.
-            senders: [sender1, sender2],
+            streaming_sender: sender1,
+            streaming_enabled: Arc::new(AtomicBool::new(streaming_consumers)),
+            ui_sender: ui_consumers.then_some(sender2),
             streaming_workunit_data: Arc::new(Mutex::new(StreamingWorkunitData::new(receiver1))),
             heavy_hitters_data: Arc::new(Mutex::new(HeavyHittersData::new(receiver2))),
             metrics_data: Arc::default(),
@@ -602,6 +619,15 @@ impl WorkunitStore {
 
     pub fn max_level(&self) -> Level {
         self.max_level
+    }
+
+    ///
+    /// Enables queueing of workunit messages for `latest_workunits` consumers. Messages recorded
+    /// before enablement are dropped.
+    ///
+    pub fn enable_streaming_workunits(&self) {
+        self.streaming_enabled
+            .store(true, atomic::Ordering::Relaxed);
     }
 
     ///
@@ -628,11 +654,21 @@ impl WorkunitStore {
                 .send(msg)
                 .unwrap_or_else(|_| panic!("Receivers are static, and should always be present."));
         };
-        // Send clones to the first N-1 senders, and the owned value to the final sender.
-        for sender in &self.senders[0..self.senders.len() - 1] {
-            send_inner(sender, msg.clone());
+        // Send a clone to the streaming sender if both consumers are enabled, and the owned value
+        // to the last enabled sender.
+        let streaming_sender = self
+            .streaming_enabled
+            .load(atomic::Ordering::Relaxed)
+            .then_some(&self.streaming_sender);
+        match (streaming_sender, self.ui_sender.as_ref()) {
+            (Some(sender1), Some(sender2)) => {
+                send_inner(sender1, msg.clone());
+                send_inner(sender2, msg);
+            }
+            (Some(sender1), None) => send_inner(sender1, msg),
+            (None, Some(sender2)) => send_inner(sender2, msg),
+            (None, None) => (),
         }
-        send_inner(&self.senders[self.senders.len() - 1], msg);
     }
 
     ///
@@ -793,7 +829,7 @@ impl WorkunitStore {
     }
 
     pub fn setup_for_tests() -> (WorkunitStore, RunningWorkunit) {
-        let store = WorkunitStore::new(false, Level::Trace);
+        let store = WorkunitStore::new(false, Level::Trace, true, true);
         store.init_thread_state(None);
         let workunit =
             store._start_workunit(SpanId(0), "testing", Level::Info, None, Option::default());

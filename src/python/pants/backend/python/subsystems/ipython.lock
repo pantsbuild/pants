@@ -445,19 +445,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d63947694a0539a1d51e01eda7caf800c291020e6cdd7e28ad7b14dd33ad4f85",
-              "url": "https://files.pythonhosted.org/packages/96/42/3e5985a0a7e57de470b320c6d6a1a67c844f6737a587f3d44dd13d1819e7/wcwidth-0.8.2-py3-none-any.whl"
+              "hash": "f453740b1e4a4f3291faa37944c555d71056c4da08d59809b307ef4feba695c8",
+              "url": "https://files.pythonhosted.org/packages/bd/6e/95b0e537de1f4d4301f76f944642c6da50d1511cc7b3d64dc418a66c7509/wcwidth-0.8.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "91fbef97204b96a3d4d421609b80340b760cf33e26da123ff243d76b1fda8dda",
-              "url": "https://files.pythonhosted.org/packages/34/74/c6428f875774288bec1396f5bfcbc2d925700a4dad61727fd5f2b12f249d/wcwidth-0.8.2.tar.gz"
+              "hash": "faf5b4a5366a72dc49cad48cdf21f52bdf63bdda995178e483ba247ff79089b9",
+              "url": "https://files.pythonhosted.org/packages/49/b4/51fe890511f0f242d07cb1ebe6a5b6db417262b9d2568b460347c57d95cc/wcwidth-0.8.1.tar.gz"
             }
           ],
           "project_name": "wcwidth",
           "requires_dists": [],
           "requires_python": ">=3.8",
-          "version": "0.8.2"
+          "version": "0.8.1"
         }
       ],
       "marker": null,

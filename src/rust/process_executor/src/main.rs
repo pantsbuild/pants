@@ -163,7 +163,7 @@ struct Opt {
 #[tokio::main]
 async fn main() -> Result<(), String> {
     env_logger::init();
-    let workunit_store = WorkunitStore::new(false, log::Level::Debug);
+    let workunit_store = WorkunitStore::new(false, log::Level::Debug, true, true);
     workunit_store.init_thread_state(None);
 
     let args = Opt::parse();
@@ -433,7 +433,6 @@ async fn make_request_from_flat_args(
 }
 
 #[allow(clippy::redundant_closure)] // False positives for prost::Message::decode: https://github.com/rust-lang/rust-clippy/issues/5939
-#[allow(deprecated)] // TODO: Move to REAPI `output_path` instead of `output_files` and `output_directories`.
 async fn extract_request_from_action_digest(
     store: &Store,
     action_digest: Digest,
@@ -478,6 +477,38 @@ async fn extract_request_from_action_digest(
         .await
         .map_err(|e| e.to_string())?;
 
+    let (output_files, output_directories) = if command.output_paths.is_empty() {
+        #[expect(
+            deprecated,
+            reason = "Legacy REAPI fallback for commands that still use output_files"
+        )]
+        let output_files = command
+            .output_files
+            .iter()
+            .map(RelativePath::new)
+            .collect::<Result<_, _>>()?;
+        #[expect(
+            deprecated,
+            reason = "Legacy REAPI fallback for commands that still use output_directories"
+        )]
+        let output_directories = command
+            .output_directories
+            .iter()
+            .map(RelativePath::new)
+            .collect::<Result<_, _>>()?;
+
+        (output_files, output_directories)
+    } else {
+        (
+            BTreeSet::new(),
+            command
+                .output_paths
+                .iter()
+                .map(RelativePath::new)
+                .collect::<Result<_, _>>()?,
+        )
+    };
+
     let process = process_execution::Process {
         argv: command.arguments,
         env: command
@@ -492,16 +523,8 @@ async fn extract_request_from_action_digest(
             .collect(),
         working_directory,
         input_digests,
-        output_files: command
-            .output_files
-            .iter()
-            .map(RelativePath::new)
-            .collect::<Result<_, _>>()?,
-        output_directories: command
-            .output_directories
-            .iter()
-            .map(RelativePath::new)
-            .collect::<Result<_, _>>()?,
+        output_files,
+        output_directories,
         timeout: action.timeout.map(|timeout| {
             Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
         }),
@@ -607,6 +630,43 @@ where
 mod tests {
     use super::*;
     use clap::Parser;
+    use fs::EMPTY_DIRECTORY_DIGEST;
+    use remote::remote::store_proto_locally;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    fn local_execution_environment() -> ProcessExecutionEnvironment {
+        ProcessExecutionEnvironment {
+            name: None,
+            platform: Platform::current().unwrap(),
+            strategy: ProcessExecutionStrategy::Local,
+            local_keep_sandboxes: KeepSandboxes::Never,
+        }
+    }
+
+    fn make_store_dir() -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let counter = TEST_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("process-executor-test-{nanos}-{counter}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    async fn store_action_and_command(store: &Store, command: &Command) -> Digest {
+        let command_digest = store_proto_locally(store, command).await.unwrap();
+        let action = Action {
+            command_digest: Some(command_digest.into()),
+            input_root_digest: Some(EMPTY_DIRECTORY_DIGEST.as_digest().into()),
+            ..Action::default()
+        };
+        store_proto_locally(store, &action).await.unwrap()
+    }
 
     #[test]
     fn test_process_args() {
@@ -696,5 +756,113 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_extract_request_from_action_digest_with_output_paths() {
+        let executor = task_executor::Executor::new();
+        let store_dir = make_store_dir();
+        let store = Store::local_only(executor, &store_dir).unwrap();
+        let command = Command {
+            arguments: vec!["/bin/echo".to_owned(), "test".to_owned()],
+            output_paths: vec!["dir".to_owned(), "file.txt".to_owned()],
+            ..Command::default()
+        };
+        let action_digest = store_action_and_command(&store, &command).await;
+
+        let (process, _) = extract_request_from_action_digest(
+            &store,
+            action_digest,
+            local_execution_environment(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(process.output_files.is_empty());
+        assert_eq!(
+            process.output_directories,
+            [
+                RelativePath::new("dir").unwrap(),
+                RelativePath::new("file.txt").unwrap()
+            ]
+            .into_iter()
+            .collect()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_extract_request_from_action_digest_prefers_output_paths_over_deprecated_fields() {
+        let executor = task_executor::Executor::new();
+        let store_dir = make_store_dir();
+        let store = Store::local_only(executor, &store_dir).unwrap();
+        #[expect(
+            deprecated,
+            reason = "Constructing mixed REAPI command to verify output_paths precedence"
+        )]
+        let command = Command {
+            output_paths: vec!["new-output".to_owned()],
+            output_files: vec!["old-file".to_owned()],
+            output_directories: vec!["old-dir".to_owned()],
+            ..Command::default()
+        };
+        let action_digest = store_action_and_command(&store, &command).await;
+
+        let (process, _) = extract_request_from_action_digest(
+            &store,
+            action_digest,
+            local_execution_environment(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(process.output_files.is_empty());
+        assert_eq!(
+            process.output_directories,
+            [RelativePath::new("new-output").unwrap()]
+                .into_iter()
+                .collect()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_extract_request_from_action_digest_legacy_output_fields() {
+        let executor = task_executor::Executor::new();
+        let store_dir = make_store_dir();
+        let store = Store::local_only(executor, &store_dir).unwrap();
+        #[expect(
+            deprecated,
+            reason = "Constructing legacy REAPI command to verify replay fallback"
+        )]
+        let command = Command {
+            output_files: vec!["file.txt".to_owned()],
+            output_directories: vec!["dir".to_owned()],
+            ..Command::default()
+        };
+        let action_digest = store_action_and_command(&store, &command).await;
+
+        let (process, _) = extract_request_from_action_digest(
+            &store,
+            action_digest,
+            local_execution_environment(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            process.output_files,
+            [RelativePath::new("file.txt").unwrap()]
+                .into_iter()
+                .collect()
+        );
+        assert_eq!(
+            process.output_directories,
+            [RelativePath::new("dir").unwrap()].into_iter().collect()
+        );
     }
 }
