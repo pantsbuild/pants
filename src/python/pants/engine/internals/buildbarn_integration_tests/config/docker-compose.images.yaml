@@ -1,0 +1,20 @@
+services:
+  bb-storage-image:
+    profiles: ["image_refs"]
+    image: ghcr.io/buildbarn/bb-storage:20260609T094425Z-10acc76@sha256:36201141f924865ddbea1bc518c4f98dd0dbb744181ef34f9f5e864d3dcf43f8
+
+  bb-scheduler-image:
+    profiles: ["image_refs"]
+    image: ghcr.io/buildbarn/bb-scheduler:20260527T162223Z-c48dcda@sha256:95417d159b5b9f17a6c915fec43603be51c553f68de439a9affcfe811bd0c6da
+
+  bb-worker-image:
+    profiles: ["image_refs"]
+    image: ghcr.io/buildbarn/bb-worker:20260527T162223Z-c48dcda@sha256:4cc65f0dd716fd0942ccc0fdd770421065b7f3bf55062a184c4376e4c0a4a13e
+
+  bb-runner-installer-image:
+    profiles: ["image_refs"]
+    image: ghcr.io/buildbarn/bb-runner-installer:20260527T162223Z-c48dcda@sha256:0f719066773c365ba902edebb9f7ea8e23b3b4a82002c6dbdbb0c74965bcc34d
+
+  execution-image:
+    profiles: ["image_refs"]
+    image: ghcr.io/catthehacker/ubuntu:act-22.04@sha256:b3098f231fa07cf5c2423b0f2c2e7dacf85c0c508c7f27687febe30bab8cfd3e
