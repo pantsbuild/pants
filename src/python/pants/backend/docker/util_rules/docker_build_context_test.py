@@ -355,9 +355,9 @@ def test_from_image_build_arg_unresolvable_address_does_not_misalign(
             "src/downstream/BUILD": "docker_image(name='image')",
             "src/downstream/Dockerfile": dedent(
                 """\
-                ARG PYTHON_VERSION="python:3.10.2-slim"
+                ARG AAA_VERSION="python:3.10.2-slim"
                 ARG BASE_IMAGE=src/upstream:image
-                FROM $PYTHON_VERSION
+                FROM $AAA_VERSION
                 FROM $BASE_IMAGE
                 """
             ),
