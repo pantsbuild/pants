@@ -103,7 +103,7 @@ def _scan_module(module: ModuleType) -> _ModuleScan:
     tree = ast.parse(inspect.getsource(module))
     index: dict[tuple[str, int], _FunctionNode] = {}
     for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if isinstance(node, _FunctionNode):
             # A code object's co_firstlineno points at the first decorator, if any.
             first_lineno = node.decorator_list[0].lineno if node.decorator_list else node.lineno
             index.setdefault((node.name, first_lineno), node)
