@@ -156,6 +156,9 @@ impl Task {
         // of its entire in-flight subgraph in memory until it completes.
         // The semaphore must be scoped to this call: a shared pool would deadlock when the
         // items of nested `concurrently(..)` groups held permits while waiting for their children to acquire.
+        // TODO: The window and its multipliers are ad hoc, and per-call scoping admits up to
+        // window^depth items when nested. A dependency-aware semaphore with permit inheritance
+        // would give a global bound without deadlock: https://github.com/pantsbuild/pants/issues/23503
         let window = std::cmp::max(
             64,
             std::cmp::max(
