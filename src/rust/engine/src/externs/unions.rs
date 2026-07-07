@@ -1,14 +1,20 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::sync::OnceLock;
+
 use crate::TypeId;
 use crate::externs::is_union;
 use deepsize::DeepSizeOf;
-use fnv::FnvBuildHasher;
+use fnv::{FnvBuildHasher, FnvHasher};
 use indexmap::{IndexMap, IndexSet};
-use pyo3::exceptions;
+use parking_lot::Mutex;
+use pyo3::exceptions::{self, PyValueError};
+use pyo3::intern;
 use pyo3::prelude::*;
-use pyo3::types::{PyTuple, PyType};
-use std::hash::{Hash, Hasher};
+use pyo3::pybacked::PyBackedStr;
+use pyo3::types::{PyDict, PyTuple, PyType};
 
 #[pyclass(
     frozen,
@@ -75,9 +81,10 @@ impl UnionRule {
 }
 
 #[pyclass(frozen, eq, hash, str = "UnionMembership({union_rules:?})")]
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default)]
 pub struct UnionMembership {
     pub union_rules: IndexMap<TypeId, IndexSet<TypeId, FnvBuildHasher>, FnvBuildHasher>,
+    cached_hash: OnceLock<u64>,
 }
 
 #[pymethods]
@@ -101,7 +108,10 @@ impl UnionMembership {
                 .insert(TypeId::from_owned(member));
         }
 
-        Ok(Self { union_rules })
+        Ok(Self {
+            union_rules,
+            cached_hash: OnceLock::new(),
+        })
     }
 
     fn is_member(
@@ -176,12 +186,31 @@ impl UnionMembership {
     }
 }
 
+impl PartialEq for UnionMembership {
+    fn eq(&self, other: &Self) -> bool {
+        self.union_rules == other.union_rules
+    }
+}
+
+impl Eq for UnionMembership {}
+
+impl UnionMembership {
+    // XOR over the unique `(base, member)` pairs, so the hash is order-insensitive like the equality.
+    fn compute_hash(&self) -> u64 {
+        self.union_rules.iter().fold(0_u64, |acc, (base, members)| {
+            members.iter().fold(acc, |acc, member| {
+                let mut h = FnvHasher::default();
+                base.hash(&mut h);
+                member.hash(&mut h);
+                acc ^ h.finish()
+            })
+        })
+    }
+}
+
 impl Hash for UnionMembership {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        for (key, values) in &self.union_rules {
-            key.hash(state);
-            values.iter().for_each(|el| el.hash(state));
-        }
+        state.write_u64(*self.cached_hash.get_or_init(|| self.compute_hash()));
     }
 }
 
@@ -203,8 +232,96 @@ impl DeepSizeOf for UnionMembership {
     }
 }
 
+/// Backs `Target.PluginField`: accessing it from a target subclass returns a distinct `@union`
+/// type per subclass (as `@distinct_union_type_per_subclass` does in Python), so plugin fields
+/// registered against one target type don't leak to others.
+#[pyclass(frozen, module = "pants.engine.internals.native_engine")]
+pub struct PluginFieldDescriptor {
+    base_class: Py<PyType>,
+    cache: Mutex<HashMap<TypeId, Py<PyType>>>,
+}
+
+impl PluginFieldDescriptor {
+    pub fn new(base_class: Py<PyType>) -> Self {
+        Self {
+            base_class,
+            cache: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn make_type_copy(&self, objtype: &Bound<'_, PyType>, py: Python) -> PyResult<Py<PyType>> {
+        let base = self.base_class.bind(py);
+        let name = base.getattr(intern!(py, "__name__"))?;
+        let bases = base.getattr(intern!(py, "__bases__"))?;
+
+        let new_dict = PyDict::new(py);
+        let base_dict = base.getattr(intern!(py, "__dict__"))?;
+        for key in base_dict.try_iter()? {
+            let key = key?;
+            let value = base_dict.get_item(&key)?;
+            new_dict.set_item(&key, &value)?;
+        }
+
+        let objtype_qualname: PyBackedStr =
+            objtype.getattr(intern!(py, "__qualname__"))?.extract()?;
+        let base_name: PyBackedStr = name.extract()?;
+        new_dict.set_item(
+            intern!(py, "__qualname__"),
+            format!("{}.{}", &*objtype_qualname, &*base_name),
+        )?;
+
+        let type_metaclass = py.get_type::<PyType>();
+        let new_type: Bound<'_, PyType> = type_metaclass
+            .call1((&name, &bases, &new_dict))?
+            .extract()?;
+
+        new_type.setattr(intern!(py, "_is_union_for"), &new_type)?;
+        let in_scope_types = base
+            .getattr(intern!(py, "_union_in_scope_types"))
+            .ok()
+            .filter(|v| !v.is_none())
+            .unwrap_or_else(|| PyTuple::empty(py).into_any());
+        new_type.setattr(intern!(py, "_union_in_scope_types"), in_scope_types)?;
+
+        Ok(new_type.unbind())
+    }
+}
+
+#[pymethods]
+impl PluginFieldDescriptor {
+    fn __get__(
+        &self,
+        obj: Option<&Bound<'_, PyAny>>,
+        objtype: Option<&Bound<'_, PyType>>,
+        py: Python,
+    ) -> PyResult<Py<PyType>> {
+        let objtype = match objtype {
+            Some(t) => t.clone(),
+            None => match obj {
+                Some(o) => o.get_type(),
+                None => return Err(PyValueError::new_err("descriptor needs an object or type")),
+            },
+        };
+        let type_id = TypeId::new(&objtype);
+
+        {
+            let cache = self.cache.lock();
+            if let Some(cached) = cache.get(&type_id) {
+                return Ok(cached.clone_ref(py));
+            }
+        }
+
+        let new_type = self.make_type_copy(&objtype, py)?;
+
+        let mut cache = self.cache.lock();
+        cache.insert(type_id, new_type.clone_ref(py));
+        Ok(new_type)
+    }
+}
+
 pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<UnionMembership>()?;
     m.add_class::<UnionRule>()?;
+    m.add_class::<PluginFieldDescriptor>()?;
     Ok(())
 }
