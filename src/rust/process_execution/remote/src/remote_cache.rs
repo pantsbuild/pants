@@ -191,13 +191,88 @@ impl CommandRunner {
         }
     }
 
+    /// Adds a single output path to an `ActionResult`. Handles files, directories, the empty (root)
+    /// path, and missing paths. Returns the REAPI digests that must be uploaded for this output.
+    async fn add_output_path_to_action_result(
+        &self,
+        output_trie: &DigestTrie,
+        output_path: &str,
+        action_result: &mut ActionResult,
+        digests: &mut HashSet<Digest>,
+    ) -> Result<(), StoreError> {
+        let build_output_directory = |trie: &DigestTrie| {
+            let tree = Tree::from(trie);
+            let mut file_digests = Vec::new();
+            trie.walk(SymlinkBehavior::Aware, &mut |_, entry| match entry {
+                directory::Entry::File(f) => file_digests.push(f.digest()),
+                directory::Entry::Symlink(_) => (),
+                directory::Entry::Directory(_) => {}
+            });
+            (tree, file_digests)
+        };
+
+        if output_path.is_empty() {
+            let (tree, file_digests) = build_output_directory(output_trie);
+            let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
+            digests.insert(tree_digest);
+            digests.extend(file_digests);
+            action_result
+                .output_directories
+                .push(remexec::OutputDirectory {
+                    path: output_path.to_owned(),
+                    tree_digest: Some(tree_digest.into()),
+                    is_topologically_sorted: false,
+                    ..Default::default()
+                });
+            return Ok(());
+        }
+
+        let relative = RelativePath::new(output_path)?;
+        match output_trie.entry(&relative)? {
+            None => {}
+            Some(directory::Entry::File(f)) => {
+                let output_file = remexec::OutputFile {
+                    digest: Some(f.digest().into()),
+                    path: output_path.to_owned(),
+                    is_executable: f.is_executable(),
+                    ..remexec::OutputFile::default()
+                };
+
+                digests.insert(require_digest(output_file.digest.as_ref())?);
+                action_result.output_files.push(output_file);
+            }
+            Some(directory::Entry::Symlink(_)) => {
+                return Err(format!(
+                    "Declared output path {output_path:?} is a symlink, which is not yet \
+                    supported for remote cache writes. trie_digest={:?}",
+                    output_trie.compute_root_digest()
+                )
+                .into());
+            }
+            Some(directory::Entry::Directory(d)) => {
+                let (tree, file_digests) = build_output_directory(d.tree());
+                let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
+                digests.insert(tree_digest);
+                digests.extend(file_digests);
+                action_result
+                    .output_directories
+                    .push(remexec::OutputDirectory {
+                        path: output_path.to_owned(),
+                        tree_digest: Some(tree_digest.into()),
+                        is_topologically_sorted: false,
+                        ..Default::default()
+                    });
+            }
+        }
+        Ok(())
+    }
+
     /// Converts a REAPI `Command` and a `FallibleProcessResultWithPlatform` produced from executing
     /// that Command into a REAPI `ActionResult` suitable for upload to the REAPI Action Cache.
     ///
     /// This function also returns a vector of all `Digest`s referenced directly and indirectly by
     /// the `ActionResult` suitable for passing to `Store::ensure_remote_has_recursive`. (The
     /// digests may include both File and Tree digests.)
-    #[allow(deprecated)] // TODO: Move to REAPI `output_path` instead of `output_files` and `output_directories`.
     pub(crate) async fn make_action_result(
         &self,
         command: &Command,
@@ -222,37 +297,57 @@ impl CommandRunner {
         digests.insert(result.stdout_digest);
         digests.insert(result.stderr_digest);
 
-        for output_directory in &command.output_directories {
-            let (tree, file_digests) = match Self::make_tree_for_output_directory(
-                &output_trie,
-                RelativePath::new(output_directory).unwrap(),
-            )? {
-                Some(res) => res,
-                None => continue,
-            };
+        if command.output_paths.is_empty() {
+            #[expect(
+                deprecated,
+                reason = "Legacy REAPI fallback for commands that still use output_directories"
+            )]
+            for output_directory in &command.output_directories {
+                let (tree, file_digests) = match Self::make_tree_for_output_directory(
+                    &output_trie,
+                    RelativePath::new(output_directory).unwrap(),
+                )? {
+                    Some(res) => res,
+                    None => continue,
+                };
 
-            let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
-            digests.insert(tree_digest);
-            digests.extend(file_digests);
+                let tree_digest = crate::remote::store_proto_locally(&self.store, &tree).await?;
+                digests.insert(tree_digest);
+                digests.extend(file_digests);
 
-            action_result
-                .output_directories
-                .push(remexec::OutputDirectory {
-                    path: output_directory.to_owned(),
-                    tree_digest: Some(tree_digest.into()),
-                    is_topologically_sorted: false,
-                    ..Default::default()
-                });
-        }
+                action_result
+                    .output_directories
+                    .push(remexec::OutputDirectory {
+                        path: output_directory.to_owned(),
+                        tree_digest: Some(tree_digest.into()),
+                        is_topologically_sorted: false,
+                        ..Default::default()
+                    });
+            }
 
-        for output_file_path in &command.output_files {
-            let output_file = match Self::extract_output_file(&output_trie, output_file_path)? {
-                Some(output_file) => output_file,
-                None => continue,
-            };
+            #[expect(
+                deprecated,
+                reason = "Legacy REAPI fallback for commands that still use output_files"
+            )]
+            for output_file_path in &command.output_files {
+                let output_file = match Self::extract_output_file(&output_trie, output_file_path)? {
+                    Some(output_file) => output_file,
+                    None => continue,
+                };
 
-            digests.insert(require_digest(output_file.digest.as_ref())?);
-            action_result.output_files.push(output_file);
+                digests.insert(require_digest(output_file.digest.as_ref())?);
+                action_result.output_files.push(output_file);
+            }
+        } else {
+            for output_path in &command.output_paths {
+                self.add_output_path_to_action_result(
+                    &output_trie,
+                    output_path,
+                    &mut action_result,
+                    &mut digests,
+                )
+                .await?;
+            }
         }
 
         Ok((action_result, digests.into_iter().collect::<Vec<_>>()))

@@ -116,10 +116,6 @@ def test_buildbarn_remote_cache_roundtrips_file_and_directory_outputs() -> None:
         assert "backtrack_attempts" not in metrics2
 
 
-@pytest.mark.xfail(
-    reason="Root output directories from Buildbarn remote cache hits require REAPI output_paths.",
-    strict=True,
-)
 def test_buildbarn_remote_cache_roundtrips_root_output_directory() -> None:
     expected_contents = {
         "root.txt": b"root\n",

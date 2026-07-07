@@ -312,6 +312,66 @@ def test_eager_validation(cache_content_behavior: CacheContentBehavior) -> None:
     assert "backtrack_attempts" not in metrics3
 
 
+def test_remote_cache_roundtrips_file_and_directory_outputs() -> None:
+    executor = PyExecutor(core_threads=2, max_threads=4)
+    cas = PyStubCAS.builder().build(executor)
+
+    def run() -> tuple[dict[str, bytes], dict[str, int]]:
+        rule_runner = RuleRunner(
+            rules=[
+                QueryRule(ProcessResult, [Process]),
+                QueryRule(DigestContents, [Digest]),
+            ],
+            isolated_local_store=True,
+            bootstrap_args=[
+                "--cache-content-behavior=defer",
+                "--no-local-cache",
+                *remote_cache_args(cas.address),
+            ],
+        )
+
+        result = rule_runner.request(
+            ProcessResult,
+            [
+                Process(
+                    [
+                        "/bin/bash",
+                        "-c",
+                        "/bin/echo file-output > file.txt && /bin/mkdir -p out && /bin/echo nested-output > out/nested.txt",
+                    ],
+                    description="Create file and directory outputs",
+                    output_files=["file.txt"],
+                    output_directories=["out"],
+                    # Ensure the cache lookup wins over this very fast local process.
+                    remote_cache_speculation_delay_millis=1000,
+                    level=LogLevel.INFO,
+                )
+            ],
+        )
+        contents = rule_runner.request(DigestContents, [result.output_digest])
+
+        # Wait for any async cache writes to complete.
+        time.sleep(1)
+        return {fc.path: fc.content for fc in contents}, rule_runner.scheduler.get_metrics()
+
+    expected_contents = {
+        "file.txt": b"file-output\n",
+        "out/nested.txt": b"nested-output\n",
+    }
+
+    assert cas.action_cache_len() == 0
+    contents1, metrics1 = run()
+    assert contents1 == expected_contents
+    assert cas.action_cache_len() == 1
+    assert metrics1["remote_cache_requests"] == 1
+    assert metrics1["remote_cache_requests_uncached"] == 1
+
+    contents2, metrics2 = run()
+    assert contents2 == expected_contents
+    assert metrics2["remote_cache_requests"] == 1
+    assert metrics2["remote_cache_requests_cached"] == 1
+
+
 @pytest.mark.skip(reason="Flaky test which needs to be reevaluated.")
 @pytest.mark.no_error_if_skipped
 def test_remote_cache_workunits() -> None:
