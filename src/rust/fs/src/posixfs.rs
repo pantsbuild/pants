@@ -1,6 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::ffi::OsString;
 use std::fs;
 use std::io::{self, ErrorKind};
 use std::os::unix::fs::PermissionsExt;
@@ -70,63 +71,80 @@ impl PosixFS {
         })
     }
 
-    fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
+    fn scandir_sync(&self, dir_relative_to_root: Dir) -> Result<DirectoryListing, io::Error> {
         let dir_abs = self.root.0.join(&dir_relative_to_root.0);
-        let mut stats: Vec<Stat> = dir_abs
-            .read_dir()?
-            .map(|readdir| {
-                let dir_entry = readdir?;
-                let (file_type, compute_metadata): (_, Box<dyn FnOnce() -> Result<_, _>>) =
-                    match self.symlink_behavior {
-                        SymlinkBehavior::Aware => {
-                            // Use the dir_entry metadata, which is symlink aware.
-                            (dir_entry.file_type()?, Box::new(|| dir_entry.metadata()))
-                        }
-                        SymlinkBehavior::Oblivious => {
-                            // Use an independent stat call to get metadata, which is symlink oblivious.
-                            let metadata = std::fs::metadata(dir_abs.join(dir_entry.file_name()))?;
-                            (metadata.file_type(), Box::new(|| Ok(metadata)))
-                        }
-                    };
-                PosixFS::stat_internal(
-                    &dir_abs.join(dir_entry.file_name()),
-                    file_type,
-                    compute_metadata,
-                )
-            })
-            .filter_map(|s| match s {
-                Ok(Some(s))
-                    if !self.ignore.is_ignored_path(
-                        &dir_relative_to_root.0.join(s.path()),
-                        matches!(s, Stat::Dir(_)),
-                    ) =>
-                {
-                    // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
-                    // git-style ignore patterns, we need to know whether a path represents a directory.
-                    Some(Ok(s))
-                }
-                Ok(_) => None,
-                Err(e) => Some(Err(e)),
-            })
-            .collect::<Result<Vec<_>, io::Error>>()
-            .map_err(|e| {
-                io::Error::new(
-                    e.kind(),
-                    format!("Failed to scan directory {dir_abs:?}: {e}"),
-                )
-            })?;
+        let read_dir = dir_abs.read_dir()?;
+
+        let mut entry_abs = dir_abs;
+
+        let mut stats: Vec<Stat> = Vec::new();
+        for dir_entry in read_dir {
+            let dir_entry = dir_entry.map_err(|e| Self::scandir_error(&entry_abs, e))?;
+
+            // Reuse the owned `file_name` as the `Stat`'s path so it's allocated only once.
+            let file_name = dir_entry.file_name();
+            entry_abs.push(&file_name);
+            let stat = self.scan_entry(&entry_abs, file_name, &dir_entry);
+            entry_abs.pop();
+
+            if let Some(stat) = stat.map_err(|e| Self::scandir_error(&entry_abs, e))? {
+                stats.push(stat);
+            }
+        }
         stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
         Ok(DirectoryListing(stats))
     }
 
-    ///
-    /// Makes a Stat for path_to_stat relative to its containing directory.
-    ///
-    /// This method takes both a `FileType` and a getter for `Metadata` because on Unixes,
-    /// directory walks cheaply return the `FileType` without extra syscalls, but other
-    /// metadata requires additional syscall(s) to compute. We can avoid those calls for
-    /// Dirs and Links.
-    ///
+    fn scandir_error(dir_abs: &Path, e: io::Error) -> io::Error {
+        io::Error::new(
+            e.kind(),
+            format!("Failed to scan directory {dir_abs:?}: {e}"),
+        )
+    }
+
+    fn scan_entry(
+        &self,
+        entry_abs: &Path,
+        file_name: OsString,
+        dir_entry: &std::fs::DirEntry,
+    ) -> Result<Option<Stat>, io::Error> {
+        let stat = match self.symlink_behavior {
+            SymlinkBehavior::Aware => {
+                let file_type = dir_entry.file_type()?;
+                Self::make_stat(entry_abs, file_name.into(), file_type, || {
+                    dir_entry.metadata()
+                })?
+            }
+            SymlinkBehavior::Oblivious => {
+                let metadata = std::fs::metadata(entry_abs)?;
+                Self::make_stat(entry_abs, file_name.into(), metadata.file_type(), || {
+                    Ok(metadata)
+                })?
+            }
+        };
+
+        // It would be nice to ignore paths before stat'ing them, but git-style ignore patterns need
+        // to know whether a path is a directory. The matcher takes a root-relative path, which is
+        // `entry_abs` minus the root prefix (always present, since `entry_abs` is joined onto it).
+        let Some(stat) = stat else {
+            return Ok(None);
+        };
+        let rel = entry_abs
+            .strip_prefix(&self.root.0)
+            .expect("entry path is always under the root");
+        if self
+            .ignore
+            .is_ignored_path(rel, matches!(stat, Stat::Dir(_)))
+        {
+            Ok(None)
+        } else {
+            Ok(Some(stat))
+        }
+    }
+
+    // Makes a Stat for `path_to_stat`, deriving its directory-relative name from the final path
+    // component. Callers on the directory-walk hot path use `make_stat` instead, reusing the name
+    // they already own.
     fn stat_internal<F>(
         path_to_stat: &Path,
         file_type: std::fs::FileType,
@@ -135,34 +153,45 @@ impl PosixFS {
     where
         F: FnOnce() -> Result<std::fs::Metadata, io::Error>,
     {
-        let Some(file_name) = path_to_stat.file_name() else {
+        let Some(name) = path_to_stat.file_name() else {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "Argument path_to_stat to PosixFS::stat_internal must have a file name.",
             ));
         };
-        if cfg!(debug_assertions) && !path_to_stat.is_absolute() {
+        Self::make_stat(path_to_stat, name.into(), file_type, compute_metadata)
+    }
+
+    fn make_stat<F>(
+        abs_path: &Path,
+        name: PathBuf,
+        file_type: std::fs::FileType,
+        compute_metadata: F,
+    ) -> Result<Option<Stat>, io::Error>
+    where
+        F: FnOnce() -> Result<std::fs::Metadata, io::Error>,
+    {
+        if cfg!(debug_assertions) && !abs_path.is_absolute() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!(
-                    "Argument path_to_stat to PosixFS::stat_internal must be absolute path, got {path_to_stat:?}"
+                    "Argument abs_path to PosixFS::make_stat must be an absolute path, got {abs_path:?}"
                 ),
             ));
         }
-        let path = file_name.to_owned().into();
         if file_type.is_symlink() {
             Ok(Some(Stat::Link(Link {
-                path,
-                target: std::fs::read_link(path_to_stat)?,
+                path: name,
+                target: std::fs::read_link(abs_path)?,
             })))
         } else if file_type.is_file() {
             let is_executable = compute_metadata()?.permissions().mode() & 0o100 == 0o100;
             Ok(Some(Stat::File(File {
-                path,
-                is_executable: is_executable,
+                path: name,
+                is_executable,
             })))
         } else if file_type.is_dir() {
-            Ok(Some(Stat::Dir(Dir(path))))
+            Ok(Some(Stat::Dir(Dir(name))))
         } else {
             Ok(None)
         }
@@ -174,7 +203,7 @@ impl PosixFS {
     pub async fn scandir(&self, dir_relative_to_root: Dir) -> Result<DirectoryListing, io::Error> {
         let vfs = self.clone();
         self.executor
-            .spawn_blocking(move || vfs.scandir_sync(&dir_relative_to_root))
+            .spawn_blocking(move || vfs.scandir_sync(dir_relative_to_root))
             .await?
             .map_err(|e| io::Error::other(format!("Synchronous scandir failed: {e}")))
     }
