@@ -145,6 +145,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
 
     m.add_function(wrap_pyfunction!(session_new_run_id, m)?)?;
     m.add_function(wrap_pyfunction!(session_poll_workunits, m)?)?;
+    m.add_function(wrap_pyfunction!(session_enable_streaming_workunits, m)?)?;
     m.add_function(wrap_pyfunction!(session_run_interactive_process, m)?)?;
     m.add_function(wrap_pyfunction!(session_get_metrics, m)?)?;
     m.add_function(wrap_pyfunction!(session_get_observation_histograms, m)?)?;
@@ -1072,6 +1073,15 @@ async fn workunits_to_py_tuple_value(
     }
 
     externs::store_tuple(py, workunit_values)
+}
+
+#[pyfunction]
+fn session_enable_streaming_workunits(session: &Bound<'_, PySession>) {
+    session
+        .borrow()
+        .0
+        .workunit_store()
+        .enable_streaming_workunits();
 }
 
 #[pyfunction]

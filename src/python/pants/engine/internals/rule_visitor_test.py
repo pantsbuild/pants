@@ -4,13 +4,21 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import sys
 import textwrap
+import threading
+import time
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 
-from pants.engine.internals.rule_visitor import collect_awaitables
+from pants.engine.internals.rule_visitor import (
+    PANTS_RULE_DESCRIPTORS_MODULE_KEY,
+    collect_awaitables,
+    get_module_scope_rules,
+)
 from pants.engine.rules import implicitly, rule
 
 # The visitor inspects the module for definitions.
@@ -183,6 +191,41 @@ def test_byname_mutual_recursion(tmp_path: Path) -> None:
     with temporary_module(tmp_path, rule_code) as module:
         assert_byname_awaitables(module.mutually_recursive_rule_1, [(str, [], 1)])
         assert_byname_awaitables(module.mutually_recursive_rule_2, [(int, [], 1)])
+
+
+def test_get_module_scope_rules_concurrent_init(tmp_path: Path, monkeypatch) -> None:
+    rule_code = textwrap.dedent("""
+        async def first_rule(arg: int) -> str:
+            return str(arg)
+
+        async def second_rule(arg: str) -> int:
+            return int(arg)
+    """)
+
+    with temporary_module(tmp_path, rule_code) as module:
+        source_calls = 0
+        original_getsource = inspect.getsource
+
+        def slow_getsource(obj) -> str:
+            nonlocal source_calls
+            source_calls += 1
+            time.sleep(0.01)
+            return original_getsource(obj)
+
+        monkeypatch.setattr(inspect, "getsource", slow_getsource)
+        num_threads = 8
+        barrier = threading.Barrier(num_threads)
+
+        def get_rules(_):
+            barrier.wait()
+            return get_module_scope_rules(module)
+
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            results = list(executor.map(get_rules, range(num_threads)))
+
+        assert all(result is results[0] for result in results)
+        assert getattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY) is results[0]
+        assert source_calls == 1
 
 
 def test_rule_helpers_free_functions() -> None:

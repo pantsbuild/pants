@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
-use std::env;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -75,13 +74,15 @@ impl Executor {
     /// need thread configurability, but also want to know reliably when the Runtime will shutdown
     /// (which, because it is static, will only be at the entire process' exit).
     ///
-    pub fn new_owned<F>(
+    pub fn new_owned<F, G>(
         num_worker_threads: usize,
         max_threads: usize,
         on_thread_start: F,
+        on_thread_stop: G,
     ) -> Result<Executor, String>
     where
         F: Fn() + Send + Sync + 'static,
+        G: Fn() + Send + Sync + 'static,
     {
         let mut runtime_builder = Builder::new_multi_thread();
 
@@ -90,9 +91,12 @@ impl Executor {
             .max_blocking_threads(max_threads - num_worker_threads)
             .enable_all();
 
-        if env::var("PANTS_DEBUG").is_ok() {
-            runtime_builder.on_thread_start(on_thread_start);
-        };
+        // NB: These run on every runtime-managed thread, including blocking-pool threads, which
+        // tokio expires after an idle keep-alive and respawns on demand. Any per-thread state
+        // created in `on_thread_start` must be torn down in `on_thread_stop`: a leak here is per
+        // thread created, not per pool slot, and so grows without bound in a long-lived pantsd.
+        runtime_builder.on_thread_start(on_thread_start);
+        runtime_builder.on_thread_stop(on_thread_stop);
 
         let runtime = runtime_builder
             .build()

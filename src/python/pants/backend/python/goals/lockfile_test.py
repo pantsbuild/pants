@@ -669,7 +669,7 @@ def test_uv_lockfile_generation(
                     ]
                 ),
                 find_links=FrozenOrderedSet([]),
-                interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
+                interpreter_constraints=InterpreterConstraints(["CPython==3.14"]),
                 resolve_name="test",
                 lockfile_dest="test.lock",
                 diff=False,
@@ -717,10 +717,10 @@ def test_uv_lockfile_generation(
     metadata = json.loads(by_path["test.lock.metadata"].content.decode())
     assert metadata["version"] == 8
     assert metadata["lockfile_format"] == LockfileFormat.UV
-    assert metadata["valid_for_interpreter_constraints"] == ["CPython<3.15,>=3.9"]
+    assert metadata["valid_for_interpreter_constraints"] == ["CPython==3.14"]
     assert metadata["generated_with_requirements"] == [
         "ansicolors==1.1.8",
-        "cowsay@ git+https://github.com/VaasuDevanS/cowsay-python@dcf7236f0b5ece9ed56e91271486e560526049cf",
+        "cowsay @ git+https://github.com/VaasuDevanS/cowsay-python@dcf7236f0b5ece9ed56e91271486e560526049cf",
     ]
     expected_no_binary = ["ansicolors"] if no_binary else []
     expected_only_binary = ["ansicolors"] if only_binary else []
@@ -733,7 +733,7 @@ def test_uv_lockfile_generation_with_sources(rule_runner: PythonRuleRunner) -> N
     rule_runner.set_options(
         [
             "--python-resolves={'test': 'test.lock'}",
-            "--python-repos-indexes=['alt=https://pypi.org/simple/']",
+            "--python-repos-indexes=['alt=https://pypi.org/simple/', 'https://test.pypi.org/simple']",
             "--python-resolves-to-sources={'test': ['alt=ansicolors>=1.0']}",
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
@@ -743,9 +743,14 @@ def test_uv_lockfile_generation_with_sources(rule_runner: PythonRuleRunner) -> N
         GenerateLockfileResult,
         [
             GenerateUvLockfile(
-                requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+                requirements=FrozenOrderedSet(
+                    [
+                        "ansicolors==1.1.8",
+                        "pantsbuild-testpypi-only==0.0.1",  # Exists only on test.pypi.org, not on pypi.org
+                    ]
+                ),
                 find_links=FrozenOrderedSet([]),
-                interpreter_constraints=InterpreterConstraints(["CPython>=3.9,<3.15"]),
+                interpreter_constraints=InterpreterConstraints(["CPython==3.14"]),
                 resolve_name="test",
                 lockfile_dest="test.lock",
                 diff=False,
