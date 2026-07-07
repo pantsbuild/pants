@@ -7,7 +7,7 @@ import importlib.metadata
 import logging
 import site
 import sys
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import cast
 
@@ -122,13 +122,23 @@ class PluginResolver:
 
     def __init__(
         self,
-        scheduler: BootstrapScheduler,
+        scheduler: Callable[[], BootstrapScheduler],
         interpreter_constraints: InterpreterConstraints | None = None,
         inherit_existing_constraints: bool = True,
     ) -> None:
-        self._scheduler = scheduler
+        # The scheduler is built lazily: it is only needed to pex-resolve distribution plugins,
+        # which most repos do not configure. Deferring it keeps the second rule-graph build and
+        # its backend load off the critical path when there is nothing to resolve.
+        self._scheduler_factory = scheduler
+        self._scheduler_instance: BootstrapScheduler | None = None
         self._interpreter_constraints = interpreter_constraints
         self._inherit_existing_constraints = inherit_existing_constraints
+
+    @property
+    def _scheduler(self) -> BootstrapScheduler:
+        if self._scheduler_instance is None:
+            self._scheduler_instance = self._scheduler_factory()
+        return self._scheduler_instance
 
     def resolve(
         self,
@@ -137,6 +147,13 @@ class PluginResolver:
         requirements: Iterable[str] = (),
     ) -> list[str]:
         """Resolves any configured plugins and adds them to the sys.path as a side effect."""
+        requirements = tuple(requirements)
+        # `resolve_plugins` resolves `[GLOBAL].plugins` plus these backend requirements. With
+        # neither, it would resolve nothing, so short-circuit before building the bootstrap
+        # scheduler (which exists only to run this resolution).
+        configured_plugins = options_bootstrapper.bootstrap_options.for_global_scope().plugins
+        if not configured_plugins and not requirements:
+            return []
 
         def to_requirement(d):
             return f"{d.name}=={d.version}"

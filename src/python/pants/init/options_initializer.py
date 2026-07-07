@@ -142,8 +142,11 @@ class OptionsInitializer:
         options_bootstrapper: OptionsBootstrapper,
         executor: PyExecutor,
     ) -> None:
-        self._bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, executor)
-        self._plugin_resolver = PluginResolver(self._bootstrap_scheduler)
+        # Build the bootstrap scheduler lazily: it is only needed to pex-resolve distribution
+        # plugins, so `PluginResolver` skips it entirely when there is nothing to resolve.
+        self._plugin_resolver = PluginResolver(
+            lambda: create_bootstrap_scheduler(options_bootstrapper, executor)
+        )
 
     def build_config(
         self,
