@@ -341,6 +341,7 @@ Created as part of the release process.
 + Shaked Kaplan
 + Shane Delmore
 + Shantanu Kumar
++ Shunsuke Kirino
 + Shuo Li
 + Simeon Franklin
 + Simon Biggs
@@ -409,6 +410,7 @@ Created as part of the release process.
 + azban
 + bianca rosa
 + billybecker
++ creeser-nvidia
 + csqzhang
 + csteiner
 + eugene yokota
