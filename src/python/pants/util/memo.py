@@ -3,7 +3,7 @@
 
 import functools
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from contextlib import contextmanager
 from typing import Any, TypeVar
 
@@ -125,7 +125,7 @@ def memoized(func: F | None = None, key_factory=equal_args, cache_factory=None) 
         )
 
     key_func = key_factory or equal_args
-    cache = native_engine.LockedMap()
+    cache: native_engine.LockedMap[Hashable, Any] = native_engine.LockedMap()
 
     @functools.wraps(func)
     def memoize(*args, **kwargs):

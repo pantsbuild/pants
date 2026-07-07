@@ -19,7 +19,7 @@ use pyo3::types::PyDict;
 /// while memo keys must be released by `forget`/`clear`/property `del` (a `per_instance` key holds
 /// a strong reference to `self`). Ids are assigned with `dict.setdefault`, a single dict operation
 /// and so atomic on free-threaded builds; a lost race wastes only an integer.
-#[pyclass(frozen, module = "pants.engine.internals.native_engine")]
+#[pyclass(frozen, generic, module = "pants.engine.internals.native_engine")]
 pub struct LockedMap {
     ids: Py<PyDict>,
     /// `ids.setdefault`, bound once: the hot path calls it per memoized invocation.
