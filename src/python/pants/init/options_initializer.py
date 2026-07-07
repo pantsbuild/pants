@@ -142,8 +142,9 @@ class OptionsInitializer:
         options_bootstrapper: OptionsBootstrapper,
         executor: PyExecutor,
     ) -> None:
-        self._bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, executor)
-        self._plugin_resolver = PluginResolver(self._bootstrap_scheduler)
+        self._plugin_resolver = PluginResolver(
+            lambda: create_bootstrap_scheduler(options_bootstrapper, executor)
+        )
 
     def build_config(
         self,
