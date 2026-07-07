@@ -52,7 +52,7 @@ def _node_str(node: Any) -> str:
     return str(node)
 
 
-PANTS_RULE_DESCRIPTORS_MODULE_KEY = "__pants_rule_descriptors__"
+PANTS_RULE_SCAN_MODULE_KEY = "__pants_rule_scan__"
 _rule_descriptors_lock = threading.RLock()
 
 
@@ -86,16 +86,57 @@ def get_module_scope_rules(module: ModuleType) -> tuple[RuleDescriptor, ...]:
     Note that we don't support recursive rules defined dynamically in inner scopes.
     """
     with _rule_descriptors_lock:
-        descriptors = getattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY, None)
-        if descriptors is None:
-            descriptors = []
-            for node in ast.iter_child_nodes(ast.parse(inspect.getsource(module))):
-                if isinstance(node, ast.AsyncFunctionDef) and isinstance(node.returns, ast.Name):
-                    descriptors.append(RuleDescriptor(module.__name__, node.name, node.returns.id))
-            descriptors = tuple(descriptors)
-            setattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY, descriptors)
-
+        descriptors, _ = _scan_module(module)
         return descriptors
+
+
+_FunctionNode = ast.FunctionDef | ast.AsyncFunctionDef
+_ModuleScan = tuple[tuple[RuleDescriptor, ...], dict[tuple[str, int], _FunctionNode]]
+
+
+def _scan_module(module: ModuleType) -> _ModuleScan:
+    """Parse the module source once, extracting rule descriptors and a function-node index."""
+    cached: _ModuleScan | None = getattr(module, PANTS_RULE_SCAN_MODULE_KEY, None)
+    if cached is not None:
+        return cached
+
+    tree = ast.parse(inspect.getsource(module))
+    index: dict[tuple[str, int], _FunctionNode] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            # A code object's co_firstlineno points at the first decorator, if any.
+            first_lineno = node.decorator_list[0].lineno if node.decorator_list else node.lineno
+            index.setdefault((node.name, first_lineno), node)
+    descriptors = tuple(
+        RuleDescriptor(module.__name__, node.name, node.returns.id)
+        for node in ast.iter_child_nodes(tree)
+        if isinstance(node, ast.AsyncFunctionDef) and isinstance(node.returns, ast.Name)
+    )
+    result: _ModuleScan = (descriptors, index)
+    setattr(module, PANTS_RULE_SCAN_MODULE_KEY, result)
+    return result
+
+
+def release_module_scans() -> None:
+    with _rule_descriptors_lock:
+        for module in list(sys.modules.values()):
+            if module is not None and hasattr(module, PANTS_RULE_SCAN_MODULE_KEY):
+                try:
+                    delattr(module, PANTS_RULE_SCAN_MODULE_KEY)
+                except AttributeError:
+                    pass
+
+
+def _get_function_node(func: Callable) -> _FunctionNode | None:
+    module = sys.modules.get(func.__module__)
+    if module is None:
+        return None
+    with _rule_descriptors_lock:
+        try:
+            _, index = _scan_module(module)
+        except (OSError, SyntaxError, TypeError):
+            return None
+    return index.get((func.__name__, func.__code__.co_firstlineno))
 
 
 class _TypeStack:
@@ -131,13 +172,14 @@ class _TypeStack:
         self._stack[-1][name] = value
 
     def _push_function_closures(self, func: Callable) -> None:
-        try:
-            closurevars = [c for c in inspect.getclosurevars(func) if isinstance(c, dict)]
-        except ValueError:
-            return
-
-        for closures in closurevars:
-            self.push(closures)
+        nonlocals = {}
+        for name, cell in zip(func.__code__.co_freevars, getattr(func, "__closure__", None) or ()):
+            try:
+                nonlocals[name] = cell.cell_contents
+            except ValueError:
+                continue
+        if nonlocals:
+            self.push(nonlocals)
 
     def push(self, frame: object) -> None:
         ns = dict(frame if isinstance(frame, dict) else frame.__dict__)
@@ -187,21 +229,28 @@ class _AwaitableCollector(ast.NodeVisitor):
         if isinstance(func, RuleCallTrampoline):
             func = func.__wrapped__
         self.func = func
-        source = inspect.getsource(func) or "<string>"
-        beginning_indent = _get_starting_indent(source)
-        if beginning_indent:
-            source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
-
         self.source_file = inspect.getsourcefile(func) or "<unknown>"
-
         self.types = _TypeStack(func)
         self.awaitables: list[AwaitableConstraints] = []
-        self.visit(ast.parse(source))
+
+        node = _get_function_node(func)
+        if node is not None:
+            self._lineno_offset = 0
+            self.visit(node)
+        else:
+            # Fall back to per-function `inspect.getsource` when the function has no
+            # discoverable module source, e.g. it was built dynamically.
+            source = inspect.getsource(func) or "<string>"
+            beginning_indent = _get_starting_indent(source)
+            if beginning_indent:
+                source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
+            self._lineno_offset = self.func.__code__.co_firstlineno - 1
+            self.visit(ast.parse(source))
 
     def _format(self, node: ast.AST, msg: str) -> str:
         lineno: str = "<unknown>"
         if isinstance(node, (ast.expr, ast.stmt)):
-            lineno = str(node.lineno + self.func.__code__.co_firstlineno - 1)
+            lineno = str(node.lineno + self._lineno_offset)
         return f"{self.source_file}:{lineno}: {msg}"
 
     def _lookup(self, attr: ast.expr) -> Any:
