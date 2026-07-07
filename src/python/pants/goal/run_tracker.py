@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import platform
 import socket
+import threading
 import time
 import uuid
 from hashlib import sha256
@@ -57,6 +58,7 @@ class RunTracker:
         """
         :API: public
         """
+        self._lock = threading.RLock()
         self._has_started: bool = False
         self._has_ended: bool = False
 
@@ -77,7 +79,8 @@ class RunTracker:
 
         self.run_logs_file = info_dir / self.run_id / "logs"
         self.run_logs_file.parent.mkdir(exist_ok=True, parents=True)
-        native_engine.set_per_run_log_path(str(self.run_logs_file))
+        with self._lock:
+            native_engine.set_per_run_log_path(str(self.run_logs_file))
 
         # Initialized in `start()`.
         self._run_start_time: float | None = None
@@ -97,30 +100,31 @@ class RunTracker:
 
     def start(self, run_start_time: float, specs: list[str]) -> None:
         """Start tracking this pants run."""
-        if self._has_started:
-            raise AssertionError("RunTracker.start must not be called multiple times.")
-        self._has_started = True
+        with self._lock:
+            if self._has_started:
+                raise AssertionError("RunTracker.start must not be called multiple times.")
+            self._has_started = True
 
-        # Initialize the run.
-        self._run_start_time = run_start_time
+            # Initialize the run.
+            self._run_start_time = run_start_time
 
-        datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(run_start_time))
-        cmd_line = " ".join(("pants",) + self._args[1:])
+            datetime = time.strftime("%A %b %d, %Y %H:%M:%S", time.localtime(run_start_time))
+            cmd_line = " ".join(("pants",) + self._args[1:])
 
-        self._run_info.update(
-            {
-                "id": self.run_id,
-                "timestamp": run_start_time,
-                "datetime": datetime,
-                "user": getuser(),
-                "machine": socket.gethostname(),
-                "buildroot": get_buildroot(),
-                "path": get_buildroot(),
-                "version": VERSION,
-                "cmd_line": cmd_line,
-                "specs_from_command_line": specs,
-            }
-        )
+            self._run_info.update(
+                {
+                    "id": self.run_id,
+                    "timestamp": run_start_time,
+                    "datetime": datetime,
+                    "user": getuser(),
+                    "machine": socket.gethostname(),
+                    "buildroot": get_buildroot(),
+                    "path": get_buildroot(),
+                    "version": VERSION,
+                    "cmd_line": cmd_line,
+                    "specs_from_command_line": specs,
+                }
+            )
 
     def get_anonymous_telemetry_data(self, unhashed_repo_id: str) -> dict[str, str | list[str]]:
         def maybe_hash_with_repo_id_prefix(s: str) -> str:
@@ -128,17 +132,21 @@ class RunTracker:
             # If the repo_id is the empty string we return a blank string.
             return sha256(qualified_str.encode()).hexdigest() if unhashed_repo_id else ""
 
+        with self._lock:
+            run_info = dict(self._run_info)
+            run_total_duration = self._run_total_duration
+
         return {
-            "run_id": str(self._run_info.get("id", uuid.uuid4())),
-            "timestamp": str(self._run_info.get("timestamp")),
+            "run_id": str(run_info.get("id", uuid.uuid4())),
+            "timestamp": str(run_info.get("timestamp")),
             # Note that this method is called after the StreamingWorkunitHandler.session() ends,
             # i.e., after end_run() has been called, so duration will be set.
-            "duration": str(self._run_total_duration),
-            "outcome": str(self._run_info.get("outcome")),
+            "duration": str(run_total_duration),
+            "outcome": str(run_info.get("outcome")),
             "platform": platform.platform(),
             "python_implementation": platform.python_implementation(),
             "python_version": platform.python_version(),
-            "pants_version": str(self._run_info.get("version")),
+            "pants_version": str(run_info.get("version")),
             # Note that if repo_id is the empty string then these three fields will be empty.
             "repo_id": maybe_hash_with_repo_id_prefix(""),
             "machine_id": maybe_hash_with_repo_id_prefix(str(uuid.getnode())),
@@ -151,18 +159,22 @@ class RunTracker:
         }
 
     def set_pantsd_scheduler_metrics(self, metrics: dict[str, int]) -> None:
-        self._pantsd_metrics = metrics
+        with self._lock:
+            self._pantsd_metrics = metrics
 
     @property
     def pantsd_scheduler_metrics(self) -> dict[str, int]:
-        return dict(self._pantsd_metrics)  # defensive copy
+        with self._lock:
+            return dict(self._pantsd_metrics)  # defensive copy
 
     def run_information(self) -> dict[str, Any]:
         """Basic information about this run."""
-        return self._run_info
+        with self._lock:
+            return dict(self._run_info)
 
     def has_ended(self) -> bool:
-        return self._has_ended
+        with self._lock:
+            return self._has_ended
 
     def end_run(self, exit_code: ExitCode) -> None:
         """This pants run is over, so stop tracking it.
@@ -170,23 +182,25 @@ class RunTracker:
         Note: If end_run() has been called once, subsequent calls are no-ops.
         """
 
-        if self.has_ended():
-            return
-        self._has_ended = True
+        with self._lock:
+            if self._has_ended:
+                return
+            self._has_ended = True
 
-        if self._run_start_time is None:
-            raise Exception("RunTracker.end_run() called without calling .start()")
+            if self._run_start_time is None:
+                raise Exception("RunTracker.end_run() called without calling .start()")
 
-        duration = time.time() - self._run_start_time
-        self._run_total_duration = duration
+            duration = time.time() - self._run_start_time
+            self._run_total_duration = duration
 
-        outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
-        self._run_info["outcome"] = outcome_str
+            outcome_str = "SUCCESS" if exit_code == PANTS_SUCCEEDED_EXIT_CODE else "FAILURE"
+            self._run_info["outcome"] = outcome_str
 
-        native_engine.set_per_run_log_path(None)
+            native_engine.set_per_run_log_path(None)
 
     def get_cumulative_timings(self) -> list[dict[str, Any]]:
-        return [{"label": "main", "timing": self._run_total_duration}]
+        with self._lock:
+            return [{"label": "main", "timing": self._run_total_duration}]
 
     def get_options_to_record(self) -> dict:
         recorded_options = {}
