@@ -83,6 +83,7 @@ pub struct Core {
     pub watcher: Option<Arc<InvalidationWatcher>>,
     pub build_root: PathBuf,
     pub local_parallelism: usize,
+    pub remote_parallelism: Option<usize>,
     pub graceful_shutdown_timeout: Duration,
     pub sessions: Sessions,
     pub named_caches: NamedCaches,
@@ -756,6 +757,9 @@ impl Core {
             build_root,
             watcher,
             local_parallelism: exec_strategy_opts.local_parallelism,
+            remote_parallelism: remoting_opts
+                .execution_enable
+                .then_some(exec_strategy_opts.remote_parallelism),
             graceful_shutdown_timeout: exec_strategy_opts.graceful_shutdown_timeout,
             sessions,
             named_caches,
