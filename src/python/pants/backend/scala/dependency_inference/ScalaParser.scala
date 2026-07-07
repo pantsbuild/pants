@@ -178,6 +178,15 @@ class SourceAnalysisTraverser extends Traverser {
     }
   }
 
+  // Synthetised name for given definitions
+  // https://docs.scala-lang.org/scala3/reference/contextual/relationship-implicits.html
+  def anonymousGivenSynthetisedName(extractedTypeNames: Chain[QualifiedName]) = {
+    // We only use the simple name (unqualified) of the type
+    // https://github.com/scala/scala3/discussions/19179
+    NonEmptyChain.fromChain(extractedTypeNames.mapFilter(_.simpleName))
+      .map(namesFromTypeTree => QualifiedName.of(s"""given_${namesFromTypeTree.intercalate("_")}"""))
+  }
+
   def recordProvidedName(
       symbolQName: QualifiedName,
       sawObject: Boolean = false,
@@ -384,6 +393,20 @@ class SourceAnalysisTraverser extends Traverser {
       withSuppressProvidedNames(() => apply(body))
     }
 
+    case Defn.GivenAlias(mods, nameNode, _tparams, _params, decltype, body) => {
+      visitMods(mods)
+
+      val givenTypeNames = extractNamesFromTypeTree(decltype)
+      val name = nameNode match {
+        case Name.Anonymous() => anonymousGivenSynthetisedName(givenTypeNames)
+        case _ => extractName(nameNode)
+      }
+
+      name.foreach(recordProvidedName(_))
+      givenTypeNames.iterator.foreach(recordConsumedSymbol(_))
+      withSuppressProvidedNames(() => apply(body))
+    }
+
     case Decl.Def(mods, _nameNode, tparams, params, decltpe) => {
       visitMods(mods)
       extractNamesFromTypeTree(decltpe).iterator.foreach(recordConsumedSymbol(_))
@@ -408,6 +431,10 @@ class SourceAnalysisTraverser extends Traverser {
         importees.foreach(importee => {
           importee match {
             case Importee.Wildcard() => recordImport(baseName, None, true)
+            case Importee.GivenAll() => recordImport(baseName, None, true)
+            case Importee.Given(tpe) =>
+              val givenName = anonymousGivenSynthetisedName(extractNamesFromTypeTree(tpe))
+              givenName.foreach(name => recordImport(baseName.qualify(name), None, false))
             case Importee.Name(nameNode) => {
               extractName(nameNode).foreach { name =>
                 recordImport(baseName.qualify(name), None, false)
@@ -562,7 +589,7 @@ object ScalaParser {
 
     val tree = input.parse[Source].get
 
-    val analysisTraverser = new SourceAnalysisTraverser()
+    val analysisTraverser = new SourceAnalysisTraverser
     analysisTraverser.apply(tree)
     analysisTraverser.toAnalysis
   }
