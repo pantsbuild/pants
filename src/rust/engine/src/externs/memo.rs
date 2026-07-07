@@ -15,12 +15,12 @@ use pyo3::types::PyDict;
 /// A per-decorated-function memoization cache with exactly-once computation per key.
 ///
 /// Keys are arbitrary hashable Python objects, interned to a local integer id via a dict owned by
-/// this `LockMap`. The engine's global `Interns` table is deliberately not used: it never evicts,
+/// this `LockedMap`. The engine's global `Interns` table is deliberately not used: it never evicts,
 /// while memo keys must be released by `forget`/`clear`/property `del` (a `per_instance` key holds
 /// a strong reference to `self`). Ids are assigned with `dict.setdefault`, a single dict operation
 /// and so atomic on free-threaded builds; a lost race wastes only an integer.
 #[pyclass(frozen, module = "pants.engine.internals.native_engine")]
-pub struct LockMap {
+pub struct LockedMap {
     ids: Py<PyDict>,
     /// `ids.setdefault`, bound once: the hot path calls it per memoized invocation.
     ids_setdefault: Py<PyAny>,
@@ -29,7 +29,7 @@ pub struct LockMap {
 }
 
 #[pymethods]
-impl LockMap {
+impl LockedMap {
     #[new]
     fn __new__(py: Python<'_>) -> PyResult<Self> {
         let ids = PyDict::new(py);
@@ -109,7 +109,7 @@ impl LockMap {
     }
 }
 
-impl LockMap {
+impl LockedMap {
     /// Return the stable local id for `key`, assigning the next id if unseen. `setdefault` makes
     /// the check-and-assign a single atomic dict operation.
     fn intern(&self, py: Python<'_>, key: &Py<PyAny>) -> PyResult<u64> {
@@ -158,13 +158,13 @@ impl LockMap {
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<LockMap>()?;
+    m.add_class::<LockedMap>()?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::LockMap;
+    use super::LockedMap;
     use pyo3::exceptions::PyValueError;
     use pyo3::prelude::*;
     use pyo3::types::PyDictMethods;
@@ -173,8 +173,8 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    fn new_lockmap() -> LockMap {
-        Python::attach(|py| LockMap::__new__(py).unwrap())
+    fn new_locked_map() -> LockedMap {
+        Python::attach(|py| LockedMap::__new__(py).unwrap())
     }
 
     fn key(py: Python<'_>, value: i64) -> Py<PyAny> {
@@ -189,7 +189,7 @@ mod tests {
         Python::attach(|py| value.extract(py).unwrap())
     }
 
-    fn intern(cache: &LockMap, key: &Py<PyAny>) -> u64 {
+    fn intern(cache: &LockedMap, key: &Py<PyAny>) -> u64 {
         Python::attach(|py| cache.intern(py, key).unwrap())
     }
 
@@ -212,7 +212,7 @@ mod tests {
     fn same_key_concurrent_calls_initialize_once() {
         Python::initialize();
 
-        let cache = Arc::new(new_lockmap());
+        let cache = Arc::new(new_locked_map());
         let key = Python::attach(|py| key(py, 1));
         let ready = Arc::new(Barrier::new(8));
         let calls = Arc::new(AtomicUsize::new(0));
@@ -252,7 +252,7 @@ mod tests {
     fn different_keys_initialize_independently() {
         Python::initialize();
 
-        let cache = Arc::new(new_lockmap());
+        let cache = Arc::new(new_locked_map());
         let started = Arc::new((Mutex::new(0), Condvar::new()));
         let keys: Vec<_> = Python::attach(|py| (0..8).map(|value| key(py, value)).collect());
 
@@ -286,7 +286,7 @@ mod tests {
     fn failed_initialization_is_not_cached() {
         Python::initialize();
 
-        let cache = new_lockmap();
+        let cache = new_locked_map();
         let key = Python::attach(|py| key(py, 1));
         let calls = AtomicUsize::new(0);
 
@@ -315,7 +315,7 @@ mod tests {
     fn equal_keys_share_an_id() {
         Python::initialize();
 
-        let cache = new_lockmap();
+        let cache = new_locked_map();
         // Equal-but-not-identical keys (Python smallint caching is bypassed via tuples).
         let (a, b) = Python::attach(|py| {
             let a = (1_i64, "x").into_pyobject(py).unwrap().into_any().unbind();
@@ -329,7 +329,7 @@ mod tests {
     fn put_forget_and_clear() {
         Python::initialize();
 
-        let cache = new_lockmap();
+        let cache = new_locked_map();
         let key = Python::attach(|py| key(py, 1));
         let calls = AtomicUsize::new(0);
 
@@ -372,7 +372,7 @@ mod tests {
     fn reconcile_drops_entry_when_forget_won() {
         Python::initialize();
 
-        let cache = new_lockmap();
+        let cache = new_locked_map();
         let key = Python::attach(|py| key(py, 1));
 
         // Writer interned id, then a concurrent forget popped the binding before the writer
@@ -398,7 +398,7 @@ mod tests {
     fn forget_and_clear_release_keys() {
         Python::initialize();
 
-        let cache = new_lockmap();
+        let cache = new_locked_map();
         let (key_a, key_b) = Python::attach(|py| (key(py, 1), key(py, 2)));
 
         Python::attach(|py| {
