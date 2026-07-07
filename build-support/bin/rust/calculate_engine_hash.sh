@@ -33,7 +33,7 @@ function calculate_current_hash() {
       echo "${MODE_FLAG}"
       uname -mps
       # the engine only depends on the implementation and major.minor version, not the patch
-      "${PY}" -c 'import sys; print(sys.implementation.name, sys.version_info.major, sys.version_info.minor)'
+      "${PY}" -c 'import sys; print(sys.implementation.name, sys.version_info.major, sys.version_info.minor, sys.abiflags)'
       git ls-files --cached --others --exclude-standard \
         "${NATIVE_ROOT}" \
         "${REPO_ROOT}/build-support/bin/rust" |
