@@ -1144,6 +1144,7 @@ dependencies = [
  "mock",
  "nailgun",
  "num_enum",
+ "once_cell",
  "options",
  "options_pants_ng",
  "pantsd",
