@@ -12,7 +12,12 @@ import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.internals.native_engine import PyRemotingOptions
-from pants.option.bootstrap_options import DynamicRemoteOptions, ExecutionOptions, RemoteProvider
+from pants.option.bootstrap_options import (
+    BootstrapOptions,
+    DynamicRemoteOptions,
+    ExecutionOptions,
+    RemoteProvider,
+)
 from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -271,3 +276,36 @@ def test_remote_provider_matches_rust_enum(
         client_key_path=None,
         append_only_caches_base_path=None,
     )
+
+
+@pytest.mark.parametrize(
+    "requested, explicitly_set, abiflags, scie_pants_version, expected",
+    [
+        (True, False, "", "0.14.0", None),
+        (True, False, "t", None, None),
+        (True, True, "t", "0.14.0", None),
+        (False, True, "", "0.14.0", None),
+        (True, True, "", "0.14.0", "did not"),
+        (False, True, "t", "0.14.0", "did not"),
+        (True, True, "", None, "standalone scie"),
+        (False, True, "t", None, "standalone scie"),
+    ],
+)
+def test_free_threaded_advisory(
+    requested: bool,
+    explicitly_set: bool,
+    abiflags: str,
+    scie_pants_version: str | None,
+    expected: str | None,
+) -> None:
+    advisory = BootstrapOptions._free_threaded_advisory(
+        requested=requested,
+        explicitly_set=explicitly_set,
+        abiflags=abiflags,
+        scie_pants_version=scie_pants_version,
+    )
+    if expected is None:
+        assert advisory is None
+    else:
+        assert advisory is not None
+        assert expected in advisory
