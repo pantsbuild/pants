@@ -58,12 +58,14 @@ __dependents_rules__(
             "[/python/util_rules/pex_requirements.py]",
         ),
         "src/python/pants/init/plugin_resolver.py",
+        "src/python/pants/init/plugin_resolver_rules.py",
         DEFAULT_DEPENDENTS_RULES,
     ),
     (
         "[/python/util_rules/pex.py]",
         "src/python/pants/core/goals/update_build_files.py",
         "src/python/pants/init/plugin_resolver.py",
+        "src/python/pants/init/plugin_resolver_rules.py",
         DEFAULT_DEPENDENTS_RULES,
     ),
     (
