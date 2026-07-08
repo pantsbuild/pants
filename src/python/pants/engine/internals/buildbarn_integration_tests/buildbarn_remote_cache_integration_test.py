@@ -153,3 +153,42 @@ def test_buildbarn_remote_cache_roundtrips_root_output_directory() -> None:
         assert metrics2["remote_cache_requests"] == 1
         assert metrics2["remote_cache_requests_cached"] == 1
         assert "backtrack_attempts" not in metrics2
+
+
+def test_buildbarn_remote_cache_roundtrips_empty_root_output_directory() -> None:
+    expected_contents = {
+        "root.txt": b"empty-root\n",
+        "sub/child.txt": b"empty-child\n",
+    }
+    process = Process(
+        [
+            "/bin/sh",
+            "-c",
+            "/bin/echo empty-root > root.txt && /bin/mkdir -p sub && /bin/echo empty-child > sub/child.txt",
+        ],
+        description="Create empty root output directory contents",
+        output_directories=[""],
+        level=LogLevel.INFO,
+    )
+
+    with LocalBuildbarnStack() as buildbarn:
+        contents1, digest1, metrics1 = _run_process(
+            process,
+            address=buildbarn.address,
+            instance_name=buildbarn.instance_name,
+        )
+        assert contents1 == expected_contents
+        assert metrics1["remote_cache_requests"] == 1
+        assert metrics1["remote_cache_requests_uncached"] == 1
+        assert "backtrack_attempts" not in metrics1
+
+        contents2, digest2, metrics2 = _run_process(
+            process,
+            address=buildbarn.address,
+            instance_name=buildbarn.instance_name,
+        )
+        assert contents2 == expected_contents
+        assert digest1 == digest2
+        assert metrics2["remote_cache_requests"] == 1
+        assert metrics2["remote_cache_requests_cached"] == 1
+        assert "backtrack_attempts" not in metrics2
