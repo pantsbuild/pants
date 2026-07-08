@@ -801,15 +801,14 @@ class PexScieBindResourcePathField(StringSequenceField):
     alias = "scie_bind_resource_path"
     default = None
     help = help_text(
-        """ Specifies an environment variable to bind the path of a resource
-        in the PEX to in the form `<env var name>=<resource rel path>`. For
-        example `WINDOWS_X64_CONSOLE_TRAMPOLINE=pex/windows/stubs/uv-
-        trampoline-x86_64-console.exe` would lookup the path of the
-        `pex/windows/stubs/uv-trampoline-x86_64-console.exe` file on the
-        `sys.path` and bind its absolute path to the
-        WINDOWS_X64_CONSOLE_TRAMPOLINE environment variable.  N.B.: resource
-        paths must use the Unix path separator of `/`. These will be converted
-        to the runtime host path separator as needed.
+        """
+        Specifies an environment variable to bind the path of a resource in the PEX to in the form
+        `<env var name>=<resource rel path>`. For example
+        `WINDOWS_X64_CONSOLE_TRAMPOLINE=pex/windows/stubs/uv-trampoline-x86_64-console.exe` would
+        lookup the path of the `pex/windows/stubs/uv-trampoline-x86_64-console.exe` file on the
+        `sys.path` and bind its absolute path to the WINDOWS_X64_CONSOLE_TRAMPOLINE environment
+        variable. N.B.: resource paths must use the Unix path separator of `/`. These will be
+        converted to the runtime host path separator as needed.
         """
     )
 
@@ -832,8 +831,9 @@ class PexScieArgsField(StringSequenceField):
     alias = "scie_args"
     default = None
     help = help_text(
-        """ Additional arguments to pass to the custom `scie_exe` entry
-        point. Scie placeholders can be used in `scie_args`,
+        """
+        Additional arguments to pass to the custom `scie_exe` entry point. Scie placeholders can be
+        used in `scie_args`,
         """
     )
 
@@ -855,11 +855,12 @@ class PexScieLoadDotenvField(TriBoolField):
     required = False
     default = None
     help = help_text(
-        """ Have the scie launcher load `.env` files and apply the loaded env
-        vars to the PEX scie environment. See the 'load_dotenv' docs here for
-        more on the `.env` loading specifics: https://github.com/a-
-        scie/jump/blob/main/docs/packaging.md#optional-fields (Pex default:
-        False) """
+        """
+        Have the scie launcher load `.env` files and apply the loaded env vars to the PEX scie
+        environment. See the 'load_dotenv' docs here for more on the `.env` loading specifics
+        (https://github.com/a-scie/jump/blob/main/docs/packaging.md#optional-fields). (Pex
+        default: False)
+        """
     )
 
 
@@ -911,7 +912,7 @@ class PexScieBusyBox(StringField):
         run `SCIE=help <your PEX scie>` and review the `install` command help.
 
         NOTE: This is only available for formal Python entry points
-        <https://packaging.python.org/en/latest/specifications/entry-points/>
+        (https://packaging.python.org/en/latest/specifications/entry-points/)
         and not the informal use by the `pex_binary` field `entry_point` to
         run first party files.
         """
@@ -949,14 +950,14 @@ class PexSciePlatformField(StringSequenceField):
     )
     expected_type = str
     help = help_text(
-        """ The platform to produce the native PEX scie executable for.  You
-        can use a value of `current` to select the current platform. If left
-        unspecified, the platforms implied by the targets selected to build
-        the PEX with are used. Those targets are influenced by the current
-        interpreter running Pex as well as use of `complete_platforms` and
-        `interpreter_constraints`. Note that, in general, `scie_platform`
-        should only be used to select a subset of the platforms implied by the
-        targets selected via other options.  """
+        """
+        The platform to produce the native PEX scie executable for. You can use a value of `current`
+        to select the current platform. If left unspecified, the platforms implied by the targets
+        selected to build the PEX with are used. Those targets are influenced by the current
+        interpreter running Pex as well as use of `complete_platforms` and `interpreter_constraints`.
+        Note that, in general, `scie_platform` should only be used to select a subset of the
+        platforms implied by the targets selected via other options.
+        """
     )
 
 
@@ -964,13 +965,12 @@ class PexSciePbsReleaseField(StringField):
     alias = "scie_pbs_release"
     default = None
     help = help_text(
-        """ The Python Standalone Builds release to use when a CPython
-        interpreter distribution is needed for the PEX scie. Currently,
-        releases are dates of the form YYYYMMDD, e.g.: '20240713'. See their
-        GitHub releases page at
-        <https://github.com/astral-sh/python-build-standalone/releases> to
-        discover available releases. If left unspecified the latest release is
-        used.
+        """
+        The Python Standalone Builds release to use when a CPython interpreter distribution is needed
+        for the PEX scie. Currently, releases are dates of the form YYYYMMDD, e.g.: '20240713'. See
+        the Python Standalone Builds releases
+        (https://github.com/astral-sh/python-build-standalone/releases) to discover available
+        releases. If left unspecified the latest release is used.
         """
     )
 
@@ -979,14 +979,14 @@ class PexSciePythonVersion(StringField):
     alias = "scie_python_version"
     default = None
     help = help_text(
-        """ The portable CPython version to select. Can be either in
-        `<major>.<minor>` form; e.g.: '3.11', or else fully specified as
-        `<major>.<minor>.<patch>`; e.g.: '3.11.3'. If you don't specify this
-        option, Pex will do its best to guess appropriate portable CPython
-        versions. N.B.: Python Standalone Builds does not provide all patch
-        versions; so you should check their releases at
-        <https://github.com/astral-sh/python-build-standalone/releases> if you
-        wish to pin down to the patch level.
+        """
+        The portable CPython version to select. Can be either in `<major>.<minor>` form; e.g.:
+        '3.11', or else fully specified as `<major>.<minor>.<patch>`; e.g.: '3.11.3'. If you don't
+        specify this option, Pex will do its best to guess appropriate portable CPython versions.
+        N.B.: Python Standalone Builds does not provide all patch versions; so you should check the
+        Python Standalone Builds releases
+        (https://github.com/astral-sh/python-build-standalone/releases) if you wish to pin down to
+        the patch level.
         """
     )
 
@@ -1010,9 +1010,10 @@ class PexSciePbsDebug(TriBoolField):
     alias = "scie_pbs_debug"
     default = None
     help = help_text(
-        """ Should the Python Standalone Builds CPython distributions be debug
-        builds. Note that this option is not compatible with
-        `scie_pbs_stripped=True`. (default: False) """
+        """
+        Should the Python Standalone Builds CPython distributions be debug builds. Note that this
+        option is not compatible with `scie_pbs_stripped=True`. (default: False)
+        """
     )
 
 
@@ -1021,27 +1022,27 @@ class PexSciePbsStripped(TriBoolField):
     required = False
     default = None
     help = help_text(
-        """ Should the Python Standalone Builds CPython distributions used be
-        stripped of debug symbols or not. For Linux and Windows particularly,
-        the stripped distributions are less than half the size of the
-        distributions that ship with debug symbols.  Note that this option is
-        not compatible with `scie_pbs_free_threaded=True` or
-        `scie_pbs_debug=True`. (Pex default: False) """
+        """
+        Should the Python Standalone Builds CPython distributions used be stripped of debug symbols
+        or not. For Linux and Windows particularly, the stripped distributions are less than half the
+        size of the distributions that ship with debug symbols. Note that this option is not
+        compatible with `scie_pbs_free_threaded=True` or `scie_pbs_debug=True`. (Pex default: False)
+        """
     )
 
 
 class PexScieHashAlgField(StringField):
     alias = "scie_hash_alg"
     help = help_text(
-        """ Output a checksum file for each scie generated that is compatible
-        with the shasum family of tools. For each unique algorithm specified,
-        a sibling file to each scie executable will be generated with the same
-        stem as that scie file and hash algorithm name suffix.  The file will
-        contain the hex fingerprint of the scie executable using that
-        algorithm to hash it. Supported algorithms include at least md5, sha1,
-        sha256, sha384 and sha512. For the complete list of supported hash
-        algorithms, see the science tool --hash documentation here:
-        <https://science.scie.app/cli.html#science-lift-build>.  """
+        """
+        Output a checksum file for each scie generated that is compatible with the shasum family of
+        tools. For each unique algorithm specified, a sibling file to each scie executable will be
+        generated with the same stem as that scie file and hash algorithm name suffix. The file will
+        contain the hex fingerprint of the scie executable using that algorithm to hash it. Supported
+        algorithms include at least md5, sha1, sha256, sha384 and sha512. For the complete list of
+        supported hash algorithms, see the science tool --hash documentation
+        (https://science.scie.app/cli.html#science-lift-build).
+        """
     )
 
 
