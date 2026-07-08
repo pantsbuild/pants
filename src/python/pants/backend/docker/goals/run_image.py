@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import cast
 
+from pants.backend.docker.engine_types import DockerRunEngine
 from pants.backend.docker.goals.package_image import DockerPackageFieldSet
 from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.subsystems.docker_options import DockerOptions
@@ -14,7 +15,12 @@ from pants.backend.docker.target_types import (
     DockerImageRunExtraArgsField,
     DockerImageSourceField,
 )
-from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.binaries import (
+    DockerBinary,
+    PodmanBinary,
+    get_docker,
+    get_podman,
+)
 from pants.core.goals.package import PackageFieldSet, build_package
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.env_vars import environment_vars_subset
@@ -38,7 +44,6 @@ class DockerRunFieldSet(RunFieldSet):
 @rule
 async def docker_image_run_request(
     field_set: DockerRunFieldSet,
-    docker: DockerBinary,
     options: DockerOptions,
     options_env_aware: DockerOptions.EnvironmentAware,
 ) -> RunRequest:
@@ -63,6 +68,12 @@ async def docker_image_run_request(
     )
 
     tag = cast(BuiltDockerImage, image.artifacts[0]).tags[0]
+    docker: DockerBinary | PodmanBinary
+    match options.run_engine:
+        case DockerRunEngine.DOCKER:
+            docker = await get_docker(**implicitly())
+        case DockerRunEngine.PODMAN:
+            docker = await get_podman(**implicitly())
     run = docker.run_image(
         tag,
         docker_run_args=field_set.get_run_args(options),

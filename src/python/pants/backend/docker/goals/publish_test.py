@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pants.backend.docker.engine_types import DockerBuildEngine, DockerPushEngine
 from pants.backend.docker.goals.package_image import (
     DockerImageBuildProcess,
     DockerImageRefs,
@@ -27,7 +28,7 @@ from pants.backend.docker.package_types import BuiltDockerImage
 from pants.backend.docker.registries import DockerRegistryOptions
 from pants.backend.docker.subsystems.docker_options import DockerOptions
 from pants.backend.docker.target_types import DockerImageTarget
-from pants.backend.docker.util_rules.docker_binary import DockerBinary
+from pants.backend.docker.util_rules.binaries import DockerBinary, PodmanBinary
 from pants.core.goals.package import BuiltPackage
 from pants.core.goals.publish import (
     CheckSkipResult,
@@ -96,16 +97,21 @@ def run_publish(
     options: dict | None = None,
     env_vars: list[str] | None = None,
     mock_calls: dict | None = None,
-) -> tuple[PublishProcesses, DockerBinary]:
+    binary: DockerBinary | PodmanBinary = DockerBinary("/dummy/docker"),
+) -> tuple[PublishProcesses, DockerBinary | PodmanBinary]:
     opts = options or {}
     opts.setdefault("registries", {})
     opts.setdefault("default_repository", "{directory}/{name}")
     opts.setdefault("publish_noninteractively", False)
+    opts.setdefault("build_engine", DockerBuildEngine.DOCKER)
+    opts.setdefault(
+        "push_engine",
+        DockerPushEngine.PODMAN if isinstance(binary, PodmanBinary) else DockerPushEngine.DOCKER,
+    )
     docker_options = create_subsystem(DockerOptions, **opts)
     tgt = cast(DockerImageTarget, rule_runner.get_target(address))
     fs = PublishDockerImageFieldSet.create(tgt)
     packages = build(tgt, docker_options)
-    docker = DockerBinary("/dummy/docker")
     mock_env_aware = MagicMock(spec=DockerOptions.EnvironmentAware)
     if env_vars:
         mock_env_aware.env_vars = env_vars
@@ -113,14 +119,17 @@ def run_publish(
     mock_calls = mock_calls or {
         "pants.core.util_rules.env_vars.environment_vars_subset": lambda *args: rule_runner.request(
             EnvironmentVars, args
-        )
+        ),
+        "pants.backend.docker.util_rules.binaries.get_podman"
+        if isinstance(binary, PodmanBinary)
+        else "pants.backend.docker.util_rules.binaries.get_docker": lambda *args: binary,
     }
     result = run_rule_with_mocks(
         push_docker_images,
-        rule_args=[fs._request(packages), docker, docker_options, mock_env_aware],
+        rule_args=[fs._request(packages), docker_options, mock_env_aware],
         mock_calls=mock_calls,
     )
-    return result, docker
+    return result, binary
 
 
 def assert_publish(
@@ -316,6 +325,7 @@ def test_check_if_skip_push(
     opts = options or {}
     opts.setdefault("registries", {})
     opts.setdefault("default_repository", "{directory}/{name}")
+    opts.setdefault("build_engine", DockerBuildEngine.DOCKER)
     docker_options = create_subsystem(DockerOptions, **opts)
     tgt = cast(DockerImageTarget, rule_runner.get_target(address))
     package_fs = DockerPackageFieldSet.create(tgt)
@@ -455,7 +465,7 @@ def test_docker_push_env(rule_runner: RuleRunner) -> None:
 
 def test_docker_push_on_package(rule_runner: RuleRunner) -> None:
     """Test push_docker_images when pushes_on_package() returns True."""
-    docker = DockerBinary("/dummy/docker")
+    docker: DockerBinary | PodmanBinary = DockerBinary("/dummy/docker")
 
     # Create mock build process that will be returned by get_docker_image_build_process
     mock_tags = ("push-on-package/push-on-package:latest",)
@@ -480,6 +490,49 @@ def test_docker_push_on_package(rule_runner: RuleRunner) -> None:
     result, docker = run_publish(
         rule_runner,
         PUSH_ON_PACKAGE_ADDRESS,
+        mock_calls={
+            "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
+        },
+    )
+
+    assert len(result) == 1
+    assert_publish(
+        result[0],
+        mock_tags,
+        None,
+        expect_process,
+    )
+
+
+def test_buildctl_publish_uses_build_process(rule_runner: RuleRunner) -> None:
+    mock_tags = ("default/default:latest",)
+    expected_process = Process(
+        argv=(
+            "/dummy/buildctl",
+            "build",
+            "--output",
+            "type=image,name=default/default:latest,push=true",
+        ),
+        description="Build and push docker image",
+    )
+
+    def expect_process(process: Process) -> None:
+        assert process == expected_process
+
+    def mock_get_build_process(field_set: DockerPackageFieldSet) -> DockerImageBuildProcess:
+        assert field_set.address == DEFAULT_ADDRESS
+        return DockerImageBuildProcess(
+            process=expected_process,
+            context=MagicMock(),
+            context_root=".",
+            image_refs=MagicMock(),
+            tags=mock_tags,
+        )
+
+    result, _ = run_publish(
+        rule_runner,
+        DEFAULT_ADDRESS,
+        options={"build_engine": DockerBuildEngine.BUILDCTL},
         mock_calls={
             "pants.backend.docker.goals.package_image.get_docker_image_build_process": mock_get_build_process,
         },

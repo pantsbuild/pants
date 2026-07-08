@@ -10,9 +10,14 @@ class ExperimentalPodmanOptions:
         default=True,
         help=softwrap(
             """
-            Allow support for podman when available.
+            DEPRECATED: Use `[docker].build_engine = "podman"`,
+            `[docker].push_engine = "podman"`, and `[docker].run_engine = "podman"` instead.
+
+            If true, use Podman for builds, pushes, and runs. If false, use Docker for builds,
+            pushes, and runs.
             """
         ),
+        deprecation_start_version="2.33.0",
     )
 
 

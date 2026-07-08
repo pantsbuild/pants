@@ -17,8 +17,8 @@ from pants.backend.docker.subsystems import dockerfile_parser
 from pants.backend.docker.subsystems.dockerfile_parser import DockerfileInfo
 from pants.backend.docker.target_types import DockerImageTarget
 from pants.backend.docker.util_rules import (
+    binaries,
     dependencies,
-    docker_binary,
     docker_build_args,
     docker_build_context,
     docker_build_env,
@@ -56,7 +56,7 @@ def create_rule_runner() -> RuleRunner:
         rules=[
             *core_target_types_rules(),
             *dependencies.rules(),
-            *docker_binary.rules(),
+            *binaries.rules(),
             *docker_build_args.rules(),
             *docker_build_context.rules(),
             *docker_build_env.rules(),
