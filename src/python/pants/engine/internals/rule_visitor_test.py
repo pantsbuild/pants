@@ -15,9 +15,10 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from pants.engine.internals.rule_visitor import (
-    PANTS_RULE_DESCRIPTORS_MODULE_KEY,
+    PANTS_RULE_SCAN_MODULE_KEY,
     collect_awaitables,
     get_module_scope_rules,
+    release_module_scans,
 )
 from pants.engine.rules import implicitly, rule
 
@@ -224,8 +225,31 @@ def test_get_module_scope_rules_concurrent_init(tmp_path: Path, monkeypatch) -> 
             results = list(executor.map(get_rules, range(num_threads)))
 
         assert all(result is results[0] for result in results)
-        assert getattr(module, PANTS_RULE_DESCRIPTORS_MODULE_KEY) is results[0]
+        cached_descriptors, _ = getattr(module, PANTS_RULE_SCAN_MODULE_KEY)
+        assert cached_descriptors is results[0]
         assert source_calls == 1
+
+
+def test_release_module_scans_is_safe(tmp_path: Path) -> None:
+    rule_code = textwrap.dedent("""
+        async def first_rule(arg: int) -> str:
+            return str(arg)
+
+        async def second_rule(arg: str) -> int:
+            return int(arg)
+    """)
+
+    with temporary_module(tmp_path, rule_code) as module:
+        before = get_module_scope_rules(module)
+        assert before  # sanity: rules were discovered
+        assert hasattr(module, PANTS_RULE_SCAN_MODULE_KEY)
+
+        release_module_scans()
+        assert not hasattr(module, PANTS_RULE_SCAN_MODULE_KEY)
+
+        # Re-parsing lazily after release must reproduce the same descriptors.
+        after = get_module_scope_rules(module)
+        assert after == before
 
 
 def test_rule_helpers_free_functions() -> None:

@@ -57,6 +57,7 @@ from pants.engine.internals.native_engine import (
     PyTypes,
 )
 from pants.engine.internals.nodes import Return, Throw
+from pants.engine.internals.rule_visitor import release_module_scans
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import RunId, SessionValues
 from pants.engine.platform import Platform
@@ -154,6 +155,8 @@ class Scheduler:
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
         tasks = register_rules(rule_index, union_membership)
+        # All rule introspection is done; reclaim the cached module parses it used.
+        release_module_scans()
 
         # Create the native Scheduler and Session.
         types = PyTypes(
