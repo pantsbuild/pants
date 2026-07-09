@@ -82,7 +82,7 @@ def run_codespell(
         results.append(result)
         if result.exit_code != 0:
             return result
-    return results[-1] if results else results[0]
+    return results[-1]
 
 
 def test_passing(rule_runner: RuleRunner) -> None:
@@ -107,16 +107,13 @@ def test_config_file_discovery(rule_runner: RuleRunner) -> None:
         }
     )
     result = run_codespell(rule_runner)
-    # Should still fail because "teh" is not ignored, but "speling" is
     assert result.exit_code == 65
-    # "speling" should not appear in output since it's ignored
     output = result.stdout + result.stderr
     assert "teh" in output
 
 
 def test_skip(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"test.txt": BAD_FILE})
-    # When skipped, partitions should be empty
     rule_runner.set_options(
         ["--backend-packages=pants.backend.experimental.tools.codespell", "--codespell-skip"],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
@@ -155,7 +152,6 @@ def test_file_exclusion(rule_runner: RuleRunner) -> None:
 
 
 def test_pyproject_toml_config(rule_runner: RuleRunner) -> None:
-    """Test that pyproject.toml config is discovered for files without .codespellrc."""
     rule_runner.write_files(
         {
             "test.txt": BAD_FILE,
@@ -163,7 +159,6 @@ def test_pyproject_toml_config(rule_runner: RuleRunner) -> None:
         }
     )
     result = run_codespell(rule_runner)
-    # Should still fail because "teh" is not ignored, but "speling" is
     assert result.exit_code == 65
     output = result.stdout + result.stderr
     assert "test.txt" in output and "teh" in output
@@ -173,7 +168,6 @@ def test_pyproject_toml_config(rule_runner: RuleRunner) -> None:
 
 
 def test_setup_cfg_config(rule_runner: RuleRunner) -> None:
-    """Test that setup.cfg config is discovered for files without .codespellrc."""
     rule_runner.write_files(
         {
             "test.txt": BAD_FILE,
@@ -181,7 +175,6 @@ def test_setup_cfg_config(rule_runner: RuleRunner) -> None:
         }
     )
     result = run_codespell(rule_runner)
-    # Should still fail because "teh" is not ignored, but "speling" is
     assert result.exit_code == 65
     output = result.stdout + result.stderr
     assert "test.txt" in output and "teh" in output
@@ -191,7 +184,6 @@ def test_setup_cfg_config(rule_runner: RuleRunner) -> None:
 
 
 def test_multiple_config_partitions(rule_runner: RuleRunner) -> None:
-    """Test that files are correctly partitioned by their nearest config file."""
     rule_runner.write_files(
         {
             "src/good.txt": GOOD_FILE,

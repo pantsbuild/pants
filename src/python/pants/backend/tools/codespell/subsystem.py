@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.target_types import ConsoleScript
@@ -31,7 +31,6 @@ class Codespell(PythonToolBase):
 
     register_interpreter_constraints = True
 
-    register_lockfile = True
     default_lockfile_resource = ("pants.backend.tools.codespell", "codespell.lock")
 
     skip = SkipOption("lint")
@@ -72,7 +71,18 @@ class Codespell(PythonToolBase):
     file_glob_exclude = StrListOption(
         "--exclude",
         default=[],
-        help="Glob patterns for files to exclude from codespell checks.",
+        help=softwrap(
+            """
+            Glob patterns for files to exclude from codespell checks.
+
+            Machine-generated files such as lockfiles are a common source of false
+            positives, and are best excluded. Use the `.add` syntax to extend rather
+            than replace this option, e.g.:
+
+                [codespell]
+                exclude.add = ["**/*.lock", "**/package-lock.json", "**/go.sum"]
+            """
+        ),
     )
 
 

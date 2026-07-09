@@ -35,18 +35,12 @@ class CodespellRequest(LintFilesRequest):
 @dataclass(frozen=True)
 class PartitionInfo:
     config_snapshot: Snapshot | None
-    # If True, this partition has no .codespellrc ancestor and should try
-    # to discover setup.cfg/pyproject.toml at runtime
-    discover_root_config: bool = False
 
     @property
     def description(self) -> str:
         if self.config_snapshot:
             return self.config_snapshot.files[0]
-        elif self.discover_root_config:
-            return "<root config discovery>"
-        else:
-            return "<default>"
+        return "<root config discovery>"
 
 
 @rule
@@ -99,7 +93,7 @@ async def partition_inputs(
                 (
                     Partition(
                         tuple(sorted(default_source_files)),
-                        PartitionInfo(config_snapshot=None, discover_root_config=True),
+                        PartitionInfo(config_snapshot=None),
                     ),
                 )
                 if default_source_files
@@ -118,15 +112,16 @@ async def run_codespell(
 
     codespell_pex_get = create_pex(codespell.to_pex_request())
 
-    # If this partition has no .codespellrc, try to discover setup.cfg/pyproject.toml at root
+    # If this partition has no `[codespell].config_file_name` ancestor (a root config file of
+    # that name would have been assigned during partitioning), try to discover codespell config
+    # embedded in setup.cfg/pyproject.toml at the build root.
     root_config: ConfigFiles | None = None
-    if partition_info.discover_root_config:
+    if partition_info.config_snapshot is None:
         codespell_pex, root_config = await concurrently(
             codespell_pex_get,
             find_config_file(
                 ConfigFilesRequest(
                     discovery=True,
-                    check_existence=[".codespellrc"],
                     check_content={
                         "setup.cfg": b"[codespell]",
                         "pyproject.toml": b"[tool.codespell]",
@@ -146,16 +141,13 @@ async def run_codespell(
     config_args: tuple[str, ...] = ()
 
     if config_snapshot is not None:
-        # We have a .codespellrc from directory-based discovery
         config_args = ("--config", config_snapshot.files[0])
     elif root_config is not None and root_config.snapshot.files:
-        # We found a config at root
         config_file = root_config.snapshot.files[0]
         config_snapshot = root_config.snapshot
         if config_file.endswith("pyproject.toml"):
             config_args = ("--toml", config_file)
         else:
-            # .codespellrc or setup.cfg use --config
             config_args = ("--config", config_file)
 
     input_digest = await merge_digests(

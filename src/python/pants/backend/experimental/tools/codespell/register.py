@@ -8,7 +8,7 @@ See https://github.com/codespell-project/codespell for details.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from pants.backend.python.goals import lockfile as python_lockfile
 from pants.backend.tools.codespell import rules as codespell_rules
