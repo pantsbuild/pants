@@ -285,21 +285,6 @@ jobs:
             -H "Content-Type: application/octet-stream" \
             "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
             --data-binary "@$WHL";
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Attest the pantsbuild.pants.testutil wheel
-      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
-      with:
-        subject-path: dist/deploy/wheels/pantsbuild.pants/**/pantsbuild_pants_testutil*.whl
-    - if: needs.release_info.outputs.is-release == 'true'
-      name: Upload testutil Wheel
-      run: |
-        WHL=$(find dist/deploy/wheels/pantsbuild.pants -type f -name "pantsbuild_pants_testutil*.whl")
-        curl -L --fail \
-            -X POST \
-            -H "Authorization: Bearer ${{ github.token }}" \
-            -H "Content-Type: application/octet-stream" \
-            "${{ needs.release_info.outputs.release-asset-upload-url }}?name=$(basename $WHL)" \
-            --data-binary "@$WHL";
     timeout-minutes: 90
   build_wheels_cp314_macos14_arm64:
     env:

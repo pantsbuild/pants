@@ -1218,7 +1218,10 @@ def build_wheels_job(
                                     ),
                                 },
                             ]
-                            if platform == Platform.LINUX_X86_64
+                            # `testutil` is a pure-Python `py3-none-any` wheel, so both ABI lanes
+                            # produce an identical artifact. Upload it from a single lane to avoid
+                            # a duplicate release-asset name collision.
+                            if platform == Platform.LINUX_X86_64 and free_threaded
                             else []
                         ),
                     ]
