@@ -132,7 +132,7 @@ def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
     pex_executable = os.path.join(rule_runner.build_root, "pex_exe/pex_exe.pex")
     return subprocess.run(
         args=[pex_executable, "interpreter", "inspect", "-mt"],
-        env=dict(PEX_MODULE="pex.cli", **os.environ),
+        env=dict(PEX_SCRIPT="pex3", **os.environ),
         check=True,
         stdout=subprocess.PIPE,
     ).stdout
