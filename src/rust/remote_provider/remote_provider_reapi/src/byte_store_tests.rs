@@ -129,7 +129,31 @@ async fn load_grpc_error() {
     // retries:
     assert_eq!(
         cas.request_counts.lock().get(&RequestType::BSRead),
-        Some(&3)
+        Some(&2)
+    );
+}
+
+#[tokio::test]
+async fn load_grpc_error_retries_configured_times() {
+    let testdata = TestData::roland();
+    let cas = StubCAS::cas_always_errors().await;
+
+    let provider = Provider::new(RemoteStoreOptions {
+        retries: 4,
+        ..remote_options(cas.address(), 10 * MEGABYTES, STORE_BATCH_API_SIZE_LIMIT)
+    })
+    .await
+    .unwrap();
+    let mut destination = Vec::new();
+
+    provider
+        .load(testdata.digest(), &mut destination)
+        .await
+        .expect_err("Want error");
+
+    assert_eq!(
+        cas.request_counts.lock().get(&RequestType::BSRead),
+        Some(&5)
     );
 }
 
@@ -296,7 +320,7 @@ async fn store_file_grpc_error() {
     // retries:
     assert_eq!(
         cas.request_counts.lock().get(&RequestType::BSWrite),
-        Some(&3)
+        Some(&2)
     );
 }
 
@@ -415,7 +439,7 @@ async fn store_bytes_batch_grpc_error() {
         cas.request_counts
             .lock()
             .get(&RequestType::CASBatchUpdateBlobs),
-        Some(&3)
+        Some(&2)
     );
 }
 
@@ -444,7 +468,7 @@ async fn store_bytes_write_stream_grpc_error() {
     // retries:
     assert_eq!(
         cas.request_counts.lock().get(&RequestType::BSWrite),
-        Some(&3)
+        Some(&2)
     );
 }
 
@@ -564,7 +588,7 @@ async fn list_missing_digests_grpc_error() {
         cas.request_counts
             .lock()
             .get(&RequestType::CASFindMissingBlobs),
-        Some(&3)
+        Some(&2)
     );
 }
 

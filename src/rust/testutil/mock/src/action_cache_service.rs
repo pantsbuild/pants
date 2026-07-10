@@ -16,6 +16,8 @@ use hashing::{Digest, Fingerprint};
 use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use protos::require_digest;
 
+use crate::cas::{RequestCounter, RequestType};
+
 pub struct ActionCacheHandle {
     pub action_map: Arc<Mutex<HashMap<Fingerprint, ActionResult>>>,
     pub always_errors: Arc<AtomicBool>,
@@ -64,6 +66,7 @@ pub(crate) struct ActionCacheResponder {
     pub always_errors: Arc<AtomicBool>,
     pub read_delay: Duration,
     pub write_delay: Duration,
+    pub request_counts: Arc<RequestCounter>,
 }
 
 #[tonic::async_trait]
@@ -72,6 +75,7 @@ impl ActionCache for ActionCacheResponder {
         &self,
         request: Request<GetActionResultRequest>,
     ) -> Result<Response<ActionResult>, Status> {
+        RequestType::ACGetActionResult.record(&self.request_counts);
         sleep(self.read_delay).await;
 
         let request = request.into_inner();
@@ -106,6 +110,7 @@ impl ActionCache for ActionCacheResponder {
         &self,
         request: Request<UpdateActionResultRequest>,
     ) -> Result<Response<ActionResult>, Status> {
+        RequestType::ACUpdateActionResult.record(&self.request_counts);
         sleep(self.write_delay).await;
 
         let request = request.into_inner();

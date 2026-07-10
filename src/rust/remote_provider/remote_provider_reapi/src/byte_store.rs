@@ -42,7 +42,7 @@ const DEFAULT_MAX_GRPC_MESSAGE_SIZE: usize = 4 * 1024 * 1024;
 pub struct Provider {
     instance_name: Option<String>,
     chunk_size_bytes: usize,
-    _rpc_attempts: usize,
+    rpc_attempts: usize,
     byte_stream_client: Arc<ByteStreamClient<LayeredService>>,
     cas_client: Arc<ContentAddressableStorageClient<LayeredService>>,
     capabilities_cell: Arc<OnceCell<ServerCapabilities>>,
@@ -110,7 +110,7 @@ impl Provider {
         Ok(Provider {
             instance_name: options.instance_name,
             chunk_size_bytes: options.chunk_size_bytes,
-            _rpc_attempts: options.retries + 1,
+            rpc_attempts: options.retries + 1,
             byte_stream_client,
             cas_client,
             capabilities_cell: Arc::new(OnceCell::new()),
@@ -334,6 +334,7 @@ impl ByteStoreProvider for Provider {
                 }
             },
             ByteStoreError::is_retryable,
+            self.rpc_attempts,
         )
         .await
         .map_err(|e| e.to_string())
@@ -359,6 +360,7 @@ impl ByteStoreProvider for Provider {
         self.store_source_stream(digest, source).await
       },
       ByteStoreError::is_retryable,
+      self.rpc_attempts,
     )
     .await
     .map_err(|e| e.to_string())
@@ -441,6 +443,7 @@ impl ByteStoreProvider for Provider {
                 })
             },
             status_is_retryable,
+            self.rpc_attempts,
         )
         .await
         .map_err(|e| e.to_string())
@@ -555,6 +558,7 @@ impl ByteStoreProvider for Provider {
                         }
                     },
                     status_is_retryable,
+                    self.rpc_attempts,
                 )
             })
             .collect::<Vec<_>>();
@@ -621,6 +625,7 @@ impl ByteStoreProvider for Provider {
                         async move { client.find_missing_blobs(request).await }
                     },
                     status_is_retryable,
+                    self.rpc_attempts,
                 )
             })
             .collect::<Vec<_>>();
