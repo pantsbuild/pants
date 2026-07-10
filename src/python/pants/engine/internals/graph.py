@@ -1460,11 +1460,19 @@ async def hydrate_sources(
     # protocol sources to be hydrated.
     path_globs = sources_field.path_globs(unmatched_build_file_globs)
     snapshot = await digest_to_snapshot(**implicitly({path_globs: PathGlobs}))
-    sources_field.validate_resolved_files(snapshot.files)
+
+    input_validation_failure = None
+    try:
+        sources_field.validate_resolved_files(snapshot.files)
+    except InvalidFieldException as e:
+        if not request.enable_codegen or generate_request_type is None:
+            raise
+        input_validation_failure = e
 
     # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
     if not request.enable_codegen or generate_request_type is None:
         return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
+
     wrapped_protocol_target = await resolve_target(
         WrappedTargetRequest(
             sources_field.address,
@@ -1477,6 +1485,13 @@ async def hydrate_sources(
     generated_sources = await generate_sources(
         **implicitly({req: GenerateSourcesRequest, env_name: EnvironmentName})
     )
+
+    # If the input failed, we validate whether the output satisfies the field rule.
+    if input_validation_failure is not None:
+        try:
+            sources_field.validate_resolved_files(generated_sources.snapshot.files)
+        except InvalidFieldException:
+            raise input_validation_failure
 
     return HydratedSources(
         generated_sources.snapshot, sources_field.filespec, sources_type=sources_type

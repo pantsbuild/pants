@@ -12,7 +12,6 @@ import pytest
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.internals.native_engine import PyRemotingOptions
-from pants.engine.internals.scheduler import ExecutionError
 from pants.option.bootstrap_options import DynamicRemoteOptions, ExecutionOptions, RemoteProvider
 from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptions
@@ -107,9 +106,9 @@ def test_execution_options_remote_addresses() -> None:
     assert exec_options.execution_address == f"https://{host}"
     assert exec_options.store_address == f"https://{host}"
 
-    with pytest.raises(ExecutionError):
+    with pytest.raises(OptionsError):
         create_dynamic_remote_options(address=f"http://{host}")
-    with pytest.raises(ExecutionError):
+    with pytest.raises(OptionsError):
         create_dynamic_remote_options(address=f"https:://{host}")
 
 

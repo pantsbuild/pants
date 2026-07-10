@@ -156,6 +156,7 @@ def _setup_docker_options(rule_runner: RuleRunner, options: dict | None) -> Dock
         opts.setdefault("build_hosts", None)
         opts.setdefault("build_verbose", False)
         opts.setdefault("build_no_cache", False)
+        opts.setdefault("build_extra_options", [])
         opts.setdefault("use_buildx", False)
         opts.setdefault("env_vars", [])
         opts.setdefault("suggest_renames", True)
@@ -3316,3 +3317,143 @@ def test_field_set_pushes_on_package(output: dict | None, expected: bool) -> Non
         rule_runner.get_target(Address("", target_name="image"))
     )
     assert field_set.pushes_on_package() is expected
+
+
+@pytest.mark.parametrize(
+    ("global_options", "target_options", "expected"),
+    [
+        (["--compress"], None, ["--compress"]),
+        (["--compress"], ["--pull=always"], ["--compress", "--pull=always"]),
+        # The `--no-cache` option is set in a different place in the code and hence requires separate tests.
+        (["--no-cache"], None, ["--no-cache"]),
+        (None, ["--no-cache"], ["--no-cache"]),
+    ],
+)
+def test_global_build_extra_options_merge(
+    rule_runner: RuleRunner,
+    global_options: list | None,
+    target_options: list | None,
+    expected: list,
+) -> None:
+    if global_options:
+        rule_runner.set_options(
+            [],
+            env={
+                "PANTS_DOCKER_BUILD_EXTRA_OPTIONS": f"{global_options}",
+            },
+        )
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="img1",
+                  extra_build_options={target_options},
+                )
+                """
+            ),
+        }
+    )
+
+    def check_build_process(result: DockerImageBuildProcess):
+        for expected_option in expected:
+            assert expected_option in result.process.argv
+
+    assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        build_process_assertions=check_build_process,
+    )
+
+
+def test_extra_build_options_overrides_pull_field_and_global_field(
+    rule_runner: RuleRunner,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_EXTRA_OPTIONS": '["--pull=missing"]',
+        },
+    )
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  pull=True,
+                  extra_build_options=["--pull=always"],
+                )
+                """
+            ),
+        }
+    )
+
+    def check_build_process(result: DockerImageBuildProcess):
+        argv = result.process.argv
+        assert "--pull=always" in argv
+        assert "--pull=True" not in argv
+        assert "--pull=missing" not in argv
+
+    assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        build_process_assertions=check_build_process,
+    )
+
+    caplog.set_level(logging.WARNING)
+
+    warning_messages = [
+        record.message for record in caplog.records if record.levelno == logging.WARNING
+    ]
+
+    assert (
+        warning_messages[0]
+        == "The individual `pull=True` field on the `docker_image` target in `docker/test:img1` is overridden by `extra_build_options` (`--pull=always`). Consider using `extra_build_options` instead of specifying individual build option fields."
+    )
+
+
+def test_warning_on_deprecated_target_stage_field(
+    rule_runner: RuleRunner, caplog: pytest.LogCaptureFixture
+) -> None:
+    rule_runner.set_options(
+        [],
+        env={
+            "PANTS_DOCKER_BUILD_TARGET_STAGE": "dev",
+        },
+    )
+    rule_runner.write_files(
+        {
+            "docker/test/BUILD": dedent(
+                """\
+                docker_image(
+                  name="img1",
+                  extra_build_options=["--target=test"],
+                )
+                """
+            ),
+            "docker/test/Dockerfile": dedent(
+                """\
+                FROM base AS dev
+                FROM dev AS prod
+                """
+            ),
+        }
+    )
+
+    assert_build_process(
+        rule_runner,
+        Address("docker/test", target_name="img1"),
+        version_tags=("dev latest", "prod latest"),
+    )
+
+    caplog.set_level(logging.WARNING)
+
+    warning_messages = [
+        record.message for record in caplog.records if record.levelno == logging.WARNING
+    ]
+    assert (
+        warning_messages[0]
+        == "The individual `--target=dev` field on the `docker_image` target in `docker/test:img1` is overridden by `extra_build_options` (`--target=test`). Consider using `extra_build_options` instead of specifying individual build option fields."
+    )

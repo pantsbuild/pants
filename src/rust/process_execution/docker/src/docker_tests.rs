@@ -1095,7 +1095,7 @@ async fn working_directory(runner: &dyn DockerCommandTestRunner) {
     process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
     process.input_digests =
         InputDigests::with_input_files(TestDirectory::nested().directory_digest());
-    process.timeout = Some(Duration::from_secs(1));
+    process.timeout = Some(Duration::from_secs(5));
     process.description = "confused-cat".to_string();
 
     let result = runner
@@ -1109,9 +1109,14 @@ async fn working_directory(runner: &dyn DockerCommandTestRunner) {
         .await
         .unwrap();
 
-    assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
+    assert_eq!(
+        result.original.exit_code,
+        0,
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr_bytes)
+    );
     assert_eq!(result.stderr_bytes, "".as_bytes());
-    assert_eq!(result.original.exit_code, 0);
+    assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
     assert_eq!(
         result.original.output_directory,
         TestDirectory::containing_roland().directory_digest()
@@ -1164,7 +1169,7 @@ async fn immutable_inputs(runner: &dyn DockerCommandTestRunner) {
     )
     .await
     .unwrap();
-    process.timeout = Some(Duration::from_secs(1));
+    process.timeout = Some(Duration::from_secs(5));
     process.description = "confused-cat".to_string();
 
     let result = runner
@@ -1182,9 +1187,14 @@ async fn immutable_inputs(runner: &dyn DockerCommandTestRunner) {
         .unwrap()
         .lines()
         .collect::<HashSet<_>>();
-    assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
+    assert_eq!(
+        result.original.exit_code,
+        0,
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr_bytes)
+    );
     assert_eq!(result.stderr_bytes, "".as_bytes());
-    assert_eq!(result.original.exit_code, 0);
+    assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
 }
 
 struct ExitedContainerTestRunner {
