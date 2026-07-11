@@ -197,10 +197,22 @@ def test_buildbarn_remote_execution(subtests) -> None:
                 output_directories=["."],
                 level=LogLevel.INFO,
             )
-            run = _run_remote_process(process, buildbarn=buildbarn)
+            run1 = _run_remote_process(process, buildbarn=buildbarn)
 
-            assert run.contents == expected_contents
-            assert run.metrics.get("remote_execution_requests", 0) == 1
-            assert len(run.remote_action_digest.fingerprint) == 64
-            assert len(run.remote_command_digest.fingerprint) == 64
-            assert run.process_workunit["metadata"]["exit_code"] == 0
+            assert run1.contents == expected_contents
+            assert run1.metrics.get("remote_execution_requests", 0) == 1
+            assert "backtrack_attempts" not in run1.metrics
+            assert len(run1.remote_action_digest.fingerprint) == 64
+            assert len(run1.remote_command_digest.fingerprint) == 64
+            assert run1.process_workunit["metadata"]["exit_code"] == 0
+
+            run2 = _run_remote_process(process, buildbarn=buildbarn)
+
+            assert run2.contents == expected_contents
+            assert run2.output_digest == run1.output_digest
+            assert run2.metrics.get("remote_execution_requests", 0) == 0
+            assert run2.metrics.get("remote_cache_requests_cached", 0) == 1
+            assert "backtrack_attempts" not in run2.metrics
+            assert run2.remote_action_digest == run1.remote_action_digest
+            assert run2.remote_command_digest == run1.remote_command_digest
+            assert run2.process_workunit["metadata"]["exit_code"] == 0
