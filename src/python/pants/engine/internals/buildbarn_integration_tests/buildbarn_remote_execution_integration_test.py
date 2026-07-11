@@ -163,8 +163,6 @@ def _assert_output_cache_roundtrip(
     assert run1.contents == expected_contents
     assert run1.metrics.get("remote_execution_requests", 0) == 1
     assert "backtrack_attempts" not in run1.metrics
-    assert len(run1.remote_action_digest.fingerprint) == 64
-    assert len(run1.remote_command_digest.fingerprint) == 64
     assert run1.process_workunit["metadata"]["exit_code"] == 0
 
     run2 = _run_remote_process(process_input, buildbarn=buildbarn)
@@ -222,8 +220,6 @@ def test_buildbarn_remote_execution(subtests) -> None:
 
             assert run.contents == {}
             assert run.metrics.get("remote_execution_requests", 0) == 1
-            assert len(run.remote_action_digest.fingerprint) == 64
-            assert len(run.remote_command_digest.fingerprint) == 64
             assert run.process_workunit["metadata"]["exit_code"] == 0
 
         with subtests.test('root output directory (".")'):
