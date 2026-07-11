@@ -220,6 +220,7 @@ async def generate_pex_lockfile(
             PexCliProcess(
                 subcommand=("lock", "sync" if generate_lockfiles_subsystem.sync else "create"),
                 extra_args=(
+                    "-v",
                     f"{output_flag}={req.lockfile_dest}",
                     f"--style={req.lock_style}",
                     "--pip-version",
@@ -259,7 +260,7 @@ async def generate_pex_lockfile(
                 ),
                 output_files=(req.lockfile_dest,),
                 description=f"Generate pex lockfile for {req.resolve_name}",
-                # Instead of caching lockfile generation with LMDB, we instead use the invalidation
+                # Instead of caching lockfile generation with LMDB, we use the invalidation
                 # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
                 # necessary so that our invalidation is resilient to deleting LMDB or running on a
                 # new machine.
