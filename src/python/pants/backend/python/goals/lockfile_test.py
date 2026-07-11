@@ -766,3 +766,75 @@ def test_uv_lockfile_generation_with_sources(rule_runner: PythonRuleRunner) -> N
     packages = {pkg["name"]: pkg for pkg in lock_data.get("package", []) if "version" in pkg}
     assert "ansicolors" in packages
     assert packages["ansicolors"]["version"] == "1.1.8"
+
+
+def test_uv_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
+    """`generate-lockfiles --sync` must rename the existing uv lockfile to `uv.lock` so that uv
+    performs a minimal update against it, rather than a full regeneration.
+
+    Regression test for https://github.com/pantsbuild/pants/pull/23514.
+    """
+    requirements = FrozenOrderedSet(["ansicolors==1.1.8"])
+    interpreter_constraints = InterpreterConstraints(["CPython==3.14"])
+
+    def generate() -> DigestContents:
+        result = rule_runner.request(
+            GenerateLockfileResult,
+            [
+                GenerateUvLockfile(
+                    requirements=requirements,
+                    find_links=FrozenOrderedSet([]),
+                    interpreter_constraints=interpreter_constraints,
+                    resolve_name="test",
+                    lockfile_dest="test.lock",
+                    diff=False,
+                )
+            ],
+        )
+        return rule_runner.request(DigestContents, [result.digest])
+
+    # First, generate the lockfile from scratch and materialize it (plus its sidecar metadata)
+    # into the build root so that `--sync` has an existing lockfile to pick up.
+    rule_runner.set_options(
+        ["--python-resolves={'test': 'test.lock'}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    initial_result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GenerateUvLockfile(
+                requirements=requirements,
+                find_links=FrozenOrderedSet([]),
+                interpreter_constraints=interpreter_constraints,
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+            )
+        ],
+    )
+    rule_runner.write_digest(initial_result.digest)
+
+    # Now re-generate with `--sync`. This exercises the code path that reads the existing
+    # `test.lock`, confirms it is a uv-format lockfile, and renames it to `uv.lock` for uv to
+    # perform a minimal update against.
+    rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--generate-lockfiles-sync",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    sync_digest_contents = generate()
+
+    by_path = {fc.path: fc for fc in sync_digest_contents}
+    assert "test.lock" in by_path
+    assert "test.lock.metadata" in by_path
+
+    lock_data = tomllib.loads(by_path["test.lock"].content.decode())
+    packages = {pkg["name"]: pkg for pkg in lock_data.get("package", []) if "version" in pkg}
+    assert "ansicolors" in packages
+    assert packages["ansicolors"]["version"] == "1.1.8"
+
+    metadata = json.loads(by_path["test.lock.metadata"].content.decode())
+    assert metadata["lockfile_format"] == LockfileFormat.UV
+    assert metadata["generated_with_requirements"] == ["ansicolors==1.1.8"]
