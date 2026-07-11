@@ -28,8 +28,6 @@ from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.logging import LogLevel
 
-ProcessFactory = Callable[[RuleRunner], Process]
-
 
 @dataclass(frozen=True)
 class RemoteExecutionRun:
@@ -83,7 +81,7 @@ def _new_run_tracker() -> RunTracker:
 
 
 def _run_remote_process(
-    process_factory: ProcessFactory,
+    process_input: Process | Callable[[RuleRunner], Process],
     *,
     buildbarn: RemoteExecutionBuildbarn,
 ) -> RemoteExecutionRun:
@@ -100,7 +98,7 @@ def _run_remote_process(
             *_remote_execution_args(buildbarn),
         ],
     )
-    process = process_factory(rule_runner)
+    process = process_input if isinstance(process_input, Process) else process_input(rule_runner)
     tracker = WorkunitTracker()
     with rule_runner.pushd():
         handler = StreamingWorkunitHandler(
@@ -138,10 +136,6 @@ def _run_remote_process(
     )
 
 
-def _fixed_process(process: Process) -> ProcessFactory:
-    return lambda _: process
-
-
 def _working_directory_process(rule_runner: RuleRunner) -> Process:
     input_digest = rule_runner.request(Digest, [CreateDigest([Directory("workdir")])])
     return Process(
@@ -159,12 +153,12 @@ def _working_directory_process(rule_runner: RuleRunner) -> Process:
 
 
 def _assert_output_cache_roundtrip(
-    process_factory: ProcessFactory,
+    process_input: Process | Callable[[RuleRunner], Process],
     expected_contents: dict[str, bytes],
     *,
     buildbarn: RemoteExecutionBuildbarn,
 ) -> None:
-    run1 = _run_remote_process(process_factory, buildbarn=buildbarn)
+    run1 = _run_remote_process(process_input, buildbarn=buildbarn)
 
     assert run1.contents == expected_contents
     assert run1.metrics.get("remote_execution_requests", 0) == 1
@@ -173,7 +167,7 @@ def _assert_output_cache_roundtrip(
     assert len(run1.remote_command_digest.fingerprint) == 64
     assert run1.process_workunit["metadata"]["exit_code"] == 0
 
-    run2 = _run_remote_process(process_factory, buildbarn=buildbarn)
+    run2 = _run_remote_process(process_input, buildbarn=buildbarn)
 
     assert run2.contents == expected_contents
     assert run2.output_digest == run1.output_digest
@@ -195,7 +189,7 @@ def _worker_preflight(buildbarn: RemoteExecutionBuildbarn) -> None:
         description="Buildbarn worker preflight",
         level=LogLevel.INFO,
     )
-    run = _run_remote_process(_fixed_process(preflight_process), buildbarn=buildbarn)
+    run = _run_remote_process(preflight_process, buildbarn=buildbarn)
     assert run.contents == {}
     assert run.metrics.get("remote_execution_requests", 0) == 1
     assert run.process_workunit["metadata"]["exit_code"] == 0
@@ -224,7 +218,7 @@ def test_buildbarn_remote_execution(subtests) -> None:
                 description="Buildbarn remote execution control case",
                 level=LogLevel.INFO,
             )
-            run = _run_remote_process(_fixed_process(process), buildbarn=buildbarn)
+            run = _run_remote_process(process, buildbarn=buildbarn)
 
             assert run.contents == {}
             assert run.metrics.get("remote_execution_requests", 0) == 1
@@ -247,9 +241,7 @@ def test_buildbarn_remote_execution(subtests) -> None:
                 output_directories=["."],
                 level=LogLevel.INFO,
             )
-            _assert_output_cache_roundtrip(
-                _fixed_process(process), expected_contents, buildbarn=buildbarn
-            )
+            _assert_output_cache_roundtrip(process, expected_contents, buildbarn=buildbarn)
 
         with subtests.test('working directory output directory ("")'):
             _assert_output_cache_roundtrip(
