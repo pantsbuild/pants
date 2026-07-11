@@ -162,48 +162,45 @@ def local_buildbarn_remote_execution() -> Iterator[RemoteExecutionBuildbarn]:
         stack.teardown()
 
 
-def test_buildbarn_remote_execution_runs_process() -> None:
-    process = Process(
-        [
-            "/bin/sh",
-            "-c",
-            "/bin/true",
-        ],
-        description="Buildbarn remote execution control case",
-        level=LogLevel.INFO,
-    )
-
+def test_buildbarn_remote_execution(subtests) -> None:
     with local_buildbarn_remote_execution() as buildbarn:
-        run = _run_remote_process(process, buildbarn=buildbarn)
+        with subtests.test("control process"):
+            process = Process(
+                [
+                    "/bin/sh",
+                    "-c",
+                    "/bin/true",
+                ],
+                description="Buildbarn remote execution control case",
+                level=LogLevel.INFO,
+            )
+            run = _run_remote_process(process, buildbarn=buildbarn)
 
-    assert run.contents == {}
-    assert run.metrics.get("remote_execution_requests", 0) == 1
-    assert len(run.remote_action_digest.fingerprint) == 64
-    assert len(run.remote_command_digest.fingerprint) == 64
-    assert run.process_workunit["metadata"]["exit_code"] == 0
+            assert run.contents == {}
+            assert run.metrics.get("remote_execution_requests", 0) == 1
+            assert len(run.remote_action_digest.fingerprint) == 64
+            assert len(run.remote_command_digest.fingerprint) == 64
+            assert run.process_workunit["metadata"]["exit_code"] == 0
 
+        with subtests.test('root output directory (".")'):
+            expected_contents = {
+                "root.txt": b"root\n",
+                "sub/child.txt": b"child\n",
+            }
+            process = Process(
+                [
+                    "/bin/sh",
+                    "-c",
+                    "/bin/echo root > root.txt && /bin/mkdir -p sub && /bin/echo child > sub/child.txt",
+                ],
+                description="Buildbarn remote execution root output case",
+                output_directories=["."],
+                level=LogLevel.INFO,
+            )
+            run = _run_remote_process(process, buildbarn=buildbarn)
 
-def test_buildbarn_remote_execution_root_output_directory() -> None:
-    expected_contents = {
-        "root.txt": b"root\n",
-        "sub/child.txt": b"child\n",
-    }
-    process = Process(
-        [
-            "/bin/sh",
-            "-c",
-            "/bin/echo root > root.txt && /bin/mkdir -p sub && /bin/echo child > sub/child.txt",
-        ],
-        description="Buildbarn remote execution root output case",
-        output_directories=["."],
-        level=LogLevel.INFO,
-    )
-
-    with local_buildbarn_remote_execution() as buildbarn:
-        run = _run_remote_process(process, buildbarn=buildbarn)
-
-    assert run.contents == expected_contents
-    assert run.metrics.get("remote_execution_requests", 0) == 1
-    assert len(run.remote_action_digest.fingerprint) == 64
-    assert len(run.remote_command_digest.fingerprint) == 64
-    assert run.process_workunit["metadata"]["exit_code"] == 0
+            assert run.contents == expected_contents
+            assert run.metrics.get("remote_execution_requests", 0) == 1
+            assert len(run.remote_action_digest.fingerprint) == 64
+            assert len(run.remote_command_digest.fingerprint) == 64
+            assert run.process_workunit["metadata"]["exit_code"] == 0
