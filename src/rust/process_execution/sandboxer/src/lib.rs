@@ -78,7 +78,7 @@ fn ensure_socket_file_removed(socket_path: &Path) -> Result<(), String> {
             ret = Ok(());
         }
     } else {
-        debug!("Removed existing socket file {}", &socket_path.display());
+        debug!("Removed existing socket file {}", socket_path.display());
     }
     ret.map_err(|e| e.to_string())
 }
@@ -146,7 +146,7 @@ impl SandboxerService {
                 // Note: just a regular thread::sleep() since this is not an async context.
                 thread::sleep(SandboxerService::POLLING_INTERVAL);
                 if !fs::exists(&socket_path).unwrap_or(false) {
-                    warn!("Socket file {} deleted. Exiting.", &socket_path.display());
+                    warn!("Socket file {} deleted. Exiting.", socket_path.display());
                     let _ = graceful_shutdown_tx.send(());
                     break;
                 }
@@ -207,7 +207,7 @@ impl SandboxerGrpcImpl {
         request: Request<MaterializeDirectoryRequest>,
     ) -> Result<Response<MaterializeDirectoryResponse>, String> {
         let r = request.into_inner();
-        debug!("Received materialize_directory() request: {:#?}", &r);
+        debug!("Received materialize_directory() request: {:#?}", r);
         let destination_root: PathBuf = r.destination_root.into();
         let digest: Digest = r.digest.ok_or("No digest provided")?.try_into()?;
         let dir_digest = DirectoryDigest::from_persisted_digest(digest);
@@ -459,7 +459,7 @@ impl Sandboxer {
 
         debug!(
             "Spawning sandboxer with cmd: {} {}",
-            &self.sandboxer_bin.to_string_lossy(),
+            self.sandboxer_bin.to_string_lossy(),
             cmd.as_std()
                 .get_args()
                 .map(|a| a.to_string_lossy())
