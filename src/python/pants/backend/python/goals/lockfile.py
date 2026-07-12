@@ -382,14 +382,24 @@ async def generate_uv_lockfile(
         # So we just need to make sure it is. There are no special flags to specify.
         lockfile = await get_lockfile_for_resolve(Resolve(req.resolve_name, False), **implicitly())
         loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
-        if isinstance(loaded_lockfile.metadata, PythonLockfileMetadataV8):
-            if cast(PythonLockfileMetadataV8, loaded_lockfile).lockfile_format == LockfileFormat.UV:
-                # Rename the configured lockfile destination to uv.lock.
-                repo_lock_entry = cast(
-                    FileEntry, next(iter(await get_digest_entries(loaded_lockfile.lockfile_digest)))
-                )
+        if (
+            isinstance(metadata_v8 := loaded_lockfile.metadata, PythonLockfileMetadataV8)
+            and metadata_v8.lockfile_format == LockfileFormat.UV
+        ):
+            # Rename the configured lockfile destination to uv.lock.
+            if isinstance(
+                repo_lock_entry := next(
+                    iter(await get_digest_entries(loaded_lockfile.lockfile_digest))
+                ),
+                FileEntry,
+            ):
                 existing_uv_lock_digest = await create_digest(
                     CreateDigest([FileEntry(uv_lock, repo_lock_entry.file_digest)])
+                )
+            else:
+                # Should never happen, assuming the lockfile is a regular file.
+                raise ValueError(
+                    f"Expected lockfile entry to be a FileEntry but was a {type(repo_lock_entry)}"
                 )
 
     uv_config = resolve_config.uv_config(extra_find_links=req.find_links)
