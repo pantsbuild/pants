@@ -34,7 +34,7 @@ from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
-from pants.core.util_rules.system_binaries import RealpathBinary
+from pants.core.util_rules.system_binaries import MaybeFlockBinary, RealpathBinary
 from pants.engine.composite_process import Subprocess
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import (
@@ -47,9 +47,11 @@ from pants.engine.intrinsics import (
     get_digest_contents,
     merge_digests,
 )
+from pants.engine.pants_lock import pants_lock_bin
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.docutil import bin_name
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
@@ -175,6 +177,8 @@ async def create_venv_repository_from_uv_lockfile(
     uv_env: UvEnvironment,
     realpath_binary: RealpathBinary,
     buildroot: BuildRoot,
+    maybe_flock_binary: MaybeFlockBinary,
+    level: LogLevel,
 ) -> VenvRepository:
     """Install all packages from a uv lockfile into a virtualenv."""
     if request.lockfile.lockfile_format != LockfileFormat.UV:
@@ -234,6 +238,7 @@ async def create_venv_repository_from_uv_lockfile(
             *downloaded_uv.args(),
             "sync",
             "--frozen",
+            *(["--verbose"] if level == LogLevel.DEBUG else []),
             "--no-install-project",
             # TODO: extras can conflict, so we might need to be more selective.
             "--all-extras",
@@ -246,10 +251,39 @@ async def create_venv_repository_from_uv_lockfile(
     # environment this process runs in. This gives uv a stable absolute path for the venv
     # so that any entry point scripts it creates exec a valid path that doesn't reference
     # the sandbox.
+    #
+    # uv claims that you can run sync concurrently on the same venv, but this relies on a
+    # lock on the workspace (not on the target venv), and since each sandbox is its own
+    # uv workspace, these locks don't exclude each other. So instead we use flock (if available)
+    # or pants_lock (otherwise) to provide mutual exclusion on the venv.
+    # The local platform will always have pants_lock, since we bundle it with Pants.
+    # A Linux platform should normally have flock. So the cases where neither binary is available
+    # are a remote platform that isn't Linux (unlikely) or a very constrained Linux, that doesn't
+    # have flock. We error in these cases. If a user encounters this error they must ensure that
+    # flock is available on their remote executors.
+    flock = (
+        maybe_flock_binary.flock_binary.path
+        if maybe_flock_binary.flock_binary
+        else "/flock/not/found"
+    )
+    pants_lock = pants_lock_bin()
     command = dedent(
         f"""\
         cache_root="$({realpath_binary.path} {shlex.quote(VenvRepository.cache_dir)})"
-        UV_PROJECT_ENVIRONMENT="${{cache_root}}/{venv_path_suffix}" {uv_cmd}
+        project_env="${{cache_root}}/{venv_path_suffix}"
+        lock_path="${{project_env}}.lock"
+        mkdir -p $(dirname "${{lock_path}}")
+        (
+          if [ -x "{flock}" ]; then
+            {flock} 200
+          elif [ -x "{pants_lock}" ]; then
+            {pants_lock} 200
+          else
+            echo "ERROR: No flock or pants_lock binary found on system executing a uv process." >&2
+            exit 1
+          fi
+          UV_PROJECT_ENVIRONMENT="${{project_env}}" {uv_cmd}
+        ) 200>"${{lock_path}}" || exit $?
         """
     )
 

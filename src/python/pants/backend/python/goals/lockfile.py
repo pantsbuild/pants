@@ -351,6 +351,7 @@ async def generate_uv_lockfile(
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     downloaded_uv: DownloadedUv,
     uv_env: UvEnvironment,
+    level: LogLevel,
 ) -> GenerateLockfileResult:
     if not req.interpreter_constraints:
         raise ValueError(
@@ -427,6 +428,7 @@ async def generate_uv_lockfile(
                 argv=(
                     *downloaded_uv.args(),
                     "lock",
+                    *(["--verbose"] if level == LogLevel.DEBUG else []),
                 ),
                 env=uv_env.env,
                 input_digest=input_digest,
