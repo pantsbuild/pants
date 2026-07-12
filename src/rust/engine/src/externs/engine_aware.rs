@@ -28,10 +28,9 @@ impl EngineAwareReturnType {
             // If the metadata already existed, or if its level changed, we need to update it.
             let (mut metadata, level) = if let Some((metadata, old_level)) = old {
                 (metadata, new_level.unwrap_or(old_level))
-            } else if let Some(level) = new_level {
-                (WorkunitMetadata::default(), level)
             } else {
-                return None;
+                let level = new_level?;
+                (WorkunitMetadata::default(), level)
             };
 
             metadata.message = Self::message(task_result);

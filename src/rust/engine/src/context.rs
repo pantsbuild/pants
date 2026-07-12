@@ -666,7 +666,7 @@ impl Core {
 
         let sandboxer = if exec_strategy_opts.use_sandboxer {
             let sandboxer_bin = get_sandboxer_binary()?;
-            debug!("Running against sandboxer at {:?}", &sandboxer_bin);
+            debug!("Running against sandboxer at {:?}", sandboxer_bin);
             Some(
                 Sandboxer::new(
                     sandboxer_bin,

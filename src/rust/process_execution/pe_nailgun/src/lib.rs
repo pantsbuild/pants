@@ -187,7 +187,7 @@ impl process_execution::CommandRunner for CommandRunner {
                     &nailgun_name,
                     nailgun_args,
                 );
-                trace!("Running request under nailgun:\n {:#?}", &client_req);
+                trace!("Running request under nailgun:\n {:#?}", client_req);
 
                 // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
                 let mut nailgun_process = self
