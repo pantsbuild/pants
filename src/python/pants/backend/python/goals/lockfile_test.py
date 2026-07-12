@@ -845,7 +845,7 @@ def test_uv_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
     orig_requirements = FrozenOrderedSet(["ansicolors==1.1.7", "cowsay==6.0"])
     updated_requirements = FrozenOrderedSet(["ansicolors==1.1.8", "cowsay>=6.0,<=6.1"])
 
-    def generate(reqs: FrozenOrderedSet[str], sync: bool, with_constraints: bool = False) -> Digest:
+    def generate(reqs: FrozenOrderedSet[str], sync: bool) -> Digest:
         # Generates a lockfile and returns its output digest.
         sync_opt = "--generate-lockfiles-sync" if sync else "--no-generate-lockfiles-sync"
         args = [
@@ -885,8 +885,9 @@ def test_uv_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
         # Generates a lockfile and returns a map of package names to versions.
         return get_versions(generate(reqs, sync))
 
-    # Generate the initial lockfile and write its digest.
-    digest = generate(orig_requirements, False, with_constraints=True)
+    # Generate the initial lockfile and write its digest (we also test that `sync` works when
+    # there is no lockfile).
+    digest = generate(orig_requirements, True)
     rule_runner.write_digest(digest)
     versions = get_versions(digest)
     assert {"ansicolors": "1.1.7", "cowsay": "6.0"} == versions

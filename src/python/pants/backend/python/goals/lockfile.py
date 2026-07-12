@@ -67,7 +67,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.internals.native_engine import EMPTY_DIGEST, EngineError
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.intrinsics import (
@@ -381,26 +381,31 @@ async def generate_uv_lockfile(
         # `uv lock` does a minimal update by default if an existing lockfile is present.
         # So we just need to make sure it is. There are no special flags to specify.
         lockfile = await get_lockfile_for_resolve(Resolve(req.resolve_name, False), **implicitly())
-        loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
-        if (
-            isinstance(metadata_v8 := loaded_lockfile.metadata, PythonLockfileMetadataV8)
-            and metadata_v8.lockfile_format == LockfileFormat.UV
-        ):
-            # Rename the configured lockfile destination to uv.lock.
-            if isinstance(
-                repo_lock_entry := next(
-                    iter(await get_digest_entries(loaded_lockfile.lockfile_digest))
-                ),
-                FileEntry,
+        try:
+            loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
+            if (
+                isinstance(metadata_v8 := loaded_lockfile.metadata, PythonLockfileMetadataV8)
+                and metadata_v8.lockfile_format == LockfileFormat.UV
             ):
-                existing_uv_lock_digest = await create_digest(
-                    CreateDigest([FileEntry(uv_lock, repo_lock_entry.file_digest)])
-                )
-            else:
-                # Should never happen, assuming the lockfile is a regular file.
-                raise ValueError(
-                    f"Expected lockfile entry to be a FileEntry but was a {type(repo_lock_entry)}"
-                )
+                # Rename the configured lockfile destination to uv.lock.
+                if isinstance(
+                    repo_lock_entry := next(
+                        iter(await get_digest_entries(loaded_lockfile.lockfile_digest))
+                    ),
+                    FileEntry,
+                ):
+                    existing_uv_lock_digest = await create_digest(
+                        CreateDigest([FileEntry(uv_lock, repo_lock_entry.file_digest)])
+                    )
+                else:
+                    # Should never happen, assuming the lockfile is a regular file.
+                    raise ValueError(
+                        f"Expected lockfile entry to be a FileEntry but was a {type(repo_lock_entry)}"
+                    )
+        except EngineError:
+            # May fail if the file doesn't exist, which is expected the first time a new lockfile
+            # is generated.
+            pass
 
     uv_config = resolve_config.uv_config(extra_find_links=req.find_links)
 
