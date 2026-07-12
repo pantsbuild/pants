@@ -141,10 +141,8 @@ class InterpreterConstraints(FrozenOrderedSet[Requirement], EngineAwareParameter
         free_threaded: bool | None = None,
     ) -> InterpreterConstraints:
         qualifier = ""
-        if free_threaded is True:
-            qualifier = f"[{FREE_THREADED_ABI}]"
-        elif free_threaded is False:
-            qualifier = f"[{GIL_ABI}]"
+        if free_threaded is not None:
+            qualifier = f"[{FREE_THREADED_ABI}]" if free_threaded else f"[{GIL_ABI}]"
         return cls([f"{interpreter_type}{qualifier}=={python_version_str}"])
 
     def __new__(cls, constraints: Iterable[str | Requirement] = ()) -> InterpreterConstraints:
