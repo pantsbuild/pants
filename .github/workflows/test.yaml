@@ -81,6 +81,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -113,6 +114,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -190,6 +192,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -222,6 +225,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -306,6 +310,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -338,6 +343,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
