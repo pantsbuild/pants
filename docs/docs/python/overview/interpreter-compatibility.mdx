@@ -37,7 +37,7 @@ If you use Python code on Apple's M1/M2 hardware you may need to set your interp
 
 ## Selecting the free-threaded (no-GIL) CPython ABI
 
-The free-threaded (no-GIL) and standard CPython builds share a version but are distinct ABIs, so `CPython>=3.13` matches either. Qualify the interpreter type with an extra to pin one: `CPython[free-threaded]>=3.13` or `CPython[gil]>=3.13` (the `CPython+t` / `CPython-t` spellings also work). Pants selects the matching interpreter from the [search path](#changing-the-interpreter-search-path), so one of that ABI must be discoverable.
+The free-threaded (no-GIL) and standard CPython builds share a version but are distinct ABIs, so `CPython>=3.13` matches either. Qualify the interpreter type to pin one, using either an extra, `CPython[free-threaded]>=3.13` or `CPython[gil]>=3.13`, or the equivalent `CPython+t` / `CPython-t` spellings. Both spellings are adopted from [Pex](https://docs.pex-tool.org) and may evolve alongside future Python packaging standards. Pants selects the matching interpreter from the [search path](#changing-the-interpreter-search-path), so one of that ABI must be discoverable.
 
 `parametrize` it to build both wheels of a `python_distribution` at once:
 
