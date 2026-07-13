@@ -1,7 +1,7 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use crate::local::ByteStore;
-use crate::{EntryType, LocalOptions, ShrinkBehavior};
+use crate::{EntryType, ImmutableInputs, LocalOptions, ShrinkBehavior, Store};
 
 use std::collections::HashSet;
 use std::io::Write;
@@ -9,6 +9,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use bytes::{BufMut, Bytes, BytesMut};
+use fs::DirectoryDigest;
 use hashing::{Digest, Fingerprint};
 use tempfile::{NamedTempFile, TempDir};
 use testutil::data::{TestData, TestDirectory};
@@ -806,4 +807,39 @@ fn get_directory_size(path: &Path) -> usize {
             .len() as usize;
     }
     len
+}
+
+#[tokio::test]
+async fn recovers_from_deleted_directory_issue_23411() {
+    let executor = task_executor::Executor::new();
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::local_only(executor, store_dir.path()).unwrap();
+
+    let base_dir = TempDir::new().unwrap();
+    let immutable_inputs = ImmutableInputs::new(store.clone(), base_dir.path()).unwrap();
+
+    let digest = DirectoryDigest::from_persisted_digest(TestDirectory::empty().digest());
+
+    let path1 = immutable_inputs.path_for_dir(digest.clone()).await.unwrap();
+    assert!(
+        path1.exists(),
+        "The directory should have been created the first time"
+    );
+
+    std::fs::remove_dir_all(&path1).unwrap();
+    assert!(
+        !path1.exists(),
+        "The directory was physically deleted by the 'reaper'"
+    );
+
+    let path2 = immutable_inputs.path_for_dir(digest).await.unwrap();
+
+    assert!(
+        path2.exists(),
+        "The code must have detected the absence and recreated the directory on the disk"
+    );
+    assert_ne!(
+        path1, path2,
+        "The returned path will be different because a new random chroot has been generated"
+    );
 }
