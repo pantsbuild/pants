@@ -59,7 +59,7 @@ from pants.backend.go.util_rules.stdlib_archives import (
 from pants.backend.go.util_rules.third_party_pkg import (
     ThirdPartyPkgAnalysisRequest,
     extract_package_info,
-    third_party_pkg_sources_digest,
+    resolve_third_party_pkg_sources_digest,
 )
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
@@ -484,7 +484,7 @@ async def setup_build_go_package_target_request(
         imports = set(_third_party_pkg_info.imports)
         dir_path = _third_party_pkg_info.dir_path
         pkg_name = _third_party_pkg_info.name
-        digest = await third_party_pkg_sources_digest(_third_party_pkg_info)
+        digest = await resolve_third_party_pkg_sources_digest(_third_party_pkg_info)
         minimum_go_version = _third_party_pkg_info.minimum_go_version
         go_file_names = _third_party_pkg_info.go_files
         s_files = _third_party_pkg_info.s_files
