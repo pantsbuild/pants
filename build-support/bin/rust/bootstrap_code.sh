@@ -85,9 +85,12 @@ function bootstrap_native_code() {
   engine_version_calculated="$(calculate_current_hash)"
 
   # Create the native engine resource.
-  # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
-  #  process from being killed when recompiling.
-  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_BINARY}"
+  # NB: Remove the old files rather than copying over them:
+  #  * On Mac Silicon, for some reason, overwriting the old native_engine.so causes the Pants
+  #    process to be killed when recompiling.
+  #  * For the sandboxer, we needed to delete it to void copying over a
+  #    running binary, which could ironically fail with ETXTBSY
+  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_BINARY}" "${NATIVE_SANDBOXER_BINARY}"
   cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
   cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_BINARY}"
   cp "${NATIVE_SANDBOXER_TARGET}" "${NATIVE_SANDBOXER_BINARY}"
