@@ -3,7 +3,6 @@
 
 use std::cmp;
 use std::collections::HashMap;
-use std::future;
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -18,6 +17,8 @@ use indicatif::ProgressStyle;
 use indicatif::WeakProgressBar;
 use parking_lot::{Condvar, Mutex};
 
+use logging::fatal_log;
+use task_executor::Executor;
 use workunit_store::SpanId;
 use workunit_store::format_workunit_duration_ms;
 
@@ -32,6 +33,7 @@ struct Task {
 
 pub struct IndicatifInstance {
     tasks_to_display: IndexSet<SpanId>,
+    executor: Executor,
     snapshot: Arc<Mutex<Vec<Option<Task>>>>,
     stopping: Arc<(Mutex<bool>, Condvar)>,
     join_handle: Option<thread::JoinHandle<()>>,
@@ -39,6 +41,7 @@ pub struct IndicatifInstance {
 
 impl IndicatifInstance {
     pub fn new(
+        executor: Executor,
         local_parallelism: usize,
         terminal_width: u16,
         terminal_height: u16,
@@ -85,6 +88,7 @@ impl IndicatifInstance {
 
         Ok(IndicatifInstance {
             tasks_to_display: IndexSet::new(),
+            executor,
             snapshot,
             stopping,
             join_handle: Some(join_handle),
@@ -92,10 +96,26 @@ impl IndicatifInstance {
     }
 
     pub fn teardown(self) -> BoxFuture<'static, ()> {
-        // Drop signals the render thread to stop, joins it, and then drops the MultiProgress
-        // (which restores direct access to the Console).
-        std::mem::drop(self);
-        future::ready(()).boxed()
+        // Eagerly signal the render thread to stop, so that it winds down concurrently with
+        // acquiring a thread from the blocking pool below.
+        {
+            let (lock, cv) = &*self.stopping;
+            *lock.lock() = true;
+            cv.notify_all();
+        }
+        // Drop joins the render thread, which restores direct access to the Console as it exits:
+        // move the drop to the blocking pool so that the join cannot stall an async thread (or
+        // whoever holds the Session's display lock). The returned Future completes only once the
+        // Console has been restored; if it is instead dropped, teardown still completes in the
+        // background.
+        let executor = self.executor.clone();
+        let teardown = executor.spawn_blocking(move || std::mem::drop(self));
+        async move {
+            if let Err(e) = teardown.await {
+                fatal_log!("Failed to teardown UI: {e}");
+            }
+        }
+        .boxed()
     }
 
     pub fn render(&mut self, heavy_hitters: &HashMap<SpanId, (String, SystemTime)>) {
