@@ -238,11 +238,11 @@ impl Nail for RawFdNail {
             }
         };
 
-        // Spawn the underlying function as a blocking task, and capture its exit code to append to the
-        // output stream.
+        // Spawn the underlying function as a blocking task on the request pool, and capture its
+        // exit code to append to the output stream.
         let executor = self.executor.clone();
         let nail = self.clone();
-        let exit_code_join = executor.spawn_blocking(move || {
+        let exit_code_join = executor.spawn_request_blocking(move || {
             // NB: This closure captures the stdio handles, and will drop/close them when it completes.
             (nail.runner)(RawFdExecution {
                 cmd,
