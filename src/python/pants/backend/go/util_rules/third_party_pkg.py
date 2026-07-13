@@ -95,24 +95,28 @@ class ThirdPartyPkgAnalysis:
 
     error: GoThirdPartyPkgError | None = None
 
+    @property
+    def contains_native_sources(self) -> bool:
+        return bool(
+            self.cgo_files
+            or self.c_files
+            or self.cxx_files
+            or self.m_files
+            or self.f_files
+            or self.s_files
+            or self.h_files
+            or self.syso_files
+        )
 
-async def third_party_pkg_sources_digest(pkg_info: ThirdPartyPkgAnalysis) -> Digest:
+
+async def resolve_third_party_pkg_sources_digest(pkg_info: ThirdPartyPkgAnalysis) -> Digest:
     """Slice the whole-module analysis digest down to the files this package's compilation
     consumes.
 
     Native-code packages keep the whole module: their include closure is not knowable from
     `go list` metadata.
     """
-    if (
-        pkg_info.cgo_files
-        or pkg_info.c_files
-        or pkg_info.cxx_files
-        or pkg_info.m_files
-        or pkg_info.f_files
-        or pkg_info.s_files
-        or pkg_info.h_files
-        or pkg_info.syso_files
-    ):
+    if pkg_info.contains_native_sources:
         return pkg_info.digest
 
     glob = f"{pkg_info.dir_path}/**" if pkg_info.embed_config else f"{pkg_info.dir_path}/*"
