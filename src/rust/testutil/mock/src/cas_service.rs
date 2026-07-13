@@ -408,7 +408,7 @@ impl ContentAddressableStorage for StubCASResponder {
                 Err(err) => {
                     return Status::invalid_argument(format!(
                         "Bad fingerprint: {}: {}",
-                        &digest.hash, err
+                        digest.hash, err
                     ));
                 }
             };
@@ -471,7 +471,7 @@ impl ContentAddressableStorage for StubCASResponder {
                         None,
                         Status::invalid_argument(format!(
                             "Bad fingerprint: {}: {}",
-                            &digest.hash, err
+                            digest.hash, err
                         )),
                     );
                 }

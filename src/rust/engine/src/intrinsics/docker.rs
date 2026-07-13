@@ -53,12 +53,12 @@ fn docker_resolve_image(docker_request: Value) -> PyGeneratorResponseNativeCall 
         let image_metadata = docker.inspect_image(&image_name).await.map_err(|err| {
             format!(
                 "Failed to resolve image ID for image `{}`: {:?}",
-                &image_name, err
+                image_name, err
             )
         })?;
         let image_id = image_metadata
             .id
-            .ok_or_else(|| format!("Image does not exist: `{}`", &image_name))?;
+            .ok_or_else(|| format!("Image does not exist: `{}`", image_name))?;
 
         Ok::<_, Failure>(Python::attach(|py| {
             externs::unsafe_call(

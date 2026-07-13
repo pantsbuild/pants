@@ -151,6 +151,21 @@ def test_merge_interpreter_constraints() -> None:
         expected=["PyPy>=43.0,<44.0", "Jython>=1.2,<1.3"],
     )
 
+    # The free-threaded / GIL ABI qualifier is preserved, and an unqualified constraint (which
+    # matches either ABI) narrows to whichever ABI it is ANDed with.
+    assert_merged(
+        inp=[["CPython[free-threaded]==3.14.*"], ["CPython==3.14.*"]],
+        expected=["CPython[free-threaded]==3.14.*"],
+    )
+    assert_merged(
+        inp=[["CPython[gil]>=3.14"], ["CPython==3.14.*"]],
+        expected=["CPython[gil]>=3.14,==3.14.*"],
+    )
+    assert_merged(
+        inp=[["CPython[free-threaded]==3.14.*"], ["CPython[free-threaded]>=3.13"]],
+        expected=["CPython[free-threaded]==3.14.*,>=3.13"],
+    )
+
     # Ensure we error when there is no solution.
     def assert_impossible(constraints, expected_msg):
         with pytest.raises(ValueError) as excinfo:
@@ -163,6 +178,11 @@ def test_merge_interpreter_constraints() -> None:
         )
 
     assert_impossible([["CPython==3.7.*"], ["PyPy==43.0"]], "(CPython==3.7.*) AND (PyPy==43.0)")
+    # The two CPython ABIs are mutually exclusive.
+    assert_impossible(
+        [["CPython[free-threaded]==3.14.*"], ["CPython[gil]==3.14.*"]],
+        "(CPython[free-threaded]==3.14.*) AND (CPython[gil]==3.14.*)",
+    )
     assert_impossible(
         [["CPython==3.7.*", "Jython>=1.2"], ["PyPy==43.0", "Stackless<3.7"]],
         "(CPython==3.7.* OR Jython>=1.2) AND (PyPy==43.0 OR Stackless<3.7)",
@@ -238,6 +258,7 @@ def test_interpreter_constraints_minimum_python_version(
         (["CPython==3.7.*", "PyPy==3.6.*"], "PyPy==3.6.*"),
         (["CPython"], "CPython==2.7.*"),
         (["CPython==3.7.*,<3.6"], None),
+        (["CPython[free-threaded]>=3.9"], "CPython[free-threaded]==3.9.*"),
         ([], None),
     ],
 )
@@ -454,6 +475,12 @@ def test_enumerate_python_versions_invalid_universe(version: str) -> None:
             [">=3.5"],
             True,
         ),  # target matches a weirdly specified non-disjoint IC list
+        # An ABI-agnostic candidate contains an ABI-qualified target...
+        (["==3.9.*"], ["CPython[free-threaded]==3.9.*"], True),
+        # ...but a qualified candidate does not contain an agnostic or opposite-ABI target.
+        (["CPython[free-threaded]==3.9.*"], ["==3.9.*"], False),
+        (["CPython[free-threaded]==3.9.*"], ["CPython[gil]==3.9.*"], False),
+        (["CPython[free-threaded]>=3.9"], ["CPython[free-threaded]==3.9.*"], True),
     ),
 )
 def test_contains(candidate, target, matches) -> None:
@@ -498,6 +525,8 @@ def test_partition_into_major_minor_versions(constraints: list[str], expected: l
         (["CPython==2.7.*"], (2, 7)),
         (["==3.0.*"], (3, 0)),
         (["==3.45.*"], (3, 45)),
+        (["CPython[free-threaded]==3.14.*"], (3, 14)),
+        (["CPython[gil]==3.14.*"], (3, 14)),
         ([">=3.45,<3.46"], (3, 45)),
         (["CPython>=3.45,<3.46"], (3, 45)),
         (["<3.46,>=3.45"], (3, 45)),
@@ -552,6 +581,13 @@ def test_major_minor_version_when_single_and_entire(
         ("CPython==3.9.*", "CPython==3.9.*"),
         ("==3.9.*", "CPython==3.9.*"),
         ("PyPy==3.9.*", "PyPy==3.9.*"),
+        ("CPython[free-threaded]==3.14.*", "CPython[free-threaded]==3.14.*"),
+        ("CPython[gil]==3.14.*", "CPython[gil]==3.14.*"),
+        ("[free-threaded]==3.14.*", "CPython[free-threaded]==3.14.*"),
+        # Pex's `+t` / `-t` value spelling is accepted and normalized to the `[extra]` form.
+        ("CPython+t==3.14.*", "CPython[free-threaded]==3.14.*"),
+        ("CPython-t==3.14.*", "CPython[gil]==3.14.*"),
+        ("+t==3.14.*", "CPython[free-threaded]==3.14.*"),
     ],
 )
 def test_parse_python_interpreter_constraint_when_valid(input_ic: str, expected: str) -> None:
@@ -559,10 +595,50 @@ def test_parse_python_interpreter_constraint_when_valid(input_ic: str, expected:
 
 
 @pytest.mark.parametrize(
+    ("constraints", "expected"),
+    [
+        ([], None),
+        (["CPython==3.14.*"], None),
+        (["CPython[free-threaded]==3.14.*"], True),
+        (["CPython[gil]==3.14.*"], False),
+        (["CPython[free-threaded]==3.14.*", "CPython[free-threaded]==3.15.*"], True),
+        # Mixed ABIs across the OR'd alternatives are not a single requirement.
+        (["CPython[free-threaded]==3.14.*", "CPython[gil]==3.14.*"], None),
+        (["CPython[free-threaded]==3.14.*", "CPython==3.15.*"], None),
+    ],
+)
+def test_requires_free_threaded_abi(constraints: list[str], expected: bool | None) -> None:
+    assert InterpreterConstraints(constraints).requires_free_threaded_abi() is expected
+
+
+def test_for_fixed_python_version_free_threaded() -> None:
+    assert InterpreterConstraints.for_fixed_python_version("3.14.1") == InterpreterConstraints(
+        ["CPython==3.14.1"]
+    )
+    assert InterpreterConstraints.for_fixed_python_version(
+        "3.14.1", free_threaded=True
+    ) == InterpreterConstraints(["CPython[free-threaded]==3.14.1"])
+    assert InterpreterConstraints.for_fixed_python_version(
+        "3.14.1", free_threaded=False
+    ) == InterpreterConstraints(["CPython[gil]==3.14.1"])
+
+
+def test_free_threaded_qualifier_reaches_pex_arg_list() -> None:
+    # Pex selects the ABI from this qualifier; it must survive to the CLI verbatim.
+    ics = InterpreterConstraints(["CPython[free-threaded]==3.14.*"])
+    assert ics.generate_pex_arg_list() == [
+        "--interpreter-constraint",
+        "CPython[free-threaded]==3.14.*",
+    ]
+
+
+@pytest.mark.parametrize(
     ("input_ic", "expected_error"),
     [
         ("some-invalid-constraint-3.9.*", "Failed to parse Python interpreter constraint"),
         ("3.9.*", "Failed to parse Python interpreter constraint"),
+        ("CPython[nogil]==3.14.*", "unknown qualifier"),
+        ("CPython[free-threaded,gil]==3.14.*", "cannot require both"),
     ],
 )
 def test_parse_python_interpreter_constraint_when_invalid(

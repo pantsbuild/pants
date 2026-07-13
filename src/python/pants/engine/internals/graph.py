@@ -1238,6 +1238,7 @@ def find_source_blocks_owners(
 async def find_owners(
     owners_request: OwnersRequest,
     local_environment_name: ChosenLocalEnvironmentName,
+    target_origin_sources_blocks_options: TargetOriginSourcesBlocksOptions,
 ) -> Owners:
     block_owners: tuple[Owners, ...] = (
         await concurrently(
@@ -1326,6 +1327,16 @@ async def find_owners(
             if not matching_files and not (
                 owners_request.match_if_owning_build_file_included_in_sources
                 and bfa.rel_path in sources_set
+            ):
+                continue
+
+            # If we have block-level change information (`sources_blocks`) for this BUILD file,
+            # we skip adding all its targets indiscriminately. The precise targets affected
+            # by the line changes are already captured by the `block_owners` calculation.
+            if (
+                not matching_files
+                and target_origin_sources_blocks_options.enable
+                and bfa.rel_path in owners_request.sources_blocks
             ):
                 continue
 
