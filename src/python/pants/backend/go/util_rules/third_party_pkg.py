@@ -692,12 +692,12 @@ async def extract_package_info(
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:
         return pkg_info
-    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.module:
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.MODULE:
         raise GoThirdPartyPkgError(
             f"There is no Go package with the import path `{request.import_path}` in the "
             f"third-party modules of `{request.go_mod_path}`.\n\n"
             'Under `[golang].third_party_target_granularity = "module"`, a '
-            "`go_third_party_package` target address refers to its module's root package; "
+            "`go_third_party_module` target address refers to its module's root package; "
             "other packages are compiled automatically when imported. To build a specific "
             "package as a binary, use the `main_import_path` field of `go_binary`."
         )

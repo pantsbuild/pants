@@ -21,8 +21,8 @@ _DEFAULT_COMPILER_FLAGS = ("-g", "-O2")
 
 
 class ThirdPartyTargetGranularity(Enum):
-    package = "package"
-    module = "module"
+    PACKAGE = "package"
+    MODULE = "module"
 
 
 class GolangSubsystem(Subsystem):
@@ -223,17 +223,18 @@ class GolangSubsystem(Subsystem):
         ),
     )
     third_party_target_granularity = EnumOption(
-        default=ThirdPartyTargetGranularity.package,
+        default=ThirdPartyTargetGranularity.PACKAGE,
         help=softwrap(
             """
-            The granularity at which `go_third_party_package` targets are generated from a
-            `go_mod` target.
+            The granularity at which third-party targets are generated from a `go_mod` target.
 
-            `package`: one target per third-party Go package (the historical behavior).
+            `package`: one `go_third_party_package` target per third-party Go package (the
+            historical behavior).
 
-            `module`: one target per third-party Go module. First-party targets depend on
-            the modules they import; `go.mod`/`go.sum` owns transitive resolution. Use
-            `go_binary`'s `main_import_path` field to build a specific third-party package.
+            `module`: one `go_third_party_module` target per third-party Go module. First-party
+            targets depend on the modules they import; `go.mod`/`go.sum` owns transitive
+            resolution. Use `go_binary`'s `main_import_path` field to build a specific
+            third-party package.
             """
         ),
         advanced=True,

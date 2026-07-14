@@ -405,7 +405,7 @@ async def setup_full_package_build_request(
     # Under module granularity, third-party imports resolve by import path: the target
     # mapping only maps them to whole-module targets.
     third_party_index = None
-    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.module:
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.MODULE:
         go_mod_info = await determine_go_mod_info(GoModInfoRequest(go_mod_addr.address))
         all_third_party_packages = await download_and_analyze_third_party_packages(
             AllThirdPartyPackagesRequest(
@@ -448,7 +448,7 @@ async def setup_full_package_build_request(
                     return FallibleBuildGoPackageRequest(
                         request=None,
                         import_path=request.import_path,
-                        exit_code=result.exit_code,
+                        exit_code=1,
                         stderr=textwrap.dedent(
                             f"""
                             Multiple addresses match import of `{dep_import_path}`.

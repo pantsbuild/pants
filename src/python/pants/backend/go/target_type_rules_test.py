@@ -17,6 +17,7 @@ from pants.backend.go.target_types import (
     GoModTarget,
     GoPackageSourcesField,
     GoPackageTarget,
+    GoThirdPartyModuleTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.testutil import gen_module_gomodproxy
@@ -50,6 +51,7 @@ from pants.engine.target import (
     InferredDependencies,
     InvalidFieldException,
     InvalidTargetException,
+    Tags,
 )
 from pants.testutil.rule_runner import RuleRunner, engine_error
 
@@ -80,6 +82,8 @@ def rule_runner() -> RuleRunner:
             GoModTarget,
             GoPackageTarget,
             GoBinaryTarget,
+            GoThirdPartyPackageTarget,
+            GoThirdPartyModuleTarget,
             GenericTarget,
         ],
     )
@@ -358,8 +362,8 @@ def test_generate_module_targets(rule_runner: RuleRunner) -> None:
         for fp in ("go.mod", "go.sum")
     ]
 
-    def gen_module_tgt(import_path: str) -> GoThirdPartyPackageTarget:
-        return GoThirdPartyPackageTarget(
+    def gen_module_tgt(import_path: str) -> GoThirdPartyModuleTarget:
+        return GoThirdPartyModuleTarget(
             {
                 GoImportPathField.alias: import_path,
                 Dependencies.alias: [t.address.spec for t in file_tgts],
@@ -376,6 +380,113 @@ def test_generate_module_targets(rule_runner: RuleRunner) -> None:
         )
     }
     assert set(generated.values()) == {*file_tgts, *all_modules}
+
+
+def test_module_granularity_applies_third_party_module_defaults(rule_runner: RuleRunner) -> None:
+    # `GoModTarget` declares no `generated_target_cls`, so the generation rule must resolve
+    # `__defaults__` for the emitted type itself. Verify `go_third_party_module` defaults apply.
+    import_path = "pantsbuild.org/go-sample-for-test"
+    version = "v0.0.1"
+    fake_gomod = gen_module_gomodproxy(
+        version,
+        import_path,
+        (("cmd/hello/main.go", "package main\n\nfunc main() {}\n"),),
+    )
+    fake_gomod.update(
+        {
+            "go.mod": dedent(
+                f"""\
+                module example.com/foo
+                go 1.16
+
+                require (
+                \t{import_path} {version}
+                )
+                """
+            ),
+            "BUILD": dedent(
+                """\
+                __defaults__({go_third_party_module: dict(tags=["3p"])})
+                go_mod(name="mod")
+                """
+            ),
+        }
+    )
+    rule_runner.write_files(fake_gomod)
+    rule_runner.set_options(
+        [
+            "--golang-third-party-target-granularity=module",
+            f"--golang-subprocess-env-vars=GOPROXY=file://{rule_runner.build_root}/go-mod-proxy",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+        ],
+        env_inherit={"PATH"},
+    )
+    generated = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="mod"), description_of_origin="tests"
+            )
+        ],
+    ).parametrizations
+    module_tgts = [t for t in generated.values() if isinstance(t, GoThirdPartyModuleTarget)]
+    assert module_tgts
+    assert all(t[Tags].value == ("3p",) for t in module_tgts)
+
+
+@pytest.mark.parametrize("granularity", ["package", "module"])
+def test_go_mod_copied_fields_propagate_to_generated_targets(
+    rule_runner: RuleRunner, granularity: str
+) -> None:
+    # `tags`/`description` on the `go_mod` generator are `copied_fields` and must reach the
+    # generated third-party targets in BOTH granularities (regression guard: dropping
+    # `generated_target_cls` must not lose the generator's copied fields).
+    import_path = "pantsbuild.org/go-sample-for-test"
+    version = "v0.0.1"
+    fake_gomod = gen_module_gomodproxy(
+        version,
+        import_path,
+        (("pkg/hello/hello.go", "package hello\n"),),
+    )
+    fake_gomod.update(
+        {
+            "go.mod": dedent(
+                f"""\
+                module example.com/foo
+                go 1.16
+
+                require (
+                \t{import_path} {version}
+                )
+                """
+            ),
+            "BUILD": "go_mod(name='mod', tags=['team-x'])\n",
+        }
+    )
+    rule_runner.write_files(fake_gomod)
+    rule_runner.set_options(
+        [
+            f"--golang-third-party-target-granularity={granularity}",
+            f"--golang-subprocess-env-vars=GOPROXY=file://{rule_runner.build_root}/go-mod-proxy",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+        ],
+        env_inherit={"PATH"},
+    )
+    generated = rule_runner.request(
+        _TargetParametrizations,
+        [
+            _TargetParametrizationsRequest(
+                Address("", target_name="mod"), description_of_origin="tests"
+            )
+        ],
+    ).parametrizations
+    third_party = [
+        t
+        for t in generated.values()
+        if isinstance(t, (GoThirdPartyPackageTarget, GoThirdPartyModuleTarget))
+    ]
+    assert third_party
+    assert all(t[Tags].value == ("team-x",) for t in third_party)
 
 
 def test_third_party_package_targets_cannot_be_manually_created() -> None:
@@ -514,7 +625,8 @@ def test_determine_main_pkg_for_go_binary(rule_runner: RuleRunner) -> None:
     with engine_error(ResolveError, contains="There are multiple `go_package` targets"):
         get_main(Address("ambiguous"))
     with engine_error(
-        InvalidFieldException, contains="a `go_package` or `go_third_party_package` target"
+        InvalidFieldException,
+        contains="a `go_package`, `go_third_party_package`, or `go_third_party_module` target",
     ):
         get_main(Address("explicit_wrong_type"))
 
@@ -586,6 +698,7 @@ def test_determine_main_pkg_by_import_path_module_granularity(rule_runner: RuleR
     # The address is the module's target; the import path selects the package within it.
     assert main_pkg.address == Address("", target_name="mod", generated_name=import_path)
     assert main_pkg.is_third_party
+    assert main_pkg.is_third_party_module
     assert main_pkg.import_path == f"{import_path}/cmd/hello"
 
     deps = set(rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])]))

@@ -6,7 +6,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
-from pants.backend.go.subsystems.golang import GolangSubsystem, ThirdPartyTargetGranularity
 from pants.backend.go.target_type_rules import (
     GoBinaryMainImportPathRequest,
     resolve_go_binary_main_import_path,
@@ -16,6 +15,7 @@ from pants.backend.go.target_types import (
     GoBinaryMainPackageField,
     GoBinaryTarget,
     GoPackageTarget,
+    GoThirdPartyModuleTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules.binary import (
@@ -75,7 +75,7 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 
 @rule(desc="Package Go binary", level=LogLevel.DEBUG)
-async def package_go_binary(field_set: GoBinaryFieldSet, golang: GolangSubsystem) -> BuiltPackage:
+async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
     main_pkg_get = (
         resolve_go_binary_main_import_path(
             GoBinaryMainImportPathRequest(field_set.address), **implicitly()
@@ -120,19 +120,21 @@ async def package_go_binary(field_set: GoBinaryFieldSet, golang: GolangSubsystem
         package_name = main_pkg_analysis.analysis.name
 
     if package_name != "main":
+        if main_pkg.is_third_party_module:
+            main_alias = GoThirdPartyModuleTarget.alias
+        elif main_pkg.is_third_party:
+            main_alias = GoThirdPartyPackageTarget.alias
+        else:
+            main_alias = GoPackageTarget.alias
         raise ValueError(
-            f"{GoThirdPartyPackageTarget.alias if main_pkg.is_third_party else GoPackageTarget.alias} "
-            f"target `{main_pkg.address}` is used as the main package for {GoBinaryTarget.alias} target "
-            f"`{field_set.address}` but uses package name `{package_name}` instead of `main`. Go "
-            "requires that main packages actually use `main` as the package name."
+            f"`{main_alias}` target `{main_pkg.address}` is used as the main package for "
+            f"{GoBinaryTarget.alias} target `{field_set.address}` but uses package name "
+            f"`{package_name}` instead of `main`. Go requires that main packages actually use "
+            "`main` as the package name."
         )
 
-    if (
-        main_pkg.is_third_party
-        and golang.third_party_target_granularity == ThirdPartyTargetGranularity.module
-    ):
+    if main_pkg.is_third_party_module:
         assert isinstance(main_pkg.import_path, str)
-        # The address identifies the whole module; build the main package by import path.
         fallible_request = await setup_build_go_package_target_request_for_third_party(
             BuildGoPackageRequestForThirdPartyPackageRequest(
                 import_path=main_pkg.import_path,

@@ -453,7 +453,8 @@ def test_package_first_party_with_third_party_imports_module_granularity(
     assert result.stdout == b"Hello world!\n"
 
 
-def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
+@pytest.mark.parametrize("granularity", ["package", "module"])
+def test_package_with_dependencies(rule_runner: RuleRunner, granularity: str) -> None:
     rule_runner.write_files(
         {
             "lib/lib.go": dedent(
@@ -519,6 +520,9 @@ def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
                 """
             ),
         }
+    )
+    rule_runner.set_options(
+        [f"--golang-third-party-target-granularity={granularity}"], env_inherit={"PATH"}
     )
     binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
     built_package = build_package(rule_runner, binary_tgt)

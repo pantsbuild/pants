@@ -187,7 +187,6 @@ async def setup_build_go_package_target_request_for_stdlib(
             direct_dependency_import_pats.add("syscall")
 
     direct_dependencies_wrapped = await concurrently(
-        # TODO need to move setup_build_go_package_target_request_for_stdlib around above this rule
         setup_build_go_package_target_request_for_stdlib(
             BuildGoPackageRequestForStdlibRequest(
                 import_path=dep_import_path,

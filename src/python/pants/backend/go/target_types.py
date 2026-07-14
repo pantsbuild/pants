@@ -221,7 +221,12 @@ class GoImportPathField(StringField):
     value: str
 
 
-class GoThirdPartyPackageDependenciesField(Dependencies):
+class GoThirdPartyDependenciesField(Dependencies):
+    """Shared base of the third-party deps fields; `has_field` of this matches any third-party Go
+    target, while the concrete subclasses distinguish package- from module-granularity."""
+
+
+class GoThirdPartyPackageDependenciesField(GoThirdPartyDependenciesField):
     pass
 
 
@@ -234,12 +239,42 @@ class GoThirdPartyPackageTarget(Target):
 
         You should not explicitly create this target in BUILD files. Instead, add a `go_mod`
         target where you have your `go.mod` file, which will generate
-        `go_third_party_package` targets for you.
-
-        Under `[golang].third_party_target_granularity = "module"`, one target is generated
-        per third-party module instead, addressed by the module's import path.
+        `go_third_party_package` targets for you (one per package, under the default
+        `[golang].third_party_target_granularity = "package"`).
 
         Make sure that your `go.mod` and `go.sum` files include this package's module.
+        """
+    )
+
+    def validate(self) -> None:
+        if not self.address.is_generated_target:
+            raise InvalidTargetException(
+                f"The `{self.alias}` target type should not be manually created in BUILD "
+                f"files, but it was created for {self.address}.\n\n"
+                "Instead, add a `go_mod` target where you have your `go.mod` file, which will "
+                f"generate `{self.alias}` targets for you based on the `require` directives in "
+                f"your `go.mod`."
+            )
+
+
+class GoThirdPartyModuleDependenciesField(GoThirdPartyDependenciesField):
+    pass
+
+
+class GoThirdPartyModuleTarget(Target):
+    alias = "go_third_party_module"
+    core_fields = (*COMMON_TARGET_FIELDS, GoThirdPartyModuleDependenciesField, GoImportPathField)
+    help = help_text(
+        """
+        A third-party Go module.
+
+        You should not explicitly create this target in BUILD files. Under
+        `[golang].third_party_target_granularity = "module"`, adding a `go_mod` target generates
+        one `go_third_party_module` target per third-party module, addressed by the module's
+        import path (its root package). Other packages in the module are compiled on demand when
+        imported; use `go_binary`'s `main_import_path` field to build a specific package.
+
+        Make sure that your `go.mod` and `go.sum` files include this module.
         """
     )
 
@@ -304,14 +339,16 @@ class GoModTarget(TargetGenerator):
         """
         A first-party Go module (corresponding to a `go.mod` file).
 
-        Generates `go_third_party_package` targets based on the `require` directives in your
-        `go.mod`.
+        Generates `go_third_party_package` targets (or `go_third_party_module` targets under
+        `[golang].third_party_target_granularity = "module"`) based on the `require` directives in
+        your `go.mod`.
 
         If you have third-party packages, make sure you have an up-to-date `go.sum`. Run
         `go mod tidy` directly to update your `go.mod` and `go.sum`.
         """
     )
-    generated_target_cls = GoThirdPartyPackageTarget
+    # No `generated_target_cls`: this generator emits `go_third_party_package` or
+    # `go_third_party_module` by granularity, resolving `__defaults__` itself (`generate_targets_from_go_mod`).
     core_fields = (
         *COMMON_TARGET_FIELDS,
         GoModDependenciesField,
@@ -451,8 +488,8 @@ class GoBinaryMainImportPathField(StringField, AsyncFieldMixin):
 
 
 class GoBinaryDependenciesField(Dependencies):
-    # This is only used to inject a dependency from the `GoBinaryMainPackageField`. Users should
-    # add any explicit dependencies to the `go_package`.
+    # This is only used to inject the dependency on the main package (from either the `main` or
+    # `main_import_path` field). Users should add any explicit dependencies to the `go_package`.
     alias = "_dependencies"
 
 

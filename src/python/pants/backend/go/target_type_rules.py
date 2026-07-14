@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.go.dependency_inference import (
     AllGoModuleImportPathsMappings,
@@ -25,6 +26,8 @@ from pants.backend.go.target_types import (
     GoModSourcesField,
     GoModTarget,
     GoPackageSourcesField,
+    GoThirdPartyModuleDependenciesField,
+    GoThirdPartyModuleTarget,
     GoThirdPartyPackageDependenciesField,
     GoThirdPartyPackageTarget,
 )
@@ -63,6 +66,7 @@ from pants.core.target_types import (
 )
 from pants.engine.addresses import Address
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.internals.build_files import AddressFamilyDir, ensure_address_family
 from pants.engine.internals.graph import resolve_target
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -75,6 +79,7 @@ from pants.engine.target import (
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
+    Target,
     WrappedTargetRequest,
 )
 from pants.engine.unions import UnionMembership, UnionRule
@@ -134,7 +139,6 @@ class FirstPartyGoModuleImportPathsMappingsHook(GoModuleImportPathsMappingsHook)
 async def go_map_import_paths_by_module(
     _request: FirstPartyGoModuleImportPathsMappingsHook,
     all_targets: AllTargets,
-    golang: GolangSubsystem,
 ) -> GoModuleImportPathsMappings:
     import_paths_by_module: dict[Address, dict[str, set[Address]]] = defaultdict(
         lambda: defaultdict(set)
@@ -170,15 +174,14 @@ async def go_map_import_paths_by_module(
     ):
         import_paths_by_module[owning_go_mod.address][import_path_info.import_path].add(addr)
 
-    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.module:
-        # Map every package import path to its owning module's target.
-        module_granularity_go_mods = sorted(
-            {
-                owning_go_mod.address
-                for tgt, owning_go_mod in zip(candidate_go_source_targets, owning_go_mod_targets)
-                if tgt.has_field(GoThirdPartyPackageDependenciesField)
-            }
-        )
+    module_granularity_go_mods = sorted(
+        {
+            owning_go_mod.address
+            for tgt, owning_go_mod in zip(candidate_go_source_targets, owning_go_mod_targets)
+            if tgt.has_field(GoThirdPartyModuleDependenciesField)
+        }
+    )
+    if module_granularity_go_mods:
         module_expansions = await concurrently(
             expand_module_import_paths(ModuleImportPathsExpansionRequest(go_mod_addr))
             for go_mod_addr in module_granularity_go_mods
@@ -326,7 +329,12 @@ async def resolve_go_binary_main_import_path(
     if wrapped_main_tgt.target.has_field(GoPackageSourcesField):
         return GoBinaryMainPackage(wrapped_main_tgt.target.address, is_third_party=False)
     return GoBinaryMainPackage(
-        wrapped_main_tgt.target.address, is_third_party=True, import_path=import_path
+        wrapped_main_tgt.target.address,
+        is_third_party=True,
+        import_path=import_path,
+        is_third_party_module=wrapped_main_tgt.target.has_field(
+            GoThirdPartyModuleDependenciesField
+        ),
     )
 
 
@@ -448,12 +456,7 @@ class InferGoThirdPartyPackageDependenciesRequest(InferDependenciesRequest):
 @rule(desc="Infer dependencies for third-party Go packages", level=LogLevel.DEBUG)
 async def infer_go_third_party_package_dependencies(
     request: InferGoThirdPartyPackageDependenciesRequest,
-    golang: GolangSubsystem,
 ) -> InferredDependencies:
-    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.module:
-        # Module targets carry no inter-module edges: Go module graphs may contain cycles.
-        return InferredDependencies(())
-
     addr = request.field_set.address
     go_mod_address = addr.maybe_convert_to_target_generator()
 
@@ -551,10 +554,12 @@ async def generate_targets_from_go_mod(
     if go_mod_sources.go_sum_path in go_mod_snapshot.files:
         file_tgts.append(gen_file_tgt("go.sum"))
 
-    def create_tgt(import_path: str) -> GoThirdPartyPackageTarget:
-        return GoThirdPartyPackageTarget(
+    def create_tgt(
+        import_path: str, target_type: type[Target], template: Mapping[str, Any]
+    ) -> Target:
+        return target_type(
             {
-                **request.template,
+                **template,
                 GoImportPathField.alias: import_path,
                 Dependencies.alias: [t.address.spec for t in file_tgts],
             },
@@ -564,17 +569,28 @@ async def generate_targets_from_go_mod(
             residence_dir=generator_addr.spec_path,
         )
 
-    import_paths: Iterable[str] = all_packages.import_paths_to_pkg_info.keys()
-    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.module:
-        # One target per module, addressed by module path.
-        import_paths = sorted(
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.MODULE:
+        import_paths: Iterable[str] = sorted(
             {
                 pkg_info.module_import_path
                 for pkg_info in all_packages.import_paths_to_pkg_info.values()
             }
         )
+        target_type: type[Target] = GoThirdPartyModuleTarget
+    else:
+        import_paths = all_packages.import_paths_to_pkg_info.keys()
+        target_type = GoThirdPartyPackageTarget
 
-    result = tuple(create_tgt(import_path) for import_path in import_paths) + tuple(file_tgts)
+    # GoModTarget has no `generated_target_cls`, so resolve the emitted type's `__defaults__` here.
+    address_family = await ensure_address_family(
+        **implicitly(AddressFamilyDir(generator_addr.spec_path))
+    )
+    template: Mapping[str, Any] = {
+        **address_family.defaults.get(target_type.alias, {}),
+        **request.template,
+    }
+
+    result = tuple(create_tgt(ip, target_type, template) for ip in import_paths) + tuple(file_tgts)
     return GeneratedTargets(request.generator, result)
 
 

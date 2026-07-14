@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -17,7 +18,7 @@ from pants.backend.go.target_types import (
     GoCompilerFlagsField,
     GoImportPathField,
     GoPackageSourcesField,
-    GoThirdPartyPackageDependenciesField,
+    GoThirdPartyDependenciesField,
 )
 from pants.backend.go.util_rules import build_opts, build_pkg_stdlib, build_pkg_third_party
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
@@ -82,6 +83,8 @@ from pants.engine.unions import UnionMembership, union
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import bullet_list
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -181,7 +184,6 @@ async def setup_build_go_package_target_request(
 
     codegen_request = maybe_get_codegen_request_type(target, request.build_opts, union_membership)
     if codegen_request:
-        # TODO need to move setup_build_go_package_target_request_for_stdlib around to resolve circular dependency
         codegen_result = await get_build_request_for_generated_code(
             **implicitly({codegen_request: GoCodegenBuildRequest})
         )
@@ -273,7 +275,7 @@ async def setup_build_go_package_target_request(
             fortran_files = ()
             embed_config = _first_party_pkg_digest.xtest_embed_config
 
-    elif target.has_field(GoThirdPartyPackageDependenciesField):
+    elif target.has_field(GoThirdPartyDependenciesField):
         import_path = target[GoImportPathField].value
         base_import_path = import_path
 
@@ -453,8 +455,9 @@ async def setup_build_go_package_target_request(
         assert maybe_pkg_dep.request
         pkg_direct_dependencies.append(maybe_pkg_dep.request)
 
-    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.module:
-        # Compile imports that no dependency target provided by import path.
+    # Module granularity: a third-party target is only its module root, so its other packages have
+    # no dep edge and resolve here by import path. Guarded so package mode still fails on a real gap.
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.MODULE:
         third_party_remaining = [
             imp
             for imp in sorted(remaining_imports_set)
@@ -475,6 +478,22 @@ async def setup_build_go_package_target_request(
                     build_opts=request.build_opts,
                 )
             )
+            resolvable = [
+                imp
+                for imp in third_party_remaining
+                if imp in owning_mod_all_packages.import_paths_to_pkg_info
+            ]
+            unresolved = [
+                imp
+                for imp in third_party_remaining
+                if imp not in owning_mod_all_packages.import_paths_to_pkg_info
+            ]
+            if unresolved:
+                # Not in the index (e.g. `replace` directive, missing module); leave it for the compiler.
+                logger.debug(
+                    f"Building {request.address}: no third-party package found for imports "
+                    f"{sorted(unresolved)} in `{owning_go_mod_info.mod_path}`."
+                )
             maybe_third_party_deps = await concurrently(
                 setup_build_go_package_target_request_for_third_party(
                     BuildGoPackageRequestForThirdPartyPackageRequest(
@@ -483,8 +502,7 @@ async def setup_build_go_package_target_request(
                         build_opts=request.build_opts,
                     )
                 )
-                for imp in third_party_remaining
-                if imp in owning_mod_all_packages.import_paths_to_pkg_info
+                for imp in resolvable
             )
             for maybe_pkg_dep in maybe_third_party_deps:
                 if maybe_pkg_dep.request is None:
@@ -495,7 +513,6 @@ async def setup_build_go_package_target_request(
     if request.for_xtests and any(
         dep_import_path == base_import_path for dep_import_path in imports
     ):
-        # TODO need to move setup_build_go_package_target_request_for_stdlib around to resolve circular dependency
         maybe_base_pkg_dep = await setup_build_go_package_target_request(
             BuildGoPackageTargetRequest(
                 request.address,
