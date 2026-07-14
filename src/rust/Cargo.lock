@@ -4801,6 +4801,7 @@ dependencies = [
  "futures",
  "indexmap 2.13.0",
  "indicatif",
+ "log",
  "logging",
  "parking_lot 0.12.5",
  "prodash",

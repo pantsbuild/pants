@@ -47,10 +47,11 @@ impl Instance {
 
         if ui_use_prodash {
             let instance =
-                prodash::ProdashInstance::new(executor.clone(), terminal_width, terminal_height)?;
+                prodash::ProdashInstance::new(executor, terminal_width, terminal_height)?;
             Ok(Instance::Prodash(instance))
         } else {
             let instance = indicatif::IndicatifInstance::new(
+                executor,
                 local_parallelism,
                 terminal_width,
                 terminal_height,
