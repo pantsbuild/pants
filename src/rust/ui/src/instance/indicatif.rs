@@ -82,7 +82,7 @@ impl IndicatifInstance {
             interval: ConsoleUI::render_interval(),
         };
         let join_handle = thread::Builder::new()
-            .name("pants-indicatif-render".into())
+            .name("pants-spinner".into())
             .spawn(move || render_loop.run())
             .map_err(|e| format!("Failed to spawn indicatif render thread: {e}"))?;
 
