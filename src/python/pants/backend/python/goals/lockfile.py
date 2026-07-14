@@ -67,7 +67,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.internals.native_engine import EMPTY_DIGEST, EngineError
+from pants.engine.internals.native_engine import EMPTY_DIGEST, IntrinsicError
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.intrinsics import (
@@ -220,7 +220,6 @@ async def generate_pex_lockfile(
             PexCliProcess(
                 subcommand=("lock", "sync" if generate_lockfiles_subsystem.sync else "create"),
                 extra_args=(
-                    "-v",
                     f"{output_flag}={req.lockfile_dest}",
                     f"--style={req.lock_style}",
                     "--pip-version",
@@ -402,7 +401,7 @@ async def generate_uv_lockfile(
                     raise ValueError(
                         f"Expected lockfile entry to be a FileEntry but was a {type(repo_lock_entry)}"
                     )
-        except EngineError:
+        except IntrinsicError:
             # May fail if the file doesn't exist, which is expected the first time a new lockfile
             # is generated.
             pass
