@@ -4,8 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
-import subprocess
 from io import BytesIO
 from textwrap import dedent
 from typing import Any
@@ -28,10 +26,7 @@ from pants.backend.awslambda.python.target_types import (
     PythonAWSLambdaLayer,
 )
 from pants.backend.awslambda.python.target_types import rules as target_rules
-from pants.backend.python.goals import package_pex_binary
-from pants.backend.python.goals.package_pex_binary import PexBinaryFieldSet
 from pants.backend.python.target_types import (
-    PexBinary,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
 )
@@ -65,7 +60,6 @@ def rule_runner() -> PythonRuleRunner:
         rules=[
             *awslambda_python_rules(),
             *core_target_types_rules(),
-            *package_pex_binary.rules(),
             *python_target_types_rules(),
             *target_rules(),
             *package.rules(),
@@ -75,7 +69,6 @@ def rule_runner() -> PythonRuleRunner:
         target_types=[
             FileTarget,
             FilesGeneratorTarget,
-            PexBinary,
             PythonAWSLambda,
             PythonAWSLambdaLayer,
             PythonRequirementTarget,
@@ -120,31 +113,6 @@ def create_python_awslambda(
     assert expected_metadata == json.loads(metadata.content)
 
     return relpath, artifact.content
-
-
-@pytest.fixture
-def complete_platform(rule_runner: PythonRuleRunner) -> bytes:
-    rule_runner.write_files(
-        {
-            "pex_exe/BUILD": dedent(
-                """\
-                python_requirement(name="req", requirements=["pex==2.1.112"])
-                pex_binary(dependencies=[":req"], script="pex")
-                """
-            ),
-        }
-    )
-    result = rule_runner.request(
-        BuiltPackage, [PexBinaryFieldSet.create(rule_runner.get_target(Address("pex_exe")))]
-    )
-    rule_runner.write_digest(result.digest)
-    pex_executable = os.path.join(rule_runner.build_root, "pex_exe/pex_exe.pex")
-    return subprocess.run(
-        args=[pex_executable, "interpreter", "inspect", "-mt"],
-        env=dict(PEX_MODULE="pex.cli", **os.environ),
-        check=True,
-        stdout=subprocess.PIPE,
-    ).stdout
 
 
 def test_warn_files_targets(rule_runner: PythonRuleRunner, caplog) -> None:
