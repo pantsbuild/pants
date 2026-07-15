@@ -8,6 +8,7 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from operator import itemgetter
+from typing import cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup, Resolver
@@ -19,7 +20,11 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_diff import _generate_lockfile_diff
-from pants.backend.python.util_rules.lockfile_metadata import LockfileFormat, PythonLockfileMetadata
+from pants.backend.python.util_rules.lockfile_metadata import (
+    LockfileFormat,
+    PythonLockfileMetadata,
+    PythonLockfileMetadataV8,
+)
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     digest_complete_platform_addresses,
@@ -28,10 +33,14 @@ from pants.backend.python.util_rules.pex import (
 from pants.backend.python.util_rules.pex_cli import PexCliProcess, maybe_log_pex_stderr
 from pants.backend.python.util_rules.pex_environment import PexSubsystem
 from pants.backend.python.util_rules.pex_requirements import (
+    LoadedLockfileRequest,
     PexRequirements,
+    Resolve,
     ResolveConfig,
     ResolveConfigRequest,
     determine_resolve_config,
+    get_lockfile_for_resolve,
+    load_lockfile,
     strip_comments_from_pex_json_lockfile,
 )
 from pants.backend.python.util_rules.uv import UvEnvironment, generate_pyproject_toml
@@ -53,16 +62,18 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     FileContent,
+    FileEntry,
     GlobExpansionConjunction,
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.internals.native_engine import EMPTY_DIGEST
+from pants.engine.internals.native_engine import EMPTY_DIGEST, IntrinsicError
 from pants.engine.internals.synthetic_targets import SyntheticAddressMaps, SyntheticTargetsRequest
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.intrinsics import (
     create_digest,
     get_digest_contents,
+    get_digest_entries,
     merge_digests,
     path_globs_to_digest,
 )
@@ -248,7 +259,7 @@ async def generate_pex_lockfile(
                 ),
                 output_files=(req.lockfile_dest,),
                 description=f"Generate pex lockfile for {req.resolve_name}",
-                # Instead of caching lockfile generation with LMDB, we instead use the invalidation
+                # Instead of caching lockfile generation with LMDB, we use the invalidation
                 # scheme from `lockfile_metadata.py` to check for stale/invalid lockfiles. This is
                 # necessary so that our invalidation is resilient to deleting LMDB or running on a
                 # new machine.
@@ -360,23 +371,41 @@ async def generate_uv_lockfile(
         sources=resolve_config.sources,
     )
 
+    # uv always writes the lockfile to `uv.lock` in the project directory. We capture that
+    # and rename it to req.lockfile_dest in the final digest.
+    uv_lock = "uv.lock"
+
+    existing_uv_lock_digest = EMPTY_DIGEST
     if generate_lockfiles_subsystem.sync:
         # `uv lock` does a minimal update by default if an existing lockfile is present.
         # So we just need to make sure it is. There are no special flags to specify.
-        existing_lockfile_digest = await path_globs_to_digest(
-            PathGlobs(
-                globs=(req.lockfile_dest,),
-                # We ignore errors, since the lockfile may not exist.
-                glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-                conjunction=GlobExpansionConjunction.any_match,
-            )
-        )
-    else:
-        existing_lockfile_digest = EMPTY_DIGEST
+        lockfile = await get_lockfile_for_resolve(Resolve(req.resolve_name, False), **implicitly())
+        try:
+            loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
+            if (
+                isinstance(metadata_v8 := loaded_lockfile.metadata, PythonLockfileMetadataV8)
+                and metadata_v8.lockfile_format == LockfileFormat.UV
+            ):
+                # Rename the configured lockfile destination to uv.lock.
+                if isinstance(
+                    repo_lock_entry := next(
+                        iter(await get_digest_entries(loaded_lockfile.lockfile_digest))
+                    ),
+                    FileEntry,
+                ):
+                    existing_uv_lock_digest = await create_digest(
+                        CreateDigest([FileEntry(uv_lock, repo_lock_entry.file_digest)])
+                    )
+                else:
+                    # Should never happen, assuming the lockfile is a regular file.
+                    raise ValueError(
+                        f"Expected lockfile entry to be a FileEntry but was a {type(repo_lock_entry)}"
+                    )
+        except IntrinsicError:
+            # May fail if the file doesn't exist, which is expected the first time a new lockfile
+            # is generated.
+            pass
 
-    # uv always writes the lockfile to `uv.lock` in the project directory. We capture that
-    # and rename it to req.lockfile_dest in the final digest.
-    uv_lock_output = "uv.lock"
     uv_config = resolve_config.uv_config(extra_find_links=req.find_links)
 
     uv_config_digest = await create_digest(
@@ -389,7 +418,7 @@ async def generate_uv_lockfile(
     )
 
     input_digest = await merge_digests(
-        MergeDigests([downloaded_uv.digest, uv_config_digest, existing_lockfile_digest])
+        MergeDigests([downloaded_uv.digest, uv_config_digest, existing_uv_lock_digest])
     )
 
     result = await execute_process_or_raise(
@@ -401,7 +430,7 @@ async def generate_uv_lockfile(
                 ),
                 env=uv_env.env,
                 input_digest=input_digest,
-                output_files=(uv_lock_output,),
+                output_files=(uv_lock,),
                 append_only_caches=downloaded_uv.append_only_caches(),
                 description=f"Generate uv lockfile for {req.resolve_name}",
                 # We disable persistent caching so that when you generate a lockfile, you always
@@ -412,9 +441,9 @@ async def generate_uv_lockfile(
     )
 
     # Rename uv.lock to the configured lockfile destination.
-    uv_lock_contents = await get_digest_contents(result.output_digest)
-    uv_lock_digest = await create_digest(
-        CreateDigest([FileContent(req.lockfile_dest, next(iter(uv_lock_contents)).content)])
+    uv_lock_entry = cast(FileEntry, next(iter(await get_digest_entries(result.output_digest))))
+    repo_lock_digest = await create_digest(
+        CreateDigest([FileEntry(req.lockfile_dest, uv_lock_entry.file_digest)])
     )
 
     regenerate_command = (
@@ -454,7 +483,7 @@ async def generate_uv_lockfile(
             ]
         )
     )
-    final_lockfile_digest = await merge_digests(MergeDigests([metadata_digest, uv_lock_digest]))
+    final_lockfile_digest = await merge_digests(MergeDigests([metadata_digest, repo_lock_digest]))
 
     if req.diff:
         diff = await _generate_lockfile_diff(

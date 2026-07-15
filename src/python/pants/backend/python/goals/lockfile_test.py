@@ -24,6 +24,7 @@ from pants.backend.python.util_rules.interpreter_constraints import InterpreterC
 from pants.backend.python.util_rules.lockfile_metadata import LockfileFormat
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult, UserGenerateLockfiles
 from pants.engine.fs import DigestContents
+from pants.engine.internals.native_engine import Digest
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule
@@ -766,3 +767,136 @@ def test_uv_lockfile_generation_with_sources(rule_runner: PythonRuleRunner) -> N
     packages = {pkg["name"]: pkg for pkg in lock_data.get("package", []) if "version" in pkg}
     assert "ansicolors" in packages
     assert packages["ansicolors"]["version"] == "1.1.8"
+
+
+def test_pex_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
+    # Pex's "sync" semantics are slightly different from uv's. Pex will update packages whose
+    # requirement strings have changed. So to test the pex case we constrain the initial `cowsay`
+    # version to 6.0 via a constraints file.
+    orig_requirements = FrozenOrderedSet(["ansicolors==1.1.7", "cowsay>=6.0,<=6.1"])
+    updated_requirements = FrozenOrderedSet(["ansicolors==1.1.8", "cowsay>=6.0,<=6.1"])
+
+    def generate(reqs: FrozenOrderedSet[str], sync: bool, with_constraints: bool = False) -> Digest:
+        # Generates a lockfile and returns its output digest.
+        sync_opt = "--generate-lockfiles-sync" if sync else "--no-generate-lockfiles-sync"
+        args = [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-separate-lockfile-metadata-file",
+            sync_opt,
+        ]
+        if with_constraints:
+            args.append("--python-resolves-to-constraints-file={'test': 'constraints.txt'}")
+        rule_runner.write_files({"constraints.txt": "cowsay==6.0"})
+        rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
+        req = GeneratePexLockfile(
+            requirements=reqs,
+            find_links=FrozenOrderedSet([]),
+            interpreter_constraints=InterpreterConstraints(["CPython==3.14.*"]),
+            lock_style="universal",
+            complete_platforms=tuple(),
+            resolve_name="test",
+            lockfile_dest="test.lock",
+            diff=False,
+        )
+
+        result = rule_runner.request(
+            GenerateLockfileResult,
+            [req],
+        )
+        return result.digest
+
+    def get_versions(digest: Digest) -> dict[str, str]:
+        # Returns a map of package names to versions from a lockfile in a digest.
+        digest_contents = rule_runner.request(DigestContents, [digest])
+        path_to_file_content = {fc.path: fc for fc in digest_contents}
+        assert "test.lock" in path_to_file_content
+        assert "test.lock.metadata" in path_to_file_content
+        lock_data = json.loads(path_to_file_content["test.lock"].content.decode())
+        package_to_version = {
+            pkg["project_name"]: pkg["version"]
+            for pkg in lock_data["locked_resolves"][0]["locked_requirements"]
+        }
+        return package_to_version
+
+    def generate_and_get_versions(reqs: FrozenOrderedSet[str], sync: bool) -> dict[str, str]:
+        # Generates a lockfile and returns a map of package names to versions.
+        return get_versions(generate(reqs, sync))
+
+    # Generate the initial lockfile and write its digest.
+    digest = generate(orig_requirements, False, with_constraints=True)
+    rule_runner.write_digest(digest)
+    versions = get_versions(digest)
+    assert {"ansicolors": "1.1.7", "cowsay": "6.0"} == versions
+
+    # Regenerate without --sync (note that we don't write the digest, so this updated lockfile
+    # does not affect the following call to generate_and_get_versions).
+    versions = generate_and_get_versions(updated_requirements, sync=False)
+    assert {"ansicolors": "1.1.8", "cowsay": "6.1"} == versions
+
+    # Regenerate with --sync.
+    versions = generate_and_get_versions(updated_requirements, sync=True)
+    assert {"ansicolors": "1.1.8", "cowsay": "6.0"} == versions
+
+
+def test_uv_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
+    # uv's "sync" semantics are slightly different from pex's. uv will not update packages even
+    # if their requirement strings have changed, as long as the old version still is still valid.
+    # So we can constrain `cowsay` directly in the requirement string.
+    orig_requirements = FrozenOrderedSet(["ansicolors==1.1.7", "cowsay==6.0"])
+    updated_requirements = FrozenOrderedSet(["ansicolors==1.1.8", "cowsay>=6.0,<=6.1"])
+
+    def generate(reqs: FrozenOrderedSet[str], sync: bool) -> Digest:
+        # Generates a lockfile and returns its output digest.
+        sync_opt = "--generate-lockfiles-sync" if sync else "--no-generate-lockfiles-sync"
+        args = [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-separate-lockfile-metadata-file",
+            sync_opt,
+        ]
+        rule_runner.write_files({"constraints.txt": "cowsay==6.0"})
+        rule_runner.set_options(args, env_inherit=PYTHON_BOOTSTRAP_ENV)
+        req = GenerateUvLockfile(
+            requirements=reqs,
+            find_links=FrozenOrderedSet([]),
+            interpreter_constraints=InterpreterConstraints(["CPython==3.14"]),
+            resolve_name="test",
+            lockfile_dest="test.lock",
+            diff=False,
+        )
+
+        result = rule_runner.request(
+            GenerateLockfileResult,
+            [req],
+        )
+        return result.digest
+
+    def get_versions(digest: Digest) -> dict[str, str]:
+        # Returns a map of package names to versions from a lockfile in a digest.
+        digest_contents = rule_runner.request(DigestContents, [digest])
+        path_to_file_content = {fc.path: fc for fc in digest_contents}
+        assert "test.lock" in path_to_file_content
+        assert "test.lock.metadata" in path_to_file_content
+        lock_data = tomllib.loads(path_to_file_content["test.lock"].content.decode())
+        package_to_version = {pkg["name"]: pkg["version"] for pkg in lock_data.get("package", [])}
+        del package_to_version["pants-lockfile-for-test"]
+        return package_to_version
+
+    def generate_and_get_versions(reqs: FrozenOrderedSet[str], sync: bool) -> dict[str, str]:
+        # Generates a lockfile and returns a map of package names to versions.
+        return get_versions(generate(reqs, sync))
+
+    # Generate the initial lockfile and write its digest (we also test that `sync` works when
+    # there is no lockfile).
+    digest = generate(orig_requirements, True)
+    rule_runner.write_digest(digest)
+    versions = get_versions(digest)
+    assert {"ansicolors": "1.1.7", "cowsay": "6.0"} == versions
+
+    # Regenerate without --sync (note that we don't write the digest, so this updated lockfile
+    # does not affect the following call to generate_and_get_versions).
+    versions = generate_and_get_versions(updated_requirements, sync=False)
+    assert {"ansicolors": "1.1.8", "cowsay": "6.1"} == versions
+
+    # Regenerate with --sync.
+    versions = generate_and_get_versions(updated_requirements, sync=True)
+    assert {"ansicolors": "1.1.8", "cowsay": "6.0"} == versions
