@@ -44,7 +44,7 @@ impl ParsedJVMCommandLines {
         if args_to_consume.clone().peekable().peek().is_some() {
             return Err(format!(
                 "Malformed command line: There are still arguments to consume: {:?}",
-                &args_to_consume
+                args_to_consume
             ));
         }
 

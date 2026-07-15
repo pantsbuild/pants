@@ -131,10 +131,10 @@ impl DockerOnceCell {
             let major = (*major).parse::<usize>().map_err(|err| format!("Failed to decode Docker API major version `{major}`: {err}"))?;
             let minor = (*minor).parse::<usize>().map_err(|err| format!("Failed to decode Docker API minor version `{minor}`: {err}"))?;
             if major < 1 || (major == 1 && minor < 41) {
-              return Err(format!("Pants requires Docker to support API version 1.41 or higher. Local Docker only supports: {:?}", &version.api_version));
+              return Err(format!("Pants requires Docker to support API version 1.41 or higher. Local Docker only supports: {:?}", version.api_version));
             }
           }
-          _ => return Err(format!("Unparseable API version `{}` returned by Docker.", &api_version)),
+          _ => return Err(format!("Unparseable API version `{}` returned by Docker.", api_version)),
         }
         Ok(docker)
       })
@@ -560,7 +560,7 @@ impl process_execution::CommandRunner for CommandRunner<'_> {
                             .into_string()
                             .map_err(|s| format!("Unable to convert sandbox path to string due to non UTF-8 characters: {s:?}"))?;
                         apply_chroot(&sandbox_path_in_container, &mut mreq);
-                        log::trace!("sandbox_path_in_container = {:?}", &sandbox_path_in_container);
+                        log::trace!("sandbox_path_in_container = {:?}", sandbox_path_in_container);
                         mreq.working_directory
                             .as_ref()
                             .map(|relpath| Path::new(&sandbox_path_in_container).join(relpath))
@@ -795,7 +795,7 @@ impl Command {
                 err,
             })?;
 
-        log::trace!("created execution {}", &exec.id);
+        log::trace!("created execution {}", exec.id);
 
         let exec_result =
             docker
@@ -811,7 +811,7 @@ impl Command {
             panic!("Unexpected value returned from start_exec: {exec_result:?}");
         };
 
-        log::trace!("started execution {}", &exec.id);
+        log::trace!("started execution {}", exec.id);
 
         let exec_id = exec.id.to_owned();
         let docker = docker.to_owned();
@@ -821,16 +821,16 @@ impl Command {
           while let Some(output_msg) = output_stream.next().await {
             match output_msg {
                 Ok(LogOutput::StdOut { message }) => {
-                    log::trace!("execution {} wrote {} bytes to stdout", &exec_id, message.len());
+                    log::trace!("execution {} wrote {} bytes to stdout", exec_id, message.len());
                     yield ChildOutput::Stdout(message);
                 }
                 Ok(LogOutput::StdErr { message }) => {
-                    log::trace!("execution {} wrote {} bytes to stderr", &exec_id, message.len());
+                    log::trace!("execution {} wrote {} bytes to stderr", exec_id, message.len());
                     yield ChildOutput::Stderr(message);
                 }
                 Ok(_) => (),
                 Err(err) => {
-                    log::trace!("error while capturing output of execution {}: {:?}", &exec_id, err);
+                    log::trace!("error while capturing output of execution {}: {:?}", exec_id, err);
                 }
             }
           }
@@ -838,11 +838,11 @@ impl Command {
           let exec_metadata = docker
             .inspect_exec(&exec_id)
             .await
-            .map_err(|err| format!("Failed to inspect Docker execution `{}`: {:?}", &exec_id, err))?;
+            .map_err(|err| format!("Failed to inspect Docker execution `{}`: {:?}", exec_id, err))?;
 
           let status_code = exec_metadata
             .exit_code
-            .ok_or_else(|| format!("Inspected execution `{}` for exit status but status was missing.", &exec_id))?;
+            .ok_or_else(|| format!("Inspected execution `{}` for exit status but status was missing.", exec_id))?;
 
           log::trace!("execution {} exited with status code {}", &exec_id, status_code);
 
@@ -997,13 +997,13 @@ impl<'a> ContainerCache<'a> {
             .map_err(|err| {
                 format!(
                     "Failed to start Docker container `{}` for image `{image_name}`: {err:?}",
-                    &container.id
+                    container.id
                 )
             })?;
 
         log::debug!(
             "started container `{}` for image `{image_name}`",
-            &container.id,
+            container.id,
         );
 
         Ok(container.id)

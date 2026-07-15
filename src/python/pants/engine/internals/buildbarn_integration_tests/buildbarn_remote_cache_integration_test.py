@@ -7,10 +7,11 @@ import os
 import shutil
 import subprocess
 import time
+from collections.abc import Callable
 
 import pytest
 
-from pants.engine.fs import Digest, DigestContents
+from pants.engine.fs import CreateDigest, Digest, DigestContents, Directory
 from pants.engine.internals.buildbarn_integration_tests.stack import LocalBuildbarnStack
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
@@ -49,7 +50,10 @@ def _remote_cache_args(address: str, instance_name: str) -> list[str]:
 
 
 def _run_process(
-    process: Process, *, address: str, instance_name: str
+    process_input: Process | Callable[[RuleRunner], Process],
+    *,
+    address: str,
+    instance_name: str,
 ) -> tuple[dict[str, bytes], Digest, dict[str, int]]:
     rule_runner = RuleRunner(
         rules=[
@@ -64,6 +68,7 @@ def _run_process(
         ],
     )
 
+    process = process_input if isinstance(process_input, Process) else process_input(rule_runner)
     result = rule_runner.request(ProcessResult, [process])
     contents = rule_runner.request(DigestContents, [result.output_digest])
 
@@ -76,80 +81,106 @@ def _run_process(
     )
 
 
-def test_buildbarn_remote_cache_roundtrips_file_and_directory_outputs() -> None:
-    expected_contents = {
-        "file.txt": b"file-output\n",
-        "out/nested.txt": b"nested-output\n",
-    }
-    process = Process(
+def _working_directory_process(rule_runner: RuleRunner) -> Process:
+    input_digest = rule_runner.request(Digest, [CreateDigest([Directory("workdir")])])
+    return Process(
         [
             "/bin/sh",
             "-c",
-            "/bin/echo file-output > file.txt && /bin/mkdir -p out && /bin/echo nested-output > out/nested.txt",
+            "/bin/echo workdir-root > root.txt && /bin/mkdir -p sub && /bin/echo workdir-child > sub/child.txt",
         ],
-        description="Create file and directory outputs",
-        output_files=["file.txt"],
-        output_directories=["out"],
+        description="Create working directory outputs",
+        input_digest=input_digest,
+        working_directory="workdir",
+        output_directories=[""],
         level=LogLevel.INFO,
     )
 
-    with LocalBuildbarnStack() as buildbarn:
-        contents1, digest1, metrics1 = _run_process(
-            process,
-            address=buildbarn.address,
-            instance_name=buildbarn.instance_name,
-        )
-        assert contents1 == expected_contents
-        assert metrics1["remote_cache_requests"] == 1
-        assert metrics1["remote_cache_requests_uncached"] == 1
-        assert "backtrack_attempts" not in metrics1
 
-        contents2, digest2, metrics2 = _run_process(
-            process,
-            address=buildbarn.address,
-            instance_name=buildbarn.instance_name,
-        )
-        assert contents2 == expected_contents
-        assert digest1 == digest2
-        assert metrics2["remote_cache_requests"] == 1
-        assert metrics2["remote_cache_requests_cached"] == 1
-        assert "backtrack_attempts" not in metrics2
-
-
-def test_buildbarn_remote_cache_roundtrips_root_output_directory() -> None:
-    expected_contents = {
-        "root.txt": b"root\n",
-        "sub/child.txt": b"child\n",
-    }
-    process = Process(
-        [
-            "/bin/sh",
-            "-c",
-            "/bin/echo root > root.txt && /bin/mkdir -p sub && /bin/echo child > sub/child.txt",
-        ],
-        description="Create root output directory contents",
-        output_directories=["."],
-        level=LogLevel.INFO,
+def test_buildbarn_remote_cache_roundtrips_outputs(subtests) -> None:
+    cases = (
+        (
+            "file and directory outputs",
+            Process(
+                [
+                    "/bin/sh",
+                    "-c",
+                    "/bin/echo file-output > file.txt && /bin/mkdir -p out && /bin/echo nested-output > out/nested.txt",
+                ],
+                description="Create file and directory outputs",
+                output_files=["file.txt"],
+                output_directories=["out"],
+                level=LogLevel.INFO,
+            ),
+            {
+                "file.txt": b"file-output\n",
+                "out/nested.txt": b"nested-output\n",
+            },
+        ),
+        (
+            'root output directory (".")',
+            Process(
+                [
+                    "/bin/sh",
+                    "-c",
+                    "/bin/echo root > root.txt && /bin/mkdir -p sub && /bin/echo child > sub/child.txt",
+                ],
+                description="Create root output directory contents",
+                output_directories=["."],
+                level=LogLevel.INFO,
+            ),
+            {
+                "root.txt": b"root\n",
+                "sub/child.txt": b"child\n",
+            },
+        ),
+        (
+            'root output directory ("")',
+            Process(
+                [
+                    "/bin/sh",
+                    "-c",
+                    "/bin/echo empty-root > root.txt && /bin/mkdir -p sub && /bin/echo empty-child > sub/child.txt",
+                ],
+                description="Create empty root output directory contents",
+                output_directories=[""],
+                level=LogLevel.INFO,
+            ),
+            {
+                "root.txt": b"empty-root\n",
+                "sub/child.txt": b"empty-child\n",
+            },
+        ),
+        (
+            'working directory output directory ("")',
+            _working_directory_process,
+            {
+                "root.txt": b"workdir-root\n",
+                "sub/child.txt": b"workdir-child\n",
+            },
+        ),
     )
 
     with LocalBuildbarnStack() as buildbarn:
-        contents1, digest1, metrics1 = _run_process(
-            process,
-            address=buildbarn.address,
-            instance_name=buildbarn.instance_name,
-        )
-        assert contents1 == expected_contents
-        assert metrics1["remote_cache_requests"] == 1
-        assert metrics1["remote_cache_requests_uncached"] == 1
-        assert "backtrack_attempts" not in metrics1
+        for name, process_input, expected_contents in cases:
+            with subtests.test(name):
+                contents1, digest1, metrics1 = _run_process(
+                    process_input,
+                    address=buildbarn.address,
+                    instance_name=buildbarn.instance_name,
+                )
+                assert contents1 == expected_contents
+                assert metrics1["remote_cache_requests"] == 1
+                assert metrics1["remote_cache_requests_uncached"] == 1
+                assert "backtrack_attempts" not in metrics1
 
-        contents2, digest2, metrics2 = _run_process(
-            process,
-            address=buildbarn.address,
-            instance_name=buildbarn.instance_name,
-        )
-        assert contents2 == expected_contents
-        assert digest1 == digest2
-        assert metrics2["remote_cache_requests"] == 1
-        assert metrics2["remote_cache_requests_cached"] == 1
-        assert "backtrack_attempts" not in metrics2
+                contents2, digest2, metrics2 = _run_process(
+                    process_input,
+                    address=buildbarn.address,
+                    instance_name=buildbarn.instance_name,
+                )
+                assert contents2 == expected_contents
+                assert digest1 == digest2
+                assert metrics2["remote_cache_requests"] == 1
+                assert metrics2["remote_cache_requests_cached"] == 1
+                assert "backtrack_attempts" not in metrics2

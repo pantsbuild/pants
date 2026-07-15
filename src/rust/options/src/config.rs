@@ -368,7 +368,7 @@ fn add_to_sha256(value: &Value, hasher: &mut Sha256) {
         Value::String(s) => hasher.update(s.as_bytes()),
         Value::Integer(i) => hasher.update(&i.to_le_bytes()),
         Value::Float(f) => hasher.update(&f.to_le_bytes()),
-        Value::Boolean(b) => hasher.update(&(if *b { [b'1'] } else { [b'0'] })),
+        Value::Boolean(b) => hasher.update(&(if *b { *b"1" } else { *b"0" })),
         // We don't support datetime types in config, so we won't incur this to_string() cost
         // in practice.
         Value::Datetime(dt) => hasher.update(dt.to_string().as_bytes()),

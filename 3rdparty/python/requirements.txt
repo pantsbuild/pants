@@ -13,7 +13,7 @@ packaging==26.0
 psutil==7.2.2
 # This should be compatible with pytest.py, although it can be looser so that we don't
 # over-constrain pantsbuild.pants.testutil
-pytest>=7,<9,!=7.1.0,!=7.1.1
+pytest>=7,<10,!=7.1.0,!=7.1.1
 python-lsp-jsonrpc==1.1.2
 PyYAML>=6.0,<7.0
 requests[security]==2.32.5
