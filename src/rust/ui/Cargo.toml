@@ -9,6 +9,7 @@ console = { workspace = true }
 futures = { workspace = true }
 indexmap = { workspace = true }
 indicatif = { workspace = true }
+log = { workspace = true }
 logging = { path = "../logging" }
 parking_lot = { workspace = true }
 # TODO: See https://github.com/Byron/prodash/pull/9.
