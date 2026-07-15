@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
-from pants.backend.codegen.protobuf.target_types import ProtobufDependenciesField
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufDependenciesField,
+    ProtobufGrpcToggleField,
+)
 from pants.backend.scala.subsystems.scala import ScalaSubsystem
 from pants.build_graph.address import Address
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -13,6 +16,7 @@ from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDepe
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
+    UnversionedCoordinate,
     find_jvm_artifacts_or_raise,
 )
 from pants.jvm.resolve.coordinate import Coordinate
@@ -21,14 +25,20 @@ from pants.jvm.target_types import JvmResolveField
 
 _SCALAPB_RUNTIME_GROUP = "com.thesamet.scalapb"
 _SCALAPB_RUNTIME_ARTIFACT = "scalapb-runtime"
+_SCALAPB_RUNTIME_GRPC_ARTIFACT = "scalapb-runtime-grpc"
 
 
 @dataclass(frozen=True)
 class ScalaPBRuntimeDependencyInferenceFieldSet(FieldSet):
-    required_fields = (ProtobufDependenciesField, JvmResolveField)
+    required_fields = (
+        ProtobufDependenciesField,
+        JvmResolveField,
+        ProtobufGrpcToggleField,
+    )
 
     dependencies: ProtobufDependenciesField
     resolve: JvmResolveField
+    grpc: ProtobufGrpcToggleField
 
 
 class InferScalaPBRuntimeDependencyRequest(InferDependenciesRequest):
@@ -75,6 +85,57 @@ async def resolve_scalapb_runtime_for_resolve(
     return ScalaPBRuntimeForResolve(addresses)
 
 
+@dataclass(frozen=True)
+class ScalaPBGrpcRuntimeForResolveRequest:
+    resolve_name: str
+
+
+@dataclass(frozen=True)
+class ScalaPBGrpcRuntimeForResolve:
+    addresses: frozenset[Address]
+
+
+@rule
+async def resolve_scalapb_grpc_runtime_for_resolve(
+    request: ScalaPBGrpcRuntimeForResolveRequest,
+    jvm_artifact_targets: AllJvmArtifactTargets,
+    jvm: JvmSubsystem,
+    scala_subsystem: ScalaSubsystem,
+    scalapb: ScalaPBSubsystem,
+) -> ScalaPBGrpcRuntimeForResolve:
+    scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
+    scala_binary_version = scala_version.binary
+    version = scalapb.version
+
+    addresses = find_jvm_artifacts_or_raise(
+        required_coordinates=[
+            Coordinate(
+                group=_SCALAPB_RUNTIME_GROUP,
+                artifact=f"{_SCALAPB_RUNTIME_GRPC_ARTIFACT}_{scala_binary_version}",
+                version=version,
+            ),
+            UnversionedCoordinate(
+                group="io.grpc",
+                artifact="grpc-netty-shaded",
+            ),
+            UnversionedCoordinate(
+                group="io.grpc",
+                artifact="grpc-protobuf",
+            ),
+            UnversionedCoordinate(
+                group="io.grpc",
+                artifact="grpc-stub",
+            ),
+        ],
+        resolve=request.resolve_name,
+        jvm_artifact_targets=jvm_artifact_targets,
+        jvm=jvm,
+        subsystem="the ScalaPB gRPC runtime",
+        target_type="protobuf_sources",
+    )
+    return ScalaPBGrpcRuntimeForResolve(addresses)
+
+
 @rule
 async def infer_scalapb_runtime_dependency(
     request: InferScalaPBRuntimeDependencyRequest,
@@ -85,7 +146,15 @@ async def infer_scalapb_runtime_dependency(
     scalapb_runtime_target_info = await resolve_scalapb_runtime_for_resolve(
         ScalaPBRuntimeForResolveRequest(resolve), **implicitly()
     )
-    return InferredDependencies(scalapb_runtime_target_info.addresses)
+    addresses: set[Address] = set(scalapb_runtime_target_info.addresses)
+
+    if request.field_set.grpc.value:
+        grpc_runtime_info = await resolve_scalapb_grpc_runtime_for_resolve(
+            ScalaPBGrpcRuntimeForResolveRequest(resolve), **implicitly()
+        )
+        addresses.update(grpc_runtime_info.addresses)
+
+    return InferredDependencies(frozenset(addresses))
 
 
 def rules():
