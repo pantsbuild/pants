@@ -336,3 +336,86 @@ def test_generates_fs2_grpc_via_jvm_plugin(
         ],
         extra_args=["--scalapb-jvm-plugins=+['fs2=org.typelevel:fs2-grpc-codegen_2.12:2.3.1']"],
     )
+
+
+@pytest.fixture
+def scalapb_grpc_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "scalapb-grpc.test.lock",
+        [
+            "com.thesamet.scalapb:scalapb-runtime_2.13:0.11.6",
+            "com.thesamet.scalapb:scalapb-runtime-grpc_2.13:0.11.6",
+            "org.scala-lang:scala-library:2.13.6",
+            "io.grpc:grpc-netty-shaded:1.78.0",
+            "io.grpc:grpc-protobuf:1.78.0",
+            "io.grpc:grpc-stub:1.78.0",
+        ],
+    )
+
+
+@pytest.fixture
+def scalapb_grpc_lockfile(
+    scalapb_grpc_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return scalapb_grpc_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+def test_generates_grpc_scala(
+    rule_runner: RuleRunner, scalapb_grpc_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "protos/BUILD": "protobuf_sources(grpc=True)",
+            "protos/service.proto": dedent(
+                """\
+            syntax = "proto3";
+
+            package service;
+
+            message TestMessage {
+              string foo = 1;
+            }
+
+            service TestService {
+              rpc noStreaming (TestMessage) returns (TestMessage);
+              rpc clientStreaming (stream TestMessage) returns (TestMessage);
+              rpc serverStreaming (TestMessage) returns (stream TestMessage);
+              rpc bothStreaming (stream TestMessage) returns (stream TestMessage);
+            }
+            """
+            ),
+            "3rdparty/jvm/default.lock": scalapb_grpc_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": scalapb_grpc_lockfile.requirements_as_jvm_artifact_targets(),
+            "src/jvm/BUILD": "scala_sources(dependencies=['protos'])",
+            "src/jvm/ScalaPBGrpcExample.scala": dedent(
+                """\
+                package org.pantsbuild.scala.example
+
+                import service.service.TestServiceGrpc
+
+                trait TestScalaGrpc {
+                  val service: TestServiceGrpc.TestServiceStub
+                }
+                """
+            ),
+        }
+    )
+    assert_files_generated(
+        rule_runner,
+        Address("protos", relative_file_path="service.proto"),
+        source_roots=["/"],
+        expected_files=[
+            "service/service/ServiceProto.scala",
+            "service/service/TestMessage.scala",
+            "service/service/TestServiceGrpc.scala",
+        ],
+    )
+
+    coarsened_target = expect_single_expanded_coarsened_target(
+        rule_runner, Address(spec_path="src/jvm")
+    )
+    _ = rule_runner.request(
+        RenderedClasspath,
+        [CompileScalaSourceRequest(component=coarsened_target, resolve=make_resolve(rule_runner))],
+    )
