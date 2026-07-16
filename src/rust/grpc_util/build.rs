@@ -6,10 +6,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = Config::new();
 
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .build_client(true)
         .build_server(true)
-        .compile_protos_with_config(config, &["protos/test.proto"], &["protos"])?;
+        .compile_with_config(config, &["protos/test.proto"], &["protos"])?;
 
     Ok(())
 }
