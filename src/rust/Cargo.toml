@@ -162,7 +162,7 @@ ignore = "0.4.25"
 indexmap = { version = "2.13.0", features = ["std", "serde"] }
 indicatif = "0.18.4"
 indoc = "2.0.7"
-internment = "0.6"
+internment = { version = "0.8", features = ["deepsize"] }
 itertools = "0.14"
 libc = "0.2.182"
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
@@ -244,6 +244,11 @@ tree-sitter = "0.26.8"
 tree-sitter-dockerfile = { git = "https://github.com/pantsbuild/tree-sitter-dockerfile.git", rev = "508588913c93a30e7ef09a4ac3ecdee955b7b950" }
 tree-sitter-python = "0.25.0"
 tree-sitter-typescript = "0.23.2"
+
+# internment's `deepsize` feature provides the `DeepSizeOf for Intern<T>` impl, which must
+# be implemented against the same deepsize crate as the rest of the workspace (the fork above).
+[patch.crates-io]
+deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
 
 # Default lints adopted by most crates in this workspace.
 
