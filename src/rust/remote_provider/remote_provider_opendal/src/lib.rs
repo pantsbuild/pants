@@ -48,16 +48,12 @@ pub struct Provider {
 impl Provider {
     pub fn new<B: Builder>(
         builder: B,
+        scheme: &str,
         scope: String,
         options: RemoteStoreOptions,
     ) -> Result<Provider, String> {
         let operator = Operator::new(builder)
-            .map_err(|e| {
-                format!(
-                    "failed to initialise {} remote store provider: {e}",
-                    B::SCHEME
-                )
-            })?
+            .map_err(|e| format!("failed to initialise {scheme} remote store provider: {e}"))?
             .layer(ConcurrentLimitLayer::new(options.concurrency_limit))
             .layer(
                 // TODO: record Metric::RemoteStoreRequestTimeouts for timeouts
@@ -82,7 +78,7 @@ impl Provider {
 
     pub fn fs(path: &str, scope: String, options: RemoteStoreOptions) -> Result<Provider, String> {
         let builder = opendal::services::Fs::default().root(path);
-        Provider::new(builder, scope, options)
+        Provider::new(builder, opendal::services::FS_SCHEME, scope, options)
     }
 
     pub fn github_actions_cache(
@@ -118,7 +114,7 @@ impl Provider {
 
         builder = builder.runtime_token(token);
 
-        Provider::new(builder, scope, options)
+        Provider::new(builder, opendal::services::GHAC_SCHEME, scope, options)
     }
 
     fn path(&self, fingerprint: Fingerprint) -> String {
