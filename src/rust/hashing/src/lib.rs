@@ -9,8 +9,6 @@ use std::task::{Context, Poll};
 
 use byteorder::ByteOrder;
 use deepsize::DeepSizeOf;
-use digest::consts::U32;
-use generic_array::GenericArray;
 use serde::de::{MapAccess, Visitor};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde::{Deserialize, Deserializer};
@@ -45,7 +43,7 @@ impl Fingerprint {
         Fingerprint(fingerprint)
     }
 
-    pub fn from_bytes(bytes: GenericArray<u8, U32>) -> Fingerprint {
+    pub fn from_bytes(bytes: impl Into<[u8; FINGERPRINT_SIZE]>) -> Fingerprint {
         Fingerprint(bytes.into())
     }
 
