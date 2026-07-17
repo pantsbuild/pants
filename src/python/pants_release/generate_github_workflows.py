@@ -763,7 +763,8 @@ def bootstrap_jobs(
         raise ValueError(f"Unrecognized RustTesting value: {rust_testing}")
 
     if helper.platform in [Platform.LINUX_X86_64]:
-        step_cmd = "sudo apt-get install -y pkg-config fuse libfuse-dev\n" + step_cmd
+        # The fs/brfs tests need the fusermount3 binary at runtime.
+        step_cmd = "sudo apt-get install -y fuse3\n" + step_cmd
     human_readable_job_name += f" ({helper.platform_name()})"
 
     return {
