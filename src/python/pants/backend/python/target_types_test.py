@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from textwrap import dedent
 
 import pytest
+from toml import TomlDecodeError
 
 from pants.backend.python import target_types_rules
 from pants.backend.python.dependency_inference.rules import import_rules
@@ -22,6 +23,7 @@ from pants.backend.python.target_types import (
     PexExecutableField,
     PexScriptField,
     PythonDistribution,
+    PythonDistributionInterpreterConstraintsField,
     PythonRequirementsField,
     PythonRequirementTarget,
     PythonSourcesGeneratorTarget,
@@ -35,11 +37,11 @@ from pants.backend.python.target_types_rules import (
     DependencyValidationFieldSet,
     InferPexBinaryEntryPointDependency,
     InferPythonDistributionDependencies,
+    InvalidPyprojectRequiresPythonError,
     PexBinaryEntryPointDependencyInferenceFieldSet,
     PythonDistributionDependenciesInferenceFieldSet,
-    PythonDistributionEffectiveInterpreterConstraints,
-    PythonDistributionEffectiveInterpreterConstraintsRequest,
     PythonValidateDependenciesRequest,
+    _pyproject_requires_python,
     resolve_pex_entry_point,
 )
 from pants.backend.python.util_rules import python_sources
@@ -166,8 +168,8 @@ def _python_dependency_validation_rule_runner(*, options: Iterable[str] = ()) ->
             *target_types_rules.rules(),
             QueryRule(ValidatedDependencies, [PythonValidateDependenciesRequest]),
             QueryRule(
-                PythonDistributionEffectiveInterpreterConstraints,
-                [PythonDistributionEffectiveInterpreterConstraintsRequest],
+                InterpreterConstraints,
+                [PythonDistributionInterpreterConstraintsField],
             ),
         ],
         target_types=[PythonDistribution, PythonSourceTarget],
@@ -492,7 +494,7 @@ def test_validate_python_distribution_dependencies_invalid_pyproject_requires_py
 
     with pytest.raises(ExecutionError) as exc:
         _validate_python_dependencies(rule_runner)
-    assert isinstance(exc.value.wrapped_exceptions[0], InvalidFieldException)
+    assert isinstance(exc.value.wrapped_exceptions[0], InvalidPyprojectRequiresPythonError)
     assert "`[project].requires-python` field" in str(exc.value)
 
 
@@ -521,8 +523,8 @@ def test_validate_python_distribution_dependencies_malformed_pyproject() -> None
 
     with pytest.raises(ExecutionError) as exc:
         _validate_python_dependencies(rule_runner)
-    assert isinstance(exc.value.wrapped_exceptions[0], InvalidFieldException)
-    assert "Failed to parse" in str(exc.value)
+    assert isinstance(exc.value.wrapped_exceptions[0], InvalidPyprojectRequiresPythonError)
+    assert "Failed to infer" in str(exc.value)
 
 
 def test_validate_python_distribution_dependencies_pyproject_without_requires_python() -> None:
@@ -550,12 +552,34 @@ def test_validate_python_distribution_dependencies_pyproject_without_requires_py
     assert _validate_python_dependencies(rule_runner) == ValidatedDependencies()
 
 
+def test_pyproject_requires_python_extracts_value() -> None:
+    assert _pyproject_requires_python(b'[project]\nrequires-python = ">=3.10"') == ">=3.10"
+
+
+def test_pyproject_requires_python_without_project_table() -> None:
+    assert _pyproject_requires_python(b"[build-system]\nrequires = ['setuptools']") is None
+
+
+def test_pyproject_requires_python_without_requires_python() -> None:
+    assert _pyproject_requires_python(b'[project]\nname = "demo"') is None
+
+
+def test_pyproject_requires_python_non_string_raises() -> None:
+    with pytest.raises(ValueError):
+        _pyproject_requires_python(b"[project]\nrequires-python = 42")
+
+
+def test_pyproject_requires_python_malformed_toml_raises() -> None:
+    with pytest.raises(TomlDecodeError):
+        _pyproject_requires_python(b"[project\nrequires-python = ")
+
+
 def _effective_interpreter_constraints(rule_runner: RuleRunner) -> InterpreterConstraints:
     tgt = rule_runner.get_target(Address("project", target_name="app"))
     return rule_runner.request(
-        PythonDistributionEffectiveInterpreterConstraints,
-        [PythonDistributionEffectiveInterpreterConstraintsRequest(tgt)],
-    ).value
+        InterpreterConstraints,
+        [tgt[PythonDistributionInterpreterConstraintsField]],
+    )
 
 
 def test_python_distribution_effective_interpreter_constraints_inferred() -> None:
