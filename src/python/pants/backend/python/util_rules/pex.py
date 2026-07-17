@@ -72,7 +72,6 @@ from pants.backend.python.util_rules.uv import (
 from pants.build_graph.address import Address
 from pants.core.environments.target_types import EnvironmentTarget
 from pants.core.target_types import FileSourceField, ResourceSourceField
-from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.stripped_source_files import StrippedFileNameRequest, strip_file_name
 from pants.core.util_rules.stripped_source_files import rules as stripped_source_rules
 from pants.core.util_rules.system_binaries import BashBinary
@@ -210,6 +209,7 @@ class PexRequest(EngineAwareParameter):
     interpreter_constraints: InterpreterConstraints
     platforms: PexPlatforms
     complete_platforms: CompletePlatforms
+    uv_platforms: tuple[str, ...]
     sources: Digest | None
     additional_inputs: Digest
     main: MainSpecification | None
@@ -231,6 +231,7 @@ class PexRequest(EngineAwareParameter):
         interpreter_constraints=InterpreterConstraints(),
         platforms=PexPlatforms(),
         complete_platforms=CompletePlatforms(),
+        uv_platforms: Iterable[str] = (),
         sources: Digest | None = None,
         additional_inputs: Digest | None = None,
         main: MainSpecification | None = None,
@@ -290,6 +291,7 @@ class PexRequest(EngineAwareParameter):
         object.__setattr__(self, "interpreter_constraints", interpreter_constraints)
         object.__setattr__(self, "platforms", platforms)
         object.__setattr__(self, "complete_platforms", complete_platforms)
+        object.__setattr__(self, "uv_platforms", tuple(uv_platforms))
         object.__setattr__(self, "sources", sources)
         object.__setattr__(self, "additional_inputs", additional_inputs or EMPTY_DIGEST)
         object.__setattr__(self, "main", main)
@@ -518,6 +520,7 @@ class _BuildPexRequirementsSetup:
     # Set when the requirements come from a uv lockfile; signals build_pex to
     # use create_venv_repository_from_uv_lockfile instead of pex's resolver.
     uv_lockfile: LoadedLockfile | None = None
+    uv_platforms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -624,7 +627,11 @@ async def _setup_pex_requirements(
             # uv support being tacked on later. Fixing this will require a bit more of a
             # refactor than we want to do right now.
             return _BuildPexRequirementsSetup(
-                [], [], loaded_lockfile.requirement_estimate, uv_lockfile=loaded_lockfile
+                [],
+                [],
+                loaded_lockfile.requirement_estimate,
+                uv_lockfile=loaded_lockfile,
+                uv_platforms=request.uv_platforms or resolve_config.uv_platforms,
             )
 
         argv = (
@@ -683,7 +690,11 @@ async def _setup_pex_requirements(
 
         if loaded_lockfile.lockfile_format == LockfileFormat.UV:
             return _BuildPexRequirementsSetup(
-                [], [], concurrency_available, uv_lockfile=loaded_lockfile
+                [],
+                [],
+                concurrency_available,
+                uv_lockfile=loaded_lockfile,
+                uv_platforms=request.uv_platforms or resolve_config.uv_platforms,
             )
 
         if loaded_lockfile.metadata:
@@ -791,39 +802,39 @@ async def build_pex(
         )
         req_strings = ()
 
-    venv_repo: VenvRepository | None = None
+    venv_repos: list[VenvRepository] = []
     if requirements_setup.uv_lockfile is not None:
-        if request.platforms or request.complete_platforms:
-            # TODO: Support this via multiple --venv-repository venvs.
+        if request.platforms:
             raise ValueError(
                 softwrap(
                     f"""
-                    Cannot build a cross-platform PEX from a uv lockfile for
-                    {request.output_filename}.
+                    Cannot build a cross-platform PEX from a uv lockfile using pex platform
+                    strings for {request.output_filename}. Use
+                    `[python].resolves_to_uv_platforms` instead.
                     """
                 )
             )
 
         if pex_python_setup.python is None:
-            # Should never happen.
-            raise ValueError(
-                softwrap(
-                    f"""
-                    Cannot build a pex from a uv lockfile  for {request.output_filename} with no
-                    local python specified. Please report this error to the Pants team.
-                    """
-                )
-            )
+            python = await find_interpreter(request.interpreter_constraints, **implicitly())
+        else:
+            python = pex_python_setup.python
+        uv_platforms = requirements_setup.uv_platforms or (None,)
 
-        venv_repo = await create_venv_repository_from_uv_lockfile(
-            VenvFromUvLockfileRequest(
-                lockfile=requirements_setup.uv_lockfile,
-                python=pex_python_setup.python,
-            ),
-            **implicitly(),
+        venv_repos = list(
+            await concurrently(
+                create_venv_repository_from_uv_lockfile(
+                    VenvFromUvLockfileRequest(
+                        lockfile=requirements_setup.uv_lockfile,
+                        python=python,
+                        uv_platform=uv_platform,
+                    ),
+                    **implicitly(),
+                )
+                for uv_platform in uv_platforms
+            )
         )
 
-        # This is where we add the argv for the uv case (as explained above).
         requirements_setup = dataclasses.replace(
             requirements_setup,
             argv=[
@@ -831,7 +842,7 @@ async def build_pex(
                 # default to all the distributions in the venv-repository.
                 *req_strings,
                 "--no-transitive",
-                f"--venv-repository={venv_repo.relpath()}",
+                *(f"--venv-repository={venv_repo.relpath()}" for venv_repo in venv_repos),
                 # If uv decided there should be prereleases in the venv, we
                 # shouldn't refuse to resolve them.
                 "--pre",
@@ -858,18 +869,8 @@ async def build_pex(
         *request.additional_args,
     ]
 
-    if venv_repo is None:
+    if not venv_repos:
         argv.extend(pex_python_setup.argv)
-        interpreter = None
-    else:
-        # When using --venv-repository the interpreter is fixed to the venv's Python;
-        # PEX does not accept --python / --interpreter-constraint in this case.
-        # TODO: This type name is misleading here: this isn't a PBS (or at least not one we
-        #  downloaded as such), but PythonBuildStandaloneBinary is just a wrapper for
-        #  a path to an interpreter, so we use it as such.  But we should probably rename the type.
-        interpreter = PythonBuildStandaloneBinary(
-            os.path.join(venv_repo.relpath(), "bin", "python")
-        )
 
     if request.main is not None:
         argv.extend(request.main.iter_pex_args())
@@ -920,12 +921,11 @@ async def build_pex(
 
     pex_process = await setup_pex_cli_process(
         PexCliProcess(
-            interpreter=interpreter,
             subcommand=(),
             extra_args=argv,
             additional_input_digest=merged_digest,
             description=_build_pex_description(request, req_strings, python_setup.resolves),
-            append_only_caches=venv_repo.append_only_caches() if venv_repo else None,
+            append_only_caches=VenvRepository.append_only_caches() if venv_repos else None,
             output_files=None,
             output_directories=[output_chroot],
             concurrency_available=requirements_setup.concurrency_available,
@@ -934,9 +934,9 @@ async def build_pex(
         **implicitly(),
     )
 
-    if venv_repo:
+    if venv_repos:
         composite_process = CompositeProcess.from_process(pex_process).prepend_subprocesses(
-            [venv_repo.creation_subprocess]
+            [venv_repo.creation_subprocess for venv_repo in venv_repos]
         )
         pex_process = await composite_process_to_process(composite_process, **implicitly())
 

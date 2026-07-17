@@ -23,12 +23,13 @@ from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
     PythonInferSubsystem,
 )
-from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.subsystems.setup import PythonSetup, Resolver
 from pants.backend.python.target_types import (
     PexCompletePlatformsField,
     PexLayout,
     PythonResolveField,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     create_pex,
@@ -298,6 +299,16 @@ class FaaSArchitecture(StrEnum):
     ARM64 = "arm64"
 
 
+# Maps FaaS architecture to the uv --python-platform value for cross-platform installs.
+# manylinux_2_17 corresponds to manylinux2014, which is what FaaS runtimes typically support.
+# TODO: If/when this is not sufficient, allow setting the uv platform strings on a field of
+#  the relevant target, as we do for complete_platforms in the pex resolver case.
+_FAAS_ARCHITECTURE_TO_UV_PLATFORM: dict[FaaSArchitecture, str] = {
+    FaaSArchitecture.X86_64: "x86_64-manylinux_2_17",
+    FaaSArchitecture.ARM64: "aarch64-manylinux_2_17",
+}
+
+
 @dataclass(frozen=True)
 class PythonFaaSKnownRuntime:
     name: str
@@ -371,7 +382,10 @@ class RuntimePlatformsRequest:
 @dataclass(frozen=True)
 class RuntimePlatforms:
     interpreter_version: None | tuple[int, int]
-    complete_platforms: CompletePlatforms = CompletePlatforms()
+    # For use with pex lockfiles.
+    complete_platforms: CompletePlatforms
+    # For use with uv lockfiles.
+    uv_platform: str
 
 
 async def _infer_from_ics(request: RuntimePlatformsRequest) -> tuple[int, int]:
@@ -419,13 +433,7 @@ async def _infer_from_ics(request: RuntimePlatformsRequest) -> tuple[int, int]:
 
 @rule
 async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePlatforms:
-    if request.complete_platforms.value is not None:
-        # explicit complete platforms wins:
-
-        complete_platforms = await digest_complete_platforms(request.complete_platforms)
-        # Don't bother trying to infer the runtime version if the user has provided their own
-        # complete platform; they probably know what they're doing.
-        return RuntimePlatforms(interpreter_version=None, complete_platforms=complete_platforms)
+    uv_platform = _FAAS_ARCHITECTURE_TO_UV_PLATFORM[request.architecture]
 
     version = request.runtime.to_interpreter_version()
     inferred_from_ics = False
@@ -467,15 +475,21 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
             description_of_origin=f"In the {request.target_name!r} target",
         ) from None
 
-    module = request.runtime.known_runtimes_complete_platforms_module()
-
-    content = (importlib.resources.files(module) / file_name).read_bytes()
-    snapshot = await digest_to_snapshot(
-        **implicitly(CreateDigest([FileContent(file_name, content)]))
-    )
+    if request.complete_platforms.value is not None:
+        # Use explicit complete platforms if provided.
+        complete_platforms = await digest_complete_platforms(request.complete_platforms)
+    else:
+        module = request.runtime.known_runtimes_complete_platforms_module()
+        content = (importlib.resources.files(module) / file_name).read_bytes()
+        snapshot = await digest_to_snapshot(
+            **implicitly(CreateDigest([FileContent(file_name, content)]))
+        )
+        complete_platforms = CompletePlatforms.from_snapshot(snapshot)
 
     return RuntimePlatforms(
-        interpreter_version=version, complete_platforms=CompletePlatforms.from_snapshot(snapshot)
+        complete_platforms=complete_platforms,
+        interpreter_version=version,
+        uv_platform=uv_platform,
     )
 
 
@@ -505,6 +519,7 @@ class BuildPythonFaaSRequest:
 @rule
 async def build_python_faas(
     request: BuildPythonFaaSRequest,
+    python_setup: PythonSetup,
 ) -> BuiltPackage:
     additional_pex_args = (
         # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
@@ -556,6 +571,16 @@ async def build_python_faas(
         additional_sources = EMPTY_DIGEST
         reexported_handler_func = None
 
+    if python_setup.resolver == Resolver.uv and platforms.interpreter_version:
+        # Use an appropriate local interpreter for `uv sync` (which requires a local interpreter
+        # of the right version even to create a venv with foreign platform wheels).
+        major, minor = platforms.interpreter_version
+        interpreter_constraints: InterpreterConstraints | None = InterpreterConstraints(
+            [f"CPython=={major}.{minor}.*"]
+        )
+    else:
+        interpreter_constraints = None
+
     repository_filename = "faas_repository.pex"
     pex_request = PexFromTargetsRequest(
         addresses=[request.address],
@@ -564,10 +589,12 @@ async def build_python_faas(
         include_source_files=request.include_sources,
         output_filename=repository_filename,
         complete_platforms=platforms.complete_platforms,
+        uv_platforms=(platforms.uv_platform,) if platforms.uv_platform else (),
         layout=PexLayout.PACKED,
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
         additional_sources=additional_sources,
+        hardcoded_interpreter_constraints=interpreter_constraints,
         warn_for_transitive_files_targets=True,
     )
 
