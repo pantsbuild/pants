@@ -24,7 +24,7 @@ async-trait = { workspace = true }
 protos = { path = "../protos" }
 bytes = { workspace = true }
 cache = { path = "../cache" }
-deepsize = { workspace = true, features = ["internment", "smallvec", "indexmap"] }
+deepsize = { workspace = true, features = ["smallvec", "indexmap"] }
 dep_inference = { path = "../dep_inference" }
 derivative = { workspace = true }
 docker = { path = "../process_execution/docker" }
