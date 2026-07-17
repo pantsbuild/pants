@@ -17,6 +17,7 @@ from pants.backend.python.providers.pyenv.rules import rules as pyenv_rules
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior, RunRequest
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.external_tool import rules as external_tools_rules
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import MergeDigests
 from pants.engine.internals.selectors import concurrently
@@ -66,6 +67,7 @@ async def run_pyenv_install(
     _: RunPyenvInstallFieldSet,
     platform: Platform,
     pyenv_subsystem: PyenvPythonProviderSubsystem,
+    bash: BashBinary,
 ) -> RunRequest:
     run_request, pyenv = await concurrently(
         get_pyenv_install_info(PyenvInstallInfoRequest(), **implicitly()),
@@ -79,14 +81,12 @@ async def run_pyenv_install(
                     "run_install_python_shim.sh",
                     dedent(
                         f"""\
-                        #!/usr/bin/env bash
                         set -e
                         cd "$CHROOT"
                         SPECIFIC_VERSION=$("{pyenv.exe}" latest --known $1)
                         {" ".join(run_request.args)} $SPECIFIC_VERSION
                         """
                     ).encode(),
-                    is_executable=True,
                 )
             ]
         )
@@ -94,7 +94,7 @@ async def run_pyenv_install(
     digest = await merge_digests(MergeDigests([run_request.digest, wrapper_script_digest]))
     return dataclasses.replace(
         run_request,
-        args=("{chroot}/run_install_python_shim.sh",),
+        args=(bash.path, "{chroot}/run_install_python_shim.sh"),
         digest=digest,
         extra_env=FrozenDict(
             {

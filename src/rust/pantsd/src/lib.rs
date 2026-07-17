@@ -101,7 +101,7 @@ impl Metadata {
                     .map_err(|e| {
                         format!(
                             "Failed to parse pantsd port from {socket_metadata_path}: {err}",
-                            socket_metadata_path = &socket_metadata_path.display(),
+                            socket_metadata_path = socket_metadata_path.display(),
                             err = e
                         )
                     })
@@ -119,7 +119,7 @@ impl Metadata {
                 format!(
                     "Failed to read {name} from {metadata_path}: {err}",
                     name = name,
-                    metadata_path = &metadata_path.display(),
+                    metadata_path = metadata_path.display(),
                     err = e
                 )
             })

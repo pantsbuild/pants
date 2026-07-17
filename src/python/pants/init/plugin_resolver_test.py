@@ -284,7 +284,7 @@ def plugin_resolution(
             sys.path.insert(0, str(site_packages_path))
 
         plugin_resolver = PluginResolver(
-            bootstrap_scheduler,
+            lambda: bootstrap_scheduler,
             interpreter_constraints,
             inherit_existing_constraints=inherit_existing_constraints,
         )

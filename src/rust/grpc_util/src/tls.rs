@@ -137,7 +137,7 @@ impl TryFrom<Config> for ClientConfig {
             the correct PEM file. Error(s):\n\n",
                                 );
                                 for error in &native_root_certs_result.errors {
-                                    write!(&mut msg, "{}\n\n", &error)
+                                    write!(&mut msg, "{}\n\n", error)
                                         .expect("write into mutable string");
                                 }
                                 return Err(msg);

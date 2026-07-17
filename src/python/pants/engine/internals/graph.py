@@ -1238,6 +1238,7 @@ def find_source_blocks_owners(
 async def find_owners(
     owners_request: OwnersRequest,
     local_environment_name: ChosenLocalEnvironmentName,
+    target_origin_sources_blocks_options: TargetOriginSourcesBlocksOptions,
 ) -> Owners:
     block_owners: tuple[Owners, ...] = (
         await concurrently(
@@ -1326,6 +1327,16 @@ async def find_owners(
             if not matching_files and not (
                 owners_request.match_if_owning_build_file_included_in_sources
                 and bfa.rel_path in sources_set
+            ):
+                continue
+
+            # If we have block-level change information (`sources_blocks`) for this BUILD file,
+            # we skip adding all its targets indiscriminately. The precise targets affected
+            # by the line changes are already captured by the `block_owners` calculation.
+            if (
+                not matching_files
+                and target_origin_sources_blocks_options.enable
+                and bfa.rel_path in owners_request.sources_blocks
             ):
                 continue
 
@@ -1449,11 +1460,19 @@ async def hydrate_sources(
     # protocol sources to be hydrated.
     path_globs = sources_field.path_globs(unmatched_build_file_globs)
     snapshot = await digest_to_snapshot(**implicitly({path_globs: PathGlobs}))
-    sources_field.validate_resolved_files(snapshot.files)
+
+    input_validation_failure = None
+    try:
+        sources_field.validate_resolved_files(snapshot.files)
+    except InvalidFieldException as e:
+        if not request.enable_codegen or generate_request_type is None:
+            raise
+        input_validation_failure = e
 
     # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
     if not request.enable_codegen or generate_request_type is None:
         return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
+
     wrapped_protocol_target = await resolve_target(
         WrappedTargetRequest(
             sources_field.address,
@@ -1466,6 +1485,13 @@ async def hydrate_sources(
     generated_sources = await generate_sources(
         **implicitly({req: GenerateSourcesRequest, env_name: EnvironmentName})
     )
+
+    # If the input failed, we validate whether the output satisfies the field rule.
+    if input_validation_failure is not None:
+        try:
+            sources_field.validate_resolved_files(generated_sources.snapshot.files)
+        except InvalidFieldException:
+            raise input_validation_failure
 
     return HydratedSources(
         generated_sources.snapshot, sources_field.filespec, sources_type=sources_type

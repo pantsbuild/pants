@@ -25,7 +25,7 @@
     "packaging==26.0",
     "psutil==7.2.2",
     "pydevd-pycharm==261.20362.36",
-    "pytest!=7.1.0,!=7.1.1,<9,>=7",
+    "pytest!=7.1.0,!=7.1.1,<10,>=7",
     "python-gnupg==0.5.5",
     "python-lsp-jsonrpc==1.1.2",
     "requests[security]==2.32.5",
