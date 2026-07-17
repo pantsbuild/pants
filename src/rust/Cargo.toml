@@ -64,8 +64,8 @@ members = [
 # It should be exactly equivalent to members, except without any packages that require more system
 # configuration than we're comfortable doing in our bootstrap scripts.
 #
-# In particular, it does not contain the fs/brfs package, which will not compile without a fuse installation.
-# On Ubuntu, that means installing libfuse-dev. On OSX, that means installing OSXFUSE.
+# In particular, it does not contain the fs/brfs package, which on macOS will not compile without
+# macFUSE installed, and on Linux needs the fusermount binary (e.g. the fuse3 package) at runtime.
 default-members = [
   "address",
   "async_latch",
