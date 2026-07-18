@@ -219,7 +219,7 @@ strum = "0.26"
 strum_macros = "0.26"
 sysinfo = { version = "0.39.5", default-features = false, features = ["system"] }
 tempfile = "3.27.0"
-terminal_size = "0.1.15"
+terminal_size = "0.4.4"
 time = "0.3.47"
 tokio = "1.51.1"
 tokio-retry2 = "0.6"

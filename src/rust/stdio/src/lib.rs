@@ -11,10 +11,11 @@ use std::fmt;
 use std::fs::File;
 use std::future::Future;
 use std::io::{Read, Write};
+use std::mem::ManuallyDrop;
 #[cfg(unix)]
-use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::os::unix::io::FromRawFd;
 #[cfg(windows)]
-use std::os::windows::io::{FromRawHandle, IntoRawHandle};
+use std::os::windows::io::FromRawHandle;
 #[cfg(windows)]
 use std::os::windows::raw::HANDLE;
 use std::sync::Arc;
@@ -36,37 +37,29 @@ unsafe extern "C" {
 }
 
 // We cannot recover Python's CFd from a Windows RawHandle, so must carry it around with the File.
-// The File is optional only so that it may be "taken" during Drop.
+// The File is wrapped in ManuallyDrop because we do not own the underlying file handle, and so
+// must never close it.
 #[derive(Debug)]
-struct FileAndCFd(Option<File>, CFd);
+struct FileAndCFd(ManuallyDrop<File>, CFd);
 
 impl FileAndCFd {
     #[cfg(unix)]
     // cfd must represent a valid C file descriptor.
     fn from_cfd(cfd: CFd) -> Self {
         // Assuming cfd is a valid C file descriptor, this call is safe.
-        unsafe { Self(Some(File::from_raw_fd(cfd)), cfd) }
+        unsafe { Self(ManuallyDrop::new(File::from_raw_fd(cfd)), cfd) }
     }
 
     #[cfg(windows)]
     // cfd must represent a valid C file descriptor.
     fn from_cfd(cfd: CFd) -> Self {
         // Assuming cfd is a valid C file descriptor, this call is safe.
-        unsafe { Self(Some(File::from_raw_handle(_get_osfhandle(cfd))), cfd) }
-    }
-}
-
-impl Drop for FileAndCFd {
-    #[cfg(unix)]
-    fn drop(&mut self) {
-        // "Forget" about our file handle without closing it.
-        let _ = self.0.take().unwrap().into_raw_fd();
-    }
-
-    #[cfg(windows)]
-    fn drop(&mut self) {
-        // "Forget" about our file handle without closing it.
-        let _ = self.0.take().unwrap().into_raw_handle();
+        unsafe {
+            Self(
+                ManuallyDrop::new(File::from_raw_handle(_get_osfhandle(cfd))),
+                cfd,
+            )
+        }
     }
 }
 
@@ -93,17 +86,17 @@ impl Console {
     }
 
     fn read_stdin(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.stdin_handle.0.as_ref().unwrap().read(buf)
+        self.stdin_handle.0.read(buf)
     }
 
     fn write_stdout(&mut self, content: &[u8]) -> Result<(), std::io::Error> {
-        let mut stdout = self.stdout_handle.0.as_ref().unwrap();
+        let stdout = &mut *self.stdout_handle.0;
         stdout.write_all(content)?;
         stdout.flush()
     }
 
     fn write_stderr(&mut self, content: &[u8]) -> Result<(), std::io::Error> {
-        let mut stderr = self.stderr_handle.0.as_ref().unwrap();
+        let stderr = &mut *self.stderr_handle.0;
         stderr.write_all(content)?;
         stderr.flush()
     }
@@ -122,6 +115,10 @@ impl Console {
 
     fn stderr_as_c_fd(&self) -> CFd {
         self.stderr_handle.1
+    }
+
+    fn stderr_file(&self) -> &File {
+        &self.stderr_handle.0
     }
 }
 
@@ -412,6 +409,23 @@ impl Destination {
     pub fn stderr_as_c_fd(&self) -> Result<CFd, String> {
         match &*self.0.lock() {
       InnerDestination::Console(console) => Ok(console.stderr_as_c_fd()),
+      InnerDestination::Logging => {
+        Err("No associated file descriptor for the Logging destination".to_owned())
+      }
+      InnerDestination::Exclusive { .. } => {
+        Err("A UI or process has exclusive access, and must be stopped before stdio is directly accessible.".to_owned())
+      }
+    }
+    }
+
+    ///
+    /// If stderr is backed by a real file, invokes the given function with a reference to it.
+    /// The file is guaranteed to remain open for the duration of the call, since the destination
+    /// lock is held while it runs.
+    ///
+    pub fn with_stderr_file<T>(&self, f: impl FnOnce(&File) -> T) -> Result<T, String> {
+        match &*self.0.lock() {
+      InnerDestination::Console(console) => Ok(f(console.stderr_file())),
       InnerDestination::Logging => {
         Err("No associated file descriptor for the Logging destination".to_owned())
       }
