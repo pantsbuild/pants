@@ -192,9 +192,9 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
   "render-line",
   "render-line-termion",
 ] }
-prost = "0.13"
-prost-build = "0.13"
-prost-types = "0.13"
+prost = "0.14"
+prost-build = "0.14"
+prost-types = "0.14"
 pyo3 = { version = "0.28.3", features = ["parking_lot"] }
 pyo3-build-config = "0.28.3"
 rand = "0.10.0"
@@ -227,8 +227,9 @@ tokio-rustls = "0.26"
 tokio-stream = "0.1.18"
 tokio-util = "0.7.18"
 toml = "0.8"
-tonic = "0.12"
-tonic-build = "0.12"
+tonic = "0.14"
+tonic-prost = "0.14"
+tonic-prost-build = "0.14"
 tower = "0.5.3"
 tower-layer = "0.3"
 tower-service = "0.3"
