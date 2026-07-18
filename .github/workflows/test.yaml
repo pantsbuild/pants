@@ -235,7 +235,7 @@ jobs:
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
       run: |-
-        sudo apt-get install -y pkg-config fuse libfuse-dev
+        sudo apt-get install -y fuse3
         ./build-support/bin/check_rust_pre_commit.sh
         ./cargo test --locked --all --tests --benches -- --nocapture
     timeout-minutes: 60

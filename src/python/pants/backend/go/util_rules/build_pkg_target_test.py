@@ -17,6 +17,7 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMappingsHook,
 )
 from pants.backend.go.target_types import GoModTarget, GoOwningGoModAddressField, GoPackageTarget
+from pants.backend.go.testutil import gen_module_gomodproxy
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -364,6 +365,94 @@ def test_build_third_party_pkg_target(rule_runner: RuleRunner) -> None:
         ],
         expected_transitive_dependency_import_paths=[],
     )
+
+
+def test_third_party_pkg_digest_is_sliced_to_package_sources(rule_runner: RuleRunner) -> None:
+    import_path = "pantsbuild.org/go-slice-for-test"
+    version = "v0.0.1"
+    files = gen_module_gomodproxy(
+        version,
+        import_path,
+        (
+            ("pure/pure.go", "package pure\n\nfunc Two() int { return 2 }\n"),
+            # Glob metacharacters in file names must not affect the slicing globs.
+            ("pure/helpers[gen].go", "package pure\n"),
+            ("other/other.go", "package other\n"),
+            (
+                "embedder/embedder.go",
+                dedent(
+                    """\
+                    package embedder
+
+                    import _ "embed"
+
+                    //go:embed data/msg.txt
+                    var Msg string
+                    """
+                ),
+            ),
+            ("embedder/data/msg.txt", "hello\n"),
+            ("native/native.go", "package native\n\nfunc Two() int { return 2 }\n"),
+            ("native/native.h", "#define TWO 2\n"),
+        ),
+    )
+    files.update(
+        {
+            "BUILD": "go_mod(name='mod')",
+            "go.mod": dedent(
+                f"""\
+                module example.com/slicetest
+                go 1.17
+
+                require {import_path} {version}
+                """
+            ),
+        }
+    )
+    rule_runner.write_files(files)
+    rule_runner.set_options(
+        [
+            f"--golang-subprocess-env-vars=GOPROXY=file://{rule_runner.build_root}/go-mod-proxy",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    prefix = f"gopath/pkg/mod/{import_path}@{version}"
+
+    def get_build_request(pkg_import_path: str) -> BuildGoPackageRequest:
+        return rule_runner.request(
+            BuildGoPackageRequest,
+            [
+                BuildGoPackageTargetRequest(
+                    Address("", target_name="mod", generated_name=pkg_import_path),
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
+
+    def digest_files(request: BuildGoPackageRequest) -> set[str]:
+        return set(rule_runner.request(Snapshot, [request.digest]).files)
+
+    pure_request = get_build_request(f"{import_path}/pure")
+    assert digest_files(pure_request) == {
+        f"{prefix}/pure/pure.go",
+        f"{prefix}/pure/helpers[gen].go",
+    }
+
+    embedder_request = get_build_request(f"{import_path}/embedder")
+    assert digest_files(embedder_request) == {
+        f"{prefix}/embedder/embedder.go",
+        f"{prefix}/embedder/data/msg.txt",
+    }
+
+    # Native-code packages keep the whole module.
+    native_files = digest_files(get_build_request(f"{import_path}/native"))
+    assert f"{prefix}/other/other.go" in native_files
+
+    # The sliced packages still compile.
+    assert_built(rule_runner, pure_request, expected_import_paths=[f"{import_path}/pure"])
+    assert_built(rule_runner, embedder_request, expected_import_paths=[f"{import_path}/embedder"])
 
 
 def test_build_target_with_dependencies(rule_runner: RuleRunner) -> None:
