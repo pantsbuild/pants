@@ -54,7 +54,7 @@ process_execution = { path = "../process_execution" }
 pyo3 = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true, default-features = false, features = ["stream", "rustls-tls"] }
+reqwest = { workspace = true, default-features = false, features = ["stream", "rustls"] }
 rule_graph = { path = "../rule_graph" }
 sandboxer = { path = "../process_execution/sandboxer" }
 smallvec = { workspace = true, features = ["union"] }
