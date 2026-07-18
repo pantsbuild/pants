@@ -217,7 +217,7 @@ shlex = "1.2.0"
 smallvec = "1"
 strum = "0.26"
 strum_macros = "0.26"
-sysinfo = "0.20.5"
+sysinfo = { version = "0.39.5", default-features = false, features = ["system"] }
 tempfile = "3.27.0"
 terminal_size = "0.1.15"
 time = "0.3.47"
