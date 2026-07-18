@@ -541,7 +541,11 @@ impl OptionParser {
         seed_values.extend([
             ("buildroot".to_string(), buildroot_string.clone()),
             ("homedir".to_string(), shellexpand::tilde("~").into_owned()),
-            ("user".to_string(), whoami::username()),
+            (
+                "user".to_string(),
+                // whoami 1.x fell back to "unknown" instead of failing; preserve that.
+                whoami::username().unwrap_or_else(|_| "unknown".to_string()),
+            ),
             ("pants_workdir".to_string(), subdir("workdir", ".pants.d")?),
             ("pants_distdir".to_string(), subdir("distdir", "dist")?),
         ]);
