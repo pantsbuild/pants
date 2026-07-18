@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 import re
@@ -25,6 +26,7 @@ from pants.backend.go.dependency_inference import (
     GoModuleImportPathsMappings,
     GoModuleImportPathsMappingsHook,
 )
+from pants.backend.go.subsystems.golang import GolangSubsystem, ThirdPartyTargetGranularity
 from pants.backend.go.target_type_rules import (
     GoImportPathMappingRequest,
     map_import_paths_to_packages,
@@ -45,21 +47,36 @@ from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
 )
-from pants.backend.go.util_rules.build_pkg_target import (
+from pants.backend.go.util_rules.build_pkg_stdlib import (
     BuildGoPackageRequestForStdlibRequest,
+    setup_build_go_package_target_request_for_stdlib,
+)
+from pants.backend.go.util_rules.build_pkg_target import (
     BuildGoPackageTargetRequest,
     GoCodegenBuildRequest,
     required_build_go_package_request,
-    setup_build_go_package_target_request_for_stdlib,
+)
+from pants.backend.go.util_rules.build_pkg_third_party import (
+    BuildGoPackageRequestForThirdPartyPackageRequest,
+    setup_build_go_package_target_request_for_third_party,
 )
 from pants.backend.go.util_rules.first_party_pkg import FallibleFirstPartyPkgAnalysis
-from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
+from pants.backend.go.util_rules.go_mod import (
+    GoModInfoRequest,
+    OwningGoModRequest,
+    determine_go_mod_info,
+    find_owning_go_mod,
+)
 from pants.backend.go.util_rules.import_analysis import (
     GoStdLibPackagesRequest,
     analyze_go_stdlib_packages,
 )
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.third_party_pkg import (
+    AllThirdPartyPackagesRequest,
+    download_and_analyze_third_party_packages,
+)
 from pants.backend.python.util_rules import pex
 from pants.build_graph.address import Address
 from pants.core.util_rules.external_tool import download_external_tool
@@ -240,6 +257,7 @@ async def setup_full_package_build_request(
     go_protoc_plugin: _SetupGoProtocPlugin,
     analyzer: PackageAnalyzerSetup,
     platform: Platform,
+    golang: GolangSubsystem,
 ) -> FallibleBuildGoPackageRequest:
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
@@ -384,9 +402,25 @@ async def setup_full_package_build_request(
         )
     )
 
+    # Under module granularity, third-party imports resolve by import path: the target
+    # mapping only maps them to whole-module targets.
+    third_party_index = None
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.MODULE:
+        go_mod_info = await determine_go_mod_info(GoModInfoRequest(go_mod_addr.address))
+        all_third_party_packages = await download_and_analyze_third_party_packages(
+            AllThirdPartyPackagesRequest(
+                go_mod_addr.address,
+                go_mod_info.digest,
+                go_mod_info.mod_path,
+                build_opts=request.build_opts,
+            )
+        )
+        third_party_index = all_third_party_packages.import_paths_to_pkg_info
+
     # Obtain build requests for standard-library and third-party dependencies.
     # TODO: Consider how to merge this code with existing dependency inference code.
     dep_build_request_addrs: set[Address] = set()
+    third_party_dep_import_paths: set[str] = set()
     stdlib_dep_import_paths: set[str] = set()
     for dep_import_path in (*analysis.imports, *analysis.test_imports, *analysis.xtest_imports):
         if dep_import_path in ("C", "unsafe", "builtin"):
@@ -397,6 +431,10 @@ async def setup_full_package_build_request(
         # contains only direct dependencies' export data.
         if dep_import_path in stdlib_packages:
             stdlib_dep_import_paths.add(dep_import_path)
+            continue
+
+        if third_party_index is not None and dep_import_path in third_party_index:
+            third_party_dep_import_paths.add(dep_import_path)
             continue
 
         # Infer dependencies on other Go packages.
@@ -410,7 +448,7 @@ async def setup_full_package_build_request(
                     return FallibleBuildGoPackageRequest(
                         request=None,
                         import_path=request.import_path,
-                        exit_code=result.exit_code,
+                        exit_code=1,
                         stderr=textwrap.dedent(
                             f"""
                             Multiple addresses match import of `{dep_import_path}`.
@@ -427,6 +465,22 @@ async def setup_full_package_build_request(
         )
         for addr in sorted(dep_build_request_addrs)
     )
+
+    fallible_third_party_dep_build_requests = await concurrently(
+        setup_build_go_package_target_request_for_third_party(
+            BuildGoPackageRequestForThirdPartyPackageRequest(
+                import_path=dep_import_path,
+                go_mod_address=go_mod_addr.address,
+                build_opts=request.build_opts,
+            )
+        )
+        for dep_import_path in sorted(third_party_dep_import_paths)
+    )
+    third_party_dep_build_requests: list[BuildGoPackageRequest] = []
+    for fallible_third_party_dep in fallible_third_party_dep_build_requests:
+        if fallible_third_party_dep.request is None:
+            return dataclasses.replace(fallible_third_party_dep, dependency_failed=True)
+        third_party_dep_build_requests.append(fallible_third_party_dep.request)
 
     fallible_stdlib_dep_build_requests = await concurrently(
         setup_build_go_package_target_request_for_stdlib(
@@ -451,7 +505,11 @@ async def setup_full_package_build_request(
             dir_path=analysis.dir_path,
             go_files=analysis.go_files,
             s_files=analysis.s_files,
-            direct_dependencies=(*dep_build_requests, *stdlib_dep_build_requests),
+            direct_dependencies=(
+                *dep_build_requests,
+                *third_party_dep_build_requests,
+                *stdlib_dep_build_requests,
+            ),
             minimum_go_version=analysis.minimum_go_version,
             build_opts=request.build_opts,
         ),

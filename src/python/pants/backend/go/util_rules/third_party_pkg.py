@@ -13,6 +13,7 @@ from typing import Any
 import ijson.backends.python as ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
+from pants.backend.go.subsystems.golang import GolangSubsystem, ThirdPartyTargetGranularity
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
@@ -58,7 +59,8 @@ class GoThirdPartyPkgError(Exception):
 class ThirdPartyPkgAnalysis:
     """All the info and files needed to build a third-party package.
 
-    The digest only contains the files for the package, with all prefixes stripped.
+    The digest contains the sources of the package's whole module; the package's own files
+    live under `dir_path`.
     """
 
     import_path: str
@@ -66,6 +68,9 @@ class ThirdPartyPkgAnalysis:
 
     digest: Digest
     dir_path: str
+
+    # The import path of the Go module providing this package.
+    module_import_path: str
 
     # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
     # tests directly on a third-party package.
@@ -435,6 +440,7 @@ async def analyze_go_third_party_package(
         import_path=import_path,
         name=request.pkg_json["Name"],
         dir_path=request.package_path,
+        module_import_path=request.module_import_path,
         imports=tuple(request.pkg_json.get("Imports", ())),
         go_files=tuple(request.pkg_json.get("GoFiles", ())),
         c_files=tuple(request.pkg_json.get("CFiles", ())),
@@ -700,7 +706,9 @@ async def download_and_analyze_third_party_packages(
 
 
 @rule
-async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPartyPkgAnalysis:
+async def extract_package_info(
+    request: ThirdPartyPkgAnalysisRequest, golang: GolangSubsystem
+) -> ThirdPartyPkgAnalysis:
     all_packages = await download_and_analyze_third_party_packages(
         AllThirdPartyPackagesRequest(
             request.go_mod_address,
@@ -712,6 +720,15 @@ async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPa
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:
         return pkg_info
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.MODULE:
+        raise GoThirdPartyPkgError(
+            f"There is no Go package with the import path `{request.import_path}` in the "
+            f"third-party modules of `{request.go_mod_path}`.\n\n"
+            'Under `[golang].third_party_target_granularity = "module"`, a '
+            "`go_third_party_module` target address refers to its module's root package; "
+            "other packages are compiled automatically when imported. To build a specific "
+            "package as a binary, use the `main_import_path` field of `go_binary`."
+        )
     raise AssertionError(
         f"The package `{request.import_path}` was not downloaded, but Pants tried using it. "
         "This should not happen. Please open an issue at "
@@ -754,6 +771,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             import_path=import_path,
             name="",
             dir_path="",
+            module_import_path="",
             digest=EMPTY_DIGEST,
             imports=(),
             go_files=(),

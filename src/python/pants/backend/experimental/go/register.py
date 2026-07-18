@@ -12,6 +12,7 @@ from pants.backend.go.target_types import (
     GoModTarget,
     GoPackageSourcesField,
     GoPackageTarget,
+    GoThirdPartyModuleTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules import (
@@ -46,6 +47,7 @@ def target_types():
         GoPackageTarget,
         GoModTarget,
         GoThirdPartyPackageTarget,
+        GoThirdPartyModuleTarget,
         GoBinaryTarget,
         *wrap_golang.target_types,
     ]
