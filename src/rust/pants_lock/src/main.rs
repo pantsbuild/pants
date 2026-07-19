@@ -15,11 +15,10 @@ use std::process::ExitCode;
 // Grabs an exclusive lock on the given file descriptor, which must be inherited from the
 // parent process, blocking until the lock is acquired, then exits.
 //
-// We use an "open file description" lock (F_OFD_SETLKW) rather than a traditional
-// process-associated fcntl lock. The lock is owned by the open file description that the
-// fd refers to, which is shared with the parent process, so the lock remains held after
-// this process exits, and is released when the parent closes the fd (e.g., when the
-// subshell above exits).
+// We use flock(2), just as the flock utility does. flock(2) locks are owned by the open
+// file description that the fd refers to, which is shared with the parent process, so the
+// lock remains held after this process exits, and is released when the parent closes the
+// fd (e.g., when the subshell above exits).
 fn main() -> ExitCode {
     const USAGE: &str = "Usage: pants_lock <fd>";
     let args: Vec<String> = env::args().collect();
@@ -35,13 +34,8 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut flock: libc::flock = unsafe { std::mem::zeroed() };
-    flock.l_type = libc::F_WRLCK as libc::c_short;
-    flock.l_whence = libc::SEEK_SET as libc::c_short;
-    // l_start and l_len of 0 mean: lock the entire file. l_pid must be 0 for OFD locks,
-    // which zeroing the struct already ensures.
     loop {
-        let rc = unsafe { libc::fcntl(fd, libc::F_OFD_SETLKW, &flock) };
+        let rc = unsafe { libc::flock(fd, libc::LOCK_EX) };
         if rc == 0 {
             return ExitCode::SUCCESS;
         }
