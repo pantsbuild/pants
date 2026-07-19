@@ -32,6 +32,7 @@ fnv = { workspace = true }
 fs = { path = "../fs" }
 futures = { workspace = true }
 futures-core = { workspace = true }
+glob = { workspace = true }
 graph = { path = "../graph" }
 grpc_util = { path = "../grpc_util" }
 hashing = { path = "../hashing" }
@@ -60,6 +61,7 @@ sandboxer = { path = "../process_execution/sandboxer" }
 smallvec = { workspace = true, features = ["union"] }
 stdio = { path = "../stdio" }
 store = { path = "../fs/store" }
+strsim = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 task_executor = { path = "../task_executor" }
