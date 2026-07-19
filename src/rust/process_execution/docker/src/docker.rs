@@ -96,8 +96,29 @@ impl DockerOnceCell {
         self
       .cell
       .get_or_try_init(async move {
-        let docker = Docker::connect_with_local_defaults()
-          .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
+        let docker = Docker::connect_with_local_defaults().or_else(|original_err| {
+            if let Ok(xdg) = std::env::var("XDG_RUNTIME_DIR") {
+                let podman_sock = format!("{}/podman/podman.sock", xdg);
+                if std::path::Path::new(&podman_sock).exists() {
+                    let podman_uri = format!("unix://{}", podman_sock);
+                    return Docker::connect_with_socket(
+                        &podman_uri,
+                        120,
+                        bollard::API_DEFAULT_VERSION
+                    );
+                }
+            }
+
+            if std::path::Path::new("/run/podman/podman.sock").exists() {
+                return Docker::connect_with_socket(
+                    "unix:///run/podman/podman.sock",
+                    120,
+                    bollard::API_DEFAULT_VERSION
+                );
+            }
+
+            Err(original_err)
+        }).map_err(|err| format!("Failed to connect to local Docker/Podman: {err}"))?;
 
         // Clamp the client API version to the daemon's, as the docker CLI does.
         let docker = docker.negotiate_version().await
