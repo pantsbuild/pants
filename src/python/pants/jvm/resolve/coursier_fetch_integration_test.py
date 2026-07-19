@@ -200,7 +200,7 @@ def test_resolve_with_packaging(rule_runner: RuleRunner) -> None:
                     packaging="jar",
                     strict=True,
                 ),
-                file_name="org.bouncycastle_bcprov-jdk15on_jar_1.70.jar",
+                file_name="org.bouncycastle_bcprov-jdk15on_1.70.jar",
                 direct_dependencies=Coordinates([]),
                 dependencies=Coordinates([]),
                 file_digest=FileDigest(

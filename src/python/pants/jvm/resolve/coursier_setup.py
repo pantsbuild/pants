@@ -112,8 +112,12 @@ class CoursierSubsystem(TemplatedExternalTool):
     name = "coursier"
     help = "A dependency resolver for the Maven ecosystem. (https://get-coursier.io/)"
 
-    default_version = "v2.1.24"
+    default_version = "v2.1.25-M26"
     default_known_versions = [
+        "v2.1.25-M26|linux_arm64 |68288bcd47a81f3a3bcf0392572d40ec0981172bba9055a8b662413691358be9|30241456|https://github.com/coursier/coursier/releases/download/v2.1.25-M26/cs-aarch64-pc-linux.gz",
+        "v2.1.25-M26|linux_x86_64|017812b4da91a72fadd3cb0fb97caae4a16cb947a7bd6be2b46e5aa984458cbf|31136143",
+        "v2.1.25-M26|macos_arm64 |4ebc84fa2fd767dffca3b4e63ed1cd7bc0f55870f98f14207e46e00512043bc4|29762912|https://github.com/coursier/coursier/releases/download/v2.1.25-M26/cs-aarch64-apple-darwin.gz",
+        "v2.1.25-M26|macos_x86_64|e061ec985562e9b21d75975cb6d60cac3c8874df19e3c6e007d935bc68aaf6b0|29978385",
         "v2.1.24|linux_arm64 |96b4c7580d253b6999a40e94413ca6c4a9bd2339ecce4754ac31a26d1a12fcbf|21534519|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.24/cs-aarch64-pc-linux.gz",
         "v2.1.24|linux_x86_64|d2c0572a17fb6146ea65349b59dd216b38beff60ae22bce6e549867c6ed2eda6|23366878",
         "v2.1.24|macos_arm64 |8f47594eb62dea25af913c8932d1f1d86a3a9c8e1262925b63852635390a3f43|21541383|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.24/cs-aarch64-apple-darwin.gz",
