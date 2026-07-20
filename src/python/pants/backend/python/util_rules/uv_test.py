@@ -5,13 +5,15 @@ from __future__ import annotations
 
 import sys
 
-from pants.backend.python.subsystems.uv import DownloadedUv
+from pants.backend.python.goals.lockfile import GenerateUvLockfile
+from pants.backend.python.goals.lockfile import rules as lockfile_rules
 from pants.backend.python.util_rules import uv
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.lockfile_metadata import (
     LockfileFormat,
     PythonLockfileMetadataV8,
 )
+from pants.backend.python.util_rules.pex import rules as pex_rules
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import LoadedLockfile, Lockfile
 from pants.backend.python.util_rules.uv import (
@@ -20,49 +22,50 @@ from pants.backend.python.util_rules.uv import (
     generate_pyproject_toml,
 )
 from pants.core.environments.target_types import DockerEnvironmentTarget, LocalEnvironmentTarget
+from pants.core.goals.generate_lockfiles import GenerateLockfileResult
 from pants.core.util_rules import external_tool, subprocess_environment
 from pants.core.util_rules.env_vars import rules as env_vars_rules
 from pants.engine import composite_process
 from pants.engine.composite_process import CompositeProcess
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, DigestContents, MergeDigests
-from pants.engine.process import FallibleProcessResult, Process, ProcessResult
+from pants.engine.fs import Digest, DigestContents
+from pants.engine.internals.native_engine import FrozenOrderedSet
+from pants.engine.process import FallibleProcessResult, Process
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 RESOLVE_NAME = "test-resolve"
-
-DOCKER_IMAGE = "python:3.14-slim"
 
 
 def _make_rule_runner(docker_image: str | None) -> RuleRunner:
     rule_runner = RuleRunner(
         rules=[
             *uv.rules(),
+            *pex_rules(),
+            *lockfile_rules(),
             *composite_process.rules(),
             *external_tool.rules(),
             *subprocess_environment.rules(),
             *env_vars_rules(),
             QueryRule(VenvRepository, [VenvFromUvLockfileRequest]),
-            QueryRule(DownloadedUv, []),
-            QueryRule(Digest, [MergeDigests]),
+            QueryRule(GenerateLockfileResult, [GenerateUvLockfile]),
             QueryRule(DigestContents, [Digest]),
             QueryRule(Process, [CompositeProcess]),
-            QueryRule(ProcessResult, [Process]),
             QueryRule(FallibleProcessResult, [Process]),
         ],
         target_types=[LocalEnvironmentTarget, DockerEnvironmentTarget],
         inherent_environment=EnvironmentName("test-env") if docker_image else EnvironmentName(None),
     )
+    args = [f"--python-resolves={{'{RESOLVE_NAME}': 'uv.lock'}}"]
     if docker_image:
         rule_runner.write_files(
             {"BUILD": f"docker_environment(name='test-env', image='{docker_image}')"}
         )
         rule_runner.set_options(
-            ["--environments-preview-names={'test-env': '//:test-env'}"],
+            [*args, "--environments-preview-names={'test-env': '//:test-env'}"],
             env_inherit={"PATH"},
         )
     else:
-        rule_runner.set_options([], env_inherit={"PATH"})
+        rule_runner.set_options(args, env_inherit={"PATH"})
     return rule_runner
 
 
@@ -84,36 +87,34 @@ def _create_venv_repository(rule_runner: RuleRunner, python_path: str) -> Fallib
         resolve=RESOLVE_NAME,
     )
 
-    downloaded_uv = rule_runner.request(DownloadedUv, [])
     pyproject = generate_pyproject_toml(
         RESOLVE_NAME, metadata.valid_for_interpreter_constraints, ()
     )
-    config_digest = rule_runner.make_snapshot({"pyproject.toml": pyproject, "uv.toml": ""}).digest
-    lock_input = rule_runner.request(Digest, [MergeDigests([downloaded_uv.digest, config_digest])])
+    rule_runner.write_files({"pyproject.toml": pyproject, "uv.toml": ""})
     lock_result = rule_runner.request(
-        ProcessResult,
+        GenerateLockfileResult,
         [
-            Process(
-                argv=(*downloaded_uv.args(), "lock", "--offline", "--no-progress"),
-                input_digest=lock_input,
-                output_files=["uv.lock"],
-                append_only_caches=DownloadedUv.append_only_caches(),
-                description="Generate uv.lock",
+            GenerateUvLockfile(
+                resolve_name=RESOLVE_NAME,
+                lockfile_dest="test.lock",
+                diff=False,
+                requirements=FrozenOrderedSet(),
+                find_links=FrozenOrderedSet(),
+                interpreter_constraints=InterpreterConstraints.for_fixed_python_version("3.14.*"),
             )
         ],
     )
-    uv_lock_content = rule_runner.request(DigestContents, [lock_result.output_digest])[0].content
-
-    lockfile_digest = rule_runner.make_snapshot({"uv.lock": uv_lock_content.decode()}).digest
+    uv_lock_content = rule_runner.request(DigestContents, [lock_result.digest])[0].content
+    lockfile_digest = rule_runner.make_snapshot({"test.lock": uv_lock_content.decode()}).digest
     loaded_lockfile = LoadedLockfile(
         lockfile_digest,
-        "uv.lock",
+        "test.lock",
         metadata=metadata,
         requirement_estimate=0,
         lockfile_format=LockfileFormat.UV,
         as_constraints_strings=None,
         original_lockfile=Lockfile(
-            "uv.lock", url_description_of_origin="test", resolve_name=RESOLVE_NAME
+            "test.lock", url_description_of_origin="test", resolve_name=RESOLVE_NAME
         ),
     )
 
@@ -122,7 +123,7 @@ def _create_venv_repository(rule_runner: RuleRunner, python_path: str) -> Fallib
         [
             VenvFromUvLockfileRequest(
                 lockfile=loaded_lockfile,
-                python=PythonExecutable(python_path, fingerprint="a1" * 32),
+                python=PythonExecutable(python_path, fingerprint="00" * 32),
             )
         ],
     )
@@ -149,6 +150,6 @@ def test_local_environment() -> None:
 def test_docker_environment_with_flock() -> None:
     # In a docker environment the pants_lock binary is not available in the container, so success
     # proves that the container's flock binary was used.
-    rule_runner = _make_rule_runner(docker_image=DOCKER_IMAGE)
+    rule_runner = _make_rule_runner(docker_image="python:3.14-slim")
     result = _create_venv_repository(rule_runner, "/usr/local/bin/python3")
     assert result.exit_code == 0, result.stderr.decode()
