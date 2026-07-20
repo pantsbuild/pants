@@ -81,6 +81,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -113,6 +114,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -190,6 +192,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -222,6 +225,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -235,7 +239,7 @@ jobs:
       if: needs.classify_changes.outputs.rust == 'true'
       name: Test and lint Rust
       run: |-
-        sudo apt-get install -y pkg-config fuse libfuse-dev
+        sudo apt-get install -y fuse3
         ./build-support/bin/check_rust_pre_commit.sh
         ./cargo test --locked --all --tests --benches -- --nocapture
     timeout-minutes: 60
@@ -306,6 +310,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:
@@ -338,6 +343,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:

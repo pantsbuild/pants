@@ -149,6 +149,7 @@ NATIVE_FILES_COMMON_PREFIX = "src/python/pants"
 NATIVE_FILES = [
     f"{NATIVE_FILES_COMMON_PREFIX}/bin/native_client",
     f"{NATIVE_FILES_COMMON_PREFIX}/bin/sandboxer",
+    f"{NATIVE_FILES_COMMON_PREFIX}/bin/pants_lock",
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so",
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so.metadata",
 ]
@@ -763,7 +764,8 @@ def bootstrap_jobs(
         raise ValueError(f"Unrecognized RustTesting value: {rust_testing}")
 
     if helper.platform in [Platform.LINUX_X86_64]:
-        step_cmd = "sudo apt-get install -y pkg-config fuse libfuse-dev\n" + step_cmd
+        # The fs/brfs tests need the fusermount3 binary at runtime.
+        step_cmd = "sudo apt-get install -y fuse3\n" + step_cmd
     human_readable_job_name += f" ({helper.platform_name()})"
 
     return {

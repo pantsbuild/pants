@@ -35,7 +35,7 @@ fn dir_attr_for(inode: Inode) -> fuser::FileAttr {
 
 fn attr_for(inode: Inode, size: u64, kind: fuser::FileType, perm: u16) -> fuser::FileAttr {
     fuser::FileAttr {
-        ino: inode,
+        ino: fuser::INodeNo(inode),
         size: size,
         // TODO: Find out whether blocks is actually important
         blocks: 0,
@@ -394,41 +394,54 @@ impl BuildResultFS {
     }
 }
 
+// NB: fuser 0.17+ dispatches requests via `&self`, from multiple threads when `Config::n_threads`
+// exceeds 1. We use the default of 1, so this mutex is uncontended. Requests keep the lock while
+// waiting on store I/O, so raising `n_threads` helps only once that wait moves out of the lock.
+struct LockedBuildResultFS(Mutex<BuildResultFS>);
+
 // inodes:
 //  1: /
 //  2: /digest
 //  3: /directory
 //  ... created on demand and cached for the lifetime of the program.
-impl fuser::Filesystem for BuildResultFS {
+impl fuser::Filesystem for LockedBuildResultFS {
     fn init(
         &mut self,
         _req: &fuser::Request,
         _config: &mut fuser::KernelConfig,
-    ) -> Result<(), libc::c_int> {
-        self.sender.send(BRFSEvent::Init).map_err(|_| 1)
+    ) -> std::io::Result<()> {
+        self.0
+            .lock()
+            .sender
+            .send(BRFSEvent::Init)
+            .map_err(|_| std::io::Error::from_raw_os_error(libc::EPERM))
     }
 
     fn destroy(&mut self) {
-        self.sender
+        self.0
+            .lock()
+            .sender
             .send(BRFSEvent::Destroy)
             .unwrap_or_else(|err| warn!("Failed to send {:?} event: {}", BRFSEvent::Destroy, err))
     }
 
     // Used to answer stat calls
     fn lookup(
-        &mut self,
-        _req: &fuser::Request<'_>,
-        parent: Inode,
+        &self,
+        _req: &fuser::Request,
+        parent: fuser::INodeNo,
         name: &OsStr,
         reply: fuser::ReplyEntry,
     ) {
-        let runtime = self.runtime.clone();
+        let parent = parent.0;
+        let mut fs = self.0.lock();
+        let runtime = fs.runtime.clone();
         runtime.enter(|| {
             let r = match (parent, name.to_str()) {
                 (ROOT, Some("digest")) => Ok(dir_attr_for(DIGEST_ROOT)),
                 (ROOT, Some("directory")) => Ok(dir_attr_for(DIRECTORY_ROOT)),
                 (DIGEST_ROOT, Some(digest_str)) => match digest_from_filepath(digest_str) {
-                    Ok(digest) => self
+                    Ok(digest) => fs
                         .inode_for_file(digest, true)
                         .map_err(|err| {
                             error!("Error loading file by digest {digest_str}: {err}");
@@ -436,7 +449,7 @@ impl fuser::Filesystem for BuildResultFS {
                         })
                         .and_then(|maybe_inode| {
                             maybe_inode
-                                .and_then(|inode| self.file_attr_for(inode))
+                                .and_then(|inode| fs.file_attr_for(inode))
                                 .ok_or(libc::ENOENT)
                         }),
                     Err(err) => {
@@ -445,23 +458,23 @@ impl fuser::Filesystem for BuildResultFS {
                     }
                 },
                 (DIRECTORY_ROOT, Some(digest_str)) => match digest_from_filepath(digest_str) {
-                    Ok(digest) => self.dir_attr_for(digest),
+                    Ok(digest) => fs.dir_attr_for(digest),
                     Err(err) => {
                         warn!("Invalid digest for directory in directory root: {err}");
                         Err(libc::ENOENT)
                     }
                 },
                 (parent, Some(filename)) => {
-                    let maybe_cache_entry = self
+                    let maybe_cache_entry = fs
                         .inode_digest_cache
                         .get(&parent)
                         .cloned()
                         .ok_or(libc::ENOENT);
                     maybe_cache_entry
                         .and_then(|cache_entry| {
-                            let store = self.store.clone();
+                            let store = fs.store.clone();
                             let parent_digest = cache_entry.digest;
-                            let directory = self
+                            let directory = fs
                                 .runtime
                                 .block_on(async move { store.load_directory(parent_digest).await })
                                 .map_err(|err| match err {
@@ -471,8 +484,7 @@ impl fuser::Filesystem for BuildResultFS {
                                         libc::EINVAL
                                     }
                                 })?;
-                            self.node_for_digest(&directory, filename)
-                                .ok_or(libc::ENOENT)
+                            fs.node_for_digest(&directory, filename).ok_or(libc::ENOENT)
                         })
                         .and_then(|node| match node {
                             Node::Directory(directory_node) => {
@@ -481,7 +493,7 @@ impl fuser::Filesystem for BuildResultFS {
                                         error!("Error parsing digest: {err:?}");
                                         libc::ENOENT
                                     })?;
-                                self.dir_attr_for(digest)
+                                fs.dir_attr_for(digest)
                             }
                             Node::File(file_node) => {
                                 let digest =
@@ -489,14 +501,14 @@ impl fuser::Filesystem for BuildResultFS {
                                         error!("Error parsing digest: {err:?}");
                                         libc::ENOENT
                                     })?;
-                                self.inode_for_file(digest, file_node.is_executable)
+                                fs.inode_for_file(digest, file_node.is_executable)
                                     .map_err(|err| {
                                         error!("Error loading file by digest {filename}: {err}");
                                         libc::EINVAL
                                     })
                                     .and_then(|maybe_inode| {
                                         maybe_inode
-                                            .and_then(|inode| self.file_attr_for(inode))
+                                            .and_then(|inode| fs.file_attr_for(inode))
                                             .ok_or(libc::ENOENT)
                                     })
                             }
@@ -505,50 +517,60 @@ impl fuser::Filesystem for BuildResultFS {
                 _ => Err(libc::ENOENT),
             };
             match r {
-                Ok(r) => reply.entry(&TTL, &r, 1),
-                Err(err) => reply.error(err),
+                Ok(r) => reply.entry(&TTL, &r, fuser::Generation(1)),
+                Err(err) => reply.error(fuser::Errno::from_i32(err)),
             }
         })
     }
 
-    fn getattr(&mut self, _req: &fuser::Request<'_>, inode: Inode, reply: fuser::ReplyAttr) {
-        let runtime = self.runtime.clone();
+    fn getattr(
+        &self,
+        _req: &fuser::Request,
+        inode: fuser::INodeNo,
+        _fh: Option<fuser::FileHandle>,
+        reply: fuser::ReplyAttr,
+    ) {
+        let inode = inode.0;
+        let mut fs = self.0.lock();
+        let runtime = fs.runtime.clone();
         runtime.enter(|| match inode {
             ROOT => reply.attr(&TTL, &dir_attr_for(ROOT)),
             DIGEST_ROOT => reply.attr(&TTL, &dir_attr_for(DIGEST_ROOT)),
             DIRECTORY_ROOT => reply.attr(&TTL, &dir_attr_for(DIRECTORY_ROOT)),
-            _ => match self.inode_digest_cache.get(&inode) {
+            _ => match fs.inode_digest_cache.get(&inode) {
                 Some(&InodeDetails {
                     entry_type: EntryType::File,
                     ..
-                }) => match self.file_attr_for(inode) {
+                }) => match fs.file_attr_for(inode) {
                     Some(file_attr) => reply.attr(&TTL, &file_attr),
-                    None => reply.error(libc::ENOENT),
+                    None => reply.error(fuser::Errno::ENOENT),
                 },
                 Some(&InodeDetails {
                     entry_type: EntryType::Directory,
                     ..
                 }) => reply.attr(&TTL, &dir_attr_for(inode)),
-                _ => reply.error(libc::ENOENT),
+                _ => reply.error(fuser::Errno::ENOENT),
             },
         })
     }
 
-    // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
+    // TODO: Find out whether fh is ever passed if open isn't explicitly implemented
     fn read(
-        &mut self,
-        _req: &fuser::Request<'_>,
-        inode: Inode,
-        _fh: u64,
-        offset: i64,
+        &self,
+        _req: &fuser::Request,
+        inode: fuser::INodeNo,
+        _fh: fuser::FileHandle,
+        offset: u64,
         size: u32,
-        _flags: i32,
-        _lock_owner: Option<u64>,
+        _flags: fuser::OpenFlags,
+        _lock_owner: Option<fuser::LockOwner>,
         reply: fuser::ReplyData,
     ) {
-        let runtime = self.runtime.clone();
+        let inode = inode.0;
+        let fs = self.0.lock();
+        let runtime = fs.runtime.clone();
         runtime.enter(|| {
-            match self.inode_digest_cache.get(&inode) {
+            match fs.inode_digest_cache.get(&inode) {
                 Some(&InodeDetails {
                     digest,
                     entry_type: EntryType::File,
@@ -558,8 +580,8 @@ impl fuser::Filesystem for BuildResultFS {
                     let reply2 = reply.clone();
                     // TODO: Read from a cache of Futures driven from a CPU pool, so we can merge in-flight
                     // requests, rather than reading from the store directly here.
-                    let store = self.store.clone();
-                    let result: Result<(), ()> = self
+                    let store = fs.store.clone();
+                    let result: Result<(), ()> = fs
                         .runtime
                         .block_on(async move {
                             store
@@ -577,13 +599,13 @@ impl fuser::Filesystem for BuildResultFS {
                             match err {
                                 StoreError::MissingDigest { .. } => {
                                     if let Some(reply) = maybe_reply {
-                                        reply.error(libc::ENOENT);
+                                        reply.error(fuser::Errno::ENOENT);
                                     }
                                 }
                                 err => {
                                     error!("Error loading bytes for {digest:?}: {err}");
                                     if let Some(reply) = maybe_reply {
-                                        reply.error(libc::EINVAL);
+                                        reply.error(fuser::Errno::EINVAL);
                                     }
                                 }
                             }
@@ -593,49 +615,51 @@ impl fuser::Filesystem for BuildResultFS {
                         "Error from read future which should have been handled in the future ",
                     );
                 }
-                _ => reply.error(libc::ENOENT),
+                _ => reply.error(fuser::Errno::ENOENT),
             }
         })
     }
 
     fn readdir(
-        &mut self,
-        _req: &fuser::Request<'_>,
-        inode: Inode,
-        // TODO: Find out whether fh is ever passed if open isn't explicitly implemented (and whether offset is ever negative)
-        _fh: u64,
-        offset: i64,
+        &self,
+        _req: &fuser::Request,
+        inode: fuser::INodeNo,
+        // TODO: Find out whether fh is ever passed if open isn't explicitly implemented
+        _fh: fuser::FileHandle,
+        offset: u64,
         mut reply: fuser::ReplyDirectory,
     ) {
-        let runtime = self.runtime.clone();
+        let inode = inode.0;
+        let mut fs = self.0.lock();
+        let runtime = fs.runtime.clone();
         runtime.enter(|| {
-            match self.readdir_entries(inode) {
+            match fs.readdir_entries(inode) {
                 Ok(entries) => {
                     // 0 is a magic offset which means no offset, whereas a non-zero offset means start
                     // _after_ that entry. Inconsistency is fun.
                     let to_skip = if offset == 0 { 0 } else { offset + 1 } as usize;
                     for (i, entry) in (offset..).zip(entries.into_iter().skip(to_skip)) {
-                        if reply.add(entry.inode, i, entry.kind, entry.name) {
+                        if reply.add(fuser::INodeNo(entry.inode), i, entry.kind, entry.name) {
                             // Buffer is full, don't add more entries.
                             break;
                         }
                     }
                     reply.ok();
                 }
-                Err(err) => reply.error(err),
+                Err(err) => reply.error(fuser::Errno::from_i32(err)),
             }
         })
     }
 
     // If this isn't implemented, OSX will try to manipulate ._ files to manage xattrs out of band, which adds both overhead and logspam.
     fn listxattr(
-        &mut self,
-        _req: &fuser::Request<'_>,
-        _inode: Inode,
+        &self,
+        _req: &fuser::Request,
+        _inode: fuser::INodeNo,
         _size: u32,
         reply: fuser::ReplyXattr,
     ) {
-        let runtime = self.runtime.clone();
+        let runtime = self.0.lock().runtime.clone();
         runtime.enter(|| {
             reply.size(0);
         })
@@ -648,17 +672,22 @@ pub fn mount<P: AsRef<Path>>(
     runtime: task_executor::Executor,
 ) -> std::io::Result<(fuser::BackgroundSession, Receiver<BRFSEvent>)> {
     // TODO: Work out how to disable caching in the filesystem
-    let options = vec![
+    let mut config = fuser::Config::default();
+    config.mount_options = vec![
         fuser::MountOption::RO,
         fuser::MountOption::FSName("brfs".to_owned()),
-        fuser::MountOption::CUSTOM("noapplexattr".to_owned()),
     ];
+    // Only meaningful to macFUSE; fusermount3 on Linux rejects unknown options.
+    #[cfg(target_os = "macos")]
+    config
+        .mount_options
+        .push(fuser::MountOption::CUSTOM("noapplexattr".to_owned()));
 
     let (sender, receiver) = channel();
-    let brfs = BuildResultFS::new(sender, runtime, store);
+    let brfs = LockedBuildResultFS(Mutex::new(BuildResultFS::new(sender, runtime, store)));
 
-    debug!("About to spawn_mount with options {options:?}");
-    let result = fuser::spawn_mount2(brfs, &mount_path, &options);
+    debug!("About to spawn_mount with config {config:?}");
+    let result = fuser::spawn_mount2(brfs, &mount_path, &config);
     // N.B.: The session won't be used by the caller, but we return it since a reference must be
     // maintained to prevent early dropping which unmounts the filesystem.
     result.map(|session| (session, receiver))

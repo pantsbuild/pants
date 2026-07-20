@@ -83,6 +83,17 @@ pkg/runner:runner
 Pants does not yet update your `go.mod` and `go.sum` for you; it only reads these files when downloading modules. Run `go mod download all` to make sure these files are correct.
 :::
 
+### Third-party target granularity
+
+By default, one `go_third_party_package` target is generated per third-party Go _package_, giving every package its own address. Set `[golang].third_party_target_granularity = "module"` to generate one `go_third_party_module` target per _module_ instead, reducing target-graph overhead on projects with large third-party module sets at the cost of per-package addressability:
+
+```toml title="pants.toml"
+[golang]
+third_party_target_granularity = "module"
+```
+
+First-party packages then depend on the module targets they import, and `go.mod`/`go.sum` owns transitive resolution. To build a third-party package with `go_binary` under module granularity, use its `main_import_path` field, e.g. `main_import_path="google.golang.org/protobuf/cmd/protoc-gen-go"`.
+
 ### Toolchain selection
 
 Pants always builds with the Go SDK it discovers via `[golang].go_search_paths`. Inside every sandbox, `GOTOOLCHAIN=local` is set unconditionally, which disables Go's automatic toolchain download feature (introduced in Go 1.21). This means:
