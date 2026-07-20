@@ -9,6 +9,7 @@ jobs:
       image: quay.io/pypa/manylinux_2_28_aarch64:latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      MODE: dist
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -136,6 +137,7 @@ jobs:
       - /:/mnt/host-root
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      MODE: dist
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -284,6 +286,7 @@ jobs:
   build_wheels_macos14_arm64:
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
+      MODE: dist
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
