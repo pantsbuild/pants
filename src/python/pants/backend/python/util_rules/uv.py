@@ -228,8 +228,9 @@ async def create_venv_repository_from_uv_lockfile(
     )
 
     # We maintain one cached venv per buildroot+interpreter+resolve. uv will efficiently
-    # incrementally update the venv as the lockfile changes, and will handle concurrency of
-    # `uv sync` with appropriate locking.
+    # incrementally update the venv as the lockfile changes. We lock around the `uv sync`
+    # invocations to ensure that they don't step on each others' toes (`uv sync` claims to
+    # be safe for concurrent invocation but it is not in practice, see above).
     buildroot_entropy = hashlib.sha256(buildroot.path.encode()).hexdigest()
     venv_path_suffix = os.path.join(buildroot_entropy, metadata.resolve, request.python.fingerprint)
 
@@ -238,7 +239,7 @@ async def create_venv_repository_from_uv_lockfile(
             *downloaded_uv.args(),
             "sync",
             "--frozen",
-            *(["--verbose"] if level == LogLevel.DEBUG else []),
+            *(["--verbose"] if level >= LogLevel.DEBUG else []),  # type: ignore[operator]
             "--no-install-project",
             # TODO: extras can conflict, so we might need to be more selective.
             "--all-extras",
@@ -275,9 +276,9 @@ async def create_venv_repository_from_uv_lockfile(
         mkdir -p $(dirname "${{lock_path}}")
         (
           if [ -x "{flock}" ]; then
-            {flock} 200
+            {flock} 200 || exit 1
           elif [ -x "{pants_lock}" ]; then
-            {pants_lock} 200
+            {pants_lock} 200 || exit 1
           else
             echo "ERROR: No flock or pants_lock binary found on system executing a uv process." >&2
             exit 1

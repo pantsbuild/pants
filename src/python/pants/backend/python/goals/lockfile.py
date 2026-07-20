@@ -428,7 +428,7 @@ async def generate_uv_lockfile(
                 argv=(
                     *downloaded_uv.args(),
                     "lock",
-                    *(["--verbose"] if level == LogLevel.DEBUG else []),
+                    *(["--verbose"] if level >= LogLevel.DEBUG else []),  # type: ignore[operator]
                 ),
                 env=uv_env.env,
                 input_digest=input_digest,
