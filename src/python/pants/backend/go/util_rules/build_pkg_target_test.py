@@ -45,6 +45,9 @@ from pants.backend.go.util_rules.build_pkg_target import (
     GoCodegenBuildRequest,
     setup_build_go_package_target_request,
 )
+from pants.backend.go.util_rules.build_pkg_third_party import (
+    BuildGoPackageRequestForThirdPartyPackageRequest,
+)
 from pants.backend.go.util_rules.go_mod import OwningGoModRequest, find_owning_go_mod
 from pants.backend.go.util_rules.import_analysis import (
     GoStdLibPackage,
@@ -193,6 +196,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleBuildGoPackageRequest, [BuildGoPackageTargetRequest]),
             QueryRule(GoStdLibPackages, (GoStdLibPackagesRequest,)),
             QueryRule(BuildGoPackageRequest, (BuildGoPackageRequestForStdlibRequest,)),
+            QueryRule(BuildGoPackageRequest, (BuildGoPackageRequestForThirdPartyPackageRequest,)),
             UnionRule(GoCodegenBuildRequest, GoCodegenBuildFilesRequest),
             UnionRule(GoModuleImportPathsMappingsHook, GenerateFromFileImportPathsMappingHook),
             FileTarget.register_plugin_field(GoOwningGoModAddressField),
@@ -426,6 +430,96 @@ def test_third_party_pkg_digest_is_sliced_to_package_sources(rule_runner: RuleRu
             [
                 BuildGoPackageTargetRequest(
                     Address("", target_name="mod", generated_name=pkg_import_path),
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
+
+    def digest_files(request: BuildGoPackageRequest) -> set[str]:
+        return set(rule_runner.request(Snapshot, [request.digest]).files)
+
+    pure_request = get_build_request(f"{import_path}/pure")
+    assert digest_files(pure_request) == {
+        f"{prefix}/pure/pure.go",
+        f"{prefix}/pure/helpers[gen].go",
+    }
+
+    embedder_request = get_build_request(f"{import_path}/embedder")
+    assert digest_files(embedder_request) == {
+        f"{prefix}/embedder/embedder.go",
+        f"{prefix}/embedder/data/msg.txt",
+    }
+
+    # Native-code packages keep the whole module.
+    native_files = digest_files(get_build_request(f"{import_path}/native"))
+    assert f"{prefix}/other/other.go" in native_files
+
+    # The sliced packages still compile.
+    assert_built(rule_runner, pure_request, expected_import_paths=[f"{import_path}/pure"])
+    assert_built(rule_runner, embedder_request, expected_import_paths=[f"{import_path}/embedder"])
+
+
+def test_third_party_module_mode_digest_is_sliced_by_import_path(rule_runner: RuleRunner) -> None:
+    # Under module granularity a module's non-root packages are built through the by-import-path rule
+    # rather than a per-package target, so it must slice the same way the target path does.
+    import_path = "pantsbuild.org/go-slice-for-test-module"
+    version = "v0.0.1"
+    files = gen_module_gomodproxy(
+        version,
+        import_path,
+        (
+            ("pure/pure.go", "package pure\n\nfunc Two() int { return 2 }\n"),
+            ("pure/helpers[gen].go", "package pure\n"),
+            ("other/other.go", "package other\n"),
+            (
+                "embedder/embedder.go",
+                dedent(
+                    """\
+                    package embedder
+
+                    import _ "embed"
+
+                    //go:embed data/msg.txt
+                    var Msg string
+                    """
+                ),
+            ),
+            ("embedder/data/msg.txt", "hello\n"),
+            ("native/native.go", "package native\n\nfunc Two() int { return 2 }\n"),
+            ("native/native.h", "#define TWO 2\n"),
+        ),
+    )
+    files.update(
+        {
+            "BUILD": "go_mod(name='mod')",
+            "go.mod": dedent(
+                f"""\
+                module example.com/slicetest
+                go 1.17
+
+                require {import_path} {version}
+                """
+            ),
+        }
+    )
+    rule_runner.write_files(files)
+    rule_runner.set_options(
+        [
+            f"--golang-subprocess-env-vars=GOPROXY=file://{rule_runner.build_root}/go-mod-proxy",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+        ],
+        env_inherit={"PATH"},
+    )
+
+    prefix = f"gopath/pkg/mod/{import_path}@{version}"
+
+    def get_build_request(pkg_import_path: str) -> BuildGoPackageRequest:
+        return rule_runner.request(
+            BuildGoPackageRequest,
+            [
+                BuildGoPackageRequestForThirdPartyPackageRequest(
+                    import_path=pkg_import_path,
+                    go_mod_address=Address("", target_name="mod"),
                     build_opts=GoBuildOptions(),
                 )
             ],

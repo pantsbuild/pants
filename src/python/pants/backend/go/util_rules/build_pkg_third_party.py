@@ -32,6 +32,7 @@ from pants.backend.go.util_rules.pkg_pattern import match_simple_pattern
 from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackagesRequest,
     download_and_analyze_third_party_packages,
+    resolve_third_party_pkg_sources_digest,
 )
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
@@ -82,7 +83,7 @@ async def setup_build_go_package_target_request_for_third_party(
     if pkg_info.error:
         raise pkg_info.error
 
-    digest = pkg_info.digest
+    digest = await resolve_third_party_pkg_sources_digest(pkg_info)
 
     imports = set(pkg_info.imports)
     # Add implicit dependencies for Cgo generated code.
