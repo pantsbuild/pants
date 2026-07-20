@@ -33,10 +33,12 @@ esac
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
 export NATIVE_CLIENT_BINARY="${REPO_ROOT}/src/python/pants/bin/native_client"
 export NATIVE_SANDBOXER_BINARY="${REPO_ROOT}/src/python/pants/bin/sandboxer"
+export NATIVE_PANTS_LOCK_BINARY="${REPO_ROOT}/src/python/pants/bin/pants_lock"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
 readonly NATIVE_SANDBOXER_TARGET="${NATIVE_ROOT}/target/${MODE}/sandboxer"
+readonly NATIVE_PANTS_LOCK_TARGET="${NATIVE_ROOT}/target/${MODE}/pants_lock"
 
 function _build_native_code() {
   banner "Building native code..."
@@ -46,7 +48,8 @@ function _build_native_code() {
     ${MODE_FLAG} \
     -p engine \
     -p client \
-    -p sandboxer || die
+    -p sandboxer \
+    -p pants_lock || die
 }
 
 function bootstrap_native_code() {
@@ -59,6 +62,7 @@ function bootstrap_native_code() {
   fi
 
   if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f "${NATIVE_CLIENT_BINARY}" && -f "${NATIVE_SANDBOXER_BINARY}" &&
+    -f "${NATIVE_PANTS_LOCK_BINARY}" &&
     "${engine_version_calculated}" == "${engine_version_in_metadata}" ]]; then
     return 0
   fi
@@ -81,6 +85,11 @@ function bootstrap_native_code() {
     die "Failed to build native sandboxer, file missing at ${NATIVE_SANDBOXER_TARGET}."
   fi
 
+  # If bootstrapping the pants_lock fails, don't attempt to run Pants afterwards.
+  if [[ ! -f "${NATIVE_PANTS_LOCK_TARGET}" ]]; then
+    die "Failed to build native pants_lock, file missing at ${NATIVE_PANTS_LOCK_TARGET}."
+  fi
+
   # Pick up Cargo.lock changes if any caused by the `cargo build`.
   engine_version_calculated="$(calculate_current_hash)"
 
@@ -94,6 +103,7 @@ function bootstrap_native_code() {
   cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
   cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_BINARY}"
   cp "${NATIVE_SANDBOXER_TARGET}" "${NATIVE_SANDBOXER_BINARY}"
+  cp "${NATIVE_PANTS_LOCK_TARGET}" "${NATIVE_PANTS_LOCK_BINARY}"
 
   # Create the accompanying metadata file.
   local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
