@@ -27,11 +27,11 @@ jobs:
         with:
           node-version: 16
       - name: Check out code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: npm install ./build-support/cherry_pick
       - id: get-prereqs
         name: Get Cherry-Pick prerequisites
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           script: |
@@ -60,7 +60,7 @@ jobs:
         include: ${{ fromJSON(needs.prerequisites.outputs.matrix) }}
     steps:
       - name: Check out code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
       - name: Prepare cherry-pick branch
@@ -113,10 +113,10 @@ jobs:
     if: needs.prerequisites.result == 'success' && (success() || failure())
     steps:
       - name: Check out code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - run: npm install ./build-support/cherry_pick
       - name: Run Script
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.WORKER_PANTS_CHERRY_PICK_PAT }}
           script: |
