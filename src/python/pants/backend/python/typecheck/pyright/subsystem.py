@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase, bundled_lockfiles
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.option_types import ArgsListOption, SkipOption, StrListOption
@@ -21,6 +21,7 @@ class Pyright(NodeJSToolBase):
     )
 
     default_version = "pyright@1.1.396"
+    default_lockfile_resources = bundled_lockfiles(__package__, "pyright")
 
     skip = SkipOption("check")
     args = ArgsListOption(example="--version")

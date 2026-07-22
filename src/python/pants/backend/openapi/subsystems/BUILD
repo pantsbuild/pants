@@ -3,4 +3,11 @@
 
 python_sources(dependencies=[":lockfiles"])
 
-resources(name="lockfiles", sources=["*.lockfile.txt"])
+# The *.package-lock.json / *.yarn.lock / *.pnpm-lock.yaml entries are bundled lockfiles for the
+# `redocly` NodeJSToolBase subsystem. To regenerate:
+#   ./pants run build-support/bin/generate_builtin_lockfiles.py -- redocly
+# Or for all NodeJS tools at once: `... -- --all-nodejs`.
+resources(
+    name="lockfiles",
+    sources=["*.lockfile.txt", "*.package-lock.json", "*.yarn.lock", "*.pnpm-lock.yaml"],
+)
