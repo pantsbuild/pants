@@ -40,6 +40,7 @@ from pants.option.option_types import (
 )
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
+from pants.option.ranked_value import Rank
 from pants.util.docutil import bin_name, doc_url
 from pants.util.logging import LogLevel
 from pants.util.osutil import CPU_COUNT
@@ -900,6 +901,17 @@ class BootstrapOptions:
             the value in your `pants.toml` will cause the new version to be installed and run automatically.
 
             Run `{bin_name()} --version` to check what is being used.
+            """
+        ),
+    )
+    pants_free_threaded = BoolOption(
+        advanced=True,
+        default=True,
+        help=softwrap(
+            f"""
+            Run Pants on a free-threaded CPython interpreter. Like `pants_version`, this is
+            consumed by the `{bin_name()}` launcher to select which Pants distribution to
+            install and has no effect once Pants is running.
             """
         ),
     )
@@ -1923,6 +1935,55 @@ class BootstrapOptions:
                     """
                 )
             )
+
+        advisory = cls._free_threaded_advisory(
+            requested=opts.pants_free_threaded,
+            explicitly_set=opts.get_rank("pants_free_threaded") > Rank.HARDCODED,
+            abiflags=sys.abiflags,
+            scie_pants_version=os.environ.get("SCIE_PANTS_VERSION"),
+        )
+        if advisory:
+            logger.warning(advisory)
+
+    @staticmethod
+    def _free_threaded_advisory(
+        *,
+        requested: bool,
+        explicitly_set: bool,
+        abiflags: str,
+        scie_pants_version: str | None,
+    ) -> str | None:
+        """Warn when `pants_free_threaded` was set but the launcher did not honor it.
+
+        The option is consumed by the `scie-pants` launcher, so a launcher that predates it (or a
+        standalone scie) silently ignores it. We detect that mismatch from the ABI Pants is
+        actually running on.
+        """
+        if not explicitly_set:
+            return None
+        running_free_threaded = "t" in abiflags
+        if requested == running_free_threaded:
+            return None
+        want = "free-threaded" if requested else "GIL-enabled"
+        got = "free-threaded" if running_free_threaded else "GIL-enabled"
+        if scie_pants_version is None:
+            return softwrap(
+                f"""
+                `[GLOBAL] pants_free_threaded` is set to {str(requested).lower()}, but Pants is
+                running on a {got} CPython and the setting was not applied. This option is
+                consumed by the `scie-pants` launcher and has no effect on a standalone scie or a
+                `PANTS_SOURCE` run; download the {want} distribution instead.
+                """
+            )
+        return softwrap(
+            f"""
+            `[GLOBAL] pants_free_threaded` is set to {str(requested).lower()}, but Pants is
+            running on a {got} CPython. Your `scie-pants` launcher ({scie_pants_version}) did not
+            apply the setting: it either predates `pants_free_threaded` or found no {want}
+            distribution for Pants {VERSION}. Update `scie-pants` to select the {want}
+            distribution.
+            """
+        )
 
     @staticmethod
     def maybe_enable_stack_trampoline(opts: OptionValueContainer) -> None:

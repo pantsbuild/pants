@@ -128,13 +128,18 @@ class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
 
             # Check that the logs show an abort signal and the beginning of a traceback.
             pid_specific_log_file, shared_log_file = get_log_file_paths(ctx.workdir, pid)
-            regex_str = """\
-Fatal Python error: Aborted
+            # On free-threaded CPython, faulthandler can't enumerate all threads, so it emits a
+            # different header than the GIL-enabled per-thread traceback format.
+            regex_str = (
+                "Fatal Python error: Aborted\n\n"
+                "(?:Thread [^\n]+ \\(most recent call first\\):"
+                "|<Cannot show all threads while the GIL is disabled>\n"
+                "Stack \\(most recent call first\\):)\n"
+            )
 
-Thread [^\n]+ \\(most recent call first\\):
-"""
-
-            assert re.search(regex_str, read_file(pid_specific_log_file))
+            pid_specific_log_contents = read_file(pid_specific_log_file)
+            assert re.search(regex_str, pid_specific_log_contents)
+            assert '  File "' in pid_specific_log_contents
 
             # faulthandler.enable() only allows use of a single logging file at once for fatal tracebacks.
             assert "" == read_file(shared_log_file)
