@@ -52,6 +52,7 @@ from pants.backend.python.target_types import (
     ResolvePexEntryPointRequest,
 )
 from pants.backend.python.target_types_rules import resolve_pex_entry_point
+from pants.backend.python.util_rules.ipex import IpexRequest, create_ipex
 from pants.backend.python.util_rules.pex import create_pex, digest_complete_platforms
 from pants.backend.python.util_rules.pex_from_targets import (
     PexFromTargetsRequest,
@@ -68,10 +69,29 @@ from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.engine.intrinsics import digest_to_snapshot
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
+from pants.option.option_types import BoolOption
+from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+
+class PexCreationOptions(Subsystem):
+    options_scope = "pex-creation"
+    help = "Options for creating PEX files."
+
+    generate_ipex = BoolOption(
+        default=False,
+        help=softwrap(
+            """
+            Generate a dehydrated PEX that resolves and caches its third-party requirements when
+            first executed, instead of embedding those requirements at package time.
+            """
+        ),
+        advanced=True,
+    )
 
 
 @dataclass(frozen=True)
@@ -269,11 +289,17 @@ async def package_pex_binary(
 @rule
 async def built_package_for_pex_from_targets_request(
     field_set: PexBinaryFieldSet,
+    pex_creation_options: PexCreationOptions,
 ) -> BuiltPackage:
     pft_request = await package_pex_binary(field_set, **implicitly())
 
     base_pex_request = await create_pex_from_targets(**implicitly(pft_request.request))
     if field_set.builds_pex_and_scie():
+        if pex_creation_options.generate_ipex:
+            raise ValueError(
+                "The `[pex-creation].generate_ipex` option is not compatible with "
+                "`pex_binary` targets that set `scie`."
+            )
         pex_request = dataclasses.replace(
             base_pex_request,
             additional_args=(*base_pex_request.additional_args, *field_set.generate_scie_args()),
@@ -281,12 +307,15 @@ async def built_package_for_pex_from_targets_request(
     else:
         pex_request = base_pex_request
 
+    if pex_creation_options.generate_ipex:
+        pex_request = await create_ipex(**implicitly(IpexRequest(pex_request)))
+
     pex = await create_pex(**implicitly(pex_request))
     snapshot = await digest_to_snapshot(pex.digest)
 
     # "The" PEX, and not scie, hashes, or future auxiliary files must be first
     artifacts = [BuiltPackageArtifact(pft_request.request.output_filename)]
-    if PexLayout.ZIPAPP == pft_request.request.layout:
+    if PexLayout.ZIPAPP == pex_request.layout:
         artifacts.extend(
             BuiltPackageArtifact(artifact)
             for artifact in snapshot.files
