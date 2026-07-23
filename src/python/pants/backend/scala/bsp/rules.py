@@ -346,7 +346,12 @@ async def handle_bsp_scalac_options_request(
         ScalacOptionsItem(
             target=request.bsp_target_id,
             options=(
-                *local_plugins.args(local_plugins_prefix),
+                # The plugin jars are materialized under `.pants.d/bsp` in the workspace (see
+                # the `write_digest` above), so emit absolute paths for BSP clients rather than
+                # the digest-relative prefix.
+                *local_plugins.args(
+                    str(build_root.pathlib_path.joinpath(f".pants.d/bsp/{local_plugins_prefix}"))
+                ),
                 *scalac.parsed_args_for_resolve(resolve.name),
             ),
             classpath=classpath,
