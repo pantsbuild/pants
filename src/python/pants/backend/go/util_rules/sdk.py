@@ -19,6 +19,7 @@ from pants.core.util_rules.system_binaries import (
     CatBinary,
     CpBinary,
     MkdirBinary,
+    PwdBinary,
     create_binary_shims,
 )
 from pants.engine.env_vars import EnvironmentVarsRequest
@@ -94,6 +95,7 @@ async def go_sdk_invoke_setup(
     cat: CatBinary,
     cp: CpBinary,
     mkdir: MkdirBinary,
+    pwd: PwdBinary,
 ) -> GoSdkRunSetup:
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
@@ -101,12 +103,15 @@ async def go_sdk_invoke_setup(
     cat_path = shlex.quote(cat.path)
     cp_path = shlex.quote(cp.path)
     mkdir_path = shlex.quote(mkdir.path)
+    pwd_path = shlex.quote(pwd.path)
     go_run_script = FileContent(
         "__run_go.sh",
         textwrap.dedent(
             f"""\
             export GOROOT={goroot.path}
-            sandbox_root="$(/bin/pwd)"
+            # `-P` is explicit: `go` needs the resolved physical path, and the shell
+            # builtin would otherwise hand back a logical path containing symlinks.
+            sandbox_root="$({pwd_path} -P)"
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/cache"
             {mkdir_path} -p "$GOPATH" "$GOCACHE"
