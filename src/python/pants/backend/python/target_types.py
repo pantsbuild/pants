@@ -442,7 +442,8 @@ class PexExecutableField(Field):
 class PexArgsField(StringSequenceField):
     alias: ClassVar[str] = "args"
     help = help_text(
-        lambda: f"""
+        lambda: (
+            f"""
         Freeze these command-line args into the PEX. Allows you to run generic entry points
         on specific arguments without creating a shim file.
 
@@ -451,6 +452,7 @@ class PexArgsField(StringSequenceField):
         `{PexExtraBuildArgsField.alias}` passes arguments to the process that does the
         packaging.
         """
+        )
     )
 
 
@@ -458,7 +460,8 @@ class PexExtraBuildArgsField(StringSequenceField):
     alias: ClassVar[str] = "extra_build_args"
     default = ()
     help = help_text(
-        lambda: f"""
+        lambda: (
+            f"""
         Extra arguments to pass to the `pex` invocation used to build this PEX. These are
         passed after all other arguments. This can be used to pass extra options that
         Pants doesn't have built-in support for.
@@ -467,6 +470,7 @@ class PexExtraBuildArgsField(StringSequenceField):
         arguments used by the packaged PEX when executed, `{PexExtraBuildArgsField.alias}`
         passes arguments to the process that does the packaging.
         """
+        )
     )
 
 
@@ -1257,7 +1261,8 @@ class PythonTestsDependenciesField(PythonDependenciesField):
 class PythonTestsEntryPointDependenciesField(DictStringToStringSequenceField):
     alias = "entry_point_dependencies"
     help = help_text(
-        lambda: f"""
+        lambda: (
+            f"""
         Dependencies on entry point metadata of `{PythonDistribution.alias}` targets.
 
         This is a dict where each key is a `{PythonDistribution.alias}` address
@@ -1294,6 +1299,7 @@ class PythonTestsEntryPointDependenciesField(DictStringToStringSequenceField):
         standard library (available on older Python interpreters via the
         `importlib-metadata` distribution).
         """
+        )
     )
 
 
@@ -1999,11 +2005,29 @@ class LongDescriptionPathField(StringField):
     )
 
 
+class PythonDistributionInterpreterConstraintsField(InterpreterConstraintsField):
+    help = help_text(
+        f"""
+        The Python interpreters this distribution is compatible with.
+
+        Each element should be written in pip-style format, e.g. `CPython==2.7.*` or
+        `CPython>=3.6,<4`.
+
+        If this field is not set, Pants will infer the constraints from the `[project].requires-python`
+        value in a `pyproject.toml` file in the same directory as this target, if there is one.
+        Failing that, it defaults to the option `[python].interpreter_constraints`.
+
+        See {doc_url("docs/python/overview/interpreter-compatibility")} for how these interpreter
+        constraints are merged with the constraints of dependencies.
+        """
+    )
+
+
 class PythonDistribution(Target):
     alias: ClassVar[str] = "python_distribution"
     core_fields = (
         *COMMON_TARGET_FIELDS,
-        InterpreterConstraintsField,
+        PythonDistributionInterpreterConstraintsField,
         PythonDistributionDependenciesField,
         PythonDistributionEntryPointsField,
         PythonProvidesField,
