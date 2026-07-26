@@ -273,14 +273,16 @@ async def create_venv_repository_from_uv_lockfile(
         cache_root="$({realpath_binary.path} {shlex.quote(VenvRepository.cache_dir)})"
         project_env="${{cache_root}}/{venv_path_suffix}"
         lock_path="${{project_env}}.lock"
-        mkdir -p $(dirname "${{lock_path}}")
+        mkdir -p "$(dirname "${{lock_path}}")"
         (
           if [ -x "{flock}" ]; then
             {flock} 200 || exit 1
           elif [ -x "{pants_lock}" ]; then
             {pants_lock} 200 || exit 1
           else
-            echo "ERROR: No flock or pants_lock binary found on system executing a uv process." >&2
+            echo "ERROR: No flock or pants_lock binary found on system executing a uv process. " \
+                 "Please ensure flock is installed on this host and available on " \
+                 "[system-binaries].system_binary_paths." >&2
             exit 1
           fi
           UV_PROJECT_ENVIRONMENT="${{project_env}}" {uv_cmd}
