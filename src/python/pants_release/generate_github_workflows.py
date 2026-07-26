@@ -1058,11 +1058,12 @@ def build_wheels_job(
             "env": {
                 "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION": bool(container),
                 **DISABLE_REMOTE_CACHE_ENV,
-                # If we're not deploying these wheels, build in debug mode, which allows for
-                # incremental compilation across wheels. If this becomes too slow in CI, most likely
-                # the answer will be to adjust the `opt-level` for the relevant Cargo profile rather
-                # than to not use debug mode.
-                **({} if for_deploy_ref else {"MODE": "debug"}),
+                # Wheels that are deployed are built with the `dist` Cargo profile (the most
+                # optimized, and most expensive to compile). If we're not deploying these wheels,
+                # build in debug mode, which allows for incremental compilation across wheels. If
+                # this becomes too slow in CI, most likely the answer will be to adjust the
+                # `opt-level` for the relevant Cargo profile rather than to not use debug mode.
+                **({"MODE": "dist"} if for_deploy_ref else {"MODE": "debug"}),
             },
             "steps": [
                 *initial_steps,

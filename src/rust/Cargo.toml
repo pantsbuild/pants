@@ -2,6 +2,12 @@
 # Enable only "line tables", which give line information in backtraces, but do not record information
 # about local variables.
 debug = 1
+
+# The profile used to build published artifacts (wheels, fs_util), via MODE=dist.
+# More expensive to compile than `release`, in exchange for a smaller and faster binary.
+[profile.dist]
+inherits = "release"
+lto = "thin"
 # Optimise for the speed of our binary, rather than the speed of compilation.
 codegen-units = 1
 

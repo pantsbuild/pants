@@ -11,7 +11,7 @@ source "${REPO_ROOT}/build-support/common.sh"
 # Defines:
 # + NATIVE_ROOT: The Rust code directory, ie: src/rust.
 # + MODE: Whether to run in debug or release mode.
-# + MODE_FLAG: The string to pass to Cargo to determine if we're in debug or release mode.
+# + MODE_FLAG: An array of arguments to pass to Cargo to select the profile to build with.
 # Exposes:
 # + calculate_current_hash: Generate a stable hash to determine if we need to rebuild the engine.
 # shellcheck source=build-support/bin/rust/calculate_engine_hash.sh
@@ -45,7 +45,7 @@ function _build_native_code() {
   # NB: See Cargo.toml with regard to the `extension-module` features.
   "${REPO_ROOT}/cargo" build \
     --features=extension-module \
-    ${MODE_FLAG} \
+    "${MODE_FLAG[@]}" \
     -p engine \
     -p client \
     -p sandboxer \
