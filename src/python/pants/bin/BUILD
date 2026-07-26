@@ -89,6 +89,7 @@ target(
         "src/python/pants/backend/experimental/terraform",
         "src/python/pants/backend/experimental/terraform/lint/tfsec",
         "src/python/pants/backend/experimental/terraform/lint/trivy",
+        "src/python/pants/backend/experimental/tools/codespell",
         "src/python/pants/backend/experimental/tools/semgrep",
         "src/python/pants/backend/experimental/tools/trufflehog",
         "src/python/pants/backend/experimental/tools/workunit_logger",
