@@ -325,7 +325,7 @@ fn test_expand_fromfile_to_dict() {
           |
         1 | THIS IS NOT TOML
           |      ^
-        expected `.`, `=`
+        key with no value, expected `=`
         "},
     );
 
