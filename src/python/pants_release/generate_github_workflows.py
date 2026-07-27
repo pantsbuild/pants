@@ -149,6 +149,7 @@ NATIVE_FILES_COMMON_PREFIX = "src/python/pants"
 NATIVE_FILES = [
     f"{NATIVE_FILES_COMMON_PREFIX}/bin/native_client",
     f"{NATIVE_FILES_COMMON_PREFIX}/bin/sandboxer",
+    f"{NATIVE_FILES_COMMON_PREFIX}/bin/pants_lock",
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so",
     f"{NATIVE_FILES_COMMON_PREFIX}/engine/internals/native_engine.so.metadata",
 ]
@@ -763,7 +764,8 @@ def bootstrap_jobs(
         raise ValueError(f"Unrecognized RustTesting value: {rust_testing}")
 
     if helper.platform in [Platform.LINUX_X86_64]:
-        step_cmd = "sudo apt-get install -y pkg-config fuse libfuse-dev\n" + step_cmd
+        # The fs/brfs tests need the fusermount3 binary at runtime.
+        step_cmd = "sudo apt-get install -y fuse3\n" + step_cmd
     human_readable_job_name += f" ({helper.platform_name()})"
 
     return {
@@ -1056,11 +1058,12 @@ def build_wheels_job(
             "env": {
                 "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION": bool(container),
                 **DISABLE_REMOTE_CACHE_ENV,
-                # If we're not deploying these wheels, build in debug mode, which allows for
-                # incremental compilation across wheels. If this becomes too slow in CI, most likely
-                # the answer will be to adjust the `opt-level` for the relevant Cargo profile rather
-                # than to not use debug mode.
-                **({} if for_deploy_ref else {"MODE": "debug"}),
+                # Wheels that are deployed are built with the `dist` Cargo profile (the most
+                # optimized, and most expensive to compile). If we're not deploying these wheels,
+                # build in debug mode, which allows for incremental compilation across wheels. If
+                # this becomes too slow in CI, most likely the answer will be to adjust the
+                # `opt-level` for the relevant Cargo profile rather than to not use debug mode.
+                **({"MODE": "dist"} if for_deploy_ref else {"MODE": "debug"}),
             },
             "steps": [
                 *initial_steps,
@@ -1097,7 +1100,7 @@ def build_wheels_job(
                             "run": dedent(
                                 """\
                                 PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
                                 PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
                                 PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT

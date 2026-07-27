@@ -23,7 +23,6 @@ from pants.init.extension_loader import (
     load_build_configuration_from_source,
 )
 from pants.init.plugin_resolver import PluginResolver
-from pants.init.plugin_resolver import rules as plugin_resolver_rules
 from pants.option.bootstrap_options import DynamicRemoteOptions
 from pants.option.errors import UnknownFlagsError
 from pants.option.options import Options
@@ -106,6 +105,11 @@ def _collect_backends_requirements(backends: list[str]) -> list[str]:
 def create_bootstrap_scheduler(
     options_bootstrapper: OptionsBootstrapper, executor: PyExecutor
 ) -> BootstrapScheduler:
+    # Imported here rather than at module scope: this pulls in the Python/PEX rule modules, which
+    # are only needed to pex-resolve distribution plugins. Keeping the import lazy leaves them off
+    # the startup critical path when there is nothing to resolve.
+    from pants.init.plugin_resolver_rules import rules as plugin_resolver_rules
+
     bc_builder = BuildConfiguration.Builder()
     # To load plugins, we only need access to the Python/PEX rules.
     load_build_configuration_from_source(bc_builder, ["pants.backend.python"])
@@ -142,8 +146,9 @@ class OptionsInitializer:
         options_bootstrapper: OptionsBootstrapper,
         executor: PyExecutor,
     ) -> None:
-        self._bootstrap_scheduler = create_bootstrap_scheduler(options_bootstrapper, executor)
-        self._plugin_resolver = PluginResolver(self._bootstrap_scheduler)
+        self._plugin_resolver = PluginResolver(
+            lambda: create_bootstrap_scheduler(options_bootstrapper, executor)
+        )
 
     def build_config(
         self,

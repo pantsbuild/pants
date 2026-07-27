@@ -245,7 +245,7 @@ pub async fn download(
 
             return Retry::spawn(retry_strategy, || {
                 attempt_number += 1;
-                log::debug!("Downloading {} (attempt #{})", &url, &attempt_number);
+                log::debug!("Downloading {} (attempt #{})", url, attempt_number);
                 attempt_download(
                     http_client,
                     &url,
@@ -254,7 +254,7 @@ pub async fn download(
                     expected_digest,
                 )
                 .map_err(|err| {
-                    log::debug!("Error while downloading {}: {}", &url, err);
+                    log::debug!("Error while downloading {}: {}", url, err);
                     match err {
                         StreamingError::Retryable(msg) => RetryError::transient(msg),
                         StreamingError::Permanent(msg) => RetryError::permanent(msg),

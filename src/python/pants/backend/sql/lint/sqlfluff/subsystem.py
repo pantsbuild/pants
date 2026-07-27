@@ -49,7 +49,7 @@ class Sqlfluff(PythonToolBase):
     help_short = "The Sqlfluff SQL linter (https://github.com/sqlfluff/sqlfluff)."
 
     default_main = ConsoleScript("sqlfluff")
-    default_requirements = ["sqlfluff>=2.3.5,<3"]
+    default_requirements = ["sqlfluff>=2.3.5,<5"]
 
     register_interpreter_constraints = True
 

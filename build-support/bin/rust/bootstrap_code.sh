@@ -11,7 +11,7 @@ source "${REPO_ROOT}/build-support/common.sh"
 # Defines:
 # + NATIVE_ROOT: The Rust code directory, ie: src/rust.
 # + MODE: Whether to run in debug or release mode.
-# + MODE_FLAG: The string to pass to Cargo to determine if we're in debug or release mode.
+# + MODE_FLAG: An array of arguments to pass to Cargo to select the profile to build with.
 # Exposes:
 # + calculate_current_hash: Generate a stable hash to determine if we need to rebuild the engine.
 # shellcheck source=build-support/bin/rust/calculate_engine_hash.sh
@@ -33,20 +33,23 @@ esac
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
 export NATIVE_CLIENT_BINARY="${REPO_ROOT}/src/python/pants/bin/native_client"
 export NATIVE_SANDBOXER_BINARY="${REPO_ROOT}/src/python/pants/bin/sandboxer"
+export NATIVE_PANTS_LOCK_BINARY="${REPO_ROOT}/src/python/pants/bin/pants_lock"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
 readonly NATIVE_SANDBOXER_TARGET="${NATIVE_ROOT}/target/${MODE}/sandboxer"
+readonly NATIVE_PANTS_LOCK_TARGET="${NATIVE_ROOT}/target/${MODE}/pants_lock"
 
 function _build_native_code() {
   banner "Building native code..."
   # NB: See Cargo.toml with regard to the `extension-module` features.
   "${REPO_ROOT}/cargo" build \
     --features=extension-module \
-    ${MODE_FLAG} \
+    "${MODE_FLAG[@]}" \
     -p engine \
     -p client \
-    -p sandboxer || die
+    -p sandboxer \
+    -p pants_lock || die
 }
 
 function bootstrap_native_code() {
@@ -59,6 +62,7 @@ function bootstrap_native_code() {
   fi
 
   if [[ -f "${NATIVE_ENGINE_RESOURCE}" && -f "${NATIVE_CLIENT_BINARY}" && -f "${NATIVE_SANDBOXER_BINARY}" &&
+    -f "${NATIVE_PANTS_LOCK_BINARY}" &&
     "${engine_version_calculated}" == "${engine_version_in_metadata}" ]]; then
     return 0
   fi
@@ -81,16 +85,25 @@ function bootstrap_native_code() {
     die "Failed to build native sandboxer, file missing at ${NATIVE_SANDBOXER_TARGET}."
   fi
 
+  # If bootstrapping the pants_lock fails, don't attempt to run Pants afterwards.
+  if [[ ! -f "${NATIVE_PANTS_LOCK_TARGET}" ]]; then
+    die "Failed to build native pants_lock, file missing at ${NATIVE_PANTS_LOCK_TARGET}."
+  fi
+
   # Pick up Cargo.lock changes if any caused by the `cargo build`.
   engine_version_calculated="$(calculate_current_hash)"
 
   # Create the native engine resource.
-  # NB: On Mac Silicon, for some reason, first removing the old native_engine.so is necessary to avoid the Pants
-  #  process from being killed when recompiling.
-  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_BINARY}"
+  # NB: Remove the old files rather than copying over them:
+  #  * On Mac Silicon, for some reason, overwriting the old native_engine.so causes the Pants
+  #    process to be killed when recompiling.
+  #  * For the sandboxer, we needed to delete it to void copying over a
+  #    running binary, which could ironically fail with ETXTBSY
+  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_BINARY}" "${NATIVE_SANDBOXER_BINARY}"
   cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
   cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_BINARY}"
   cp "${NATIVE_SANDBOXER_TARGET}" "${NATIVE_SANDBOXER_BINARY}"
+  cp "${NATIVE_PANTS_LOCK_TARGET}" "${NATIVE_PANTS_LOCK_BINARY}"
 
   # Create the accompanying metadata file.
   local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)

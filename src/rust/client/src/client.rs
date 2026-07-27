@@ -1,7 +1,7 @@
 // Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::os::unix::io::AsRawFd;
+use std::os::fd::{AsFd, AsRawFd};
 use std::time::SystemTime;
 
 use log::debug;
@@ -29,21 +29,19 @@ pub async fn execute_command(
         connection_settings.timeout_limit.to_string(),
     ));
 
-    let raw_io_fds = [
-        std::io::stdin().as_raw_fd(),
-        std::io::stdout().as_raw_fd(),
-        std::io::stderr().as_raw_fd(),
-    ];
-    let mut tty_settings = Vec::with_capacity(raw_io_fds.len());
-    for raw_fd in &raw_io_fds {
-        match nix::sys::termios::tcgetattr(*raw_fd) {
-            Ok(termios) => tty_settings.push((raw_fd, termios)),
+    let (stdin, stdout, stderr) = (std::io::stdin(), std::io::stdout(), std::io::stderr());
+    let io_fds = [stdin.as_fd(), stdout.as_fd(), stderr.as_fd()];
+    let mut tty_settings = Vec::with_capacity(io_fds.len());
+    for fd in io_fds {
+        let raw_fd = fd.as_raw_fd();
+        match nix::sys::termios::tcgetattr(fd) {
+            Ok(termios) => tty_settings.push((fd, termios)),
             Err(err) => {
                 debug!("Failed to save terminal attributes for file descriptor {raw_fd}: {err}")
             }
         }
         if connection_settings.dynamic_ui
-            && let Ok(path) = nix::unistd::ttyname(*raw_fd)
+            && let Ok(path) = nix::unistd::ttyname(fd)
         {
             env.push((
                 format!("NAILGUN_TTY_PATH_{raw_fd}"),
@@ -61,10 +59,11 @@ pub async fn execute_command(
 
     let nailgun_result =
         nailgun::client_execute(connection_settings.port, command, args, env).await;
-    for (raw_fd, termios) in tty_settings {
+    for (fd, termios) in tty_settings {
         if let Err(err) =
-            nix::sys::termios::tcsetattr(*raw_fd, nix::sys::termios::SetArg::TCSADRAIN, &termios)
+            nix::sys::termios::tcsetattr(fd, nix::sys::termios::SetArg::TCSADRAIN, &termios)
         {
+            let raw_fd = fd.as_raw_fd();
             debug!("Failed to restore terminal attributes for file descriptor {raw_fd}: {err}");
         }
     }

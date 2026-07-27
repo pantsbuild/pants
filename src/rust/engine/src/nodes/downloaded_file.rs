@@ -55,7 +55,7 @@ impl DownloadedFile {
         let path = RelativePath::new(&file_name).map_err(|e| {
             format!(
                 "The file name derived from {} was {} which is not relative: {:?}",
-                &url, &file_name, e
+                url, file_name, e
             )
         })?;
 

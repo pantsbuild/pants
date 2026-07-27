@@ -497,17 +497,19 @@ async def _dynimport(
         else golang_env_aware.cgo_gcc_binary_name
     )
 
+    objs_to_link = [
+        *obj_files,
+        os.path.join(obj_dir_path, "_cgo_main.o"),
+        *sorted(transitive_prebuilt_objects),
+    ]
+
     cgo_binary_link_result = await _gccld(
         binary_name=linker_binary_name,
         input_digest=obj_digest,
         dir_path=dir_path,
         outfile=dynobj,
         flags=ldflags,
-        objs=[
-            *obj_files,
-            os.path.join(obj_dir_path, "_cgo_main.o"),
-            *sorted(transitive_prebuilt_objects),
-        ],
+        objs=objs_to_link,
         description=f"Link _cgo_.o ({import_path})",
     )
     if cgo_binary_link_result.exit_code != 0:
@@ -548,7 +550,7 @@ async def _dynimport(
             dir_path=dir_path,
             outfile=dynobj,
             flags=[*ldflags, allow_unresolved_symbols_ldflag],
-            objs=obj_files,
+            objs=objs_to_link,
             description=f"Link _cgo_.o ({import_path})",
         )
         if cgo_binary_link_result.exit_code != 0:

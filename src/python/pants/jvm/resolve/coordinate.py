@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 from pants.engine.collection import DeduplicatedCollection
 
+SOURCES_CLASSIFIER = "sources"
+
 
 class InvalidCoordinateString(Exception):
     """The coordinate string being passed is invalid or malformed."""
@@ -107,9 +109,16 @@ class Coordinate:
         The CLI input format uses trailing key-val attributes to specify `packaging`, `url`, etc.
 
         See https://github.com/coursier/coursier/blob/b5d5429a909426f4465a9599d25c678189a54549/modules/coursier/shared/src/test/scala/coursier/parse/DependencyParserTests.scala#L7
+
+        When a `classifier` is set, `type` must also be emitted explicitly.
+        Coursier's `--intransitive` fetch returns an empty dependency list
+        for e.g. `org:a:v,classifier=sources` (no `type`), but resolves
+        correctly for `org:a:v,classifier=sources,type=jar`. Emitting the
+        redundant `type=jar` for non-classifier coords is harmless, but we
+        only do so when needed to keep the output minimal.
         """
         attrs = dict(extra_attrs or {})
-        if self.packaging != "jar":
+        if self.packaging != "jar" or self.classifier:
             # NB: Coursier refers to `packaging` as `type` internally.
             attrs["type"] = self.packaging
         if self.classifier:

@@ -144,6 +144,7 @@ Created as part of the release process.
 + Henry Fuller
 + Herbert Rusznak
 + Huon Wilson
++ Hussein Awala
 + Hwasung Lee
 + Ian Tabolt
 + Idan Attias
@@ -169,6 +170,7 @@ Created as part of the release process.
 + Jan Berkel
 + Jan Paul Erkelens
 + Jason Barnett
++ Jason D'Amour
 + Jason Jackson
 + Jason Song
 + Jay Crumb
@@ -339,6 +341,7 @@ Created as part of the release process.
 + Shaked Kaplan
 + Shane Delmore
 + Shantanu Kumar
++ Shunsuke Kirino
 + Shuo Li
 + Simeon Franklin
 + Simon Biggs
@@ -360,6 +363,7 @@ Created as part of the release process.
 + Thales Menato
 + Thani Ath Nain Khurshid
 + Theo Ribeiro
++ Thiago Riemma Carbonera
 + Tianshuo Deng
 + Tien Nguyen
 + Tim Gates
@@ -406,6 +410,7 @@ Created as part of the release process.
 + azban
 + bianca rosa
 + billybecker
++ creeser-nvidia
 + csqzhang
 + csteiner
 + eugene yokota

@@ -157,7 +157,11 @@ impl Session {
         if dynamic_ui {
             max_workunit_level = std::cmp::max(max_workunit_level, log::Level::Debug);
         }
-        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level);
+        // Only queue workunit messages for consumers which will actually poll for them: the
+        // streaming channel is enabled later iff a streaming workunit consumer registers (see
+        // `enable_streaming_workunits`), and the heavy hitters consumer only exists for the
+        // dynamic UI.
+        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level, false, dynamic_ui);
         let display = tokio::sync::Mutex::new(SessionDisplay::new(
             &workunit_store,
             core.local_parallelism,

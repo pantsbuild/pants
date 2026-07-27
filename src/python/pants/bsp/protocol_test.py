@@ -117,6 +117,9 @@ def jvm_rule_runner() -> RuleRunner:
     rule_runner.set_options(
         args=[
             "--experimental-bsp-groups-config-files=bsp-groups.toml",
+            # NixOS doesn't have /bin/bash etc. — let the inner runner find
+            # system binaries via the inherited PATH. Harmless on other hosts.
+            '--system-binaries-system-binary-paths=["<PATH>"]',
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
@@ -230,10 +233,23 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
         )
         assert len(sources.items[0].sources) == 2
 
-        # buildTarget/dependencySources - (NB: stubbed)
-        _ = endpoint.request(
-            "buildTarget/dependencySources", DependencySourcesParams(target_ids).to_json_dict()
+        # buildTarget/dependencySources — should now report source jars for
+        # `scala-library` and `scalatest` (both in the lockfile fixture).
+        # NB: `DependencySourcesResult` has no `from_json_dict`, so we read
+        # the raw JSON dict directly.
+        dep_sources_raw = endpoint.request(
+            "buildTarget/dependencySources",
+            DependencySourcesParams(target_ids).to_json_dict(),
         ).result(timeout=timeout)
+        items = dep_sources_raw["items"]
+        assert len(items) == 1
+        all_sources = items[0]["sources"]
+        assert any("scala-library" in s and "sources" in s for s in all_sources), (
+            f"Expected a scala-library sources jar URI; got {list(all_sources)}"
+        )
+        assert any("scalatest" in s and "sources" in s for s in all_sources), (
+            f"Expected a scalatest sources jar URI; got {list(all_sources)}"
+        )
 
         # buildTarget/resources - (NB: used only to index resources)
         _ = endpoint.request(

@@ -5,15 +5,22 @@ from __future__ import annotations
 
 import pytest
 
+from pants.backend.python.providers.python_build_standalone import rules as pbs_rules
 from pants.backend.python.providers.python_build_standalone.rules import (
+    PBSPythonProvider,
     _parse_from_five_fields,
     _parse_from_three_fields,
     _parse_pbs_url,
     _parse_py_version_and_pbs_release_tag,
     _ParsedPBSPython,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex_environment import PythonExecutable
+from pants.core.environments.target_types import DockerEnvironmentTarget
 from pants.core.util_rules.external_tool import ExternalToolError
+from pants.engine.environment import EnvironmentName
 from pants.engine.platform import Platform
+from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.version import Version
 
 
@@ -126,3 +133,35 @@ def test_parse_from_five_fields() -> None:
         sha256="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         size=123,
     )
+
+
+def test_docker_python_path_uses_named_caches_in_container() -> None:
+    rule_runner = RuleRunner(
+        rules=[
+            *pbs_rules.rules(),
+            QueryRule(PythonExecutable, (PBSPythonProvider, EnvironmentName)),
+        ],
+        target_types=[DockerEnvironmentTarget],
+        inherent_environment=EnvironmentName("docker"),
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": "docker_environment(name='docker', image='ubuntu:latest')",
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--backend-packages=['pants.backend.python', 'pants.backend.python.providers.experimental.python_build_standalone']",
+            "--interpreter-versions-universe=['3.12']",
+            "--environments-preview-names={'docker': '//:docker'}",
+        ],
+        env_inherit={"PATH"},
+    )
+    python = rule_runner.request(
+        PythonExecutable,
+        [
+            PBSPythonProvider(InterpreterConstraints(["CPython==3.12.*"])),
+        ],
+    )
+    assert python.path.startswith("/pants-named-caches")
+    assert python.path.endswith("/bin/python3")

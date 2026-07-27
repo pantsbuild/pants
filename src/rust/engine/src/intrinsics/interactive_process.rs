@@ -56,16 +56,19 @@ pub async fn interactive_process_inner(
         Value,
         Value,
         externs::process::PyProcessExecutionEnvironment,
-    ) = Python::attach(|py| {
+    ) = Python::attach(|py| -> NodeResult<_> {
         let py_interactive_process = interactive_process.bind(py);
-        let py_process: Value = externs::getattr(py_interactive_process, "process").unwrap();
-        let process_config = process_config.bind(py).extract().unwrap();
-        (
-            py_interactive_process.extract().unwrap(),
+        let py_process: Value = externs::getattr(py_interactive_process, "process")?;
+        let process_config = process_config
+            .bind(py)
+            .extract()
+            .map_err(|e| format!("Failed to extract process config: {e:?}"))?;
+        Ok((
+            py_interactive_process.extract().map_err(Failure::from)?,
             py_process,
             process_config,
-        )
-    });
+        ))
+    })?;
 
     match process_config.environment.strategy {
         ProcessExecutionStrategy::Docker(_) | ProcessExecutionStrategy::RemoteExecution(_) => {
@@ -81,20 +84,17 @@ pub async fn interactive_process_inner(
     let mut process = ExecuteProcess::lift(&context.core.store(), py_process, process_config)
         .await?
         .process;
-    let (run_in_workspace, keep_sandboxes) = Python::attach(|py| {
+    let (run_in_workspace, keep_sandboxes) = Python::attach(|py| -> NodeResult<_> {
         let py_interactive_process = py_interactive_process.bind(py);
-        let run_in_workspace: bool =
-            externs::getattr(py_interactive_process, "run_in_workspace").unwrap();
+        let run_in_workspace: bool = externs::getattr(py_interactive_process, "run_in_workspace")?;
         let keep_sandboxes_value: Bound<'_, PyAny> =
-            externs::getattr(py_interactive_process, "keep_sandboxes").unwrap();
+            externs::getattr(py_interactive_process, "keep_sandboxes")?;
         let keep_sandboxes = KeepSandboxes::from_str(
-            externs::getattr::<PyBackedStr>(&keep_sandboxes_value, "value")
-                .unwrap()
-                .as_ref(),
+            externs::getattr::<PyBackedStr>(&keep_sandboxes_value, "value")?.as_ref(),
         )
-        .unwrap();
-        (run_in_workspace, keep_sandboxes)
-    });
+        .map_err(|e| format!("Failed to parse keep_sandboxes: {e}"))?;
+        Ok((run_in_workspace, keep_sandboxes))
+    })?;
 
     let session = context.session.clone();
 

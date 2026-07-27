@@ -1167,6 +1167,6 @@ def test_scalac_plugin_extra_output(
     )
     rendered_classpath = rule_runner.request(RenderedClasspath, [request])
     assert (
-        "META-INF/semanticdb/Foo.scala.semanticdb"
+        "META-INF/semanticdb/src/jvm/Foo.scala.semanticdb"
         in rendered_classpath.content["src.jvm.Foo.scala.scalac.jar"]
     )

@@ -26,7 +26,7 @@ from pants.backend.python.util_rules.pex import (
     setup_venv_pex_process,
 )
 from pants.core.goals.run import RunFieldSet, RunRequest, generate_run_request
-from pants.core.util_rules.system_binaries import CatBinary
+from pants.core.util_rules.system_binaries import BashBinary, CatBinary
 from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -183,6 +183,7 @@ async def _resolve_post_renderers(
 async def setup_post_renderer_launcher(
     request: SetupHelmPostRenderer,
     post_renderer_tool: _HelmPostRendererTool,
+    bash_binary: BashBinary,
     cat_binary: CatBinary,
 ) -> HelmPostRenderer:
     # Build post-renderer configuration file and create a digest containing it.
@@ -231,9 +232,10 @@ async def setup_post_renderer_launcher(
         f'Using post-renderer pipeline "{post_renderer_process_cli}" in {request.description_of_origin}.'
     )
 
+    # NB: Helm itself executes this script (via `--post-renderer`), so it must carry a shebang.
     postrenderer_wrapper_script = dedent(
         f"""\
-        #!/bin/bash
+        #!{bash_binary.path}
 
         # Output stdin into a file in disk
         {cat_binary.path} <&0 > {post_renderer_input_file}

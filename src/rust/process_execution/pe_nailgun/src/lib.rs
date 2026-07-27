@@ -47,7 +47,13 @@ fn construct_nailgun_server_request(
     args_for_the_jvm: Vec<String>,
 ) -> Process {
     let mut full_args = args_for_the_jvm;
-    full_args.push(NAILGUN_MAIN_CLASS.to_string());
+    let main_class = client_request
+        .env
+        .get("PANTS_NAILGUN_MAIN_CLASS")
+        .map(|s| s.as_str())
+        .unwrap_or(NAILGUN_MAIN_CLASS);
+
+    full_args.push(main_class.to_string());
     full_args.extend(ARGS_TO_START_NAILGUN.iter().map(|&a| a.to_string()));
 
     Process {
@@ -181,7 +187,7 @@ impl process_execution::CommandRunner for CommandRunner {
                     &nailgun_name,
                     nailgun_args,
                 );
-                trace!("Running request under nailgun:\n {:#?}", &client_req);
+                trace!("Running request under nailgun:\n {:#?}", client_req);
 
                 // Get an instance of a nailgun server for this fingerprint, and then run in its directory.
                 let mut nailgun_process = self

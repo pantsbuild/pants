@@ -10,8 +10,7 @@ import signal
 import sys
 import threading
 import traceback
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 
 import psutil
 import setproctitle
@@ -40,25 +39,13 @@ class SignalHandler:
         # instead just iterating over the registered signals to set handlers, so a dict is probably
         # better.
         return {
-            signal.SIGINT: self._handle_sigint_if_enabled,
+            signal.SIGINT: self.handle_sigint,
             signal.SIGQUIT: self.handle_sigquit,
             signal.SIGTERM: self.handle_sigterm,
         }
 
     def __init__(self, *, pantsd_instance: bool):
-        self._ignore_sigint_lock = threading.Lock()
-        self._ignoring_sigint = False
         self._pantsd_instance = pantsd_instance
-
-    def _handle_sigint_if_enabled(self, signum: int, _frame):
-        with self._ignore_sigint_lock:
-            if not self._ignoring_sigint:
-                self.handle_sigint(signum, _frame)
-
-    def _toggle_ignoring_sigint(self, toggle: bool) -> None:
-        if not self._pantsd_instance:
-            with self._ignore_sigint_lock:
-                self._ignoring_sigint = toggle
 
     def _send_signal_to_children(self, received_signal: int, signame: str) -> None:
         """Send a signal to any children of this process in order.
@@ -133,6 +120,7 @@ class ExceptionSink:
     # (and lets faulthandler figure out signal safety).
     _pid_specific_error_fileobj = None
     _shared_error_fileobj = None
+    _lock = threading.RLock()
 
     def __new__(cls, *args, **kwargs):
         raise TypeError(
@@ -145,15 +133,15 @@ class ExceptionSink:
     @classmethod
     def install(cls, log_location: str, pantsd_instance: bool) -> None:
         """Setup global state for this process, such as signal handlers and sys.excepthook."""
+        with cls._lock:
+            # Set the log location for writing logs before bootstrap options are parsed.
+            cls.reset_log_location(log_location)
 
-        # Set the log location for writing logs before bootstrap options are parsed.
-        cls.reset_log_location(log_location)
+            # NB: Mutate process-global state!
+            sys.excepthook = ExceptionSink.log_exception
 
-        # NB: Mutate process-global state!
-        sys.excepthook = ExceptionSink.log_exception
-
-        # Setup a default signal handler.
-        cls.reset_signal_handler(SignalHandler(pantsd_instance=pantsd_instance))
+            # Setup a default signal handler.
+            cls.reset_signal_handler(SignalHandler(pantsd_instance=pantsd_instance))
 
     # All reset_* methods are ~idempotent!
     @classmethod
@@ -170,42 +158,47 @@ class ExceptionSink:
         :raises: :class:`ExceptionSink.ExceptionSinkError` if the directory does not exist or is not
                  writable.
         """
-        # We could no-op here if the log locations are the same, but there's no reason not to have the
-        # additional safety of re-acquiring file descriptors each time (and erroring out early if the
-        # location is no longer writable).
-        try:
-            safe_mkdir(new_log_location)
-        except Exception as e:
-            raise cls.ExceptionSinkError(
-                f"The provided log location path at '{new_log_location}' is not writable or could not be created: {str(e)}.",
-                e,
-            )
+        with cls._lock:
+            # We could no-op here if the log locations are the same, but there's no reason not to
+            # have the additional safety of re-acquiring file descriptors each time (and erroring out
+            # early if the location is no longer writable).
+            try:
+                safe_mkdir(new_log_location)
+            except Exception as e:
+                raise cls.ExceptionSinkError(
+                    f"The provided log location path at '{new_log_location}' is not writable or "
+                    f"could not be created: {str(e)}.",
+                    e,
+                )
 
-        pid = os.getpid()
-        pid_specific_log_path = cls.exceptions_log_path(for_pid=pid, in_dir=new_log_location)
-        shared_log_path = cls.exceptions_log_path(in_dir=new_log_location)
-        assert pid_specific_log_path != shared_log_path
-        try:
-            pid_specific_error_stream = cls.open_pid_specific_error_stream(pid_specific_log_path)
-            shared_error_stream = safe_open(shared_log_path, mode="a")
-        except Exception as e:
-            raise cls.ExceptionSinkError(
-                f"Error opening fatal error log streams for log location '{new_log_location}': {str(e)}"
-            )
+            pid = os.getpid()
+            pid_specific_log_path = cls.exceptions_log_path(for_pid=pid, in_dir=new_log_location)
+            shared_log_path = cls.exceptions_log_path(in_dir=new_log_location)
+            assert pid_specific_log_path != shared_log_path
+            try:
+                pid_specific_error_stream = cls.open_pid_specific_error_stream(
+                    pid_specific_log_path
+                )
+                shared_error_stream = safe_open(shared_log_path, mode="a")
+            except Exception as e:
+                raise cls.ExceptionSinkError(
+                    f"Error opening fatal error log streams for log location "
+                    f"'{new_log_location}': {str(e)}"
+                )
 
-        # NB: mutate process-global state!
-        if faulthandler.is_enabled():
-            logger.debug("re-enabling faulthandler")
-            # Call Py_CLEAR() on the previous error stream:
-            # https://github.com/vstinner/faulthandler/blob/master/faulthandler.c
-            faulthandler.disable()
-        # Send a stacktrace to this file if interrupted by a fatal error.
-        faulthandler.enable(file=pid_specific_error_stream, all_threads=True)
+            # NB: mutate process-global state!
+            if faulthandler.is_enabled():
+                logger.debug("re-enabling faulthandler")
+                # Call Py_CLEAR() on the previous error stream:
+                # https://github.com/vstinner/faulthandler/blob/master/faulthandler.c
+                faulthandler.disable()
+            # Send a stacktrace to this file if interrupted by a fatal error.
+            faulthandler.enable(file=pid_specific_error_stream, all_threads=True)
 
-        # NB: mutate the class variables!
-        cls._log_dir = new_log_location
-        cls._pid_specific_error_fileobj = pid_specific_error_stream
-        cls._shared_error_fileobj = shared_error_stream
+            # NB: mutate the class variables!
+            cls._log_dir = new_log_location
+            cls._pid_specific_error_fileobj = pid_specific_error_stream
+            cls._shared_error_fileobj = shared_error_stream
 
     @classmethod
     def open_pid_specific_error_stream(cls, path):
@@ -244,23 +237,26 @@ class ExceptionSink:
         pid = os.getpid()
         fatal_error_log_entry = cls._format_exception_message(msg, pid)
 
-        # We care more about this log than the shared log, so write to it first.
-        try:
-            cls._try_write_with_flush(cls._pid_specific_error_fileobj, fatal_error_log_entry)
-        except Exception as e:
-            logger.error(
-                f"Error logging the message '{msg}' to the pid-specific file handle for {cls._log_dir} at pid {pid}:\n{e}"
-            )
+        with cls._lock:
+            # We care more about this log than the shared log, so write to it first.
+            try:
+                cls._try_write_with_flush(cls._pid_specific_error_fileobj, fatal_error_log_entry)
+            except Exception as e:
+                logger.error(
+                    f"Error logging the message '{msg}' to the pid-specific file handle for "
+                    f"{cls._log_dir} at pid {pid}:\n{e}"
+                )
 
-        # Write to the shared log.
-        try:
-            # TODO: we should probably guard this against concurrent modification by other pants
-            # subprocesses somehow.
-            cls._try_write_with_flush(cls._shared_error_fileobj, fatal_error_log_entry)
-        except Exception as e:
-            logger.error(
-                f"Error logging the message '{msg}' to the shared file handle for {cls._log_dir} at pid {pid}:\n{e}"
-            )
+            # Write to the shared log.
+            try:
+                # TODO: we should probably guard this against concurrent modification by other pants
+                # subprocesses somehow.
+                cls._try_write_with_flush(cls._shared_error_fileobj, fatal_error_log_entry)
+            except Exception as e:
+                logger.error(
+                    f"Error logging the message '{msg}' to the shared file handle for "
+                    f"{cls._log_dir} at pid {pid}:\n{e}"
+                )
 
     @classmethod
     def _try_write_with_flush(cls, fileobj, payload):
@@ -280,48 +276,18 @@ class ExceptionSink:
         the previously-registered signal handler.
         """
 
-        for signum, handler in signal_handler.signal_handler_mapping.items():
-            signal.signal(signum, handler)
-            # Retry any system calls interrupted by any of the signals we just installed handlers for
-            # (instead of having them raise EINTR). siginterrupt(3) says this is the default behavior on
-            # Linux and OSX.
-            signal.siginterrupt(signum, False)
+        with cls._lock:
+            for signum, handler in signal_handler.signal_handler_mapping.items():
+                signal.signal(signum, handler)
+                # Retry any system calls interrupted by any of the signals we just installed handlers
+                # for (instead of having them raise EINTR). siginterrupt(3) says this is the default
+                # behavior on Linux and OSX.
+                signal.siginterrupt(signum, False)
 
-        previous_signal_handler = cls._signal_handler
-        cls._signal_handler = signal_handler
+            previous_signal_handler = cls._signal_handler
+            cls._signal_handler = signal_handler
 
-        return previous_signal_handler
-
-    @classmethod
-    @contextmanager
-    def trapped_signals(cls, new_signal_handler: SignalHandler) -> Iterator[None]:
-        """A contextmanager which temporarily overrides signal handling.
-
-        NB: This method calls signal.signal(), which will crash if not called from the main thread!
-        """
-        previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
-        try:
-            yield
-        finally:
-            cls.reset_signal_handler(previous_signal_handler)
-
-    @classmethod
-    @contextmanager
-    def ignoring_sigint(cls) -> Iterator[None]:
-        """This method provides a context that temporarily disables responding to the SIGINT signal
-        sent by a Ctrl-C in the terminal.
-
-        We currently only use this to implement disabling catching SIGINT while an
-        InteractiveProcess is running (where we want that process to catch it), and only when pantsd
-        is not enabled. If pantsd is enabled, the client will actually catch SIGINT and forward it
-        to the server, so we don't want the server process to ignore it.
-        """
-
-        try:
-            cls._signal_handler._toggle_ignoring_sigint(True)
-            yield
-        finally:
-            cls._signal_handler._toggle_ignoring_sigint(False)
+            return previous_signal_handler
 
     @classmethod
     def _iso_timestamp_for_now(cls):

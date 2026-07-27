@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import os.path
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -52,6 +53,7 @@ class AddressMap:
         cls,
         filepath: str,
         build_file_content: str,
+        tree: ast.Module,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
         env_vars: EnvironmentVars,
@@ -69,6 +71,7 @@ class AddressMap:
             target_adaptors = parser.parse(
                 filepath,
                 build_file_content,
+                tree,
                 extra_symbols,
                 env_vars,
                 is_bootstrap,

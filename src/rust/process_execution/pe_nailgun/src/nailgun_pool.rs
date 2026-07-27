@@ -303,7 +303,7 @@ fn spawn_and_read_port(
         .map_err(|e| {
             format!(
                 "Failed to create child handle for nailgun with cmd: {} options {:#?}: {}",
-                &cmd, &process, e
+                cmd, process, e
             )
         })?;
 

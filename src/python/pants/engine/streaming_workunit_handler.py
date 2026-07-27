@@ -249,6 +249,10 @@ class StreamingWorkunitHandler:
         max_workunit_verbosity: LogLevel,
     ) -> None:
         scheduler = scheduler.isolated_shallow_clone("streaming_workunit_handler_session")
+        if callbacks:
+            # A polling consumer exists: enable queueing of workunit messages. NB: The shallow
+            # clone shares its WorkunitStore with the original session.
+            scheduler.enable_streaming_workunits()
         self.callbacks = callbacks
         self.context = StreamingWorkunitContext(
             _scheduler=scheduler,

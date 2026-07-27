@@ -6,9 +6,11 @@ from dataclasses import dataclass
 
 from pants.backend.go.target_types import (
     GoBinaryDependenciesField,
+    GoBinaryMainImportPathField,
     GoBinaryMainPackageField,
     GoImportPathField,
     GoPackageSourcesField,
+    GoThirdPartyModuleDependenciesField,
 )
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.build_graph.address import Address, AddressInput, ResolveError
@@ -33,6 +35,8 @@ class GoBinaryMainPackage:
 
     is_third_party: bool
     import_path: str | None = None
+    # Module granularity: the address is the module's root, so the main is built by import path.
+    is_third_party_module: bool = False
 
 
 @dataclass(frozen=True)
@@ -67,11 +71,11 @@ async def determine_main_pkg_for_go_binary(
         ) and not wrapped_specified_tgt.target.has_field(GoImportPathField):
             raise InvalidFieldException(
                 f"The {repr(GoBinaryMainPackageField.alias)} field in target {addr} must point to "
-                "a `go_package` or `go_third_party_package` target, but was the address for a "
-                f"`{wrapped_specified_tgt.target.alias}` target.\n\n"
-                "Hint: unless the package is a `go_third_party_package` target, you should normally "
-                "not specify this field for local packages so that Pants will find the `go_package` "
-                "target for you."
+                "a `go_package`, `go_third_party_package`, or `go_third_party_module` target, but "
+                f"was the address for a `{wrapped_specified_tgt.target.alias}` target.\n\n"
+                "Hint: unless the package is a `go_third_party_package` or `go_third_party_module` "
+                "target, you should normally not specify this field for local packages so that "
+                "Pants will find the `go_package` target for you."
             )
 
         if not wrapped_specified_tgt.target.has_field(GoPackageSourcesField):
@@ -79,6 +83,9 @@ async def determine_main_pkg_for_go_binary(
                 wrapped_specified_tgt.target.address,
                 is_third_party=True,
                 import_path=wrapped_specified_tgt.target.get(GoImportPathField).value,
+                is_third_party_module=wrapped_specified_tgt.target.has_field(
+                    GoThirdPartyModuleDependenciesField
+                ),
             )
         return GoBinaryMainPackage(wrapped_specified_tgt.target.address, is_third_party=False)
 
@@ -121,6 +128,7 @@ class GoBinaryMainDependencyInferenceFieldSet(FieldSet):
 
     dependencies: GoBinaryDependenciesField
     main_package: GoBinaryMainPackageField
+    main_import_path: GoBinaryMainImportPathField
 
 
 class InferGoBinaryMainDependencyRequest(InferDependenciesRequest):
@@ -131,6 +139,9 @@ class InferGoBinaryMainDependencyRequest(InferDependenciesRequest):
 async def infer_go_binary_main_dependency(
     request: InferGoBinaryMainDependencyRequest,
 ) -> InferredDependencies:
+    if request.field_set.main_import_path.value:
+        # Inferred by `infer_go_binary_main_import_path_dependency` instead.
+        return InferredDependencies(())
     main_pkg = await determine_main_pkg_for_go_binary(
         GoBinaryMainPackageRequest(request.field_set.main_package)
     )

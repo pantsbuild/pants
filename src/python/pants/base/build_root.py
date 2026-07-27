@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -37,6 +38,7 @@ class BuildRoot(metaclass=SingletonMetaclass):
 
     def __init__(self) -> None:
         self._root_dir: str | None = None
+        self._lock = threading.RLock()
 
     @property
     def pathlib_path(self) -> Path:
@@ -45,15 +47,16 @@ class BuildRoot(metaclass=SingletonMetaclass):
     @property
     def path(self) -> str:
         """Returns the build root for the current workspace."""
-        if self._root_dir is None:
-            # Do not remove/change this env var without coordinating with `pantsbuild/scie-pants` as
-            # it is being used when bootstrapping Pants.
-            override_buildroot = os.environ.get("PANTS_BUILDROOT_OVERRIDE", None)
-            if override_buildroot:
-                self._root_dir = override_buildroot
-            else:
-                self._root_dir = os.path.realpath(self.find_buildroot())
-        return self._root_dir
+        with self._lock:
+            if self._root_dir is None:
+                # Do not remove/change this env var without coordinating with
+                # `pantsbuild/scie-pants` as it is being used when bootstrapping Pants.
+                override_buildroot = os.environ.get("PANTS_BUILDROOT_OVERRIDE", None)
+                if override_buildroot:
+                    self._root_dir = override_buildroot
+                else:
+                    self._root_dir = os.path.realpath(self.find_buildroot())
+            return self._root_dir
 
     @path.setter
     def path(self, root_dir: str) -> None:
@@ -61,11 +64,13 @@ class BuildRoot(metaclass=SingletonMetaclass):
         path = os.path.realpath(root_dir)
         if not os.path.exists(path):
             raise ValueError(f"Build root does not exist: {root_dir}")
-        self._root_dir = path
+        with self._lock:
+            self._root_dir = path
 
     def reset(self) -> None:
         """Clears the last calculated build root for the current workspace."""
-        self._root_dir = None
+        with self._lock:
+            self._root_dir = None
 
     def __str__(self) -> str:
         return f"BuildRoot({self._root_dir})"
@@ -75,9 +80,10 @@ class BuildRoot(metaclass=SingletonMetaclass):
         """Establishes a temporary build root, restoring the prior build root on exit."""
         if path is None:
             raise ValueError("Can only temporarily establish a build root given a path.")
-        prior = self._root_dir
-        self._root_dir = path
-        try:
-            yield
-        finally:
-            self._root_dir = prior
+        with self._lock:
+            prior = self._root_dir
+            self._root_dir = path
+            try:
+                yield
+            finally:
+                self._root_dir = prior

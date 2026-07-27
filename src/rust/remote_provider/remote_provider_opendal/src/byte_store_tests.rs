@@ -41,7 +41,13 @@ fn remote_options() -> RemoteStoreOptions {
 }
 
 fn new_provider() -> Provider {
-    Provider::new(Memory::default(), BASE.to_owned(), remote_options()).unwrap()
+    Provider::new(
+        Memory::default(),
+        opendal::services::MEMORY_SCHEME,
+        BASE.to_owned(),
+        remote_options(),
+    )
+    .unwrap()
 }
 
 async fn write_test_data(provider: &Provider, data: &TestData) {

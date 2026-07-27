@@ -1,7 +1,7 @@
 // Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use pyo3::exceptions::PyException;
+use pyo3::exceptions::{PyException, PyUnicodeDecodeError};
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
 use pyo3::{BoundObject, prelude::*};
 
@@ -207,10 +207,12 @@ pub struct PyConfigSource(pub ConfigSource);
 #[pymethods]
 impl PyConfigSource {
     #[new]
-    fn __new__(path: &str, content: &[u8]) -> PyResult<Self> {
+    fn __new__(py: Python, path: &str, content: &[u8]) -> PyResult<Self> {
         Ok(Self(ConfigSource {
             path: path.into(),
-            content: std::str::from_utf8(content).map(str::to_string)?,
+            content: std::str::from_utf8(content)
+                .map(str::to_string)
+                .map_err(|e| PyUnicodeDecodeError::new_err_from_utf8(py, content, e))?,
         }))
     }
 }

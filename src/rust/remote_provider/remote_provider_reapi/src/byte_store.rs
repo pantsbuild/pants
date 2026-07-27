@@ -148,7 +148,7 @@ impl Provider {
         let instance_name = self.instance_name.clone().unwrap_or_default();
         let resource_name = format!(
             "{}{}uploads/{}/blobs/{}/{}",
-            &instance_name,
+            instance_name,
             if instance_name.is_empty() { "" } else { "/" },
             uuid::Uuid::new_v4(),
             digest.hash,
@@ -372,7 +372,7 @@ impl ByteStoreProvider for Provider {
         let instance_name = self.instance_name.clone().unwrap_or_default();
         let resource_name = format!(
             "{}{}blobs/{}/{}",
-            &instance_name,
+            instance_name,
             if instance_name.is_empty() { "" } else { "/" },
             digest.hash,
             digest.size_bytes

@@ -95,7 +95,7 @@ from pants.util.ordered_set import OrderedSet
 from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------------------
@@ -445,6 +445,10 @@ async def setup_pytest_for_target(
     if len(request.field_sets) > 1:
         run_description = (
             f"batch of {run_description} and {len(request.field_sets) - 1} other files"
+        )
+        logger.debug(
+            f"{run_description} contains:\n"
+            + "\n".join(f"  {field_set.address.spec}" for field_set in request.field_sets)
         )
     process = await setup_venv_pex_process(
         VenvPexProcess(

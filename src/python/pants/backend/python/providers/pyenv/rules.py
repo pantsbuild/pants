@@ -13,6 +13,7 @@ from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.external_tool import TemplatedExternalTool, download_external_tool
 from pants.core.util_rules.external_tool import rules as external_tools_rules
+from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.env_vars import EXTRA_ENV_VARS_USAGE_HELP, EnvironmentVarsRequest
 from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import MergeDigests
@@ -115,6 +116,7 @@ async def get_pyenv_install_info(
     pyenv_env_aware: PyenvPythonProviderSubsystem.EnvironmentAware,
     platform: Platform,
     bootstrap_python: PythonBuildStandaloneBinary,
+    bash: BashBinary,
 ) -> RunRequest:
     env_vars, pyenv = await concurrently(
         environment_vars_subset(
@@ -134,7 +136,6 @@ async def get_pyenv_install_info(
                     "install_python_shim.sh",
                     dedent(
                         f"""\
-                        #!/usr/bin/env bash
                         set -e
                         export PYENV_ROOT=$(readlink {PYENV_NAMED_CACHE})/{installation_fingerprint}
                         DEST="$PYENV_ROOT"/versions/$1
@@ -145,7 +146,6 @@ async def get_pyenv_install_info(
                         echo "$DEST"/bin/python
                         """
                     ).encode(),
-                    is_executable=True,
                 ),
                 FileContent(
                     "install_python_shim.py",
@@ -186,7 +186,6 @@ async def get_pyenv_install_info(
                             main()
                         """
                     ).encode(),
-                    is_executable=True,
                 ),
             ]
         )
@@ -195,7 +194,7 @@ async def get_pyenv_install_info(
     digest = await merge_digests(MergeDigests([install_script_digest, pyenv.digest]))
     return RunRequest(
         digest=digest,
-        args=["./install_python_shim.sh"],
+        args=[bash.path, "./install_python_shim.sh"],
         extra_env={
             "PATH": env_vars.get("PATH", ""),
             "TMPDIR": "{chroot}/tmpdir",

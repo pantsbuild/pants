@@ -68,6 +68,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::register(py, m)?;
     externs::address::register(py, m)?;
     externs::fs::register(m)?;
+    externs::memo::register(m)?;
     externs::nailgun::register(py, m)?;
     externs::options::register(m)?;
     externs::pants_ng::register(m)?;
@@ -78,6 +79,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::testutil::register(m)?;
     externs::workunits::register(m)?;
     externs::dep_inference::register(m)?;
+    externs::docker::register(m)?;
     externs::unions::register(py, m)?;
     externs::frozendict::register(py, m)?;
     externs::frozen_ordered_set::register(py, m)?;
@@ -145,6 +147,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
 
     m.add_function(wrap_pyfunction!(session_new_run_id, m)?)?;
     m.add_function(wrap_pyfunction!(session_poll_workunits, m)?)?;
+    m.add_function(wrap_pyfunction!(session_enable_streaming_workunits, m)?)?;
     m.add_function(wrap_pyfunction!(session_run_interactive_process, m)?)?;
     m.add_function(wrap_pyfunction!(session_get_metrics, m)?)?;
     m.add_function(wrap_pyfunction!(session_get_observation_histograms, m)?)?;
@@ -1075,6 +1078,15 @@ async fn workunits_to_py_tuple_value(
 }
 
 #[pyfunction]
+fn session_enable_streaming_workunits(session: &Bound<'_, PySession>) {
+    session
+        .borrow()
+        .0
+        .workunit_store()
+        .enable_streaming_workunits();
+}
+
+#[pyfunction]
 fn session_poll_workunits(
     py_scheduler: Py<PyAny>,
     py_session: Py<PyAny>,
@@ -1697,7 +1709,8 @@ fn capture_snapshots(
         // TODO: A parent_id should be an explicit argument.
         session.workunit_store().init_thread_state(None);
 
-        let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper).unwrap();
+        let values = externs::collect_iterable(path_globs_and_root_tuple_wrapper)
+            .map_err(PyValueError::new_err)?;
         let path_globs_and_roots = values
             .into_iter()
             .map(|value| {

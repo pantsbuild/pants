@@ -9,6 +9,7 @@ jobs:
       image: quay.io/pypa/manylinux_2_28_aarch64:latest
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      MODE: dist
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -44,7 +45,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.96.0
+        rustup default 1.97.1
         cargo version
     - name: Expose Pythons
       run: |
@@ -90,7 +91,7 @@ jobs:
       name: Rename the Pants Pex to its final name for upload
       run: |
         PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
         PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
         PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
@@ -136,6 +137,7 @@ jobs:
       - /:/mnt/host-root
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+      MODE: dist
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -171,7 +173,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.96.0
+        rustup default 1.97.1
         cargo version
     - name: Expose Pythons
       run: |
@@ -227,7 +229,7 @@ jobs:
       name: Rename the Pants Pex to its final name for upload
       run: |
         PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
         PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
         PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
@@ -284,6 +286,7 @@ jobs:
   build_wheels_macos14_arm64:
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
+      MODE: dist
       PANTS_REMOTE_CACHE_READ: 'false'
       PANTS_REMOTE_CACHE_WRITE: 'false'
     if: github.repository_owner == 'pantsbuild'
@@ -334,7 +337,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.96.0-*
+          ~/.rustup/toolchains/1.97.1-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -389,7 +392,7 @@ jobs:
       name: Rename the Pants Pex to its final name for upload
       run: |
         PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}')")
+        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
         PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
         PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
@@ -469,7 +472,7 @@ jobs:
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.96.0-*
+          ~/.rustup/toolchains/1.97.1-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -489,6 +492,7 @@ jobs:
         path: |-
           src/python/pants/bin/native_client
           src/python/pants/bin/sandboxer
+          src/python/pants/bin/pants_lock
           src/python/pants/engine/internals/native_engine.so
           src/python/pants/engine/internals/native_engine.so.metadata
     - env:

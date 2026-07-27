@@ -39,8 +39,9 @@ from pants.build_graph.address import Address
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import ResourceTarget
 from pants.core.util_rules import source_files
+from pants.engine.environment import EnvironmentName
 from pants.engine.internals.native_engine import EMPTY_DIGEST
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.testutil.skip_utils import skip_if_linux_arm64
 
@@ -68,6 +69,13 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleFirstPartyPkgDigest, [FirstPartyPkgDigestRequest]),
             QueryRule(CGoCompileResult, [CGoCompileRequest]),
             QueryRule(ProcessResult, (Process,)),
+            QueryRule(
+                FallibleProcessResult,
+                (
+                    EnvironmentName,
+                    Process,
+                ),
+            ),
         ],
         target_types=[
             GoModTarget,
@@ -879,3 +887,88 @@ def test_cgo_with_embedded_static_library(rule_runner: RuleRunner) -> None:
 
     tgt = rule_runner.get_target(Address("", target_name="bin"))
     rule_runner.request(BuiltPackage, [GoBinaryFieldSet.create(tgt)])
+
+
+def test_cgo_nocallback_noescape_directives(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+            go_mod(name="mod")
+            go_package(name="pkg")
+            go_binary(name="bin")
+            """
+            ),
+            "go.mod": "module example.pantsbuild.org/cgo_nocallback_noescape_test\n",
+            "main.go": dedent(
+                """\
+            package main
+
+            // void goCallback();
+            // static inline void triggerViolation() {
+            //   goCallback();
+            // }
+            // #cgo nocallback triggerViolation
+            import "C"
+            import "fmt"
+
+            //export goCallback
+            func goCallback() {
+                fmt.Println("[Go] Inside goCallback!")
+            }
+
+            func main() {
+                fmt.Println("[Go] Calling triggerViolation...")
+                C.triggerViolation()
+                fmt.Println("[Go] Should panic before this line due to violation of nocallback")
+            }
+            """
+            ),
+        }
+    )
+
+    tgt = rule_runner.get_target(Address("", target_name="pkg"))
+    maybe_analysis = rule_runner.request(
+        FallibleFirstPartyPkgAnalysis,
+        [FirstPartyPkgAnalysisRequest(tgt.address, build_opts=GoBuildOptions())],
+    )
+    assert maybe_analysis.analysis is not None
+    analysis = maybe_analysis.analysis
+    assert analysis.cgo_files == ("main.go",)
+
+    maybe_digest = rule_runner.request(
+        FallibleFirstPartyPkgDigest,
+        [FirstPartyPkgDigestRequest(tgt.address, build_opts=GoBuildOptions())],
+    )
+    assert maybe_digest.pkg_digest is not None
+    pkg_digest = maybe_digest.pkg_digest
+
+    cgo_request = CGoCompileRequest(
+        import_path=analysis.import_path,
+        pkg_name=analysis.name,
+        digest=pkg_digest.digest,
+        build_opts=GoBuildOptions(),
+        dir_path=analysis.dir_path,
+        cgo_files=analysis.cgo_files,
+        cgo_flags=analysis.cgo_flags,
+    )
+    cgo_compile_result = rule_runner.request(CGoCompileResult, [cgo_request])
+    assert cgo_compile_result.digest != EMPTY_DIGEST
+
+    tgt = rule_runner.get_target(Address("", target_name="bin"))
+    pkg = rule_runner.request(BuiltPackage, [GoBinaryFieldSet.create(tgt)])
+    result = rule_runner.request(
+        FallibleProcessResult,
+        [
+            Process(
+                argv=["./bin"],
+                input_digest=pkg.digest,
+                description="Run cgo binary",
+            )
+        ],
+    )
+    assert result.exit_code != 0
+    assert (
+        "panic: runtime: function marked with #cgo nocallback called back into Go"
+        in result.stderr.decode()
+    )
