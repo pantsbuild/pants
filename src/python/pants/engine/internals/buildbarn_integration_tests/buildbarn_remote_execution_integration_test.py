@@ -59,6 +59,10 @@ pytestmark = pytest.mark.skipif(
     _should_skip_for_missing_docker(), reason="Docker is required for Buildbarn tests"
 )
 
+# With the default of 0, Pants starts a remote execution before the cache lookup can answer,
+# so a cached run still counts an execution request.
+_CACHE_SPECULATION_DELAY_MILLIS = 10_000
+
 
 def _remote_execution_args(buildbarn: RemoteExecutionBuildbarn) -> list[str]:
     return [
@@ -149,6 +153,7 @@ def _working_directory_process(rule_runner: RuleRunner) -> Process:
         working_directory="workdir",
         output_directories=[""],
         level=LogLevel.INFO,
+        remote_cache_speculation_delay_millis=_CACHE_SPECULATION_DELAY_MILLIS,
     )
 
 
@@ -236,6 +241,7 @@ def test_buildbarn_remote_execution(subtests) -> None:
                 description="Buildbarn remote execution root output case",
                 output_directories=["."],
                 level=LogLevel.INFO,
+                remote_cache_speculation_delay_millis=_CACHE_SPECULATION_DELAY_MILLIS,
             )
             _assert_output_cache_roundtrip(process, expected_contents, buildbarn=buildbarn)
 
