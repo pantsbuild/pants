@@ -1722,8 +1722,7 @@ def public_repos() -> PublicReposOutput:
             ),
             # extra environment variables to pass when running the version under test,
             # e.g. `PANTS_SOME_SUBSYSTEM_SOME_SETTING=abc`.  NB. we use it in a way that's vulnerable to
-            # shell injection (there's no validation that it uses A=1 B=2 syntax, it can easily contain
-            # more commands), but this whole workflow is "run untrusted code as a service", so Pants
+            # shell injection but this whole workflow is "run untrusted code as a service", so Pants
             # maintainers injecting things is the least of our worries
             WorkflowInput(
                 "EXTRA_ENV",
@@ -1743,21 +1742,21 @@ def public_repos() -> PublicReposOutput:
             if use_default_version:
                 name = "repo-default version (baseline)"
                 version = ""
-                env_prefix = ""
+                step_env: dict[str, str] = {"PANTS_VERSION": version}
+                run_tmpl = "pants {goal}"
             else:
                 name = version = env["PANTS_VERSION"]
-                env_prefix = env["EXTRA_ENV"]
+                step_env = {"PANTS_VERSION": version, "EXTRA_ENV": env["EXTRA_ENV"]}
+                run_tmpl = 'eval "$EXTRA_ENV pants {goal}"'
 
             return [
                 {
                     "name": f"Run `{goal}` with {name}",
-                    # injecting the input string as just prefices is easier than turning it into
-                    # arguments for `env`
-                    "run": f"{env_prefix} pants {goal}",
+                    "run": run_tmpl.format(goal=goal),
                     # run all the goals, even if there's an earlier failure, because later goals
                     # might still be interesting (e.g. still run `test` even if `lint` fails)
                     "if": "success() || failure()",
-                    "env": {"PANTS_VERSION": version},
+                    "env": step_env,
                 }
                 for goal in ["version", *repo.goals]
             ]
