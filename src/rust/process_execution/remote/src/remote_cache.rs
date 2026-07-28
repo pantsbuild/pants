@@ -40,6 +40,70 @@ pub enum RemoteCacheWarningsBehavior {
     Always,
 }
 
+#[derive(Clone, Copy)]
+pub enum CacheErrorType {
+    ReadError,
+    WriteError,
+}
+
+/// Logs remote cache failures at a level throttled per `remote_cache_warnings`: the single
+/// implementation shared by every code path the option governs (the process remote cache and
+/// the remote download cache).
+pub struct CacheErrorThrottle {
+    behavior: RemoteCacheWarningsBehavior,
+    read_errors_counter: Mutex<BTreeMap<String, usize>>,
+    write_errors_counter: Mutex<BTreeMap<String, usize>>,
+}
+
+impl CacheErrorThrottle {
+    pub fn new(behavior: RemoteCacheWarningsBehavior) -> Self {
+        Self {
+            behavior,
+            read_errors_counter: Mutex::new(BTreeMap::new()),
+            write_errors_counter: Mutex::new(BTreeMap::new()),
+        }
+    }
+
+    /// Whether the `err_count`th occurrence of an error should be logged at WARN (vs DEBUG).
+    pub(crate) fn should_warn(&self, err_count: usize) -> bool {
+        match self.behavior {
+            RemoteCacheWarningsBehavior::Ignore => false,
+            RemoteCacheWarningsBehavior::FirstOnly => err_count == 1,
+            RemoteCacheWarningsBehavior::Backoff => err_count.is_power_of_two(),
+            RemoteCacheWarningsBehavior::Always => true,
+        }
+    }
+
+    /// Log a failure to read from or write to `target`, at WARN or DEBUG depending on the
+    /// configured behavior and how often this error has been seen.
+    pub fn log(&self, err_type: CacheErrorType, target: &str, err: String) {
+        let err_count = {
+            let mut errors_counter = match err_type {
+                CacheErrorType::ReadError => self.read_errors_counter.lock(),
+                CacheErrorType::WriteError => self.write_errors_counter.lock(),
+            };
+            let count = errors_counter.entry(err.clone()).or_insert(0);
+            *count += 1;
+            *count
+        };
+        let failure_desc = match err_type {
+            CacheErrorType::ReadError => "read from",
+            CacheErrorType::WriteError => "write to",
+        };
+
+        let level = if self.should_warn(err_count) {
+            Level::Warn
+        } else {
+            Level::Debug
+        };
+
+        log::log!(
+            level,
+            "Failed to {failure_desc} {target} ({err_count} occurrences so far): {err}"
+        );
+    }
+}
+
 pub struct RemoteCacheRunnerOptions {
     pub inner: Arc<dyn process_execution::CommandRunner>,
     pub instance_name: Option<String>,
@@ -73,9 +137,7 @@ pub struct CommandRunner {
     cache_read: bool,
     cache_write: bool,
     cache_content_behavior: CacheContentBehavior,
-    warnings_behavior: RemoteCacheWarningsBehavior,
-    read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
-    write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
+    error_throttle: Arc<CacheErrorThrottle>,
 }
 
 impl CommandRunner {
@@ -105,9 +167,7 @@ impl CommandRunner {
             cache_read,
             cache_write,
             cache_content_behavior,
-            warnings_behavior,
-            read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
-            write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
+            error_throttle: Arc::new(CacheErrorThrottle::new(warnings_behavior)),
         }
     }
 
@@ -404,7 +464,11 @@ impl CommandRunner {
                     }
                 },
                 Err(err) => {
-                    self.log_cache_error(err.to_string(), CacheErrorType::ReadError);
+                    self.error_throttle.log(
+                        CacheErrorType::ReadError,
+                        "remote cache",
+                        err.to_string(),
+                    );
                     None
                 }
             }
@@ -507,40 +571,6 @@ impl CommandRunner {
             .await?;
         Ok(())
     }
-
-    fn log_cache_error(&self, err: String, err_type: CacheErrorType) {
-        let err_count = {
-            let mut errors_counter = match err_type {
-                CacheErrorType::ReadError => self.read_errors_counter.lock(),
-                CacheErrorType::WriteError => self.write_errors_counter.lock(),
-            };
-            let count = errors_counter.entry(err.clone()).or_insert(0);
-            *count += 1;
-            *count
-        };
-        let failure_desc = match err_type {
-            CacheErrorType::ReadError => "read from",
-            CacheErrorType::WriteError => "write to",
-        };
-
-        let log_at_warn = match self.warnings_behavior {
-            RemoteCacheWarningsBehavior::Ignore => false,
-            RemoteCacheWarningsBehavior::FirstOnly => err_count == 1,
-            RemoteCacheWarningsBehavior::Backoff => err_count.is_power_of_two(),
-            RemoteCacheWarningsBehavior::Always => true,
-        };
-
-        let level = if log_at_warn {
-            Level::Warn
-        } else {
-            Level::Debug
-        };
-
-        log::log!(
-            level,
-            "Failed to {failure_desc} remote cache ({err_count} occurrences so far): {err}"
-        );
-    }
 }
 
 impl Debug for CommandRunner {
@@ -549,11 +579,6 @@ impl Debug for CommandRunner {
             .field("inner", &self.inner)
             .finish_non_exhaustive()
     }
-}
-
-enum CacheErrorType {
-    ReadError,
-    WriteError,
 }
 
 #[async_trait]
@@ -652,8 +677,11 @@ impl process_execution::CommandRunner for CommandRunner {
                                     result
                                 );
                             }
-                            command_runner
-                                .log_cache_error(err.to_string(), CacheErrorType::WriteError);
+                            command_runner.error_throttle.log(
+                                CacheErrorType::WriteError,
+                                "remote cache",
+                                err.to_string(),
+                            );
                             workunit.increment_counter(Metric::RemoteCacheWriteErrors, 1);
                         }
                     };
