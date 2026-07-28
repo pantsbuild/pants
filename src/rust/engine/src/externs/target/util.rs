@@ -24,17 +24,40 @@ pub fn combine_hashes(hashes: &[isize]) -> isize {
     hasher.finish() as isize
 }
 
-pub fn import_target_attr<'py>(
+pub fn import_attr<'py>(
     py: Python<'py>,
     cache: &OnceLock<Py<PyAny>>,
+    module: &str,
     name: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
     if let Some(attr) = cache.get() {
         return Ok(attr.bind(py).clone());
     }
-    let attr = py.import("pants.engine.target")?.getattr(name)?;
+    let attr = py.import(module)?.getattr(name)?;
     let _ = cache.set(attr.clone().unbind());
     Ok(attr)
+}
+
+pub fn import_type<'py>(
+    py: Python<'py>,
+    cache: &OnceLock<Py<pyo3::types::PyType>>,
+    module: &str,
+    name: &str,
+) -> PyResult<Bound<'py, pyo3::types::PyType>> {
+    if let Some(cls) = cache.get() {
+        return Ok(cls.bind(py).clone());
+    }
+    let cls: Bound<'_, pyo3::types::PyType> = py.import(module)?.getattr(name)?.extract()?;
+    let _ = cache.set(cls.clone().unbind());
+    Ok(cls)
+}
+
+pub fn import_target_attr<'py>(
+    py: Python<'py>,
+    cache: &OnceLock<Py<PyAny>>,
+    name: &str,
+) -> PyResult<Bound<'py, PyAny>> {
+    import_attr(py, cache, "pants.engine.target", name)
 }
 
 pub fn raise_invalid_field_type(
