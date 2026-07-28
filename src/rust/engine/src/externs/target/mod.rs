@@ -3,7 +3,7 @@
 
 mod field;
 mod source_fields;
-mod util;
+pub(crate) mod util;
 
 use pyo3::prelude::*;
 
