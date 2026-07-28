@@ -19,6 +19,7 @@ from pathlib import Path
 
 DEFAULT_INSTANCE_NAME = "fuse"
 DEFAULT_GRPC_PORT = 8980
+DEFAULT_DIAGNOSTICS_HTTP_PORT = 9980
 DEFAULT_READINESS_TIMEOUT_SECONDS = 30.0
 
 _CONFIG_ROOT = files(__package__).joinpath("config")
@@ -56,6 +57,7 @@ class CacheOnlyBuildbarn:
 @dataclass(frozen=True)
 class RemoteExecutionBuildbarn:
     address: str
+    metrics_url: str
     instance_name: str
     grpc_port: int
     project_name: str
@@ -202,6 +204,13 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
                 stack=self,
                 required_services=required_services,
             )
+            diagnostics_http_port = _discover_compose_host_port(
+                service="frontend",
+                container_port=DEFAULT_DIAGNOSTICS_HTTP_PORT,
+                timeout_seconds=self.readiness_timeout_seconds,
+                stack=self,
+                required_services=required_services,
+            )
             _wait_for_tcp_readiness(
                 port=grpc_port,
                 timeout_seconds=self.readiness_timeout_seconds,
@@ -217,6 +226,7 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
 
         launched = RemoteExecutionBuildbarn(
             address=f"grpc://127.0.0.1:{grpc_port}",
+            metrics_url=f"http://127.0.0.1:{diagnostics_http_port}/metrics",
             instance_name=self.instance_name,
             grpc_port=grpc_port,
             project_name=project_name,

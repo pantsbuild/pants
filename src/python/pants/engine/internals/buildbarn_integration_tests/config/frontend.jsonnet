@@ -1,4 +1,11 @@
 {
+  global: {diagnosticsHttpServer: {
+    httpServers: [{
+      listenAddresses: [':9980'],
+      authenticationPolicy: {allow: {}},
+    }],
+    enablePrometheus: true,
+  }},
   grpcServers: [{
     listenAddresses: [':8980'],
     authenticationPolicy: {allow: {}},

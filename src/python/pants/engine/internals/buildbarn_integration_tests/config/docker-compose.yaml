@@ -39,6 +39,7 @@ services:
       - scheduler
     ports:
       - "127.0.0.1::8980"
+      - "127.0.0.1::9980"
     volumes:
       - ${BUILDBARN_ASSETS_ROOT}/frontend.jsonnet:/config/frontend.jsonnet:ro
 
