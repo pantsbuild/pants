@@ -1,14 +1,16 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::hash::{Hash, Hasher};
+use std::sync::OnceLock;
+
 use crate::TypeId;
 use crate::externs::is_union;
 use deepsize::DeepSizeOf;
-use fnv::FnvBuildHasher;
+use fnv::{FnvBuildHasher, FnvHasher};
 use indexmap::{IndexMap, IndexSet};
 use pyo3::exceptions;
 use pyo3::prelude::*;
 use pyo3::types::{PyTuple, PyType};
-use std::hash::{Hash, Hasher};
 
 #[pyclass(
     frozen,
@@ -75,9 +77,10 @@ impl UnionRule {
 }
 
 #[pyclass(frozen, eq, hash, str = "UnionMembership({union_rules:?})")]
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default)]
 pub struct UnionMembership {
     pub union_rules: IndexMap<TypeId, IndexSet<TypeId, FnvBuildHasher>, FnvBuildHasher>,
+    cached_hash: OnceLock<u64>,
 }
 
 #[pymethods]
@@ -101,7 +104,10 @@ impl UnionMembership {
                 .insert(TypeId::from_owned(member));
         }
 
-        Ok(Self { union_rules })
+        Ok(Self {
+            union_rules,
+            cached_hash: OnceLock::new(),
+        })
     }
 
     fn is_member(
@@ -176,12 +182,31 @@ impl UnionMembership {
     }
 }
 
+impl PartialEq for UnionMembership {
+    fn eq(&self, other: &Self) -> bool {
+        self.union_rules == other.union_rules
+    }
+}
+
+impl Eq for UnionMembership {}
+
+impl UnionMembership {
+    // XOR over the unique `(base, member)` pairs, so the hash is order-insensitive like the equality.
+    fn compute_hash(&self) -> u64 {
+        self.union_rules.iter().fold(0_u64, |acc, (base, members)| {
+            members.iter().fold(acc, |acc, member| {
+                let mut h = FnvHasher::default();
+                base.hash(&mut h);
+                member.hash(&mut h);
+                acc ^ h.finish()
+            })
+        })
+    }
+}
+
 impl Hash for UnionMembership {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        for (key, values) in &self.union_rules {
-            key.hash(state);
-            values.iter().for_each(|el| el.hash(state));
-        }
+        state.write_u64(*self.cached_hash.get_or_init(|| self.compute_hash()));
     }
 }
 
@@ -202,7 +227,6 @@ impl DeepSizeOf for UnionMembership {
                 .sum::<usize>()
     }
 }
-
 pub fn register(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<UnionMembership>()?;
     m.add_class::<UnionRule>()?;
