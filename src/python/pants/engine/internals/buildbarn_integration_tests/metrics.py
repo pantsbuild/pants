@@ -45,9 +45,9 @@ def scrape_prometheus_metrics(metrics_url: str) -> dict[PrometheusMetricKey, flo
     return _parse_prometheus_metrics(response.text)
 
 
-def _parse_prometheus_metrics(exposition: str) -> dict[PrometheusMetricKey, float]:
+def _parse_prometheus_metrics(metrics_text: str) -> dict[PrometheusMetricKey, float]:
     metrics: dict[PrometheusMetricKey, float] = {}
-    for line in exposition.splitlines():
+    for line in metrics_text.splitlines():
         if not line or line.startswith("#"):
             continue
         match = _PROMETHEUS_SAMPLE_RE.match(line)
