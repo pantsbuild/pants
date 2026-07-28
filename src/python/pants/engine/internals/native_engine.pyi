@@ -449,6 +449,51 @@ class Hunk:
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, other: object) -> bool: ...
 
+class SourceBlock:
+    """Block of lines in a file.
+
+    Lines are 1 indexed, `start` is inclusive, `end` is exclusive.
+
+    SourceBlock is used to describe a set of source lines that are owned by a Target,
+    thus it can't be empty, i.e. `start` must be less than `end`.
+    """
+
+    start: int
+    end: int
+    def __init__(self, start: int, end: int) -> None: ...
+    def __len__(self) -> int: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+    def is_touched_by(self, o: TextBlock) -> bool: ...
+    @classmethod
+    def from_text_block(cls, text_block: TextBlock) -> SourceBlock: ...
+
+class SourceBlocks(FrozenOrderedSet[SourceBlock]): ...
+
+class TargetAdaptor:
+    """A light-weight object to store target information before being converted into the Target
+    API."""
+
+    type_alias: str
+    name: str | None
+    kwargs: FrozenDict[str, Any]
+    description_of_origin: str
+    origin_sources_blocks: FrozenDict[str, SourceBlocks]
+    name_explicitly_set: bool
+    def __init__(
+        self,
+        type_alias: str,
+        name: str | None,
+        __description_of_origin__: str,
+        __origin_sources_blocks__: FrozenDict[str, SourceBlocks] | None = None,
+        **kwargs: Any,
+    ) -> None: ...
+    def with_new_kwargs(self, **kwargs: Any) -> TargetAdaptor: ...
+    def __repr__(self) -> str: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __hash__(self) -> int: ...
+
 class Field:
     """A Field.
 
