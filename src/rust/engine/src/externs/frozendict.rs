@@ -195,8 +195,7 @@ impl FrozenDict {
     }
 
     fn keys<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
-        let dict = slf.get().inner.data.bind_borrowed(slf.py());
-        dict.call_method0(intern!(slf.py(), "keys"))
+        Self::py_keys(slf)
     }
 
     fn values<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
@@ -308,6 +307,23 @@ impl FrozenDict {
         Ok(Self {
             inner: FrozenCollectionData::new(dict, hash),
         })
+    }
+
+    pub fn py_keys<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
+        let dict = slf.get().inner.data.bind_borrowed(slf.py());
+        dict.call_method0(intern!(slf.py(), "keys"))
+    }
+
+    pub fn contains(&self, key: &Bound<PyAny>) -> PyResult<bool> {
+        self.inner.contains(key)
+    }
+
+    pub fn get_opt<'py>(&self, key: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner_get(key.as_borrowed(), None)
+    }
+
+    pub fn cached_hash(&self) -> isize {
+        self.inner.cached_hash()
     }
 
     pub fn iter(slf: Bound<Self>) -> PyResult<KeyValueIter> {
