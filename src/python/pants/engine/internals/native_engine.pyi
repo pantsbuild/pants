@@ -415,6 +415,40 @@ class _NoValue:
 # Marker for unspecified field values that should use the default value if applicable.
 NO_VALUE: _NoValue
 
+class TextBlock:
+    """Block of lines in a file.
+
+    Lines are 1 indexed, `start` is inclusive.
+
+    TextBlock is used as a part of unified diff hunk, thus it can be empty,
+    i.e. count can be equal to 0. In the special case when the file is empty
+    start = 0 and count = 0.
+    """
+
+    start: int
+    count: int
+    end: int
+    def __init__(self, start: int, count: int) -> None: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+
+class Hunk:
+    """Hunk of difference in unified format.
+
+    https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Unified.html
+
+    In the special case when file is created left = None.
+    In the special case when file is deleted right = None.
+    """
+
+    left: TextBlock | None
+    right: TextBlock | None
+    def __init__(self, left: TextBlock | None, right: TextBlock | None) -> None: ...
+    def __hash__(self) -> int: ...
+    def __eq__(self, other: object) -> bool: ...
+    def __ne__(self, other: object) -> bool: ...
+
 class Field:
     """A Field.
 
