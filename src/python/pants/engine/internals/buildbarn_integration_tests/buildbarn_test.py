@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import socket
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
@@ -64,6 +65,67 @@ def test_write_runtime_overlay_uses_instance_name(tmp_path: Path) -> None:
     overlay = overlay_path.read_text(encoding="utf-8")
     assert '"pants-test"' in overlay
     assert "ghcr.io/example/executor:tag@sha256:" in overlay
+
+
+def _configured_cache_stack(
+    tmp_path: Path, run_command: buildbarn.RunCommand
+) -> buildbarn.LocalBuildbarnStack:
+    stack = buildbarn.LocalBuildbarnStack(temp_dir=tmp_path, run_command=run_command)
+    stack._project_name = "pants-buildbarn-test"
+    stack._runtime_root = tmp_path
+    stack._env_file = tmp_path / "compose.env"
+    stack._compose_file = tmp_path / "docker-compose.yaml"
+    stack._compose_profiles = ("cache",)
+    stack._active_services = ("cache",)
+    return stack
+
+
+def test_stop_cache_service_stops_compose_service(tmp_path: Path) -> None:
+    commands: list[tuple[tuple[str, ...], bool]] = []
+
+    def run_command(args: Sequence[str], check: bool) -> subprocess.CompletedProcess[str]:
+        commands.append((tuple(args), check))
+        return completed_process(args)
+
+    stack = _configured_cache_stack(tmp_path, run_command)
+    stack.stop_cache_service()
+
+    assert [(command[-2:], check) for command, check in commands] == [(("stop", "cache"), True)]
+
+
+def test_start_cache_service_rediscovers_ephemeral_port(tmp_path: Path) -> None:
+    commands: list[tuple[tuple[str, ...], bool]] = []
+
+    # The readiness check makes a real TCP connection, so a real listener stands in for the
+    # restarted service.
+    with socket.create_server(("127.0.0.1", 0)) as listener:
+        new_port = listener.getsockname()[1]
+
+        def run_command(args: Sequence[str], check: bool) -> subprocess.CompletedProcess[str]:
+            commands.append((tuple(args), check))
+            if "port" in args:
+                return completed_process(args, stdout=f"0.0.0.0:{new_port}\n")
+            if "ps" in args:
+                return completed_process(args, stdout="")
+            return completed_process(args)
+
+        stack = _configured_cache_stack(tmp_path, run_command)
+        stale = buildbarn.CacheOnlyBuildbarn(
+            address="grpc://127.0.0.1:1",
+            instance_name="fuse",
+            grpc_port=1,
+            project_name="pants-buildbarn-test",
+            temp_dir=tmp_path,
+            logs_path=tmp_path / "logs" / "compose.log",
+        )
+        stack._launched = stale
+
+        relaunched = stack.start_cache_service()
+
+    assert relaunched.grpc_port == new_port
+    assert relaunched.address == f"grpc://127.0.0.1:{new_port}"
+    assert stack._launched is relaunched
+    assert (("start", "cache"), True) in [(command[-2:], check) for command, check in commands]
 
 
 def test_write_compose_logs_uses_compose_command(tmp_path: Path) -> None:

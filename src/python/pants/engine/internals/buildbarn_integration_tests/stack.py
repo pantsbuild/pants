@@ -13,13 +13,18 @@ import time
 import uuid
 from collections.abc import Callable, Sequence
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib.resources import files
 from pathlib import Path
 
 DEFAULT_INSTANCE_NAME = "fuse"
 DEFAULT_GRPC_PORT = 8980
 DEFAULT_READINESS_TIMEOUT_SECONDS = 30.0
+
+# For Processes whose test asserts a remote cache hit: with `Process`'s default of 0, Pants can
+# complete the process (locally, or via remote execution) before the cache lookup answers, and
+# the cached run then counts as uncached.
+CACHE_SPECULATION_DELAY_MILLIS = 10_000
 
 _CONFIG_ROOT = files(__package__).joinpath("config")
 _COMPOSE_FILE_NAME = "docker-compose.yaml"
@@ -37,6 +42,26 @@ _ASSET_FILE_NAMES = (
 _EXECUTION_IMAGE_SERVICE = "execution-image"
 
 RunCommand = Callable[[Sequence[str], bool], subprocess.CompletedProcess[str]]
+
+
+def docker_available(docker_binary: str = "docker") -> bool:
+    docker = shutil.which(docker_binary)
+    if docker is None:
+        return False
+    result = subprocess.run(
+        [docker, "version", "--format", "{{.Server.Version}}"],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def should_skip_for_missing_docker() -> bool:
+    """Whether a Buildbarn-stack test should be skipped rather than fail for lack of Docker.
+
+    In CI, Docker is expected to be present, so a missing/broken Docker fails loudly there.
+    """
+    return "CI" not in os.environ and not docker_available()
 
 
 class FetchError(ValueError):
@@ -229,6 +254,37 @@ class LocalBuildbarnStack(AbstractContextManager[CacheOnlyBuildbarn]):
         )
         self._launched = launched
         return launched
+
+    def stop_cache_service(self) -> None:
+        """Stop the cache-only Buildbarn service, e.g. to manipulate its storage on disk."""
+        self._run_compose(["stop", "cache"], check=True)
+
+    def start_cache_service(self) -> CacheOnlyBuildbarn:
+        """Start the cache-only Buildbarn service again after `stop_cache_service`.
+
+        Returns an updated `CacheOnlyBuildbarn`: Docker assigns a fresh ephemeral host port on
+        every container start, so the address from before the stop is stale.
+        """
+        launched = self._launched
+        if not isinstance(launched, CacheOnlyBuildbarn):
+            raise FetchError("start_cache_service requires a launched cache-only stack")
+        self._run_compose(["start", "cache"], check=True)
+        grpc_port = _discover_compose_host_port(
+            service="cache",
+            container_port=DEFAULT_GRPC_PORT,
+            timeout_seconds=self.readiness_timeout_seconds,
+            stack=self,
+            required_services=self._active_services,
+        )
+        _wait_for_tcp_readiness(
+            port=grpc_port,
+            timeout_seconds=self.readiness_timeout_seconds,
+            stack=self,
+            required_services=self._active_services,
+        )
+        relaunched = replace(launched, address=f"grpc://127.0.0.1:{grpc_port}", grpc_port=grpc_port)
+        self._launched = relaunched
+        return relaunched
 
     def teardown(self, *, remove_temp_dir: bool = True) -> None:
         if self._project_name is not None and self._runtime_root is not None:
