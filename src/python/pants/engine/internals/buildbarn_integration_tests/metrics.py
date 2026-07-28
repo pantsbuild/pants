@@ -42,8 +42,10 @@ def _parse_prometheus_labels(serialized_labels: str) -> tuple[tuple[str, str], .
 def scrape_prometheus_metrics(metrics_url: str) -> dict[PrometheusMetricKey, float]:
     response = requests.get(metrics_url, timeout=10)
     response.raise_for_status()
-    exposition = response.text
+    return _parse_prometheus_metrics(response.text)
 
+
+def _parse_prometheus_metrics(exposition: str) -> dict[PrometheusMetricKey, float]:
     metrics: dict[PrometheusMetricKey, float] = {}
     for line in exposition.splitlines():
         if not line or line.startswith("#"):

@@ -7,30 +7,17 @@ import pytest
 
 from pants.engine.internals.buildbarn_integration_tests.metrics import (
     PrometheusMetricKey,
+    _parse_prometheus_metrics,
     assert_counter_delta,
-    scrape_prometheus_metrics,
 )
 
 
-class _MetricsResponse:
-    def __init__(self, text: str) -> None:
-        self.text = text
-
-    def raise_for_status(self) -> None:
-        pass
-
-
-def test_scrape_prometheus_metrics_selects_complete_label_set(monkeypatch) -> None:
+def test_parse_prometheus_metrics_selects_complete_label_set() -> None:
     metrics = """# HELP grpc_server_handled_total Total number of RPCs completed on the server.
 grpc_server_handled_total{grpc_code="OK",grpc_method="Execute",grpc_service="execution.v2.Execution"} 3
 grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Execute",grpc_service="execution.v2.Execution"} 1
 """
-    monkeypatch.setattr(
-        "pants.engine.internals.buildbarn_integration_tests.metrics.requests.get",
-        lambda url, timeout: _MetricsResponse(metrics),
-    )
-
-    snapshot = scrape_prometheus_metrics("http://127.0.0.1:9980/metrics")
+    snapshot = _parse_prometheus_metrics(metrics)
 
     assert (
         snapshot[
