@@ -192,18 +192,18 @@ def _assert_output_cache_roundtrip(
     assert "backtrack_attempts" not in run1.metrics
     assert run1.process_workunit["metadata"]["exit_code"] == 0
     assert_counter_delta(
-        before_run1,
-        after_run1,
-        "grpc_server_handled_total",
-        _ACTION_CACHE_GET_ACTION_RESULT_MISS_LABELS,
-        True,
+        before=before_run1,
+        after=after_run1,
+        metric_name="grpc_server_handled_total",
+        labels=_ACTION_CACHE_GET_ACTION_RESULT_MISS_LABELS,
+        expect_increase=True,
     )
     assert_counter_delta(
-        before_run1,
-        after_run1,
-        "grpc_server_handled_total",
-        _EXECUTION_EXECUTE_LABELS,
-        True,
+        before=before_run1,
+        after=after_run1,
+        metric_name="grpc_server_handled_total",
+        labels=_EXECUTION_EXECUTE_LABELS,
+        expect_increase=True,
     )
 
     before_run2 = scrape_prometheus_metrics(buildbarn.metrics_url)
@@ -219,18 +219,18 @@ def _assert_output_cache_roundtrip(
     assert run2.remote_command_digest == run1.remote_command_digest
     assert run2.process_workunit["metadata"]["exit_code"] == 0
     assert_counter_delta(
-        before_run2,
-        after_run2,
-        "grpc_server_handled_total",
-        _ACTION_CACHE_GET_ACTION_RESULT_HIT_LABELS,
-        True,
+        before=before_run2,
+        after=after_run2,
+        metric_name="grpc_server_handled_total",
+        labels=_ACTION_CACHE_GET_ACTION_RESULT_HIT_LABELS,
+        expect_increase=True,
     )
     assert_counter_delta(
-        before_run2,
-        after_run2,
-        "grpc_server_handled_total",
-        _EXECUTION_EXECUTE_LABELS,
-        False,
+        before=before_run2,
+        after=after_run2,
+        metric_name="grpc_server_handled_total",
+        labels=_EXECUTION_EXECUTE_LABELS,
+        expect_increase=False,
     )
 
 

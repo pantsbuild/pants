@@ -74,6 +74,7 @@ def _metric_value(
 
 
 def assert_counter_delta(
+    *,
     before: Mapping[PrometheusMetricKey, float],
     after: Mapping[PrometheusMetricKey, float],
     metric_name: str,

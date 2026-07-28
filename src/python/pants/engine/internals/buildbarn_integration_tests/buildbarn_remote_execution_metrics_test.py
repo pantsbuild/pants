@@ -37,7 +37,13 @@ grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Execute",grpc_ser
 
 def test_assert_counter_delta_reports_missing_series() -> None:
     with pytest.raises(AssertionError, match="Missing Prometheus metric series"):
-        assert_counter_delta({}, {}, "grpc_server_handled_total", {"grpc_code": "OK"}, True)
+        assert_counter_delta(
+            before={},
+            after={},
+            metric_name="grpc_server_handled_total",
+            labels={"grpc_code": "OK"},
+            expect_increase=True,
+        )
 
 
 def test_assert_counter_delta_checks_expected_change() -> None:
@@ -49,6 +55,18 @@ def test_assert_counter_delta_checks_expected_change() -> None:
         ("grpc_server_handled_total", (("grpc_code", "OK"),)): 4.0
     }
 
-    assert_counter_delta(before, after, "grpc_server_handled_total", labels, True)
+    assert_counter_delta(
+        before=before,
+        after=after,
+        metric_name="grpc_server_handled_total",
+        labels=labels,
+        expect_increase=True,
+    )
     with pytest.raises(AssertionError, match="Expected no increase"):
-        assert_counter_delta(before, after, "grpc_server_handled_total", labels, False)
+        assert_counter_delta(
+            before=before,
+            after=after,
+            metric_name="grpc_server_handled_total",
+            labels=labels,
+            expect_increase=False,
+        )
