@@ -64,15 +64,23 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-_ACTION_CACHE_GET_ACTION_RESULT_LABELS = {
+_ACTION_CACHE_GET_ACTION_RESULT_MISS_LABELS = {
+    "grpc_service": "build.bazel.remote.execution.v2.ActionCache",
+    "grpc_method": "GetActionResult",
+    "grpc_code": "NotFound",
+    "grpc_type": "unary",
+}
+_ACTION_CACHE_GET_ACTION_RESULT_HIT_LABELS = {
     "grpc_service": "build.bazel.remote.execution.v2.ActionCache",
     "grpc_method": "GetActionResult",
     "grpc_code": "OK",
+    "grpc_type": "unary",
 }
 _EXECUTION_EXECUTE_LABELS = {
     "grpc_service": "build.bazel.remote.execution.v2.Execution",
     "grpc_method": "Execute",
     "grpc_code": "OK",
+    "grpc_type": "server_stream",
 }
 
 
@@ -164,6 +172,7 @@ def _working_directory_process(rule_runner: RuleRunner) -> Process:
         input_digest=input_digest,
         working_directory="workdir",
         output_directories=[""],
+        remote_cache_speculation_delay_millis=1000,
         level=LogLevel.INFO,
     )
 
@@ -186,7 +195,7 @@ def _assert_output_cache_roundtrip(
         before_run1,
         after_run1,
         "grpc_server_handled_total",
-        _ACTION_CACHE_GET_ACTION_RESULT_LABELS,
+        _ACTION_CACHE_GET_ACTION_RESULT_MISS_LABELS,
         True,
     )
     assert_counter_delta(
@@ -213,7 +222,7 @@ def _assert_output_cache_roundtrip(
         before_run2,
         after_run2,
         "grpc_server_handled_total",
-        _ACTION_CACHE_GET_ACTION_RESULT_LABELS,
+        _ACTION_CACHE_GET_ACTION_RESULT_HIT_LABELS,
         True,
     )
     assert_counter_delta(
@@ -283,6 +292,7 @@ def test_buildbarn_remote_execution(subtests) -> None:
                 ],
                 description="Buildbarn remote execution root output case",
                 output_directories=["."],
+                remote_cache_speculation_delay_millis=1000,
                 level=LogLevel.INFO,
             )
             _assert_output_cache_roundtrip(process, expected_contents, buildbarn=buildbarn)

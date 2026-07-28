@@ -14,8 +14,8 @@ from pants.engine.internals.buildbarn_integration_tests.metrics import (
 
 def test_parse_prometheus_metrics_selects_complete_label_set() -> None:
     metrics = """# HELP grpc_server_handled_total Total number of RPCs completed on the server.
-grpc_server_handled_total{grpc_code="OK",grpc_method="Execute",grpc_service="execution.v2.Execution"} 3
-grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Execute",grpc_service="execution.v2.Execution"} 1
+grpc_server_handled_total{grpc_code="OK",grpc_method="Execute",grpc_service="execution.v2.Execution",grpc_type="server_stream"} 3
+grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Execute",grpc_service="execution.v2.Execution",grpc_type="server_stream"} 1
 """
     snapshot = _parse_prometheus_metrics(metrics)
 
@@ -27,6 +27,7 @@ grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Execute",grpc_ser
                     ("grpc_code", "OK"),
                     ("grpc_method", "Execute"),
                     ("grpc_service", "execution.v2.Execution"),
+                    ("grpc_type", "server_stream"),
                 ),
             )
         ]
