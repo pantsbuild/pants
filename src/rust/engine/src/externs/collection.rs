@@ -110,6 +110,12 @@ impl<H: HashCache> FrozenCollectionData<H> {
     }
 }
 
+impl FrozenCollectionData<EagerHash> {
+    pub fn cached_hash(&self) -> isize {
+        self.hash.0
+    }
+}
+
 pub fn xor_hash_keys(dict: &Bound<PyDict>) -> PyResult<isize> {
     let mut h: isize = 0;
     for key in dict.keys() {
