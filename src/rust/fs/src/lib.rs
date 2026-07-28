@@ -57,7 +57,7 @@ pub fn default_cache_path() -> PathBuf {
         .ok()
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
-        .or_else(|| dirs_next::home_dir().map(|home| home.join(".cache")))
+        .or_else(|| dirs::home_dir().map(|home| home.join(".cache")))
         .unwrap_or_else(|| panic!("Could not find home dir or {XDG_CACHE_HOME}."));
     cache_path.join("pants")
 }

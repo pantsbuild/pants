@@ -144,7 +144,7 @@ crossbeam-channel = "0.5"
 # TODO: Waiting on https://github.com/Aeledfyr/deepsize/pull/{30,31,32}.
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
 derivative = "2.2"
-dirs-next = "2"
+dirs = "6"
 docker_credential = "1.3"
 either = "1"
 env_logger = "0.11.10"
