@@ -170,7 +170,7 @@ impl NailgunPool {
         for pool_entry in processes.drain(..) {
             let mut process = pool_entry.process.lock_arc().await;
             // Dropping the `NailgunProcess` kills the server: see its `Drop`.
-            let _ = process.take();
+            drop(process.take());
         }
         Ok(())
     }
