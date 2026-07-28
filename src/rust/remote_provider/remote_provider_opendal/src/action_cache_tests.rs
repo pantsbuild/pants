@@ -91,6 +91,26 @@ async fn get_action_result_missing() {
 }
 
 #[tokio::test]
+async fn get_action_result_undecodable_is_an_error() {
+    let provider = new_provider();
+
+    let action_digest = Digest::of_bytes(b"get_action_result_undecodable test");
+    // A corrupt/truncated entry, e.g. from an interrupted write on a backend without atomic
+    // writes. This provider loads action results without validation, so the garbage reaches the
+    // decoder, and must surface as an error (not a silent miss): consumers rely on it for
+    // corruption logging and metrics, and fall back as if it were a miss regardless.
+    provider
+        .operator
+        .write(&test_path(action_digest), &b"\xff\xffnot a valid proto"[..])
+        .await
+        .unwrap();
+
+    let result = provider.get_action_result(action_digest, "").await;
+    let err = result.expect_err("undecodable action result should be an error");
+    assert!(err.contains("failed to decode action result"), "{err}");
+}
+
+#[tokio::test]
 async fn update_action_cache() {
     let provider = new_provider();
 

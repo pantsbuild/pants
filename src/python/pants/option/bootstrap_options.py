@@ -621,6 +621,7 @@ class ExecutionOptions:
     remote_cache_warnings: RemoteCacheWarningsBehavior
     remote_cache_rpc_concurrency: int
     remote_cache_rpc_timeout_millis: int
+    remote_cache_downloads: bool
 
     remote_execution_address: str | None
     remote_execution_headers: dict[str, str]
@@ -670,6 +671,7 @@ class ExecutionOptions:
             remote_cache_warnings=bootstrap_options.remote_cache_warnings,
             remote_cache_rpc_concurrency=dynamic_remote_options.cache_rpc_concurrency,
             remote_cache_rpc_timeout_millis=bootstrap_options.remote_cache_rpc_timeout_millis,
+            remote_cache_downloads=bootstrap_options.remote_cache_downloads,
             # Remote execution setup.
             remote_execution_address=dynamic_remote_options.execution_address,
             remote_execution_headers=cls.with_user_agent(dynamic_remote_options.execution_headers),
@@ -767,6 +769,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # NB: Matches the store RPC timeout: from 2.19 until this option's wiring was restored, cache
     # RPCs accidentally used the store timeout, so this preserves the effective default.
     remote_cache_rpc_timeout_millis=30000,
+    remote_cache_downloads=True,
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_headers={},
@@ -1664,6 +1667,33 @@ class BootstrapOptions:
         advanced=True,
         default=DEFAULT_EXECUTION_OPTIONS.remote_cache_rpc_timeout_millis,
         help="Timeout value for remote cache RPCs in milliseconds.",
+    )
+    remote_cache_downloads = BoolOption(
+        advanced=True,
+        default=DEFAULT_EXECUTION_OPTIONS.remote_cache_downloads,
+        help=softwrap(
+            f"""
+            Whether to cache URL downloads (for example, `http_source` sources and the tools
+            Pants itself downloads) in the remote cache.
+
+            When enabled, the bytes of a downloaded file are stored in the remote store, along
+            with an entry recording that the URL was observed to serve exactly those bytes. A
+            machine with a cold local cache can then serve a previously-verified download
+            entirely from the remote cache, without contacting the origin server (e.g. GitHub)
+            at all. Content is always re-verified against the digest declared in the build as it
+            is fetched.
+
+            Reading requires `[GLOBAL].remote_cache_read` and writing requires
+            `[GLOBAL].remote_cache_write`; this option has no effect unless remote caching is
+            configured. Note that disabling this option stops remote cache use for downloads,
+            but machines that were already served a download keep using their local caches
+            for it.
+
+            See {doc_url("docs/using-pants/remote-caching-and-execution/remote-caching")} for
+            details, including which downloads are excluded, the trust implications for private
+            origins, and how a degraded cache behaves.
+            """
+        ),
     )
     remote_execution_address = StrOption(
         advanced=True,

@@ -1220,6 +1220,7 @@ dependencies = [
  "rand 0.10.0",
  "regex",
  "remote",
+ "remote_provider",
  "reqwest",
  "rule_graph",
  "sandboxer",

@@ -334,6 +334,10 @@ impl ActionCacheProvider for Provider {
             false => Ok(None),
             true => {
                 let bytes = Bytes::from(destination);
+                // NB: A corrupt or truncated entry (e.g. from an interrupted write on a backend
+                // without atomic writes) is deliberately an error, not a silent miss: consumers
+                // (the process remote cache, the remote download cache) treat read errors as
+                // misses anyway, but rely on the error for their corruption logging and metrics.
                 Ok(Some(ActionResult::decode(bytes).map_err(|e| {
                     format!("failed to decode action result for digest {action_digest:?}: {e}")
                 })?))

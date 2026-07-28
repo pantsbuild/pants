@@ -15,6 +15,7 @@ mod interning;
 mod intrinsics;
 mod nodes;
 mod python;
+mod remote_download_cache;
 mod scheduler;
 mod session;
 mod tasks;

@@ -11,7 +11,7 @@ from typing import ContextManager
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.engine.internals.native_engine import PyRemotingOptions
+from pants.engine.internals.native_engine import PyExecutionStrategyOptions, PyRemotingOptions
 from pants.option.bootstrap_options import DynamicRemoteOptions, ExecutionOptions, RemoteProvider
 from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptions
@@ -270,4 +270,20 @@ def test_remote_provider_matches_rust_enum(
         client_certs_path=None,
         client_key_path=None,
         append_only_caches_base_path=None,
+    )
+
+
+def test_execution_strategy_options_kwargs_match_rust() -> None:
+    PyExecutionStrategyOptions(
+        local_cache=True,
+        remote_cache_read=False,
+        remote_cache_write=False,
+        remote_cache_downloads=True,
+        use_sandboxer=False,
+        local_parallelism=1,
+        local_enable_nailgun=False,
+        remote_parallelism=1,
+        child_max_memory=0,
+        child_default_memory=1,
+        graceful_shutdown_timeout=3,
     )

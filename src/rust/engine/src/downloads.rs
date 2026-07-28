@@ -293,11 +293,38 @@ fn filesize_with_suffix(filesize: usize) -> String {
     }
 }
 
+/// Test-only HTTP server plumbing, shared with the `DownloadedFile` node tests.
+#[cfg(test)]
+pub(crate) mod test_server {
+    use std::net::SocketAddr;
+
+    use axum::Router;
+
+    /// Serve `router` on an OS-assigned localhost port for the remainder of the test, returning
+    /// the bound address. Must be called from within a tokio runtime.
+    pub(crate) fn spawn_test_server(router: Router) -> SocketAddr {
+        let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
+        let listener = std::net::TcpListener::bind(bind_addr).unwrap();
+        // NB: axum_server requires the std listener to be non-blocking.
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            axum_server::from_tcp(listener)
+                .expect("Unable to create Server from std::net::TcpListener")
+                .serve(router.into_make_service())
+                .await
+                .unwrap();
+        });
+
+        addr
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
         collections::{BTreeMap, HashSet},
-        net::SocketAddr,
         num::NonZeroUsize,
         sync::{
             Arc,
@@ -315,6 +342,7 @@ mod tests {
     use url::Url;
     use workunit_store::WorkunitStore;
 
+    use super::test_server::spawn_test_server;
     use super::{download, filesize_with_suffix};
 
     const TEST_RESPONSE: &[u8] = b"xyzzy";
@@ -326,20 +354,8 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let store = Store::local_only(task_executor::Executor::new(), dir.path()).unwrap();
 
-        let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
-        let listener = std::net::TcpListener::bind(bind_addr).unwrap();
-        listener.set_nonblocking(true).unwrap();
-        let addr = listener.local_addr().unwrap();
-
         let router = Router::new().route("/foo.txt", get(|| async { TEST_RESPONSE }));
-
-        tokio::spawn(async move {
-            axum_server::from_tcp(listener)
-                .expect("Unable to create Server from std::net::TcpListener")
-                .serve(router.into_make_service())
-                .await
-                .unwrap();
-        });
+        let addr = spawn_test_server(router);
 
         let http_client = reqwest::Client::new();
         let url = Url::parse(&format!("http://127.0.0.1:{}/foo.txt", addr.port())).unwrap();
@@ -372,11 +388,6 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let store = Store::local_only(task_executor::Executor::new(), dir.path()).unwrap();
 
-        let bind_addr = "127.0.0.1:0".parse::<SocketAddr>().unwrap();
-        let listener = std::net::TcpListener::bind(bind_addr).unwrap();
-        listener.set_nonblocking(true).unwrap();
-        let addr = listener.local_addr().unwrap();
-
         #[derive(Clone)]
         struct HandlerState {
             attempt: Arc<AtomicU32>,
@@ -403,14 +414,7 @@ mod tests {
             .with_state(HandlerState {
                 attempt: Arc::clone(&attempt),
             });
-
-        tokio::spawn(async move {
-            axum_server::from_tcp(listener)
-                .expect("Unable to create Server from std::net::TcpListener")
-                .serve(router.into_make_service())
-                .await
-                .unwrap();
-        });
+        let addr = spawn_test_server(router);
 
         let http_client = reqwest::Client::new();
         let url = Url::parse(&format!("http://127.0.0.1:{}/foo.txt", addr.port())).unwrap();
