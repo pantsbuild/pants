@@ -1208,12 +1208,11 @@ fn scheduler_live_items<'py>(
 }
 
 #[pyfunction]
-fn scheduler_shutdown(py: Python, py_scheduler: &Bound<'_, PyScheduler>, timeout_secs: u64) {
+fn scheduler_shutdown(py: Python, py_scheduler: &Bound<'_, PyScheduler>, timeout: Duration) {
     let core = py_scheduler.borrow().0.core.clone();
     core.executor.enter(|| {
         py.detach(|| {
-            core.executor
-                .block_on(core.shutdown(Duration::from_secs(timeout_secs)));
+            core.executor.block_on(core.shutdown(timeout));
         })
     })
 }
@@ -1529,10 +1528,9 @@ fn session_wait_for_tail_tasks(
     py: Python<'_>,
     py_scheduler: &Bound<'_, PyScheduler>,
     py_session: &Bound<'_, PySession>,
-    timeout: f64,
+    timeout: Duration,
 ) -> PyO3Result<()> {
     let core = &py_scheduler.borrow().0.core;
-    let timeout = Duration::from_secs_f64(timeout);
     let session = &py_session.borrow().0;
 
     core.executor.enter(|| {
