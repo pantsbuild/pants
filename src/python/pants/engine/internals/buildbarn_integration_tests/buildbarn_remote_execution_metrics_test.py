@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import io
-
 import pytest
 
 from pants.engine.internals.buildbarn_integration_tests.metrics import (
@@ -14,21 +12,21 @@ from pants.engine.internals.buildbarn_integration_tests.metrics import (
 )
 
 
-class _MetricsResponse(io.BytesIO):
-    def __enter__(self) -> _MetricsResponse:
-        return self
+class _MetricsResponse:
+    def __init__(self, text: str) -> None:
+        self.text = text
 
-    def __exit__(self, *args: object) -> None:
-        self.close()
+    def raise_for_status(self) -> None:
+        pass
 
 
 def test_scrape_prometheus_metrics_selects_complete_label_set(monkeypatch) -> None:
-    metrics = b"""# HELP grpc_server_handled_total Total number of RPCs completed on the server.
+    metrics = """# HELP grpc_server_handled_total Total number of RPCs completed on the server.
 grpc_server_handled_total{grpc_code="OK",grpc_method="Execute",grpc_service="execution.v2.Execution"} 3
 grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Execute",grpc_service="execution.v2.Execution"} 1
 """
     monkeypatch.setattr(
-        "pants.engine.internals.buildbarn_integration_tests.metrics.urlopen",
+        "pants.engine.internals.buildbarn_integration_tests.metrics.requests.get",
         lambda url, timeout: _MetricsResponse(metrics),
     )
 

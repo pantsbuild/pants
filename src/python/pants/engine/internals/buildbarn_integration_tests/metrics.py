@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import re
-from urllib.request import urlopen
+
+import requests
 
 PrometheusMetricKey = tuple[str, tuple[tuple[str, str], ...]]
 
@@ -39,8 +40,9 @@ def _parse_prometheus_labels(serialized_labels: str) -> tuple[tuple[str, str], .
 
 
 def scrape_prometheus_metrics(metrics_url: str) -> dict[PrometheusMetricKey, float]:
-    with urlopen(metrics_url, timeout=10) as response:  # noqa: S310
-        exposition = response.read().decode("utf-8")
+    response = requests.get(metrics_url, timeout=10)
+    response.raise_for_status()
+    exposition = response.text
 
     metrics: dict[PrometheusMetricKey, float] = {}
     for line in exposition.splitlines():
