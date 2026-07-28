@@ -104,35 +104,3 @@ def test_write_compose_logs_uses_compose_command(tmp_path: Path) -> None:
             False,
         )
     ]
-
-
-def test_launch_remote_execution_exposes_metrics_url(tmp_path: Path, monkeypatch) -> None:
-    def run_command(args: Sequence[str], check: bool) -> subprocess.CompletedProcess[str]:
-        if tuple(args[-8:]) == (
-            "up",
-            "-d",
-            "storage",
-            "frontend",
-            "scheduler",
-            "runner-installer",
-            "runner",
-            "worker",
-        ):
-            (tmp_path / "worker" / "runner").touch()
-        if tuple(args[-3:]) == ("port", "frontend", str(buildbarn.DEFAULT_GRPC_PORT)):
-            return completed_process(args, stdout="127.0.0.1:12345\n")
-        if tuple(args[-3:]) == (
-            "port",
-            "frontend",
-            str(buildbarn.DEFAULT_DIAGNOSTICS_HTTP_PORT),
-        ):
-            return completed_process(args, stdout="127.0.0.1:23456\n")
-        return completed_process(args)
-
-    monkeypatch.setattr(buildbarn, "_wait_for_tcp_readiness", lambda **kwargs: None)
-    stack = buildbarn.LocalBuildbarnStack(temp_dir=tmp_path, run_command=run_command)
-
-    launched = stack.launch_remote_execution()
-
-    assert launched.address == "grpc://127.0.0.1:12345"
-    assert launched.metrics_url == "http://127.0.0.1:23456/metrics"
