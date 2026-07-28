@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from hashlib import sha256
@@ -65,7 +66,9 @@ from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-from pants.util.strutil import pluralize, shell_quote
+from pants.util.strutil import pluralize, shell_quote, softwrap
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -89,6 +92,12 @@ class MyPyRequest(CheckRequest):
     tool_name = MyPy.options_scope
 
 
+def _user_supplied_sqlite_num_shards(args: Iterable[str]) -> bool:
+    return any(
+        arg == "--sqlite-num-shards" or arg.startswith("--sqlite-num-shards=") for arg in args
+    )
+
+
 def _get_cache_args(
     mypy_version: packaging.version.Version,
     python_version: str | None,
@@ -100,7 +109,7 @@ def _get_cache_args(
         and python_version is not None
         and cache_mode == MyPyCacheMode.sqlite
     ):
-        return (
+        args: tuple[str, ...] = (
             # Skip mtime checks because we don't propagate mtime when materializing the
             # sandbox, so the mtime checks will always fail otherwise.
             "--skip-cache-mtime-check",
@@ -109,6 +118,12 @@ def _get_cache_args(
             "--cache-dir",
             cache_dir,
         )
+        if mypy_version >= packaging.version.Version("2.0"):
+            # mypy >= 2.0 shards the sqlite cache into cache.{i}.db files (16
+            # by default, <https://github.com/python/mypy/pull/21292>). The
+            # copy-back scheme here depends on there being exactly one file.
+            args += ("--sqlite-num-shards=1",)
+        return args
     else:
         return ("--cache-dir=/dev/null",)
 
@@ -131,7 +146,18 @@ async def _generate_argv(
     mypy_pex_info = await determine_venv_pex_resolve_info(pex)
     mypy_info = mypy_pex_info.find("mypy")
     assert mypy_info is not None
-    args.extend(_get_cache_args(mypy_info.version, python_version, mypy.cache_mode, cache_dir))
+    cache_args = _get_cache_args(mypy_info.version, python_version, mypy.cache_mode, cache_dir)
+    if "--sqlite-num-shards=1" in cache_args and _user_supplied_sqlite_num_shards(mypy.args):
+        logger.warning(
+            softwrap(
+                """
+                `--sqlite-num-shards` set in `[mypy].args`, but Pants manages
+                mypy's sqlite cache as a single file and will use
+                `--sqlite-num-shards=1` instead.
+                """
+            )
+        )
+    args.extend(cache_args)
     args.append(f"@{file_list_path}")
     return tuple(args)
 
