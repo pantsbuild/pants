@@ -764,7 +764,9 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     # Remote cache setup.
     remote_cache_warnings=RemoteCacheWarningsBehavior.backoff,
     remote_cache_rpc_concurrency=128,
-    remote_cache_rpc_timeout_millis=1500,
+    # NB: Matches the store RPC timeout: from 2.19 until this option's wiring was restored, cache
+    # RPCs accidentally used the store timeout, so this preserves the effective default.
+    remote_cache_rpc_timeout_millis=30000,
     # Remote execution setup.
     remote_execution_address=None,
     remote_execution_headers={},
