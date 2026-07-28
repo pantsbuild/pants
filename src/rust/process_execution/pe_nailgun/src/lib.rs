@@ -233,7 +233,7 @@ impl process_execution::CommandRunner for CommandRunner {
     }
 
     async fn shutdown(&self) -> Result<(), String> {
-        Ok(())
+        self.nailgun_pool.shutdown().await
     }
 }
 
