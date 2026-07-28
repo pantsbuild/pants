@@ -9,6 +9,7 @@ import time
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import PurePath
 from types import CoroutineType
 from typing import Any, NoReturn, cast
@@ -359,8 +360,8 @@ class Scheduler:
             ),
         )
 
-    def shutdown(self, timeout_secs: float = 60) -> None:
-        native_engine.scheduler_shutdown(self.py_scheduler, timeout_secs)
+    def shutdown(self, timeout: timedelta = timedelta(seconds=60)) -> None:
+        native_engine.scheduler_shutdown(self.py_scheduler, timeout)
 
 
 class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):
@@ -668,7 +669,7 @@ class SchedulerSession:
     def cancel(self) -> None:
         self.py_session.cancel()
 
-    def wait_for_tail_tasks(self, timeout: float) -> None:
+    def wait_for_tail_tasks(self, timeout: timedelta) -> None:
         native_engine.session_wait_for_tail_tasks(self.py_scheduler, self.py_session, timeout)
 
 
