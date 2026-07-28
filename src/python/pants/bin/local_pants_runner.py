@@ -321,6 +321,10 @@ class LocalPantsRunner:
             if not self.is_pantsd_run:
                 # Without pantsd there is no daemon to own long-lived child processes such as
                 # nailgun servers, which never exit on their own. See #12996.
-                self.graph_session.scheduler_session.scheduler.shutdown(3)
+                streaming_reporter.cancel_session()
+                self.graph_session.scheduler_session.cancel()
+                self.graph_session.scheduler_session.scheduler.shutdown(
+                    self.session_end_tasks_timeout
+                )
                 # Tear down the executor. See #16105.
                 self.executor.shutdown(3)

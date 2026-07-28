@@ -1208,12 +1208,12 @@ fn scheduler_live_items<'py>(
 }
 
 #[pyfunction]
-fn scheduler_shutdown(py: Python, py_scheduler: &Bound<'_, PyScheduler>, timeout_secs: u64) {
+fn scheduler_shutdown(py: Python, py_scheduler: &Bound<'_, PyScheduler>, timeout_secs: f64) {
     let core = py_scheduler.borrow().0.core.clone();
     core.executor.enter(|| {
         py.detach(|| {
             core.executor
-                .block_on(core.shutdown(Duration::from_secs(timeout_secs)));
+                .block_on(core.shutdown(Duration::from_secs_f64(timeout_secs)));
         })
     })
 }

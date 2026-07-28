@@ -359,7 +359,7 @@ class Scheduler:
             ),
         )
 
-    def shutdown(self, timeout_secs: int = 60) -> None:
+    def shutdown(self, timeout_secs: float = 60) -> None:
         native_engine.scheduler_shutdown(self.py_scheduler, timeout_secs)
 
 
