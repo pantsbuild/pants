@@ -15,6 +15,10 @@ import pytest
 
 from pants.base.specs import Specs
 from pants.engine.fs import CreateDigest, Digest, DigestContents, Directory, FileDigest
+from pants.engine.internals.buildbarn_integration_tests.metrics import (
+    assert_counter_delta,
+    scrape_prometheus_metrics,
+)
 from pants.engine.internals.buildbarn_integration_tests.stack import (
     LocalBuildbarnStack,
     RemoteExecutionBuildbarn,
@@ -58,6 +62,18 @@ def _should_skip_for_missing_docker() -> bool:
 pytestmark = pytest.mark.skipif(
     _should_skip_for_missing_docker(), reason="Docker is required for Buildbarn tests"
 )
+
+
+_ACTION_CACHE_GET_ACTION_RESULT_LABELS = {
+    "grpc_service": "build.bazel.remote.execution.v2.ActionCache",
+    "grpc_method": "GetActionResult",
+    "grpc_code": "OK",
+}
+_EXECUTION_EXECUTE_LABELS = {
+    "grpc_service": "build.bazel.remote.execution.v2.Execution",
+    "grpc_method": "Execute",
+    "grpc_code": "OK",
+}
 
 
 def _remote_execution_args(buildbarn: RemoteExecutionBuildbarn) -> list[str]:
@@ -158,14 +174,32 @@ def _assert_output_cache_roundtrip(
     *,
     buildbarn: RemoteExecutionBuildbarn,
 ) -> None:
+    before_run1 = scrape_prometheus_metrics(buildbarn.metrics_url)
     run1 = _run_remote_process(process_input, buildbarn=buildbarn)
+    after_run1 = scrape_prometheus_metrics(buildbarn.metrics_url)
 
     assert run1.contents == expected_contents
     assert run1.metrics.get("remote_execution_requests", 0) == 1
     assert "backtrack_attempts" not in run1.metrics
     assert run1.process_workunit["metadata"]["exit_code"] == 0
+    assert_counter_delta(
+        before_run1,
+        after_run1,
+        "grpc_server_handled_total",
+        _ACTION_CACHE_GET_ACTION_RESULT_LABELS,
+        True,
+    )
+    assert_counter_delta(
+        before_run1,
+        after_run1,
+        "grpc_server_handled_total",
+        _EXECUTION_EXECUTE_LABELS,
+        True,
+    )
 
+    before_run2 = scrape_prometheus_metrics(buildbarn.metrics_url)
     run2 = _run_remote_process(process_input, buildbarn=buildbarn)
+    after_run2 = scrape_prometheus_metrics(buildbarn.metrics_url)
 
     assert run2.contents == expected_contents
     assert run2.output_digest == run1.output_digest
@@ -175,6 +209,20 @@ def _assert_output_cache_roundtrip(
     assert run2.remote_action_digest == run1.remote_action_digest
     assert run2.remote_command_digest == run1.remote_command_digest
     assert run2.process_workunit["metadata"]["exit_code"] == 0
+    assert_counter_delta(
+        before_run2,
+        after_run2,
+        "grpc_server_handled_total",
+        _ACTION_CACHE_GET_ACTION_RESULT_LABELS,
+        True,
+    )
+    assert_counter_delta(
+        before_run2,
+        after_run2,
+        "grpc_server_handled_total",
+        _EXECUTION_EXECUTE_LABELS,
+        False,
+    )
 
 
 def _worker_preflight(buildbarn: RemoteExecutionBuildbarn) -> None:
