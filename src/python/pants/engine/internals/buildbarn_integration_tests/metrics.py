@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 
 import requests
 
@@ -60,7 +61,7 @@ def _parse_prometheus_metrics(metrics_text: str) -> dict[PrometheusMetricKey, fl
 
 
 def _metric_value(
-    snapshot: dict[PrometheusMetricKey, float], metric_name: str, labels: dict[str, str]
+    snapshot: Mapping[PrometheusMetricKey, float], metric_name: str, labels: Mapping[str, str]
 ) -> float:
     key = (metric_name, tuple(sorted(labels.items())))
     try:
@@ -73,10 +74,10 @@ def _metric_value(
 
 
 def assert_counter_delta(
-    before: dict[PrometheusMetricKey, float],
-    after: dict[PrometheusMetricKey, float],
+    before: Mapping[PrometheusMetricKey, float],
+    after: Mapping[PrometheusMetricKey, float],
     metric_name: str,
-    labels: dict[str, str],
+    labels: Mapping[str, str],
     expect_increase: bool,
 ) -> None:
     before_value = _metric_value(before, metric_name, labels)
