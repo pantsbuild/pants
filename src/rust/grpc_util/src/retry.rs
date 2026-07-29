@@ -21,7 +21,12 @@ pub fn status_is_retryable(status: &Status) -> bool {
 
 /// Retry a gRPC client operation using exponential back-off to delay between attempts.
 #[inline]
-pub async fn retry_call<T, E, C, F, G, Fut>(client: C, mut f: F, is_retryable: G) -> Result<T, E>
+pub async fn retry_call<T, E, C, F, G, Fut>(
+    client: C,
+    mut f: F,
+    is_retryable: G,
+    max_attempts: usize,
+) -> Result<T, E>
 where
     C: Clone,
     F: FnMut(C, u32) -> Fut,
@@ -29,14 +34,15 @@ where
     Fut: Future<Output = Result<T, E>>,
 {
     const INTERVAL_DURATION: Duration = Duration::from_millis(20);
-    const MAX_RETRIES: u32 = 3;
     const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(5);
 
     let mut num_retries = 0;
     let last_error = loop {
         // Delay before the next send attempt if this is a retry.
         if num_retries > 0 {
-            let multiplier = rand::rng().random_range(0..2_u32.pow(num_retries) + 1);
+            // NB: saturating_pow because `max_attempts` is user-configurable; the sleep is capped
+            // just below anyway.
+            let multiplier = rand::rng().random_range(0..=2_u32.saturating_pow(num_retries));
             let sleep_time = INTERVAL_DURATION * multiplier;
             let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
             tokio::time::sleep(sleep_time).await;
@@ -57,7 +63,7 @@ where
 
         num_retries += 1;
 
-        if num_retries >= MAX_RETRIES {
+        if num_retries as usize >= max_attempts {
             break last_error;
         }
     };
@@ -116,6 +122,7 @@ mod tests {
                 async move { client.next().await }
             },
             |err| err.0,
+            3,
         )
         .await;
         assert_eq!(result, Ok(3_isize));
@@ -132,6 +139,7 @@ mod tests {
             client.clone(),
             |client, _| async move { client.next().await },
             |err| err.0,
+            3,
         )
         .await;
         assert_eq!(result, Err(MockError(false, "second")));
@@ -148,9 +156,43 @@ mod tests {
             client.clone(),
             |client, _| async move { client.next().await },
             |err| err.0,
+            3,
         )
         .await;
         assert_eq!(result, Err(MockError(true, "third")));
+        assert_eq!(client.values.lock().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn retry_call_respects_max_attempts() {
+        // succeeds on the 5th attempt, more than the historical default of 3 would allow
+        let client = MockClient::new(vec![
+            Err(MockError(true, "first")),
+            Err(MockError(true, "second")),
+            Err(MockError(true, "third")),
+            Err(MockError(true, "fourth")),
+            Ok(5_isize),
+        ]);
+        let result = retry_call(
+            client.clone(),
+            |client, _| async move { client.next().await },
+            |err| err.0,
+            5,
+        )
+        .await;
+        assert_eq!(result, Ok(5_isize));
+        assert_eq!(client.values.lock().len(), 0);
+
+        // a single attempt: even a retryable error is returned immediately
+        let client = MockClient::new(vec![Err(MockError(true, "first")), Ok(2_isize)]);
+        let result = retry_call(
+            client.clone(),
+            |client, _| async move { client.next().await },
+            |err| err.0,
+            1,
+        )
+        .await;
+        assert_eq!(result, Err(MockError(true, "first")));
         assert_eq!(client.values.lock().len(), 1);
     }
 }

@@ -3,13 +3,13 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use hashing::Digest;
-use mock::StubCAS;
+use mock::{RequestType, StubCAS};
 use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use remote_provider_traits::{ActionCacheProvider, RemoteProvider, RemoteStoreOptions};
 
 use super::action_cache::Provider;
 
-async fn new_provider(cas: &StubCAS) -> Provider {
+async fn new_provider_with_retries(cas: &StubCAS, retries: usize) -> Provider {
     Provider::new(RemoteStoreOptions {
         provider: RemoteProvider::Reapi,
         instance_name: None,
@@ -18,13 +18,17 @@ async fn new_provider(cas: &StubCAS) -> Provider {
         headers: BTreeMap::new(),
         concurrency_limit: 256,
         timeout: Duration::from_secs(2),
-        retries: 0,
+        retries,
         batch_api_size_limit: 0,
         chunk_size_bytes: 0,
         batch_load_enabled: false,
     })
     .await
     .unwrap()
+}
+
+async fn new_provider(cas: &StubCAS) -> Provider {
+    new_provider_with_retries(cas, 0).await
 }
 
 #[tokio::test]
@@ -77,6 +81,33 @@ async fn get_action_result_grpc_error() {
         error.contains("unavailable"),
         "Bad error message, got: {error}"
     );
+    // retries: 0 means only a single attempt is made
+    assert_eq!(
+        cas.request_counts
+            .lock()
+            .get(&RequestType::ACGetActionResult),
+        Some(&1)
+    );
+}
+
+#[tokio::test]
+async fn get_action_result_grpc_error_retries_configured_times() {
+    let cas = StubCAS::builder().ac_always_errors().build().await;
+    let provider = new_provider_with_retries(&cas, 3).await;
+
+    let action_digest = Digest::of_bytes(b"get_action_result_grpc_error_retries test");
+
+    provider
+        .get_action_result(action_digest, "")
+        .await
+        .expect_err("Want err");
+
+    assert_eq!(
+        cas.request_counts
+            .lock()
+            .get(&RequestType::ACGetActionResult),
+        Some(&4)
+    );
 }
 
 #[tokio::test]
@@ -120,5 +151,36 @@ async fn update_action_cache_grpc_error() {
     assert!(
         error.contains("unavailable"),
         "Bad error message, got: {error}"
+    );
+    // retries: 0 means only a single attempt is made
+    assert_eq!(
+        cas.request_counts
+            .lock()
+            .get(&RequestType::ACUpdateActionResult),
+        Some(&1)
+    );
+}
+
+#[tokio::test]
+async fn update_action_cache_grpc_error_retries_configured_times() {
+    let cas = StubCAS::builder().ac_always_errors().build().await;
+    let provider = new_provider_with_retries(&cas, 3).await;
+
+    let action_digest = Digest::of_bytes(b"update_action_cache_grpc_error_retries test");
+    let action_result = remexec::ActionResult {
+        exit_code: 123,
+        ..Default::default()
+    };
+
+    provider
+        .update_action_result(action_digest, action_result)
+        .await
+        .expect_err("Want err");
+
+    assert_eq!(
+        cas.request_counts
+            .lock()
+            .get(&RequestType::ACUpdateActionResult),
+        Some(&4)
     );
 }

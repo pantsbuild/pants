@@ -20,6 +20,7 @@ use crate::apply_headers;
 pub struct Provider {
     instance_name: Option<String>,
     action_cache_client: Arc<ActionCacheClient<LayeredService>>,
+    rpc_attempts: usize,
 }
 
 impl Provider {
@@ -31,6 +32,7 @@ impl Provider {
             headers,
             concurrency_limit,
             timeout,
+            retries,
             ..
         }: RemoteStoreOptions,
     ) -> Result<Self, String> {
@@ -51,6 +53,7 @@ impl Provider {
         Ok(Provider {
             instance_name,
             action_cache_client,
+            rpc_attempts: retries + 1,
         })
     }
 }
@@ -80,6 +83,7 @@ impl ActionCacheProvider for Provider {
                 }
             },
             status_is_retryable,
+            self.rpc_attempts,
         )
         .await
         .map_err(status_to_str)?;
@@ -105,6 +109,7 @@ impl ActionCacheProvider for Provider {
                 async move { client.get_action_result(request).await }
             },
             status_is_retryable,
+            self.rpc_attempts,
         )
         .await;
 

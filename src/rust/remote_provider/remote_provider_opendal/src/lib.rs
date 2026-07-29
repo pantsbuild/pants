@@ -62,7 +62,11 @@ impl Provider {
                     .with_io_timeout(options.timeout),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
-            .layer(RetryLayer::new().with_max_times(options.retries + 1))
+            // NB: `max_times` bounds retries _after_ the initial attempt, so passing `retries`
+            // directly yields `retries + 1` total attempts. Upstream docs are ambiguous; the
+            // semantics are pinned by backon's own tests ("executed 4 times (retry 3 times)"):
+            // https://github.com/Xuanwo/backon/blob/v1.6.0/backon/src/retry.rs#L500
+            .layer(RetryLayer::new().with_max_times(options.retries))
             .finish();
 
         let base_path = match options.instance_name {

@@ -58,6 +58,9 @@ pub enum RequestType {
     CASFindMissingBlobs,
     CASBatchUpdateBlobs,
     CASBatchReadBlobs,
+    // ActionCache
+    ACGetActionResult,
+    ACUpdateActionResult,
     // add others of interest as required
 }
 
@@ -198,6 +201,7 @@ impl StubCASBuilder {
             always_errors: ac_always_errors.clone(),
             read_delay: self.ac_read_delay,
             write_delay: self.ac_write_delay,
+            request_counts: request_counts.clone(),
         };
 
         // TODO: Refactor to just use `tokio::net::TcpListener` directly (but requries the method be async and
