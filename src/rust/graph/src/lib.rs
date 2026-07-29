@@ -59,6 +59,11 @@ impl LiveRuns {
             run_id,
         }
     }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.0.lock().len()
+    }
 }
 
 ///
@@ -458,6 +463,11 @@ impl<N: Node> Graph<N> {
         let run_id = inner.run_id_generator;
         inner.run_id_generator += 1;
         RunId(run_id)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn live_runs_len(&self) -> usize {
+        self.inner.lock().live_runs.len()
     }
 
     ///
