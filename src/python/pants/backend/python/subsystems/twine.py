@@ -29,16 +29,7 @@ class TwineSubsystem(PythonToolBase):
     default_main = ConsoleScript("twine")
 
     default_requirements = [
-        "twine>=3.7.1,<5",
-        # This explicit dependency resolves a weird behavior in poetry, where it would include a
-        # sys platform constraint on "Windows" when this was included transitively from the twine
-        # requirements.
-        # See: https://github.com/pantsbuild/pants/pull/13594#issuecomment-968154931
-        "colorama>=0.4.3",
-        # Remove this constraint once on twine > 5. See:
-        # https://github.com/pypa/twine/issues/977
-        # https://github.com/pypa/twine/issues/1125
-        "importlib-metadata<8",
+        "twine>=5.1.1,<8",
     ]
 
     register_interpreter_constraints = True
