@@ -2008,12 +2008,13 @@ fn stdio_thread_set_destination(stdio_destination: &Bound<'_, PyStdioDestination
     stdio_destination.borrow().0.set_for_current_thread();
 }
 
-// TODO: Needs to be thread-local / associated with the Console.
 #[pyfunction]
 #[pyo3(signature = (log_path))]
 fn set_per_run_log_path(py: Python, log_path: Option<PathBuf>) {
     py.detach(|| {
-        PANTS_LOGGER.set_per_run_logs(log_path);
+        if let Err(e) = stdio::get_destination().set_per_run_log_path(log_path) {
+            warn!("{e}");
+        }
     })
 }
 
