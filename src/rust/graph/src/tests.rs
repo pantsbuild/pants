@@ -12,6 +12,7 @@ use futures::future;
 use parking_lot::Mutex;
 use rand::RngExt;
 use task_executor::Executor;
+use tokio::sync::watch;
 use tokio::time::{error::Elapsed, sleep, timeout};
 
 use crate::context::Context;
@@ -462,6 +463,54 @@ async fn uncacheable_deps_is_cleaned_for_the_session() {
         Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
     );
     assert_no_change_within_session(&context);
+}
+
+#[tokio::test]
+async fn uncacheable_node_reruns_for_concurrent_run() {
+    let _logger = env_logger::try_init();
+    let graph = empty_graph();
+
+    let mut uncacheable = HashSet::new();
+    uncacheable.insert(TNode::new(1));
+
+    // Run A blocks in the uncacheable node so run B observes its attempt in flight.
+    let (gate, mut entered, release) = TGate::new();
+    let context_a = {
+        let mut gates = HashMap::new();
+        gates.insert(TNode::new(1), gate);
+        graph.context(
+            TContext::new()
+                .with_uncacheable(uncacheable.clone())
+                .with_gates(gates),
+        )
+    };
+    let context_b = graph.context(TContext::new().with_uncacheable(uncacheable));
+
+    let graph_a = graph.clone();
+    let context_a2 = context_a.clone();
+    let fut_a = tokio::spawn(async move { graph_a.create(TNode::new(2), &context_a2).await });
+    entered.wait_for(|entered| *entered).await.unwrap();
+
+    let graph_b = graph.clone();
+    let context_b2 = context_b.clone();
+    let fut_b = tokio::spawn(async move { graph_b.create(TNode::new(2), &context_b2).await });
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    // Yields are not synchronization: assert B is still pending, i.e. attached to A.
+    assert!(!fut_b.is_finished());
+    release.send(true).unwrap();
+
+    let expected = vec![T(0, 0), T(1, 0), T(2, 0)];
+    assert_eq!(fut_a.await.unwrap(), Ok(expected.clone()));
+    assert_eq!(fut_b.await.unwrap(), Ok(expected));
+
+    // B attached to A's attempt, but re-ran the uncacheable node rather than consuming it.
+    assert_eq!(
+        context_a.runs(),
+        vec![TNode::new(2), TNode::new(1), TNode::new(0)]
+    );
+    assert_eq!(context_b.runs(), vec![TNode::new(1)]);
 }
 
 #[tokio::test]
@@ -944,12 +993,38 @@ struct TContext {
     edges: Arc<HashMap<TNode, Vec<TNode>>>,
     delays_pre: Arc<HashMap<TNode, Duration>>,
     delays_post: Arc<HashMap<TNode, Duration>>,
+    gates: Arc<HashMap<TNode, TGate>>,
     // Nodes which should error when they run.
     errors: Arc<HashSet<TNode>>,
     non_restartable: Arc<HashSet<TNode>>,
     uncacheable: Arc<HashSet<TNode>>,
     aborts: Arc<Mutex<Vec<TNode>>>,
     runs: Arc<Mutex<Vec<TNode>>>,
+}
+
+///
+/// A gate for a TNode: when the node runs, it signals `entered` and then blocks until
+/// `release` becomes true.
+///
+struct TGate {
+    entered: watch::Sender<bool>,
+    release: watch::Receiver<bool>,
+}
+
+impl TGate {
+    /// Returns a TGate, a handle to await its entry, and a handle to release it.
+    fn new() -> (TGate, watch::Receiver<bool>, watch::Sender<bool>) {
+        let (entered_tx, entered_rx) = watch::channel(false);
+        let (release_tx, release_rx) = watch::channel(false);
+        (
+            TGate {
+                entered: entered_tx,
+                release: release_rx,
+            },
+            entered_rx,
+            release_tx,
+        )
+    }
 }
 
 impl TContext {
@@ -959,6 +1034,7 @@ impl TContext {
             edges: Arc::default(),
             delays_pre: Arc::default(),
             delays_post: Arc::default(),
+            gates: Arc::default(),
             errors: Arc::default(),
             non_restartable: Arc::default(),
             uncacheable: Arc::default(),
@@ -981,6 +1057,12 @@ impl TContext {
     /// Delays incurred after a node has requested its dependencies.
     fn with_delays_post(mut self, delays: HashMap<TNode, Duration>) -> TContext {
         self.delays_post = Arc::new(delays);
+        self
+    }
+
+    /// Gates awaited before a node requests its dependencies.
+    fn with_gates(mut self, gates: HashMap<TNode, TGate>) -> TContext {
+        self.gates = Arc::new(gates);
         self
     }
 
@@ -1030,6 +1112,11 @@ impl TContext {
     }
 
     async fn maybe_delay_pre(&self, node: &TNode) {
+        if let Some(gate) = self.gates.get(node) {
+            let _ = gate.entered.send(true);
+            let mut release = gate.release.clone();
+            release.wait_for(|released| *released).await.unwrap();
+        }
         if let Some(delay) = self.delays_pre.get(node) {
             sleep(*delay).await;
         }
