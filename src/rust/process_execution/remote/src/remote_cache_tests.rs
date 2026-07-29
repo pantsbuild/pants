@@ -26,7 +26,9 @@ use testutil::data::{TestData, TestDirectory, TestTree};
 use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 
 use crate::remote::ensure_action_stored_locally;
-use crate::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
+use crate::remote_cache::{
+    CacheErrorThrottle, RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior,
+};
 use process_execution::{
     CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context, EntireExecuteRequest,
     FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
@@ -1552,4 +1554,29 @@ async fn no_remote_cache_on_scope_local() {
         run_process(true, ProcessCacheScope::LocalSuccessful, &mut workunit).await;
     assert_eq!(exit_code, 1);
     assert_eq!(local_call_count, 1);
+}
+
+#[test]
+fn cache_error_throttle_warn_schedule() {
+    fn warned_occurrences(behavior: RemoteCacheWarningsBehavior) -> Vec<usize> {
+        let throttle = CacheErrorThrottle::new(behavior);
+        (1..=10).filter(|n| throttle.should_warn(*n)).collect()
+    }
+
+    assert_eq!(
+        warned_occurrences(RemoteCacheWarningsBehavior::Ignore),
+        Vec::<usize>::new()
+    );
+    assert_eq!(
+        warned_occurrences(RemoteCacheWarningsBehavior::FirstOnly),
+        vec![1]
+    );
+    assert_eq!(
+        warned_occurrences(RemoteCacheWarningsBehavior::Backoff),
+        vec![1, 2, 4, 8]
+    );
+    assert_eq!(
+        warned_occurrences(RemoteCacheWarningsBehavior::Always),
+        (1..=10).collect::<Vec<_>>()
+    );
 }
