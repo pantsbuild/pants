@@ -4,9 +4,6 @@
 from __future__ import annotations
 
 import itertools
-import os
-import shutil
-import subprocess
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -18,6 +15,7 @@ from pants.engine.fs import CreateDigest, Digest, DigestContents, Directory, Fil
 from pants.engine.internals.buildbarn_integration_tests.stack import (
     LocalBuildbarnStack,
     RemoteExecutionBuildbarn,
+    should_skip_for_missing_docker,
 )
 from pants.engine.internals.engine_testutil import WorkunitTracker
 from pants.engine.process import Process, ProcessResult
@@ -39,24 +37,8 @@ class RemoteExecutionRun:
     remote_command_digest: FileDigest
 
 
-def _docker_available() -> bool:
-    docker = shutil.which("docker")
-    if docker is None:
-        return False
-    result = subprocess.run(
-        [docker, "version", "--format", "{{.Server.Version}}"],
-        capture_output=True,
-        text=True,
-    )
-    return result.returncode == 0
-
-
-def _should_skip_for_missing_docker() -> bool:
-    return "CI" not in os.environ and not _docker_available()
-
-
 pytestmark = pytest.mark.skipif(
-    _should_skip_for_missing_docker(), reason="Docker is required for Buildbarn tests"
+    should_skip_for_missing_docker(), reason="Docker is required for Buildbarn tests"
 )
 
 # With the default of 0, Pants starts a remote execution before the cache lookup can answer,

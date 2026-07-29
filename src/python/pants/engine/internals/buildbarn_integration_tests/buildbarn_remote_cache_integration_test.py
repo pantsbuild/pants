@@ -3,40 +3,24 @@
 
 from __future__ import annotations
 
-import os
-import shutil
-import subprocess
 import time
 from collections.abc import Callable
 
 import pytest
 
 from pants.engine.fs import CreateDigest, Digest, DigestContents, Directory
-from pants.engine.internals.buildbarn_integration_tests.stack import LocalBuildbarnStack
+from pants.engine.internals.buildbarn_integration_tests.stack import (
+    CACHE_SPECULATION_DELAY_MILLIS,
+    LocalBuildbarnStack,
+    should_skip_for_missing_docker,
+)
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.logging import LogLevel
 
-
-def _docker_available() -> bool:
-    docker = shutil.which("docker")
-    if docker is None:
-        return False
-    result = subprocess.run(
-        [docker, "version", "--format", "{{.Server.Version}}"],
-        capture_output=True,
-        text=True,
-    )
-    return result.returncode == 0
-
-
-def _should_skip_for_missing_docker() -> bool:
-    return "CI" not in os.environ and not _docker_available()
-
-
 pytestmark = pytest.mark.skipif(
-    _should_skip_for_missing_docker(), reason="Docker is required for Buildbarn tests"
+    should_skip_for_missing_docker(), reason="Docker is required for Buildbarn tests"
 )
 
 
@@ -94,6 +78,7 @@ def _working_directory_process(rule_runner: RuleRunner) -> Process:
         working_directory="workdir",
         output_directories=[""],
         level=LogLevel.INFO,
+        remote_cache_speculation_delay_millis=CACHE_SPECULATION_DELAY_MILLIS,
     )
 
 
@@ -111,6 +96,7 @@ def test_buildbarn_remote_cache_roundtrips_outputs(subtests) -> None:
                 output_files=["file.txt"],
                 output_directories=["out"],
                 level=LogLevel.INFO,
+                remote_cache_speculation_delay_millis=CACHE_SPECULATION_DELAY_MILLIS,
             ),
             {
                 "file.txt": b"file-output\n",
@@ -128,6 +114,7 @@ def test_buildbarn_remote_cache_roundtrips_outputs(subtests) -> None:
                 description="Create root output directory contents",
                 output_directories=["."],
                 level=LogLevel.INFO,
+                remote_cache_speculation_delay_millis=CACHE_SPECULATION_DELAY_MILLIS,
             ),
             {
                 "root.txt": b"root\n",
@@ -145,6 +132,7 @@ def test_buildbarn_remote_cache_roundtrips_outputs(subtests) -> None:
                 description="Create empty root output directory contents",
                 output_directories=[""],
                 level=LogLevel.INFO,
+                remote_cache_speculation_delay_millis=CACHE_SPECULATION_DELAY_MILLIS,
             ),
             {
                 "root.txt": b"empty-root\n",
