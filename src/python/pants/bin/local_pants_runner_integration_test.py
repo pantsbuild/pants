@@ -20,3 +20,11 @@ def test_print_stacktrace() -> None:
     assert "Traceback" in print_stacktrace.stderr
     assert "Engine traceback:" in print_stacktrace.stderr
     assert list_rule_name in print_stacktrace.stderr
+
+    debug = run(["-ldebug"])
+    assert "Traceback" in debug.stderr
+    assert "Engine traceback:" in debug.stderr
+    assert list_rule_name in debug.stderr
+
+    debug_no_stacktrace = run(["-ldebug", "--no-print-stacktrace"])
+    assert "Traceback" not in debug_no_stacktrace.stderr
