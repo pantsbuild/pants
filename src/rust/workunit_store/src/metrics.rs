@@ -41,6 +41,18 @@ pub enum Metric {
     /// processes directly.
     RemoteCacheTotalTimeSavedMs,
     RemoteCacheRequestTimeouts,
+    /// Number of lookups of a URL download in the remote cache.
+    RemoteDownloadCacheRequests,
+    /// Number of URL downloads served entirely from the remote cache.
+    RemoteDownloadCacheRequestsCached,
+    /// Number of URL downloads which were looked up in the remote cache, but which were then
+    /// fetched from their origin URL (because the cache entry was absent, invalid, or its file
+    /// content had been evicted).
+    RemoteDownloadCacheRequestsUncached,
+    RemoteDownloadCacheReadErrors,
+    RemoteDownloadCacheWriteAttempts,
+    RemoteDownloadCacheWriteSuccesses,
+    RemoteDownloadCacheWriteErrors,
     RemoteExecutionErrors,
     RemoteExecutionRequests,
     RemoteExecutionRPCErrors,

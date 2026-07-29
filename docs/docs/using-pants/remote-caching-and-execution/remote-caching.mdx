@@ -94,6 +94,20 @@ remote_cache_read = true
 remote_cache_write = true
 ```
 
+## Caching of downloads
+
+In addition to process results, Pants caches URL downloads (`http_source` sources and the external tools Pants itself fetches, such as interpreters, linters and formatters) in the remote cache. The downloaded bytes are stored in the remote store, along with an entry recording that the URL was observed to serve exactly those bytes. A machine with a cold local cache — such as an ephemeral CI runner — is then served a previously-verified download entirely from the remote cache, without contacting the origin server (e.g. GitHub) at all, protecting builds from origin outages.
+
+This behavior is on by default whenever remote cache reads or writes are enabled, and can be disabled with `[GLOBAL].remote_cache_downloads` (for example, during a cache-corruption investigation, or if your organization audits origin fetches at an egress proxy). A download is only ever served from the cache when some machine previously fetched the same URL and verified the same digest declared in the build; content is always re-verified against that digest as it is fetched. Note that rotating `[GLOBAL].process_execution_cache_namespace` does not affect cached downloads (their content is configuration-independent): use the option or server-side deletion instead. Also note that disabling the option (or deleting entries server-side) stops new remote-cache serving, but does not revoke the local record on a machine that was already served a download: such a machine keeps serving that (URL, digest) pair from its local caches until its local store evicts the file. A strict origin-only posture therefore also requires clearing local caches on warm machines.
+
+Operational notes:
+
+- Cache uploads happen in the background at the end of the run. A very short-lived run can exit before an upload completes, in which case the next machine re-downloads from the origin and retries the upload; this self-heals, and is bounded by the number of distinct tools.
+- Cached downloads stay warm best on servers which validate that an action result's referenced blobs still exist (e.g. bazel-remote's default completeness checking): there, every cache read refreshes both the entry and the bytes. On fleets where machines with `remote_cache_write` are long-lived (and so rarely re-download), it also helps to run at least one write-enabled builder that cycles its local cache, so evicted entries get re-minted.
+- Downloads of `file:` URLs and of URLs containing userinfo (`user:password@`) never participate. Presigned URLs which differ on every run work correctly but create one dead cache entry per distinct URL.
+- Downloads using `auth_headers` do participate: if the origin is private, anyone with read access to the remote cache can read the downloaded content. Disable `[GLOBAL].remote_cache_downloads` or `[GLOBAL].remote_cache_write` if this does not suit your cache's trust domain.
+- Cache entry lookups use the `[GLOBAL].remote_cache_rpc_timeout_millis` and `[GLOBAL].remote_cache_rpc_concurrency` options, with the retry count coming from `[GLOBAL].remote_store_rpc_retries`; byte transfers use the `[GLOBAL].remote_store_*` options. If the cache is unreachable, each download waits up to (`remote_store_rpc_retries` + 1) × `remote_cache_rpc_timeout_millis` (about 90 seconds with default settings) before falling back to the origin, with a warning throttled by `[GLOBAL].remote_cache_warnings`. If a degraded cache is adding too much latency, disable `[GLOBAL].remote_cache_downloads` (or remote caching) until it recovers.
+
 ## Reference
 
 Run `pants help-advanced global` or refer to [Global options](../../../reference/global-options.mdx). Most remote execution and caching options begin with the prefix `--remote`.

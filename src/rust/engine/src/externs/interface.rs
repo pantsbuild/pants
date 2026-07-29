@@ -300,6 +300,7 @@ impl PyExecutionStrategyOptions {
         local_enable_nailgun: bool,
         remote_cache_read: bool,
         remote_cache_write: bool,
+        remote_cache_downloads: bool,
         child_default_memory: usize,
         child_max_memory: usize,
         graceful_shutdown_timeout: usize,
@@ -312,6 +313,7 @@ impl PyExecutionStrategyOptions {
             local_enable_nailgun,
             remote_cache_read,
             remote_cache_write,
+            remote_cache_downloads,
             child_default_memory,
             child_max_memory,
             graceful_shutdown_timeout: Duration::from_secs(

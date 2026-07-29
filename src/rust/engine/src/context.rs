@@ -27,6 +27,7 @@ use process_execution::{
 use regex::Regex;
 use remote::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use remote::{self, remote_cache};
+use remote_provider::choose_action_cache_provider;
 use rule_graph::RuleGraph;
 use sandboxer::Sandboxer;
 use store::{self, ImmutableInputs, RemoteProvider, RemoteStoreOptions, Store, StoreCliOpt};
@@ -37,6 +38,7 @@ use workunit_store::{Metric, RunningWorkunit};
 
 use crate::nodes::{ExecuteProcess, NodeKey, NodeOutput, NodeResult, SubjectPath};
 use crate::python::{Failure, throw};
+use crate::remote_download_cache::RemoteDownloadCache;
 use crate::session::{Session, Sessions};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
@@ -77,6 +79,11 @@ pub struct Core {
     /// their outputs, and so should be listed before uncached `CommandRunners`.
     pub command_runners: Vec<Arc<dyn CommandRunner>>,
     pub http_client: reqwest::Client,
+    /// The remote tier of the download caches, present when both remote caching and
+    /// `remote_cache_downloads` are enabled. Holds the full remote-capable Store even when
+    /// `Core::store` has been restricted to local-only: the download node is a remote cache code
+    /// path, exactly like the remote cache CommandRunner.
+    pub remote_download_cache: Option<Arc<RemoteDownloadCache>>,
     pub local_cache: PersistentCache,
     pub vfs: FS,
     pub vfs_system: FS,
@@ -168,6 +175,7 @@ pub struct ExecutionStrategyOptions {
     pub local_enable_nailgun: bool,
     pub remote_cache_read: bool,
     pub remote_cache_write: bool,
+    pub remote_cache_downloads: bool,
     pub child_max_memory: usize,
     pub child_default_memory: usize,
     pub graceful_shutdown_timeout: Duration,
@@ -693,6 +701,25 @@ impl Core {
             None
         };
 
+        let remote_download_cache = if exec_strategy_opts.remote_cache_downloads
+            && (exec_strategy_opts.remote_cache_read || exec_strategy_opts.remote_cache_write)
+        {
+            let provider = choose_action_cache_provider(
+                remoting_opts.to_remote_cache_options(tls_config.clone())?,
+            )
+            .await?;
+            Some(Arc::new(RemoteDownloadCache::new(
+                provider,
+                full_store.clone(),
+                exec_strategy_opts.remote_cache_read,
+                exec_strategy_opts.remote_cache_write,
+                remoting_opts.cache_warnings_behavior,
+                executor.clone(),
+            )))
+        } else {
+            None
+        };
+
         let immutable_inputs = ImmutableInputs::new(store.clone(), &local_execution_root_dir)?;
         let named_caches = NamedCaches::new_local(named_caches_dir);
         let command_runners = Self::make_command_runners(
@@ -762,6 +789,7 @@ impl Core {
             sandboxer,
             command_runners,
             http_client,
+            remote_download_cache,
             local_cache,
             vfs: FS::new(&build_root, ignorer, executor.clone())
                 .map_err(|e| format!("Could not initialize Vfs: {e:?}"))?,

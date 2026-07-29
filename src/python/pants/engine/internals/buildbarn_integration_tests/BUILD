@@ -6,6 +6,7 @@ python_sources(dependencies=[":config"])
 python_tests(
     name="tests",
     overrides={
+        "buildbarn_download_cache_integration_test.py": {"timeout": 300},
         "buildbarn_remote_cache_integration_test.py": {"timeout": 180},
         "buildbarn_remote_execution_integration_test.py": {"timeout": 300},
     },
