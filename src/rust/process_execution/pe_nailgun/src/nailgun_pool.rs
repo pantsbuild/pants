@@ -163,6 +163,19 @@ impl NailgunPool {
     }
 
     ///
+    /// Kills all pooled nailgun servers, waiting for any that are in use to be released first.
+    ///
+    pub async fn shutdown(&self) -> Result<(), String> {
+        let mut processes = self.processes.lock().await;
+        for pool_entry in processes.drain(..) {
+            let mut process = pool_entry.process.lock_arc().await;
+            // Dropping the `NailgunProcess` kills the server: see its `Drop`.
+            drop(process.take());
+        }
+        Ok(())
+    }
+
+    ///
     /// Find a usable process in the pool that matches the given fingerprint.
     ///
     fn find_usable(

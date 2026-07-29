@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
@@ -58,7 +59,7 @@ class LocalPantsRunner:
 
     options: Options
     options_bootstrapper: OptionsBootstrapper
-    session_end_tasks_timeout: float
+    session_end_tasks_timeout: timedelta
     build_config: BuildConfiguration
     run_tracker: RunTracker
     specs: Specs
@@ -176,7 +177,9 @@ class LocalPantsRunner:
         return cls(
             options=options,
             options_bootstrapper=options_bootstrapper,
-            session_end_tasks_timeout=global_bootstrap_options.session_end_tasks_timeout,
+            session_end_tasks_timeout=timedelta(
+                seconds=global_bootstrap_options.session_end_tasks_timeout
+            ),
             build_config=build_config,
             run_tracker=run_tracker,
             specs=specs,
@@ -319,5 +322,12 @@ class LocalPantsRunner:
                 return engine_result
         finally:
             if not self.is_pantsd_run:
+                # Without pantsd there is no daemon to own long-lived child processes such as
+                # nailgun servers, which never exit on their own. See #12996.
+                streaming_reporter.cancel_session()
+                self.graph_session.scheduler_session.cancel()
+                self.graph_session.scheduler_session.scheduler.shutdown(
+                    self.session_end_tasks_timeout
+                )
                 # Tear down the executor. See #16105.
                 self.executor.shutdown(3)
