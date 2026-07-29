@@ -666,7 +666,7 @@ async def _warn_about_any_files_targets(
             "on the below `files` targets, but Pants will not include them in the built package. "
             "Filesystem APIs like `open()` may be not able to load files within the binary "
             "itself; instead, they read from the current working directory."
-            f"\n\nInstead, use `resources` targets. See {doc_url('resources')}."
+            f"\n\nInstead, use `resources` targets. See {doc_url('docs/using-pants/assets-and-archives')}."
             f"\n\nFiles targets dependencies: {files_addresses}"
         )
 
