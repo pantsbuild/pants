@@ -3,12 +3,15 @@
 
 mod term;
 
+#[cfg(test)]
+mod tests;
+
 pub use term::{TermReadDestination, TermWriteDestination, TryCloneAsFile};
 
 use libc::c_int;
 use std::cell::RefCell;
 use std::fmt;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::future::Future;
 use std::io::{Read, Write};
 use std::mem::ManuallyDrop;
@@ -18,6 +21,7 @@ use std::os::unix::io::FromRawFd;
 use std::os::windows::io::FromRawHandle;
 #[cfg(windows)]
 use std::os::windows::raw::HANDLE;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -157,14 +161,25 @@ impl fmt::Debug for InnerDestination {
 }
 
 #[derive(Debug)]
-pub struct Destination(Mutex<InnerDestination>);
+pub struct Destination {
+    inner: Mutex<InnerDestination>,
+    per_run_log: Mutex<Option<File>>,
+}
 
 impl Destination {
+    fn new(inner: InnerDestination) -> Destination {
+        Destination {
+            inner: Mutex::new(inner),
+            per_run_log: Mutex::new(None),
+        }
+    }
+
     ///
     /// Clears the Destination, setting it back to Logging.
     ///
     pub fn console_clear(&self) {
-        *self.0.lock() = InnerDestination::Logging;
+        *self.inner.lock() = InnerDestination::Logging;
+        *self.per_run_log.lock() = None;
     }
 
     ///
@@ -184,7 +199,7 @@ impl Destination {
         ),
         String,
     > {
-        let mut destination = self.0.lock();
+        let mut destination = self.inner.lock();
         let stderr_use_color = match *destination {
             InnerDestination::Console(Console {
                 stderr_use_color, ..
@@ -214,7 +229,7 @@ impl Destination {
     /// Clears Exclusive access and restores the Console.
     ///
     fn exclusive_clear(&self, console: Console) {
-        let mut destination = self.0.lock();
+        let mut destination = self.inner.lock();
         if matches!(*destination, InnerDestination::Exclusive { .. }) {
             *destination = InnerDestination::Console(console);
         } else {
@@ -227,7 +242,7 @@ impl Destination {
     /// Set whether to use color for stderr.
     ///
     pub fn stderr_set_use_color(&self, use_color: bool) {
-        let mut destination = self.0.lock();
+        let mut destination = self.inner.lock();
         if let InnerDestination::Console(ref mut console) = *destination {
             console.stderr_set_use_color(use_color);
         }
@@ -237,7 +252,7 @@ impl Destination {
     /// True if color should be used with stderr.
     ///
     pub fn stderr_use_color(&self) -> bool {
-        let destination = self.0.lock();
+        let destination = self.inner.lock();
         match *destination {
             InnerDestination::Console(ref console) => console.stderr_use_color,
             InnerDestination::Exclusive {
@@ -248,10 +263,41 @@ impl Destination {
     }
 
     ///
+    /// Set (or clear) a file to which a copy of all log output rendered for this Destination
+    /// should be appended.
+    ///
+    pub fn set_per_run_log_path(&self, path: Option<PathBuf>) -> Result<(), String> {
+        let file = match path {
+            Some(path) => Some(
+                OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&path)
+                    .map_err(|e| {
+                        format!("Error opening per-run logfile at {}: {e}", path.display())
+                    })?,
+            ),
+            None => None,
+        };
+        *self.per_run_log.lock() = file;
+        Ok(())
+    }
+
+    ///
+    /// Write a copy of the given log content to the per-run log file, if one is set.
+    ///
+    pub fn write_per_run_log(&self, content: &[u8]) {
+        // Deliberately ignore errors writing to the per-run log file.
+        if let Some(ref mut file) = *self.per_run_log.lock() {
+            let _ = file.write_all(content);
+        }
+    }
+
+    ///
     /// Read from stdin if it is available on the current Destination.
     ///
     pub fn read_stdin(&self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let mut destination = self.0.lock();
+        let mut destination = self.inner.lock();
         match *destination {
             InnerDestination::Console(ref mut console) => console.read_stdin(buf),
             InnerDestination::Exclusive { .. } => Err(std::io::Error::new(
@@ -270,7 +316,7 @@ impl Destination {
     /// available.
     ///
     pub fn write_stdout(&self, content: &[u8]) {
-        let mut destination = self.0.lock();
+        let mut destination = self.inner.lock();
         let error_res = match *destination {
             InnerDestination::Console(ref mut console) => {
                 // Write to the underlying Console.
@@ -307,7 +353,7 @@ impl Destination {
     /// written stdio might result in infinite recursion.
     ///
     pub fn write_stderr_raw(&self, content: &[u8]) -> Result<(), String> {
-        let mut destination = self.0.lock();
+        let mut destination = self.inner.lock();
         match *destination {
             InnerDestination::Console(ref mut console) => {
                 console.write_stderr(content).map_err(|e| e.to_string())
@@ -327,7 +373,7 @@ impl Destination {
     /// available.
     ///
     pub fn write_stderr(&self, content: &[u8]) {
-        let mut destination = self.0.lock();
+        let mut destination = self.inner.lock();
         let error_res = match *destination {
             InnerDestination::Console(ref mut console) => {
                 // Write to the underlying Console.
@@ -373,7 +419,7 @@ impl Destination {
     /// time the caller interacts with it.
     ///
     pub fn stdin_as_c_fd(&self) -> Result<CFd, String> {
-        match &*self.0.lock() {
+        match &*self.inner.lock() {
       InnerDestination::Console(console) => Ok(console.stdin_as_c_fd()),
       InnerDestination::Logging => {
         Err("No associated file descriptor for the Logging destination".to_owned())
@@ -390,7 +436,7 @@ impl Destination {
     /// time the caller interacts with it.
     ///
     pub fn stdout_as_c_fd(&self) -> Result<CFd, String> {
-        match &*self.0.lock() {
+        match &*self.inner.lock() {
       InnerDestination::Console(console) => Ok(console.stdout_as_c_fd()),
       InnerDestination::Logging => {
         Err("No associated file descriptor for the Logging destination".to_owned())
@@ -407,7 +453,7 @@ impl Destination {
     /// time the caller interacts with it.
     ///
     pub fn stderr_as_c_fd(&self) -> Result<CFd, String> {
-        match &*self.0.lock() {
+        match &*self.inner.lock() {
       InnerDestination::Console(console) => Ok(console.stderr_as_c_fd()),
       InnerDestination::Logging => {
         Err("No associated file descriptor for the Logging destination".to_owned())
@@ -424,7 +470,7 @@ impl Destination {
     /// lock is held while it runs.
     ///
     pub fn with_stderr_file<T>(&self, f: impl FnOnce(&File) -> T) -> Result<T, String> {
-        match &*self.0.lock() {
+        match &*self.inner.lock() {
       InnerDestination::Console(console) => Ok(f(console.stderr_file())),
       InnerDestination::Logging => {
         Err("No associated file descriptor for the Logging destination".to_owned())
@@ -440,7 +486,7 @@ thread_local! {
   ///
   /// See set_thread_destination.
   ///
-  static THREAD_DESTINATION: RefCell<Arc<Destination>> = RefCell::new(Arc::new(Destination(Mutex::new(InnerDestination::Logging))))
+  static THREAD_DESTINATION: RefCell<Arc<Destination>> = RefCell::new(Arc::new(Destination::new(InnerDestination::Logging)))
 }
 
 // Note: The behavior of this task_local! invocation is affected by the `tokio_no_const_thread_local`
@@ -455,8 +501,8 @@ task_local! {
 /// using `set_thread_destination`.
 ///
 pub fn new_console_destination(stdin_fd: CFd, stdout_fd: CFd, stderr_fd: CFd) -> Arc<Destination> {
-    Arc::new(Destination(Mutex::new(InnerDestination::Console(
-        Console::new(stdin_fd, stdout_fd, stderr_fd),
+    Arc::new(Destination::new(InnerDestination::Console(Console::new(
+        stdin_fd, stdout_fd, stderr_fd,
     ))))
 }
 
