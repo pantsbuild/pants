@@ -262,6 +262,8 @@ class Target:
                 ),
             )
 
+            self._validate_single_field_subclass(SourcesField)
+            self._validate_single_field_subclass(Dependencies)
             self.validate()
         except Exception as e:
             raise InvalidTargetException(
@@ -314,6 +316,20 @@ class Target:
                 key=lambda field_type_to_val_pair: field_type_to_val_pair[0].alias,
             )
         )
+
+    def _validate_single_field_subclass(self, field_type: type[Field]) -> None:
+        matching_fields = [
+            registered_field_type
+            for registered_field_type in self.field_values
+            if issubclass(registered_field_type, field_type)
+        ]
+        if len(matching_fields) > 1:
+            aliases = ", ".join(f"`{field.alias}`" for field in matching_fields)
+            raise InvalidTargetException(
+                f"The target type `{self.alias}` must not register multiple `{field_type.__name__}` "
+                f"subclasses, but registered {aliases}. Pants can only handle one field of this "
+                "kind per target."
+            )
 
     @final
     @classmethod
