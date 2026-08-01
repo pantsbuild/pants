@@ -22,7 +22,6 @@ const TIME_FORMAT_STR: &str = "%H:%M:%S";
 pub static PANTS_LOGGER: LazyLock<PantsLogger> = LazyLock::new(PantsLogger::new);
 
 struct Inner {
-    per_run_logs: Mutex<Option<File>>,
     log_file: Mutex<Option<File>>,
     global_level: LevelFilter,
     show_rust_3rdparty_logs: bool,
@@ -37,7 +36,6 @@ pub struct PantsLogger(ArcSwap<Inner>);
 impl PantsLogger {
     pub fn new() -> PantsLogger {
         PantsLogger(ArcSwap::from(Arc::new(Inner {
-            per_run_logs: Mutex::new(None),
             log_file: Mutex::new(None),
             global_level: LevelFilter::Off,
             show_rust_3rdparty_logs: true,
@@ -86,7 +84,6 @@ impl PantsLogger {
             })?;
 
         PANTS_LOGGER.0.store(Arc::new(Inner {
-            per_run_logs: Mutex::default(),
             log_file: Mutex::new(Some(log_file)),
             global_level,
             show_rust_3rdparty_logs,
@@ -106,23 +103,6 @@ impl PantsLogger {
         // environment variables to decide.
         colored::control::set_override(true);
         Ok(())
-    }
-
-    pub fn set_per_run_logs(&self, per_run_log_path: Option<PathBuf>) {
-        match per_run_log_path {
-            None => {
-                *self.0.load().per_run_logs.lock() = None;
-            }
-            Some(path) => {
-                let file = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(path)
-                    .map_err(|err| format!("Error opening per-run logfile: {err}"))
-                    .unwrap();
-                *self.0.load().per_run_logs.lock() = Some(file);
-            }
-        };
     }
 
     /// log_from_python is only used in the Python FFI, which in turn is only called within the
@@ -223,13 +203,7 @@ impl Log for PantsLogger {
         };
         let log_bytes = log_string.as_bytes();
 
-        {
-            let mut maybe_per_run_file = inner.per_run_logs.lock();
-            if let Some(ref mut file) = *maybe_per_run_file {
-                // deliberately ignore errors writing to per-run log file
-                let _ = file.write_all(log_bytes);
-            }
-        }
+        destination.write_per_run_log(log_bytes);
 
         // Attempt to write to stdio, and write to the pantsd log if we fail (either because we don't
         // have a valid stdio instance, or because of an error).

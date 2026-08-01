@@ -4708,6 +4708,7 @@ dependencies = [
  "libc",
  "log",
  "parking_lot 0.12.5",
+ "tempfile",
  "tokio",
 ]
 
