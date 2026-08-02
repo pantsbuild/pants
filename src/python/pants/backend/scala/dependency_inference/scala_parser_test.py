@@ -522,6 +522,35 @@ def test_scala_3_default_args(rule_runner: RuleRunner) -> None:
     assert analysis.imports_by_scope.get("foo") == (ScalaImport("bar", None, True),)
 
 
+def test_scala_3_package_clause_top_level_definitions(rule_runner: RuleRunner) -> None:
+    rule_runner.set_options(
+        args=[
+            "-ldebug",
+            "--scala-version-for-resolve={'jvm-default':'3.3.0'}",
+            "--scalac-args=['']",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    analysis = _analyze(
+        rule_runner,
+        textwrap.dedent(
+            """
+            package example
+
+            val foo = "foo"
+            def baz = foo
+            val bar = foo
+            """
+        ),
+    )
+    assert sorted(symbol.name for symbol in analysis.provided_symbols) == [
+        "example.bar",
+        "example.baz",
+        "example.foo",
+    ]
+    assert "example.foo" in set(analysis.fully_qualified_consumed_symbols())
+
+
 def test_extract_annotations(rule_runner: RuleRunner) -> None:
     analysis = _analyze(
         rule_runner,

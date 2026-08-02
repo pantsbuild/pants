@@ -245,6 +245,45 @@ def test_infer_unqualified_symbol_from_intermediate_scope(rule_runner: RuleRunne
     assert deps == InferredDependencies([Address("bar", relative_file_path="B.scala")])
 
 
+def test_infer_top_level_scala_3_definition_from_package_clause(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.set_options(
+        args=[
+            "--scala-version-for-resolve={'jvm-default':'3.3.0'}",
+            "--scalac-args=['']",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    rule_runner.write_files(
+        {
+            "src/main/scala/example/BUILD": "scala_sources()",
+            "src/main/scala/example/Foo.scala": dedent(
+                """\
+                package example
+                val foo = "foo"
+                """
+            ),
+            "src/main/scala/example/Bar.scala": dedent(
+                """\
+                package example
+                val bar = foo
+                """
+            ),
+        }
+    )
+    target = rule_runner.get_target(
+        Address("src/main/scala/example", relative_file_path="Bar.scala")
+    )
+    deps = rule_runner.request(
+        InferredDependencies,
+        [InferScalaSourceDependencies(ScalaSourceDependenciesInferenceFieldSet.create(target))],
+    )
+    assert deps == InferredDependencies(
+        [Address("src/main/scala/example", relative_file_path="Foo.scala")]
+    )
+
+
 def test_overlapping_package_unambiguous(rule_runner: RuleRunner) -> None:
     # Test that declaring a `type` alias inside of a `package object` is unambiguous with a
     # `class`/`object` of the same name in another file.
