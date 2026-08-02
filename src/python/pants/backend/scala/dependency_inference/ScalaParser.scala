@@ -214,6 +214,14 @@ class SourceAnalysisTraverser extends Traverser {
     result
   }
 
+  def withNameParts[T](parts: Seq[String], f: () => T): T = {
+    val originalLength = nameParts.length
+    nameParts.appendAll(parts)
+    val result = f()
+    nameParts.remove(originalLength, nameParts.length - originalLength)
+    result
+  }
+
   def withSuppressProvidedNames[T](f: () => T): Unit = {
     val origSkipProvidedNames = skipProvidedNames
     skipProvidedNames = true
@@ -269,10 +277,12 @@ class SourceAnalysisTraverser extends Traverser {
     case Pkg(ref, stats) => {
       extractName(ref).foreach { qname =>
         recordScope(qname)
-        qname.parents.iterator.foreach(nameParts.append(_))
-        qname.simpleName.foreach { name =>
-          withNamePart(name, () => super.apply(stats))
-        }    
+        val packageParts = qname.elements.iterator.toVector
+        if (stats.isEmpty) {
+          nameParts.appendAll(packageParts)
+        } else {
+          withNameParts(packageParts, () => super.apply(stats))
+        }
       }
     }
 
