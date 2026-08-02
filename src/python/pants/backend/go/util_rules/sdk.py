@@ -134,6 +134,12 @@ async def setup_go_sdk_process(
         **request.env,
         GoSdkRunSetup.CHDIR_ENV: request.working_dir or "",
         "__PANTS_GO_SDK_CACHE_KEY": f"{goroot.full_version}/{goroot.goos}/{goroot.goarch}",
+        # Pin toolchain selection so a go.mod/go.work `go` or `toolchain` directive that demands
+        # a newer version fails fast with a clear message instead of silently downloading an
+        # unfingerprinted toolchain (the default `GOTOOLCHAIN=auto` behaviour since Go 1.21).
+        # Placement after **env_vars/**request.env is intentional: it prevents callers who pass
+        # GOTOOLCHAIN via `[golang].subprocess_env_vars` from accidentally re-enabling switching.
+        "GOTOOLCHAIN": "local",
     }
 
     immutable_input_digests: dict[str, Digest] = {}

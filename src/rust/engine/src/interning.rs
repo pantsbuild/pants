@@ -54,13 +54,13 @@ impl Interns {
         let (id, type_id): (u64, TypeId) = {
             let v = v.bind(py);
             let keys = self.keys.bind(py);
-            let id: u64 = if let Some(key) = keys.get_item(v)? {
-                key.extract()?
-            } else {
-                let id = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);
-                keys.set_item(v, id)?;
-                id
-            };
+            // `setdefault` is a single dict operation, so the check-and-assign is atomic on
+            // free-threaded builds (a separate get-then-set lets two threads mint distinct ids
+            // for equal values, breaking Key's id-based equality). A lost race only wastes an id.
+            let candidate = self.id_generator.fetch_add(1, atomic::Ordering::Relaxed);
+            let id: u64 = keys
+                .call_method1(pyo3::intern!(py, "setdefault"), (v, candidate))?
+                .extract()?;
             (id, TypeId::new(&v.get_type()))
         };
 

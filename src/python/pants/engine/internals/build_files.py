@@ -115,6 +115,13 @@ class BuildFileSyntaxError(SyntaxError):
         return first_line
 
 
+def _parse_build_file_ast(content: str | bytes, filepath: str) -> ast.Module:
+    try:
+        return ast.parse(content, filepath)
+    except SyntaxError as e:
+        raise BuildFileSyntaxError.from_syntax_error(e).with_traceback(e.__traceback__)
+
+
 @dataclass(frozen=True)
 class BuildFileOptions:
     patterns: tuple[str, ...]
@@ -164,12 +171,13 @@ async def evaluate_preludes(
     for file_content in prelude_digest_contents:
         try:
             file_content_str = file_content.content.decode()
-            content = compile(file_content_str, file_content.path, "exec", dont_inherit=True)
+            tree = ast.parse(file_content_str, file_content.path)
+            content = compile(tree, file_content.path, "exec", dont_inherit=True)
             exec(content, globals, locals)
         except Exception as e:
             raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
-        error_on_imports(file_content_str, file_content.path)
-        env_vars.update(BUILDFileEnvVarExtractor.get_env_vars(file_content))
+        error_on_imports(file_content_str, tree, file_content.path)
+        env_vars.update(BUILDFileEnvVarExtractor.get_env_vars_from_tree(tree, file_content.path))
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
     # TODO: Give a nice error message if a prelude tries to set and expose a non-hashable value.
@@ -270,12 +278,13 @@ class BUILDFileEnvVarExtractor(ast.NodeVisitor):
 
     @classmethod
     def get_env_vars(cls, file_content: FileContent) -> Sequence[str]:
-        obj = cls(file_content.path)
-        try:
-            obj.visit(ast.parse(file_content.content, file_content.path))
-        except SyntaxError as e:
-            raise BuildFileSyntaxError.from_syntax_error(e).with_traceback(e.__traceback__)
+        tree = _parse_build_file_ast(file_content.content, file_content.path)
+        return cls.get_env_vars_from_tree(tree, file_content.path)
 
+    @classmethod
+    def get_env_vars_from_tree(cls, tree: ast.Module, filename: str) -> Sequence[str]:
+        obj = cls(filename)
+        obj.visit(tree)
         return tuple(obj.env_vars)
 
     def visit_Call(self, node: ast.Call):
@@ -379,24 +388,32 @@ async def parse_address_family(
         dependents_rules_parser_state = None
         dependencies_rules_parser_state = None
 
+    parsed_build_files = [
+        (fc, _parse_build_file_ast(fc.content, fc.path)) for fc in digest_contents
+    ]
+
     def _extract_env_vars(
-        file_content: FileContent, extra_env: Sequence[str], env: CompleteEnvironmentVars
+        tree: ast.Module, filename: str, extra_env: Sequence[str], env: CompleteEnvironmentVars
     ) -> Coroutine[Any, Any, EnvironmentVars]:
         """For BUILD file env vars, we only ever consult the local systems env."""
-        env_vars = (*BUILDFileEnvVarExtractor.get_env_vars(file_content), *extra_env)
+        env_vars = (*BUILDFileEnvVarExtractor.get_env_vars_from_tree(tree, filename), *extra_env)
         return environment_vars_subset(EnvironmentVarsRequest(env_vars), env)
 
     all_env_vars = await concurrently(
         _extract_env_vars(
-            fc, prelude_symbols.referenced_env_vars, session_values[CompleteEnvironmentVars]
+            tree,
+            fc.path,
+            prelude_symbols.referenced_env_vars,
+            session_values[CompleteEnvironmentVars],
         )
-        for fc in digest_contents
+        for fc, tree in parsed_build_files
     )
 
     declared_address_maps = [
         AddressMap.parse(
             fc.path,
             fc.content.decode(),
+            tree,
             parser,
             prelude_symbols,
             env_vars,
@@ -405,7 +422,7 @@ async def parse_address_family(
             dependents_rules_parser_state,
             dependencies_rules_parser_state,
         )
-        for fc, env_vars in zip(digest_contents, all_env_vars)
+        for (fc, tree), env_vars in zip(parsed_build_files, all_env_vars)
     ]
     declared_address_maps.sort(key=lambda x: x.path)
 

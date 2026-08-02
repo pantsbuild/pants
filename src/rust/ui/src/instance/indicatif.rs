@@ -3,9 +3,9 @@
 
 use std::cmp;
 use std::collections::HashMap;
-use std::future;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 use futures::FutureExt;
 use futures::future::BoxFuture;
@@ -15,23 +15,33 @@ use indicatif::ProgressBar;
 use indicatif::ProgressDrawTarget;
 use indicatif::ProgressStyle;
 use indicatif::WeakProgressBar;
-use parking_lot::Mutex;
+use parking_lot::{Condvar, Mutex};
 
+use logging::fatal_log;
+use task_executor::Executor;
 use workunit_store::SpanId;
 use workunit_store::format_workunit_duration_ms;
 
 use super::TaskState;
 use crate::ConsoleUI;
 
+#[derive(Clone)]
+struct Task {
+    label: String,
+    start_time: SystemTime,
+}
+
 pub struct IndicatifInstance {
     tasks_to_display: IndexSet<SpanId>,
-    // NB: Kept for Drop.
-    _multi_progress: MultiProgress,
-    bars: Vec<ProgressBar>,
+    executor: Executor,
+    snapshot: Arc<Mutex<Vec<Option<Task>>>>,
+    stopping: Arc<(Mutex<bool>, Condvar)>,
+    join_handle: Option<thread::JoinHandle<()>>,
 }
 
 impl IndicatifInstance {
     pub fn new(
+        executor: Executor,
         local_parallelism: usize,
         terminal_width: u16,
         terminal_height: u16,
@@ -59,19 +69,53 @@ impl IndicatifInstance {
             .collect::<Vec<_>>();
 
         *stderr_dest_bar_guard = Some(bars[0].downgrade());
+        drop(stderr_dest_bar_guard);
+
+        let snapshot = Arc::new(Mutex::new((0..bars.len()).map(|_| None).collect()));
+        let stopping = Arc::new((Mutex::new(false), Condvar::new()));
+
+        let render_loop = RenderLoop {
+            _multi_progress: multi_progress,
+            bars,
+            snapshot: snapshot.clone(),
+            stopping: stopping.clone(),
+            interval: ConsoleUI::render_interval(),
+        };
+        let join_handle = thread::Builder::new()
+            .name("pants-spinner".into())
+            .spawn(move || render_loop.run())
+            .map_err(|e| format!("Failed to spawn indicatif render thread: {e}"))?;
 
         Ok(IndicatifInstance {
             tasks_to_display: IndexSet::new(),
-            _multi_progress: multi_progress,
-            bars,
+            executor,
+            snapshot,
+            stopping,
+            join_handle: Some(join_handle),
         })
     }
 
     pub fn teardown(self) -> BoxFuture<'static, ()> {
-        // When the MultiProgress completes, the Term(Destination) is dropped, which will restore
-        // direct access to the Console.
-        std::mem::drop(self);
-        future::ready(()).boxed()
+        // Eagerly signal the render thread to stop, so that it winds down concurrently with
+        // acquiring a thread from the blocking pool below.
+        {
+            let (lock, cv) = &*self.stopping;
+            *lock.lock() = true;
+            cv.notify_all();
+        }
+        // Drop joins the render thread, which restores direct access to the Console as it exits:
+        // move the drop to the blocking pool so that the join cannot stall an async thread (or
+        // whoever holds the Session's display lock). The returned Future completes only once the
+        // Console has been restored; if it is instead dropped, teardown still completes in the
+        // background.
+        let executor = self.executor.clone();
+        let teardown = executor.spawn_blocking(move || std::mem::drop(self));
+        async move {
+            if let Err(e) = teardown.await {
+                fatal_log!("Failed to teardown UI: {e}");
+            }
+        }
+        .boxed()
     }
 
     pub fn render(&mut self, heavy_hitters: &HashMap<SpanId, (String, SystemTime)>) {
@@ -92,23 +136,81 @@ impl IndicatifInstance {
             },
         );
 
-        let now = SystemTime::now();
-        for (n, pbar) in self.bars.iter().enumerate() {
-            let maybe_label = tasks_to_display.get_index(n).map(|span_id| {
-                let (label, start_time) = heavy_hitters.get(span_id).unwrap();
-                let duration_label = match now.duration_since(*start_time).ok() {
-                    None => "(Waiting)".to_string(),
-                    Some(duration) => format_workunit_duration_ms(duration),
-                };
-                format!("{duration_label} {label}")
+        let mut snap = self.snapshot.lock();
+        for slot in snap.iter_mut() {
+            *slot = None;
+        }
+        for (n, span_id) in tasks_to_display.iter().enumerate() {
+            if n >= snap.len() {
+                break;
+            }
+            let (label, start_time) = heavy_hitters.get(span_id).unwrap();
+            snap[n] = Some(Task {
+                label: label.clone(),
+                start_time: *start_time,
             });
+        }
+    }
+}
 
-            match maybe_label {
-                Some(label) => pbar.set_message(label),
-                None => pbar.set_message(""),
+impl Drop for IndicatifInstance {
+    fn drop(&mut self) {
+        {
+            let (lock, cv) = &*self.stopping;
+            *lock.lock() = true;
+            cv.notify_all();
+        }
+        if let Some(h) = self.join_handle.take() {
+            // NB: The panic itself is reported by the global panic hook when it occurs; this
+            // only explains the consequence.
+            if h.join().is_err() {
+                log::warn!(
+                    "The UI render thread panicked (see error above); the dynamic UI was disabled for the remainder of the run."
+                );
+            }
+        }
+    }
+}
+
+struct RenderLoop {
+    // NB: Kept for Drop so the terminal is restored when the render thread exits.
+    _multi_progress: MultiProgress,
+    bars: Vec<ProgressBar>,
+    snapshot: Arc<Mutex<Vec<Option<Task>>>>,
+    stopping: Arc<(Mutex<bool>, Condvar)>,
+    interval: Duration,
+}
+
+impl RenderLoop {
+    fn run(self) {
+        loop {
+            // Clone the current snapshot out quickly so we don't hold the caller's lock
+            // while writing to the terminal.
+            let snap = self.snapshot.lock().clone();
+            let now = SystemTime::now();
+            for (n, pbar) in self.bars.iter().enumerate() {
+                match snap.get(n).and_then(|e| e.as_ref()) {
+                    Some(task) => {
+                        let duration_label = match now.duration_since(task.start_time).ok() {
+                            None => "(Waiting)".to_string(),
+                            Some(duration) => format_workunit_duration_ms(duration),
+                        };
+                        pbar.set_message(format!("{duration_label} {}", task.label));
+                    }
+                    None => pbar.set_message(""),
+                }
+                pbar.tick();
             }
 
-            pbar.tick();
+            let (lock, cv) = &*self.stopping;
+            let mut stopping = lock.lock();
+            if *stopping {
+                break;
+            }
+            cv.wait_for(&mut stopping, self.interval);
+            if *stopping {
+                break;
+            }
         }
     }
 }

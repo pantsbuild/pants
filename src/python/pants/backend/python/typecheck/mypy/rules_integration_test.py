@@ -42,7 +42,6 @@ from pants.testutil.python_interpreter_selection import (
     all_major_minor_python_versions,
     skip_unless_all_pythons_present,
     skip_unless_python38_present,
-    skip_unless_python39_present,
 )
 from pants.testutil.python_rule_runner import PythonRuleRunner
 from pants.util.resources import read_sibling_resource
@@ -355,26 +354,6 @@ def test_works_with_python38(rule_runner: PythonRuleRunner) -> None:
     ]
     tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
     assert_success(rule_runner, tgt, extra_args=extra_args)
-
-
-@skip_unless_python39_present
-def test_works_with_python39(rule_runner: PythonRuleRunner) -> None:
-    """MyPy's typed-ast dependency does not understand Python 3.9, so we must instead run MyPy with
-    Python 3.9 when relevant."""
-    rule_runner.write_files(
-        {
-            f"{PACKAGE}/f.py": dedent(
-                """\
-                @lambda _: int
-                def replaced(x: bool) -> str:
-                    return "42" if x is True else "1/137"
-                """
-            ),
-            f"{PACKAGE}/BUILD": "python_sources(interpreter_constraints=['>=3.9'])",
-        }
-    )
-    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="f.py"))
-    assert_success(rule_runner, tgt)
 
 
 def test_run_only_on_specified_files(rule_runner: PythonRuleRunner) -> None:

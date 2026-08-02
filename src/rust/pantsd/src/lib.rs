@@ -8,12 +8,11 @@ mod pantsd_tests;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use libc::pid_t;
 use log::debug;
 use options::{BuildRoot, OptionId, OptionParser, OptionType, option_id};
 use sha2::digest::Update;
 use sha2::{Digest, Sha256};
-use sysinfo::{ProcessExt, ProcessStatus, System, SystemExt};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System, UpdateKind};
 
 pub struct ConnectionSettings {
     pub port: u16,
@@ -60,7 +59,7 @@ impl Metadata {
         }
     }
 
-    fn pid(&self) -> Result<pid_t, String> {
+    fn pid(&self) -> Result<Pid, String> {
         self.read_metadata("pid")
             .and_then(|(pid_metadata_path, value)| {
                 value
@@ -101,7 +100,7 @@ impl Metadata {
                     .map_err(|e| {
                         format!(
                             "Failed to parse pantsd port from {socket_metadata_path}: {err}",
-                            socket_metadata_path = &socket_metadata_path.display(),
+                            socket_metadata_path = socket_metadata_path.display(),
                             err = e
                         )
                     })
@@ -119,7 +118,7 @@ impl Metadata {
                 format!(
                     "Failed to read {name} from {metadata_path}: {err}",
                     name = name,
-                    metadata_path = &metadata_path.display(),
+                    metadata_path = metadata_path.display(),
                     err = e
                 )
             })
@@ -217,7 +216,12 @@ pub(crate) fn probe(
 
     let pid = pantsd_metadata.pid()?;
     let mut system = System::new();
-    system.refresh_process(pid);
+    // `refresh_processes` does not fetch the command line, so request it explicitly.
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[pid]),
+        true,
+        ProcessRefreshKind::nothing().with_cmd(UpdateKind::Always),
+    );
     // Check that the recorded pid is a live process.
     match system.process(pid) {
         None => Err(format!(
@@ -242,9 +246,10 @@ pub(crate) fn probe(
                 if actual_command_line.is_empty() {
                     process.name()
                 } else {
-                    &actual_command_line[0]
+                    actual_command_line[0].as_os_str()
                 }
-            };
+            }
+            .to_string_lossy();
             // It appears that the daemon only records a prefix of the process name, so we just check that.
             if actual_argv0.starts_with(&expected_process_name_prefix) {
                 Ok(port)

@@ -156,7 +156,15 @@ impl Name {
         if cfg!(debug_assertions) {
             assert!(Path::new(name).components().count() < 2)
         }
-        Name(Intern::from(name))
+        Name(Intern::from_ref(name))
+    }
+
+    fn from_remexec_name(name: &str) -> Result<Self, String> {
+        let mut components = Path::new(name).components().fuse();
+        match (components.next(), components.next()) {
+            (Some(std::path::Component::Normal(_)), None) => Ok(Name(Intern::from_ref(name))),
+            _ => Err(format!("Remote output path component is invalid: {name:?}")),
+        }
     }
 }
 
@@ -223,7 +231,7 @@ impl Directory {
             )
         })?;
         Ok(Self {
-            name: Name(Intern::from(&dir_node.name)),
+            name: Name::from_remexec_name(&dir_node.name)?,
             digest,
             tree: DigestTrie::from_remexec_directories(directory, directories_by_digest)?,
         })
@@ -301,7 +309,7 @@ impl TryFrom<&remexec::FileNode> for File {
 
     fn try_from(file_node: &remexec::FileNode) -> Result<Self, Self::Error> {
         Ok(Self {
-            name: Name(Intern::from(&file_node.name)),
+            name: Name::from_remexec_name(&file_node.name)?,
             digest: require_digest(&file_node.digest)?,
             is_executable: file_node.is_executable,
         })
@@ -340,7 +348,7 @@ impl TryFrom<&remexec::SymlinkNode> for Symlink {
 
     fn try_from(symlink_node: &remexec::SymlinkNode) -> Result<Self, Self::Error> {
         Ok(Self {
-            name: Name(Intern::from(&symlink_node.name)),
+            name: Name::from_remexec_name(&symlink_node.name)?,
             target: PathBuf::from(&symlink_node.target),
         })
     }
@@ -622,7 +630,7 @@ impl DigestTrie {
             // TODO: It's likely that a DigestTrie should hold its own Digest, to avoid re-computing it
             // here.
             let root = Entry::Directory(Directory::from_digest_tree(
-                Name(Intern::from("")),
+                Name(Intern::from_ref("")),
                 self.clone(),
             ));
             f(&PathBuf::new(), &root);
@@ -1227,7 +1235,7 @@ fn first_path_component_to_name(path: &Path) -> Result<Name, String> {
         .as_os_str()
         .to_str()
         .ok_or_else(|| format!("{first_path_component:?} is not representable in UTF8"))?;
-    Ok(Name(Intern::from(name)))
+    Ok(Name(Intern::from_ref(name)))
 }
 
 /// Return any entries which did not have the same Digest as the given Entry.

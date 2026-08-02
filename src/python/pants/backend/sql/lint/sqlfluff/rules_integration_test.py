@@ -141,15 +141,17 @@ def test_passing(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="query.sql"))
     fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [tgt])
-    assert fix_result.stdout == dedent(
-        """\
-        ==== finding fixable violations ====
-        FORCE MODE: Attempting fixes...
-        ==== no fixable linting violations found ====
-        All Finished!
-        """
+    # The leading banner varies by sqlfluff version; assert the stable tail.
+    assert fix_result.stdout.endswith(
+        dedent(
+            """\
+            ==== no fixable linting violations found ====
+            All Finished!
+            """
+        )
     )
-    assert fix_result.stderr == ""
+    # --force is deprecated since sqlfluff 3.0 and warns on stderr; older versions are silent.
+    assert fix_result.stderr == "" or "deprecated" in fix_result.stderr
     assert lint_result.exit_code == 0
     assert not fix_result.did_change
     assert fix_result.output == rule_runner.make_snapshot({"query.sql": GOOD_FILE})
@@ -167,19 +169,20 @@ def test_failing(rule_runner: RuleRunner) -> None:
     )
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="query.sql"))
     fix_result, lint_result, fmt_result = run_sqlfluff(rule_runner, [tgt])
-    assert fix_result.stdout == dedent(
-        """\
-        ==== finding fixable violations ====
-        FORCE MODE: Attempting fixes...
-        == [query.sql] FAIL
-        L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
-                               | select. [references.consistent]
-        == [query.sql] FIXED
-        1 fixable linting violations found
-          [1 unfixable linting violations found]
-        """
+    # The leading banner varies by sqlfluff version; assert the stable tail.
+    assert fix_result.stdout.endswith(
+        dedent(
+            """\
+            == [query.sql] FAIL
+            L:   3 | P:   5 | RF03 | Unqualified reference 'name' found in single table
+                                   | select. [references.consistent]
+            == [query.sql] FIXED
+            1 fixable linting violations found
+              [1 unfixable linting violations found]
+            """
+        )
     )
-    assert fix_result.stderr == ""
+    assert fix_result.stderr == "" or "deprecated" in fix_result.stderr
     assert lint_result.stdout == dedent(
         """\
          == [query.sql] FAIL

@@ -268,7 +268,7 @@ impl PantsInvocation {
                     .push(flag.value.clone());
             }
             if let Some(subcommand) = &command.subcommand {
-                let subcommand_scope = format!("{}.{}", &command.name, &subcommand.name);
+                let subcommand_scope = format!("{}.{}", command.name, subcommand.name);
                 let flags_for_scope = flags.entry(Scope::named(&subcommand_scope)).or_default();
                 for flag in &subcommand.flags {
                     flags_for_scope

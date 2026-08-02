@@ -13,6 +13,7 @@ from typing import Any
 import ijson.backends.python as ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
+from pants.backend.go.subsystems.golang import GolangSubsystem, ThirdPartyTargetGranularity
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
@@ -34,6 +35,7 @@ from pants.engine.fs import (
 )
 from pants.engine.intrinsics import (
     create_digest,
+    digest_subset_to_digest,
     digest_to_snapshot,
     execute_process,
     get_digest_contents,
@@ -57,7 +59,8 @@ class GoThirdPartyPkgError(Exception):
 class ThirdPartyPkgAnalysis:
     """All the info and files needed to build a third-party package.
 
-    The digest only contains the files for the package, with all prefixes stripped.
+    The digest contains the sources of the package's whole module; the package's own files
+    live under `dir_path`.
     """
 
     import_path: str
@@ -65,6 +68,9 @@ class ThirdPartyPkgAnalysis:
 
     digest: Digest
     dir_path: str
+
+    # The import path of the Go module providing this package.
+    module_import_path: str
 
     # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
     # tests directly on a third-party package.
@@ -93,6 +99,33 @@ class ThirdPartyPkgAnalysis:
     xtest_embed_config: EmbedConfig | None = None
 
     error: GoThirdPartyPkgError | None = None
+
+    @property
+    def contains_native_sources(self) -> bool:
+        return bool(
+            self.cgo_files
+            or self.c_files
+            or self.cxx_files
+            or self.m_files
+            or self.f_files
+            or self.s_files
+            or self.h_files
+            or self.syso_files
+        )
+
+
+async def resolve_third_party_pkg_sources_digest(pkg_info: ThirdPartyPkgAnalysis) -> Digest:
+    """Slice the whole-module analysis digest down to the files this package's compilation
+    consumes.
+
+    Native-code packages keep the whole module: their include closure is not knowable from
+    `go list` metadata.
+    """
+    if pkg_info.contains_native_sources:
+        return pkg_info.digest
+
+    glob = f"{pkg_info.dir_path}/**" if pkg_info.embed_config else f"{pkg_info.dir_path}/*"
+    return await digest_subset_to_digest(DigestSubset(pkg_info.digest, PathGlobs([glob])))
 
 
 @dataclass(frozen=True)
@@ -407,6 +440,7 @@ async def analyze_go_third_party_package(
         import_path=import_path,
         name=request.pkg_json["Name"],
         dir_path=request.package_path,
+        module_import_path=request.module_import_path,
         imports=tuple(request.pkg_json.get("Imports", ())),
         go_files=tuple(request.pkg_json.get("GoFiles", ())),
         c_files=tuple(request.pkg_json.get("CFiles", ())),
@@ -672,7 +706,9 @@ async def download_and_analyze_third_party_packages(
 
 
 @rule
-async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPartyPkgAnalysis:
+async def extract_package_info(
+    request: ThirdPartyPkgAnalysisRequest, golang: GolangSubsystem
+) -> ThirdPartyPkgAnalysis:
     all_packages = await download_and_analyze_third_party_packages(
         AllThirdPartyPackagesRequest(
             request.go_mod_address,
@@ -684,6 +720,15 @@ async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPa
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:
         return pkg_info
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.MODULE:
+        raise GoThirdPartyPkgError(
+            f"There is no Go package with the import path `{request.import_path}` in the "
+            f"third-party modules of `{request.go_mod_path}`.\n\n"
+            'Under `[golang].third_party_target_granularity = "module"`, a '
+            "`go_third_party_module` target address refers to its module's root package; "
+            "other packages are compiled automatically when imported. To build a specific "
+            "package as a binary, use the `main_import_path` field of `go_binary`."
+        )
     raise AssertionError(
         f"The package `{request.import_path}` was not downloaded, but Pants tried using it. "
         "This should not happen. Please open an issue at "
@@ -726,6 +771,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             import_path=import_path,
             name="",
             dir_path="",
+            module_import_path="",
             digest=EMPTY_DIGEST,
             imports=(),
             go_files=(),

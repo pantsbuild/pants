@@ -13,11 +13,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "google.rpc.QuotaFailure.Violation.subject",
     ]);
 
-    tonic_build::configure()
+    tonic_prost_build::configure()
     .protoc_arg("--experimental_allow_proto3_optional")
     .build_client(true)
     .build_server(true)
-    .compile_protos_with_config(
+    .compile_with_config(
       config,
       &[
         "protos/bazelbuild_remote-apis/build/bazel/remote/execution/v2/remote_execution.proto",

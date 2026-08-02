@@ -720,7 +720,7 @@ pub async fn prepare_workdir(
         if let Some(sandboxer) = sandboxer {
             debug!(
                 "Materializing via sandboxer to {:?}: {:#?}",
-                &workdir_path, &complete_input_digest
+                workdir_path, complete_input_digest
             );
             // Ensure that the tree is persisted in the store, so that the sandboxer
             // can materialize it from there.  Since record_digest_trie() takes ownership of its
@@ -749,7 +749,7 @@ pub async fn prepare_workdir(
         } else {
             debug!(
                 "Materializing directly to {:?}: {:#?}",
-                &workdir_path, &complete_input_digest
+                workdir_path, complete_input_digest
             );
             store
                 .materialize_directory(

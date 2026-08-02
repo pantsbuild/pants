@@ -195,20 +195,12 @@ async fn load_bytes_batch_missing() {
         .unwrap();
     assert_eq!(results.len(), 2);
 
+    let expected_error = tonic::Status::not_found("").to_string();
     assert_eq!(
         results[&TestData::roland().digest()],
-        Err(
-            "status: NotFound, message: \"\", details: [], metadata: MetadataMap { headers: {} }"
-                .to_owned()
-        )
+        Err(expected_error.clone())
     );
-    assert_eq!(
-        results[&TestData::catnip().digest()],
-        Err(
-            "status: NotFound, message: \"\", details: [], metadata: MetadataMap { headers: {} }"
-                .to_owned()
-        )
-    );
+    assert_eq!(results[&TestData::catnip().digest()], Err(expected_error));
 }
 
 fn assert_cas_store(cas: &StubCAS, testdata: &TestData, chunks: usize, chunk_size: usize) {

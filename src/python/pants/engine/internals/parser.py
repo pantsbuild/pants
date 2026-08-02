@@ -3,19 +3,18 @@
 
 from __future__ import annotations
 
+import ast
 import inspect
 import itertools
 import logging
 import re
 import threading
-import tokenize
 import traceback
 import typing
 from annotationlib import Format, ForwardRef, call_annotate_function
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import InitVar, dataclass, field
 from difflib import get_close_matches
-from io import StringIO
 from pathlib import PurePath
 from typing import Annotated, Any, TypeVar
 
@@ -425,6 +424,7 @@ class Parser:
         self,
         filepath: str,
         build_file_content: str,
+        tree: ast.Module,
         extra_symbols: BuildFilePreludeSymbols,
         env_vars: EnvironmentVars,
         is_bootstrap: bool,
@@ -450,7 +450,7 @@ class Parser:
             defined_symbols = set()
             while True:
                 try:
-                    code = compile(build_file_content, filepath, "exec", dont_inherit=True)
+                    code = compile(tree, filepath, "exec", dont_inherit=True)
                     exec(code, global_symbols)
                 except NameError as e:
                     bad_symbol = _extract_symbol_from_name_error(e)
@@ -473,11 +473,11 @@ class Parser:
                     continue
                 break
 
-            error_on_imports(build_file_content, filepath)
+            error_on_imports(build_file_content, tree, filepath)
             return self._parse_state.parsed_targets()
 
         try:
-            code = compile(build_file_content, filepath, "exec", dont_inherit=True)
+            code = compile(tree, filepath, "exec", dont_inherit=True)
             exec(code, global_symbols)
         except NameError as e:
             frame = traceback.extract_tb(e.__traceback__, limit=-1)[0]
@@ -506,28 +506,31 @@ class Parser:
                 f"{original}.\n\n{help_str}\n\nAll registered symbols: {valid_symbols}"
             )
 
-        error_on_imports(build_file_content, filepath)
+        error_on_imports(build_file_content, tree, filepath)
         return self._parse_state.parsed_targets()
 
 
-def error_on_imports(build_file_content: str, filepath: str) -> None:
+def error_on_imports(build_file_content: str, tree: ast.AST, filepath: str) -> None:
     # This is poor sandboxing; there are many ways to get around this. But it's sufficient to tell
     # users who aren't malicious that they're doing something wrong, and it has a low performance
     # overhead.
     if "import" not in build_file_content:
         return
-    io_wrapped_python = StringIO(build_file_content)
-    for token in tokenize.generate_tokens(io_wrapped_python.readline):
-        token_str = token[1]
-        lineno, _ = token[2]
-        if token_str != "import":
-            continue
-        raise ParseError(
-            f"Import used in {filepath} at line {lineno}. Import statements are banned in "
-            "BUILD files and macros (that act like a normal BUILD file) because they can easily "
-            "break Pants caching and lead to stale results. "
-            f"\n\nInstead, consider writing a plugin ({doc_url('docs/writing-plugins/overview')})."
-        )
+    first_import: ast.Import | ast.ImportFrom | None = None
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)) and (
+            first_import is None
+            or (node.lineno, node.col_offset) < (first_import.lineno, first_import.col_offset)
+        ):
+            first_import = node
+    if first_import is None:
+        return
+    raise ParseError(
+        f"Import used in {filepath} at line {first_import.lineno}. Import statements are banned in "
+        "BUILD files and macros (that act like a normal BUILD file) because they can easily "
+        "break Pants caching and lead to stale results. "
+        f"\n\nInstead, consider writing a plugin ({doc_url('docs/writing-plugins/overview')})."
+    )
 
 
 def _extract_symbol_from_name_error(err: NameError) -> str:

@@ -257,7 +257,7 @@ impl CommandRunner {
             Some(Ok(operation)) => {
                 trace!(
                     "wait_on_operation_stream (build_id={}): got operation: {:?}",
-                    &context.build_id, &operation
+                    context.build_id, operation
                 );
 
                 // Extract the operation name.
@@ -316,7 +316,7 @@ impl CommandRunner {
 
         trace!(
             "wait_on_operation_stream (build_id={}): monitoring stream",
-            &context.build_id
+            context.build_id
         );
 
         // If the server returns an `ExecutionStage` other than `Unknown`, then we assume that it
@@ -583,7 +583,7 @@ impl CommandRunner {
                     Some(OperationResult::Error(rpc_status)) => {
                         // Infrastructure error. Retry it.
                         let msg = format_error(&rpc_status);
-                        debug!("got operation error for runid {:?}: {}", &run_id, &msg);
+                        debug!("got operation error for runid {:?}: {}", run_id, msg);
                         return Err(ExecutionError::Retryable(msg));
                     }
                     None => {
@@ -741,7 +741,7 @@ impl CommandRunner {
                     // Execute method.
                     debug!(
                         "no current operation: submitting execute request: build_id={}; execute_request={:?}",
-                        context.build_id, &execute_request
+                        context.build_id, execute_request
                     );
                     workunit.increment_counter(Metric::RemoteExecutionRPCExecute, 1);
                     let mut client = self.execution_client.as_ref().clone();
@@ -907,7 +907,7 @@ impl process_execution::CommandRunner for CommandRunner {
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
         // Retrieve capabilities for this server.
         let capabilities = self.get_capabilities().await?;
-        trace!("RE capabilities: {:?}", &capabilities);
+        trace!("RE capabilities: {:?}", capabilities);
 
         // Construct the REv2 ExecuteRequest and related data for this execution request.
         let EntireExecuteRequest {
@@ -930,7 +930,7 @@ impl process_execution::CommandRunner for CommandRunner {
         debug!("Remote execution: {}", request.description);
         debug!(
             "built REv2 request (build_id={}): action={:?}; command={:?}; execute_request={:?}",
-            &build_id, action, command, execute_request
+            build_id, action, command, execute_request
         );
 
         // Record the time that we started to process this request, then compute the ultimate
@@ -980,7 +980,7 @@ impl process_execution::CommandRunner for CommandRunner {
                         // The Err in this match arm originates from the timeout future.
                         debug!(
                             "remote execution for build_id={} timed out after {:?}",
-                            &build_id, deadline_duration
+                            build_id, deadline_duration
                         );
                         workunit.update_metadata(|initial| {
                             let initial = initial.map(|(m, _)| m).unwrap_or_default();

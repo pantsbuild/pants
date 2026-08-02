@@ -137,7 +137,7 @@ mod tests {
 
     #[tokio::test]
     async fn collects_network_metrics() {
-        let ws = WorkunitStore::new(true, Level::Debug);
+        let ws = WorkunitStore::new(true, Level::Debug, true, true);
         ws.init_thread_state(None);
 
         let metric_for_path: Arc<HashMap<String, ObservationMetric>> = {

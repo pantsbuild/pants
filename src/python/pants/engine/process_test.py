@@ -33,6 +33,7 @@ from pants.engine.process import (
     ProcessConcurrency,
     ProcessResult,
 )
+from pants.option.global_options import KeepSandboxes
 from pants.testutil.rule_runner import QueryRule, RuleRunner, mock_console
 from pants.util.contextutil import environment_as
 
@@ -310,6 +311,33 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
             "prefix1",
             "prefix2",
         }
+
+
+def test_interactive_process_rejects_invalid_run_in_workspace(rule_runner: RuleRunner) -> None:
+    process = object.__new__(InteractiveProcess)
+    object.__setattr__(process, "process", Process(["/bin/echo", "hello"], description="echo"))
+    object.__setattr__(process, "run_in_workspace", "yes")
+    object.__setattr__(process, "keep_sandboxes", KeepSandboxes.never)
+    object.__setattr__(process, "forward_signals_to_process", True)
+    object.__setattr__(process, "restartable", False)
+
+    with pytest.raises(ExecutionError, match="run_in_workspace"):
+        rule_runner.request(InteractiveProcessResult, [process])
+
+
+def test_interactive_process_rejects_invalid_keep_sandboxes(rule_runner: RuleRunner) -> None:
+    class InvalidKeepSandboxes:
+        value = "sometimes"
+
+    process = object.__new__(InteractiveProcess)
+    object.__setattr__(process, "process", Process(["/bin/echo", "hello"], description="echo"))
+    object.__setattr__(process, "run_in_workspace", False)
+    object.__setattr__(process, "keep_sandboxes", InvalidKeepSandboxes())
+    object.__setattr__(process, "forward_signals_to_process", True)
+    object.__setattr__(process, "restartable", False)
+
+    with pytest.raises(ExecutionError, match="Failed to parse keep_sandboxes"):
+        rule_runner.request(InteractiveProcessResult, [process])
 
 
 @pytest.mark.parametrize("working_directory", [None, "foo", "foo/bar"])

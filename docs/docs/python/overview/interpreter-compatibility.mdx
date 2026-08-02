@@ -35,6 +35,23 @@ As a shortcut, you can leave off `CPython` and just put the version specifier. F
 If you use Python code on Apple's M1/M2 hardware you may need to set your interpreter constraints to Python 3.9+, as many tools, such as Black, will not install correctly on earlier Python versions on this platform.
 :::
 
+## Selecting the free-threaded (no-GIL) CPython ABI
+
+The free-threaded (no-GIL) and standard CPython builds share a version but are distinct ABIs, so `CPython>=3.13` matches either. Qualify the interpreter type to pin one, using either an extra, `CPython[free-threaded]>=3.13` or `CPython[gil]>=3.13`, or the equivalent `CPython+t` / `CPython-t` spellings. Both spellings are adopted from [Pex](https://docs.pex-tool.org) and may evolve alongside future Python packaging standards. Pants selects the matching interpreter from the [search path](#changing-the-interpreter-search-path), so one of that ABI must be discoverable.
+
+`parametrize` it to build both wheels of a `python_distribution` at once:
+
+```python title="BUILD"
+python_distribution(
+    name="dist",
+    interpreter_constraints=parametrize(
+        gil=["CPython[gil]>=3.13"],
+        ft=["CPython[free-threaded]>=3.13"],
+    ),
+    # ...
+)
+```
+
 ## Using multiple Python versions in the same project
 
 Pants also allows you to specify the interpreter compatibility for particular targets. This allows you to use multiple Python versions in the same repository, such as allowing you to incrementally migrate from Python 2 to Python 3.

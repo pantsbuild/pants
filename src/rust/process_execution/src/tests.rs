@@ -3,9 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::hash_map::DefaultHasher;
-use std::fs::Permissions;
 use std::hash::{Hash, Hasher};
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
@@ -15,11 +13,13 @@ use prost_types::Timestamp;
 use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
 use tempfile::TempDir;
+use tokio::io::AsyncWriteExt;
 use workunit_store::RunId;
 
 use crate::{
     CacheName, Platform, Process, ProcessExecutionEnvironment, ProcessExecutionStrategy,
-    ProcessResultMetadata, ProcessResultSource, local::KeepSandboxes, maybe_make_wrapper_script,
+    ProcessResultMetadata, ProcessResultSource, extract_output_files, local::KeepSandboxes,
+    maybe_make_wrapper_script,
 };
 
 #[test]
@@ -162,6 +162,25 @@ fn process_result_metadata_time_saved_from_cache() {
     assert_eq!(metadata.saved_by_cache, None);
 }
 
+/// From a child process rather than this one to avoid failing our own exec of the
+/// script with ETXTBSY.
+/// The sandboxer solves the same hazard for real sandboxes (see sandboxer/src/lib.rs).
+async fn write_executable_script(path: &Path, content: &str) {
+    let mut child = tokio::process::Command::new("/bin/sh")
+        .args([
+            "-c",
+            r#"cat > "$0" && chmod 755 "$0""#,
+            path.to_str().unwrap(),
+        ])
+        .stdin(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    stdin.write_all(content.as_bytes()).await.unwrap();
+    drop(stdin);
+    assert!(child.wait().await.unwrap().success());
+}
+
 #[tokio::test]
 async fn wrapper_script_supports_append_only_caches() {
     const CACHE_NAME: &str = "test_cache";
@@ -190,12 +209,7 @@ async fn wrapper_script_supports_append_only_caches() {
     .unwrap();
 
     let script_path = dummy_sandbox_path.path().join("wrapper");
-    tokio::fs::write(&script_path, script_content.as_bytes())
-        .await
-        .unwrap();
-    tokio::fs::set_permissions(&script_path, Permissions::from_mode(0o755))
-        .await
-        .unwrap();
+    write_executable_script(&script_path, &script_content).await;
 
     let mut cmd = tokio::process::Command::new("./wrapper");
     cmd.args(["/bin/sh", "-c", "echo xyzzy > file.txt"]);
@@ -241,6 +255,37 @@ async fn wrapper_script_supports_append_only_caches() {
     );
 }
 
+// Unit test for to verify that extract_output_files() with a malicious "../outside.txt" path
+// in output_files[].path returns an error.
+// Lower-level than the cache_read_* integration tests in remote_cache_tests.rs, which test the
+// full runner stack including fallback to local execution and filesystem materialization.
+#[tokio::test]
+async fn remote_output_file_paths_must_not_escape_materialization_root() {
+    let store_dir = TempDir::new().unwrap();
+    let store = store::Store::local_only(task_executor::Executor::new(), store_dir.path()).unwrap();
+    let digest = store
+        .store_file_bytes("PANTS_REMOTE_CACHE_HOST_WRITE\n".into(), false)
+        .await
+        .unwrap();
+
+    let action_result = remexec::ActionResult {
+        output_files: vec![remexec::OutputFile {
+            path: "../outside.txt".to_owned(),
+            digest: Some(digest.into()),
+            is_executable: false,
+            ..remexec::OutputFile::default()
+        }],
+        ..remexec::ActionResult::default()
+    };
+
+    assert!(
+        extract_output_files(store.clone(), &action_result, false)
+            .await
+            .is_err(),
+        "remote ActionResult output_files path escaped validation"
+    );
+}
+
 #[tokio::test]
 async fn wrapper_script_supports_sandbox_root_replacements_in_args() {
     let caches = BTreeMap::new();
@@ -251,12 +296,7 @@ async fn wrapper_script_supports_sandbox_root_replacements_in_args() {
 
     let dummy_sandbox_path = TempDir::new().unwrap();
     let script_path = dummy_sandbox_path.path().join("wrapper");
-    tokio::fs::write(&script_path, script_content.as_bytes())
-        .await
-        .unwrap();
-    tokio::fs::set_permissions(&script_path, Permissions::from_mode(0o755))
-        .await
-        .unwrap();
+    write_executable_script(&script_path, &script_content).await;
 
     let mut cmd = tokio::process::Command::new("./wrapper");
     cmd.args([
@@ -301,12 +341,7 @@ async fn wrapper_script_supports_sandbox_root_replacements_in_environmenbt() {
 
     let dummy_sandbox_path = TempDir::new().unwrap();
     let script_path = dummy_sandbox_path.path().join("wrapper");
-    tokio::fs::write(&script_path, script_content.as_bytes())
-        .await
-        .unwrap();
-    tokio::fs::set_permissions(&script_path, Permissions::from_mode(0o755))
-        .await
-        .unwrap();
+    write_executable_script(&script_path, &script_content).await;
 
     let mut cmd = tokio::process::Command::new("./wrapper");
     cmd.args([

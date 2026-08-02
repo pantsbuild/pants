@@ -135,4 +135,9 @@ resources(
     sources=["sandboxer"],
 )
 
+resources(
+    name="pants_lock",
+    sources=["pants_lock"],
+)
+
 python_tests(name="tests")

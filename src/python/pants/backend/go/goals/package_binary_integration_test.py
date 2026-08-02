@@ -264,7 +264,197 @@ def test_package_third_party_can_run(rule_runner: RuleRunner) -> None:
     assert result.stdout == b"Hello world!\n"
 
 
-def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
+def _third_party_hello_files(build_file: str) -> dict[str, str | bytes]:
+    import_path = "pantsbuild.org/go-sample-for-test"
+    version = "v0.0.1"
+    files = gen_module_gomodproxy(
+        version,
+        import_path,
+        (
+            (
+                "pkg/hello/hello.go",
+                dedent(
+                    """\
+                    package hello
+                    import "fmt"
+
+                    func Hello() {
+                        fmt.Println("Hello world!")
+                    }
+                    """
+                ),
+            ),
+            (
+                "cmd/hello/main.go",
+                dedent(
+                    f"""\
+                    package main
+                    import "{import_path}/pkg/hello"
+
+                    func main() {{
+                        hello.Hello()
+                    }}
+                    """
+                ),
+            ),
+        ),
+    )
+    files.update(
+        {
+            "BUILD": build_file,
+            "go.mod": dedent(
+                f"""\
+                module go.example.com/foo
+                go 1.16
+
+                require (
+                \t{import_path} {version}
+                )
+                """
+            ),
+        }
+    )
+    return files
+
+
+def _set_options(rule_runner: RuleRunner, granularity: str) -> None:
+    rule_runner.set_options(
+        [
+            f"--golang-third-party-target-granularity={granularity}",
+            f"--golang-subprocess-env-vars=GOPROXY=file://{rule_runner.build_root}/go-mod-proxy",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+        ],
+        env_inherit={"PATH"},
+    )
+
+
+@pytest.mark.parametrize("granularity", ["package", "module"])
+def test_package_third_party_main_import_path(rule_runner: RuleRunner, granularity: str) -> None:
+    rule_runner.write_files(
+        _third_party_hello_files(
+            dedent(
+                """\
+                go_mod(name='mod')
+                go_binary(name="bin", main_import_path='pantsbuild.org/go-sample-for-test/cmd/hello')
+                """
+            )
+        )
+    )
+    _set_options(rule_runner, granularity)
+
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
+    assert len(built_package.artifacts) == 1
+    assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == b"Hello world!\n"
+
+
+def test_package_main_and_main_import_path_are_mutually_exclusive(
+    rule_runner: RuleRunner,
+) -> None:
+    rule_runner.write_files(
+        _third_party_hello_files(
+            dedent(
+                """\
+                go_mod(name='mod')
+                go_binary(
+                    name="bin",
+                    main='//:mod#pantsbuild.org/go-sample-for-test/cmd/hello',
+                    main_import_path='pantsbuild.org/go-sample-for-test/cmd/hello',
+                )
+                """
+            )
+        )
+    )
+    _set_options(rule_runner, "package")
+
+    with engine_error(contains="mutually exclusive"):
+        rule_runner.get_target(Address("", target_name="bin"))
+
+
+def test_package_main_import_path_unknown_path_errors(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        _third_party_hello_files(
+            dedent(
+                """\
+                go_mod(name='mod')
+                go_binary(name="bin", main_import_path='pantsbuild.org/does-not-exist/cmd/nope')
+                """
+            )
+        )
+    )
+    _set_options(rule_runner, "module")
+
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    with engine_error(contains="no package with that import path"):
+        build_package(rule_runner, binary_tgt)
+
+
+def test_module_granularity_rootless_module_main_address_errors(
+    rule_runner: RuleRunner,
+) -> None:
+    # `pantsbuild.org/go-sample-for-test` has no root package, so its module target cannot be
+    # used as `main` under module granularity.
+    rule_runner.write_files(
+        _third_party_hello_files(
+            dedent(
+                """\
+                go_mod(name='mod')
+                go_binary(name="bin", main='//:mod#pantsbuild.org/go-sample-for-test')
+                """
+            )
+        )
+    )
+    _set_options(rule_runner, "module")
+
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    with engine_error(contains="use the `main_import_path` field"):
+        build_package(rule_runner, binary_tgt)
+
+
+def test_package_first_party_with_third_party_imports_module_granularity(
+    rule_runner: RuleRunner,
+) -> None:
+    # The sample module has no root package: compilation must resolve `pkg/hello` by import
+    # path, since the module target provides no package-level edges.
+    import_path = "pantsbuild.org/go-sample-for-test"
+    files = _third_party_hello_files(
+        dedent(
+            """\
+            go_mod(name='mod')
+            go_package(name='pkg')
+            go_binary(name='bin')
+            """
+        )
+    )
+    files["main.go"] = dedent(
+        f"""\
+        package main
+        import "{import_path}/pkg/hello"
+
+        func main() {{
+            hello.Hello()
+        }}
+        """
+    )
+    rule_runner.write_files(files)
+    _set_options(rule_runner, "module")
+
+    binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
+    built_package = build_package(rule_runner, binary_tgt)
+    assert len(built_package.artifacts) == 1
+    assert built_package.artifacts[0].relpath == "bin"
+
+    result = subprocess.run([os.path.join(rule_runner.build_root, "bin")], stdout=subprocess.PIPE)
+    assert result.returncode == 0
+    assert result.stdout == b"Hello world!\n"
+
+
+@pytest.mark.parametrize("granularity", ["package", "module"])
+def test_package_with_dependencies(rule_runner: RuleRunner, granularity: str) -> None:
     rule_runner.write_files(
         {
             "lib/lib.go": dedent(
@@ -330,6 +520,9 @@ def test_package_with_dependencies(rule_runner: RuleRunner) -> None:
                 """
             ),
         }
+    )
+    rule_runner.set_options(
+        [f"--golang-third-party-target-granularity={granularity}"], env_inherit={"PATH"}
     )
     binary_tgt = rule_runner.get_target(Address("", target_name="bin"))
     built_package = build_package(rule_runner, binary_tgt)

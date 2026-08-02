@@ -162,6 +162,20 @@ async def _get_full_python_version(python: PythonExecutable) -> str:
     return res.stdout.strip().decode()
 
 
+async def _get_abi_thread_suffix(python: PythonExecutable) -> str:
+    # The suffix (e.g. "t" for a free-threaded build, else "") that venvs append to their
+    # `lib/pythonX.Y{suffix}/site-packages` directory name.
+    argv = [
+        python.path,
+        "-c",
+        "import sysconfig; print(sysconfig.get_config_var('abi_thread') or '')",
+    ]
+    res = await execute_process_or_raise(
+        **implicitly(Process(argv, description="Get interpreter ABI thread suffix"))
+    )
+    return res.stdout.strip().decode()
+
+
 @dataclass(frozen=True)
 class VenvExportRequest:
     py_version: str
@@ -280,8 +294,12 @@ async def do_export(
             wheels_snapshot = await digest_to_snapshot(req.editable_local_dists_digest)
             # We need the paths to the installed .dist-info directories to finish installation.
             py_major_minor_version = ".".join(req.py_version.split(".", 2)[:2])
+            abi_thread_suffix = await _get_abi_thread_suffix(requirements_pex.python)
             lib_dir = os.path.join(
-                output_path, "lib", f"python{py_major_minor_version}", "site-packages"
+                output_path,
+                "lib",
+                f"python{py_major_minor_version}{abi_thread_suffix}",
+                "site-packages",
             )
             dist_info_dirs = [
                 # This builds: dist/.../resolve/3.8.9/lib/python3.8/site-packages/pkg_name-1.2.3.dist-info

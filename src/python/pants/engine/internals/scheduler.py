@@ -9,6 +9,7 @@ import time
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import PurePath
 from types import CoroutineType
 from typing import Any, NoReturn, cast
@@ -57,6 +58,7 @@ from pants.engine.internals.native_engine import (
     PyTypes,
 )
 from pants.engine.internals.nodes import Return, Throw
+from pants.engine.internals.rule_visitor import release_module_scans
 from pants.engine.internals.selectors import Params
 from pants.engine.internals.session import RunId, SessionValues
 from pants.engine.platform import Platform
@@ -154,6 +156,8 @@ class Scheduler:
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
         tasks = register_rules(rule_index, union_membership)
+        # All rule introspection is done; reclaim the cached module parses it used.
+        release_module_scans()
 
         # Create the native Scheduler and Session.
         types = PyTypes(
@@ -356,8 +360,8 @@ class Scheduler:
             ),
         )
 
-    def shutdown(self, timeout_secs: int = 60) -> None:
-        native_engine.scheduler_shutdown(self.py_scheduler, timeout_secs)
+    def shutdown(self, timeout: timedelta = timedelta(seconds=60)) -> None:
+        native_engine.scheduler_shutdown(self.py_scheduler, timeout)
 
 
 class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):
@@ -393,6 +397,10 @@ class SchedulerSession:
             self._scheduler,
             native_engine.session_isolated_shallow_clone(self._py_session, build_id),
         )
+
+    def enable_streaming_workunits(self) -> None:
+        """Enables queueing of workunit messages for `poll_workunits` consumers."""
+        native_engine.session_enable_streaming_workunits(self.py_session)
 
     def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
         result = native_engine.session_poll_workunits(
@@ -661,7 +669,7 @@ class SchedulerSession:
     def cancel(self) -> None:
         self.py_session.cancel()
 
-    def wait_for_tail_tasks(self, timeout: float) -> None:
+    def wait_for_tail_tasks(self, timeout: timedelta) -> None:
         native_engine.session_wait_for_tail_tasks(self.py_scheduler, self.py_session, timeout)
 
 

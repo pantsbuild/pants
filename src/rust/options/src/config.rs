@@ -368,7 +368,7 @@ fn add_to_sha256(value: &Value, hasher: &mut Sha256) {
         Value::String(s) => hasher.update(s.as_bytes()),
         Value::Integer(i) => hasher.update(&i.to_le_bytes()),
         Value::Float(f) => hasher.update(&f.to_le_bytes()),
-        Value::Boolean(b) => hasher.update(&(if *b { [b'1'] } else { [b'0'] })),
+        Value::Boolean(b) => hasher.update(&(if *b { *b"1" } else { *b"0" })),
         // We don't support datetime types in config, so we won't incur this to_string() cost
         // in practice.
         Value::Datetime(dt) => hasher.update(dt.to_string().as_bytes()),
@@ -392,7 +392,7 @@ impl Config {
         config_source: &ConfigSource,
         seed_values: &InterpolationMap,
     ) -> Result<Config, String> {
-        let config = config_source.content.parse::<Value>().map_err(|e| {
+        let config = config_source.content.parse::<Table>().map_err(|e| {
             format!(
                 "Failed to parse config file {}: {}",
                 config_source.path.display(),
@@ -419,46 +419,37 @@ impl Config {
         let default_imap =
             add_section_to_interpolation_map(seed_values.clone(), config.get(DEFAULT_SECTION))?;
 
-        let new_sections: Result<Vec<(String, Value)>, String> = match config {
-            Value::Table(t) => t
-                .into_iter()
-                .map(|(section_name, section)| {
-                    if !section.is_table() {
-                        return Err(format!(
-                            "Expected the config file {} to contain tables per section, \
-                            but section {} contained a {}: {}",
+        let new_sections: Result<Vec<(String, Value)>, String> = config
+            .into_iter()
+            .map(|(section_name, section)| {
+                if !section.is_table() {
+                    return Err(format!(
+                        "Expected the config file {} to contain tables per section, \
+                        but section {} contained a {}: {}",
+                        config_source.path.display(),
+                        section_name,
+                        section.type_str(),
+                        section
+                    ));
+                }
+                let section_imap = if section_name == *DEFAULT_SECTION {
+                    default_imap.clone()
+                } else {
+                    add_section_to_interpolation_map(default_imap.clone(), Some(&section))?
+                };
+                let new_section =
+                    interpolate_value("", section.clone(), &section_imap).map_err(|e| {
+                        format!(
+                            "{} in config file {}, section {}, key {}",
+                            e.msg,
                             config_source.path.display(),
                             section_name,
-                            section.type_str(),
-                            section
-                        ));
-                    }
-                    let section_imap = if section_name == *DEFAULT_SECTION {
-                        default_imap.clone()
-                    } else {
-                        add_section_to_interpolation_map(default_imap.clone(), Some(&section))?
-                    };
-                    let new_section = interpolate_value("", section.clone(), &section_imap)
-                        .map_err(|e| {
-                            format!(
-                                "{} in config file {}, section {}, key {}",
-                                e.msg,
-                                config_source.path.display(),
-                                section_name,
-                                e.key
-                            )
-                        })?;
-                    Ok((section_name, new_section))
-                })
-                .collect(),
-
-            _ => Err(format!(
-                "Expected the config file {} to contain a table but contained a {}: {}",
-                config_source.path.display(),
-                config.type_str(),
-                config
-            )),
-        };
+                            e.key
+                        )
+                    })?;
+                Ok((section_name, new_section))
+            })
+            .collect();
 
         let new_table = Table::from_iter(new_sections?);
         Ok(Self {

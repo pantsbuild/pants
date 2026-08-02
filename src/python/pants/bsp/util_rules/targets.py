@@ -527,17 +527,105 @@ async def bsp_build_target_sources(request: SourcesParams) -> SourcesResult:
 # -----------------------------------------------------------------------------------------------
 
 
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class BSPDependencySourcesRequest(Generic[_FS]):
+    """Hook to allow language backends to provide dependency source jar URIs."""
+
+    field_set_type: ClassVar[type[_FS]]
+
+    field_sets: tuple[_FS, ...]
+
+
+@dataclass(frozen=True)
+class BSPDependencySourcesResult:
+    sources: tuple[Uri, ...]
+    digest: Digest = EMPTY_DIGEST
+
+
+@rule(polymorphic=True)
+async def get_bsp_dependency_sources(
+    req: BSPDependencySourcesRequest, env_name: EnvironmentName
+) -> BSPDependencySourcesResult:
+    raise NotImplementedError()
+
+
 class DependencySourcesHandlerMapping(BSPHandlerMapping):
     method_name = "buildTarget/dependencySources"
     request_type = DependencySourcesParams
     response_type = DependencySourcesResult
 
 
+@dataclass(frozen=True)
+class ResolveOneDependencySourcesRequest:
+    bsp_target_id: BuildTargetIdentifier
+
+
+@dataclass(frozen=True)
+class ResolveOneDependencySourcesResult:
+    bsp_target_id: BuildTargetIdentifier
+    sources: tuple[Uri, ...] = ()
+    digest: Digest = EMPTY_DIGEST
+
+
 @rule
-async def bsp_dependency_sources(request: DependencySourcesParams) -> DependencySourcesResult:
-    # TODO: This is a stub.
+async def resolve_one_dependency_sources(
+    request: ResolveOneDependencySourcesRequest,
+    union_membership: UnionMembership,
+) -> ResolveOneDependencySourcesResult:
+    targets = await resolve_bsp_build_target_addresses(**implicitly(request.bsp_target_id))
+
+    field_sets_by_request_type: dict[type[BSPDependencySourcesRequest], list[FieldSet]] = (
+        defaultdict(list)
+    )
+    dep_sources_request_types: Sequence[type[BSPDependencySourcesRequest]] = union_membership.get(
+        BSPDependencySourcesRequest
+    )
+    for tgt in targets:
+        for dep_sources_request_type in dep_sources_request_types:
+            field_set_type = dep_sources_request_type.field_set_type
+            if field_set_type.is_applicable(tgt):
+                field_set = field_set_type.create(tgt)
+                field_sets_by_request_type[dep_sources_request_type].append(field_set)
+
+    if not field_sets_by_request_type:
+        return ResolveOneDependencySourcesResult(bsp_target_id=request.bsp_target_id)
+
+    responses = await concurrently(
+        get_bsp_dependency_sources(
+            **implicitly(
+                {
+                    dep_sources_request_type(field_sets=tuple(field_sets)): (
+                        BSPDependencySourcesRequest
+                    )
+                }
+            )
+        )
+        for dep_sources_request_type, field_sets in field_sets_by_request_type.items()
+    )
+
+    sources = tuple(itertools.chain.from_iterable(r.sources for r in responses))
+    digest = await merge_digests(MergeDigests([r.digest for r in responses]))
+
+    return ResolveOneDependencySourcesResult(
+        bsp_target_id=request.bsp_target_id,
+        sources=sources,
+        digest=digest,
+    )
+
+
+@_uncacheable_rule
+async def bsp_dependency_sources(
+    request: DependencySourcesParams, workspace: Workspace
+) -> DependencySourcesResult:
+    responses = await concurrently(
+        resolve_one_dependency_sources(ResolveOneDependencySourcesRequest(btgt), **implicitly())
+        for btgt in request.targets
+    )
+    output_digest = await merge_digests(MergeDigests([r.digest for r in responses]))
+    workspace.write_digest(output_digest, path_prefix=".pants.d/bsp")
     return DependencySourcesResult(
-        tuple(DependencySourcesItem(target=tgt, sources=()) for tgt in request.targets)
+        tuple(DependencySourcesItem(target=r.bsp_target_id, sources=r.sources) for r in responses)
     )
 
 

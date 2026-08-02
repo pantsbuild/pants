@@ -155,6 +155,7 @@ async def package_deploy_jar(
                 StripJarRequest(
                     digest=jar_digest,
                     filenames=(output_filename.name,),
+                    remote_cache_eligible=False,
                 )
             )
         )

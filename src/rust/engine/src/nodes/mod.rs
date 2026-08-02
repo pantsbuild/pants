@@ -76,19 +76,21 @@ pub fn task_get_context() -> Context {
     TASK_CONTEXT.with(|c| (**c).clone())
 }
 
-pub async fn task_context<T, F: future::Future<Output = T>>(
+pub fn task_context<T, F: future::Future<Output = T>>(
     context: Context,
     is_side_effecting: bool,
     side_effected: &Arc<AtomicBool>,
     f: F,
-) -> T {
+) -> impl future::Future<Output = T> {
+    // NB: Not an `async fn`: a coroutine would additionally retain the moved `f` in its own
+    // layout, doubling the size of every rule body scoped through here.
     let context = Arc::new(context);
     if is_side_effecting {
-        TASK_SIDE_EFFECTED
-            .scope(side_effected.clone(), TASK_CONTEXT.scope(context, f))
-            .await
+        future::Either::Left(
+            TASK_SIDE_EFFECTED.scope(side_effected.clone(), TASK_CONTEXT.scope(context, f)),
+        )
     } else {
-        TASK_CONTEXT.scope(context, f).await
+        future::Either::Right(TASK_CONTEXT.scope(context, f))
     }
 }
 
@@ -523,7 +525,11 @@ impl Node for NodeKey {
                 let mut result = match self {
                     NodeKey::DigestFile(n) => n.run_node(context).await.map(NodeOutput::FileDigest),
                     NodeKey::DownloadedFile(n) => {
-                        n.run_node(context).await.map(NodeOutput::Snapshot)
+                        // NB: Boxed because this coroutine is by far the largest variant (~15KB),
+                        // and this match otherwise embeds it in every node's spawned future.
+                        Box::pin(n.run_node(context))
+                            .await
+                            .map(NodeOutput::Snapshot)
                     }
                     NodeKey::ExecuteProcess(n) => {
                         let backtrack_level = context.maybe_start_backtracking(&n);

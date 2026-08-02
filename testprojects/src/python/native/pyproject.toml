@@ -1,4 +1,5 @@
 [build-system]
-# Using the oldest `setuptools` that allows `package_dists_integration_test.py` to pass on Python 3.14
-requires = ["setuptools==66.1.0", "wheel==0.37.0", "ansicolors==1.1.8"]
+# Using the oldest `setuptools` that allows `package_dists_integration_test.py` to pass on Python 3.14.
+# wheel>=0.44 is required so that `bdist_wheel` can emit free-threaded (cp314t) ABI tags.
+requires = ["setuptools==66.1.0", "wheel==0.45.1", "ansicolors==1.1.8"]
 build-backend = "setuptools.build_meta"

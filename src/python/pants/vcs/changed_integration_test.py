@@ -217,20 +217,23 @@ def test_delete_atom_target(repo: str) -> None:
 
 
 def test_change_build_file(repo: str) -> None:
-    """Every target in a BUILD file is changed when it's edited.
+    """Testing BUILD file invalidation with and without block-level tracking.
 
-    This is because we don't know what the target was like before-hand, so we're overly
-    conservative.
+    By default, we are overly conservative and assume any BUILD file change affects all targets.
+    With --enable-target-origin-sources-blocks=True, we use AST block tracking to precisely map changes.
     """
     append_to_file("BUILD", "# foo")
+
+    # Default behavior: Overly conservative (Flag is False)
     # Note that the target generator `//:lib` does not show up.
     assert_list_stdout(
         repo, ["//app.sh:lib", "//dep.sh:lib", "//transitive.sh:lib", "//:standalone"]
     )
-
-    # This is because the BUILD file gets expanded with all its targets, then their sources are
-    # used. This might not be desirable behavior.
     assert_count_loc(repo, expected_num_files=4)
+
+    # Smart Behavior: Block-level tracking (Flag is True)
+    # Since we only added a comment, no targets are invalidated.
+    assert_list_stdout(repo, [], extra_args=["--enable-target-origin-sources-blocks=True"])
 
 
 def test_different_build_file_changed(repo: str) -> None:

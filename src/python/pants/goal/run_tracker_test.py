@@ -4,6 +4,7 @@
 import datetime
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -144,3 +145,17 @@ def test_anonymous_telemetry_with_no_repo_id(tmp_path: Path) -> None:
 
         for key in ("repo_id", "machine_id", "user_id"):
             assert telemetry.get(key) == ""
+
+
+def test_end_run_concurrent_calls_are_idempotent(tmp_path: Path) -> None:
+    buildroot = tmp_path.as_posix()
+    with environment_as(PANTS_BUILDROOT_OVERRIDE=buildroot):
+        ob = create_options_bootstrapper([])
+        run_tracker = RunTracker(ob.args, ob.bootstrap_options)
+        run_tracker.start(run_start_time=time.time(), specs=[])
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            list(executor.map(lambda _: run_tracker.end_run(PANTS_SUCCEEDED_EXIT_CODE), range(8)))
+
+        assert run_tracker.has_ended()
+        assert run_tracker.run_information()["outcome"] == "SUCCESS"

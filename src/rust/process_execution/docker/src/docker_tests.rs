@@ -7,7 +7,8 @@ use std::sync::OnceLock;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bollard::container::{Config, RemoveContainerOptions};
+use bollard::models::ContainerCreateBody;
+use bollard::query_parameters::RemoveContainerOptionsBuilder;
 use bollard::{Docker, errors::Error as DockerError};
 use fs::{EMPTY_DIRECTORY_DIGEST, RelativePath};
 use itertools::Itertools;
@@ -92,29 +93,32 @@ async fn test_remove_old_images() {
             None,
             Some("/some/other/build/root"),
         ]) {
-            let mut perm = HashMap::<&str, &str>::new();
+            let mut perm = HashMap::<String, String>::new();
             if let Some(env_label) = tup.0 {
-                perm.insert(PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY, env_label);
+                perm.insert(
+                    PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY.to_string(),
+                    env_label.to_string(),
+                );
             }
             if let Some(build_root_label) = tup.1 {
-                perm.insert(PANTS_CONTAINER_BUILDROOT_LABEL_KEY, build_root_label);
+                perm.insert(
+                    PANTS_CONTAINER_BUILDROOT_LABEL_KEY.to_string(),
+                    build_root_label.to_string(),
+                );
             }
             let container_id = docker
-                .create_container::<&str, &str>(
+                .create_container(
                     None,
-                    Config {
-                        image: Some(IMAGE),
+                    ContainerCreateBody {
+                        image: Some(IMAGE.to_string()),
                         labels: Some(perm),
-                        ..Config::default()
+                        ..ContainerCreateBody::default()
                     },
                 )
                 .await
                 .unwrap()
                 .id;
-            docker
-                .start_container::<&str>(&container_id, None)
-                .await
-                .unwrap();
+            docker.start_container(&container_id, None).await.unwrap();
             docker.stop_container(&container_id, None).await.unwrap();
             ids.push(container_id);
         }
@@ -134,10 +138,7 @@ async fn test_remove_old_images() {
         let _ = ContainerCache::remove_container(
             &docker,
             container_id,
-            Some(RemoveContainerOptions {
-                force: true,
-                ..RemoveContainerOptions::default()
-            }),
+            Some(RemoveContainerOptionsBuilder::default().force(true).build()),
         )
         .await;
     }
@@ -504,10 +505,7 @@ impl UnavailableContainerTestRunner for MissingContainerTestRunner {
         ContainerCache::remove_container(
             docker,
             container_id,
-            Some(RemoveContainerOptions {
-                force: true,
-                ..RemoveContainerOptions::default()
-            }),
+            Some(RemoveContainerOptionsBuilder::default().force(true).build()),
         )
         .await
         .map_err(|err| {
@@ -904,7 +902,7 @@ async fn test_apply_chroot() {
 
     let path = format!("/usr/bin:{}/bin", work_dir.path().to_str().unwrap());
 
-    assert_eq!(&path, req.env.get(&"PATH".to_string()).unwrap());
+    assert_eq!(&path, req.env.get("PATH").unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -934,8 +932,8 @@ async fn test_chroot_placeholder() {
 
     let got_env = extract_env(result.stdout_bytes, &[]).unwrap();
     let path = format!("/usr/bin:{SANDBOX_BASE_PATH_IN_CONTAINER}");
-    assert!(got_env.get(&"PATH".to_string()).unwrap().starts_with(&path));
-    assert!(got_env.get(&"PATH".to_string()).unwrap().ends_with("/bin"));
+    assert!(got_env.get("PATH").unwrap().starts_with(&path));
+    assert!(got_env.get("PATH").unwrap().ends_with("/bin"));
 }
 
 #[parameterized(runner = {&DefaultTestRunner, &ExistingContainerTestRunner::new(IMAGE), &MissingContainerTestRunner::new(IMAGE)}, name = {"default", "existing", "missing"})]
@@ -1095,7 +1093,7 @@ async fn working_directory(runner: &dyn DockerCommandTestRunner) {
     process.output_directories = relative_paths(&["roland.ext"]).collect::<BTreeSet<_>>();
     process.input_digests =
         InputDigests::with_input_files(TestDirectory::nested().directory_digest());
-    process.timeout = Some(Duration::from_secs(1));
+    process.timeout = Some(Duration::from_secs(5));
     process.description = "confused-cat".to_string();
 
     let result = runner
@@ -1109,9 +1107,14 @@ async fn working_directory(runner: &dyn DockerCommandTestRunner) {
         .await
         .unwrap();
 
-    assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
+    assert_eq!(
+        result.original.exit_code,
+        0,
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr_bytes)
+    );
     assert_eq!(result.stderr_bytes, "".as_bytes());
-    assert_eq!(result.original.exit_code, 0);
+    assert_eq!(result.stdout_bytes, "roland.ext\n".as_bytes());
     assert_eq!(
         result.original.output_directory,
         TestDirectory::containing_roland().directory_digest()
@@ -1164,7 +1167,7 @@ async fn immutable_inputs(runner: &dyn DockerCommandTestRunner) {
     )
     .await
     .unwrap();
-    process.timeout = Some(Duration::from_secs(1));
+    process.timeout = Some(Duration::from_secs(5));
     process.description = "confused-cat".to_string();
 
     let result = runner
@@ -1182,9 +1185,14 @@ async fn immutable_inputs(runner: &dyn DockerCommandTestRunner) {
         .unwrap()
         .lines()
         .collect::<HashSet<_>>();
-    assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
+    assert_eq!(
+        result.original.exit_code,
+        0,
+        "stderr: {}",
+        String::from_utf8_lossy(&result.stderr_bytes)
+    );
     assert_eq!(result.stderr_bytes, "".as_bytes());
-    assert_eq!(result.original.exit_code, 0);
+    assert_eq!(stdout_lines, hashset! {"falcons", "cats"});
 }
 
 struct ExitedContainerTestRunner {

@@ -941,7 +941,6 @@ async def build_pex(
         pex_process = await composite_process_to_process(composite_process, **implicitly())
 
     result = await fallible_to_exec_result_or_raise(**implicitly(pex_process))
-
     maybe_log_pex_stderr(result.stderr, pex_subsystem.verbosity)
 
     if strip_output_chroot:

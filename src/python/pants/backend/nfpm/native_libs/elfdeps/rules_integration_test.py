@@ -28,7 +28,7 @@ from pants.testutil.rule_runner import RuleRunner
 # The tests build a pex with wheels for the current platform.
 # These vars are used to choose the expected platform-specific test results.
 _PY_VERSION = ".".join(map(str, sys.version_info[:3]))
-_PY_TAG = "".join(map(str, sys.version_info[:2]))
+_PY_TAG = "".join(map(str, sys.version_info[:2])) + sys.abiflags
 _PY_OS = platform.system()  # Linux
 _PY_ARCH_TAG = platform.machine()  # x86_64
 _ELF_BITS_MARKER = "(64bit)" if platform.architecture() == ("64bit", "ELF") else ""

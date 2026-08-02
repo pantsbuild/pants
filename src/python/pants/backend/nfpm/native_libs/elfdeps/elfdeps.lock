@@ -35,19 +35,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "013df952a006db5e138b1edf6d8a68ecc50630adbd0d83a2d41e7f846163d738",
-              "url": "https://files.pythonhosted.org/packages/af/43/700932c4f0638c3421177144a2e86448c0d75dbaee2c7936bda3f9fd0878/pyelftools-0.32-py3-none-any.whl"
+              "hash": "f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036",
+              "url": "https://files.pythonhosted.org/packages/46/2a/f9697576603dae937727827505a6126a066affb227034e77e6f9068910da/pyelftools-0.33-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6de90ee7b8263e740c8715a925382d4099b354f29ac48ea40d840cf7aa14ace5",
-              "url": "https://files.pythonhosted.org/packages/b9/ab/33968940b2deb3d92f5b146bc6d4009a5f95d1d06c148ea2f9ee965071af/pyelftools-0.32.tar.gz"
+              "hash": "660d82dcbeb8e83d1702bd97f223f761625da06111c0cc988eac6b8ab0c1b61f",
+              "url": "https://files.pythonhosted.org/packages/a3/11/767522582afab1b884d277de0e6e011640cb9d7292a38694b4b1a1df1ae8/pyelftools-0.33.tar.gz"
             }
           ],
           "project_name": "pyelftools",
           "requires_dists": [],
-          "requires_python": null,
-          "version": "0.32"
+          "requires_python": ">=3.10",
+          "version": "0.33"
         }
       ],
       "marker": null,
@@ -58,8 +58,8 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.69.2",
-  "pip_version": "25.3",
+  "pex_version": "2.96.1",
+  "pip_version": "26.1.2",
   "prefer_older_binary": false,
   "requirements": [
     "elfdeps>=0.2.0"

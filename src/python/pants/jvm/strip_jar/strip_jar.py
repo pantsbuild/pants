@@ -8,12 +8,13 @@ from pants.core.goals.resolves import ExportableTool
 from pants.engine.fs import AddPrefix, CreateDigest, Digest, Directory, FileContent
 from pants.engine.internals.native_engine import MergeDigests, RemovePrefix
 from pants.engine.intrinsics import add_prefix, create_digest, merge_digests, remove_prefix
-from pants.engine.process import FallibleProcessResult, ProcessCacheScope, execute_process_or_raise
+from pants.engine.process import FallibleProcessResult, execute_process_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.jvm.jdk_rules import InternalJdk, JvmProcess
 from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool, JvmToolBase
+from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
 _STRIP_JAR_BASENAME = "StripJar.java"
@@ -33,6 +34,7 @@ class StripJarTool(JvmToolBase):
 class StripJarRequest:
     digest: Digest
     filenames: tuple[str, ...]
+    remote_cache_eligible: bool = True
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,7 @@ class StripJarCompiledClassfiles:
 async def strip_jar(
     processor_classfiles: StripJarCompiledClassfiles,
     jdk: InternalJdk,
+    jvm: JvmSubsystem,
     request: StripJarRequest,
     tool: StripJarTool,
 ) -> Digest:
@@ -88,7 +91,9 @@ async def strip_jar(
                 extra_nailgun_keys=extra_immutable_input_digests,
                 description=f"Stripping jar {filenames[0]}",
                 level=LogLevel.DEBUG,
-                cache_scope=ProcessCacheScope.LOCAL_SUCCESSFUL,
+                cache_scope=jvm.intermediate_jar_cache_scope_for(
+                    eligible=request.remote_cache_eligible
+                ),
             )
         )
     )

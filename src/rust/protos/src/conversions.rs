@@ -25,7 +25,7 @@ impl TryFrom<&crate::pb::build::bazel::remote::execution::v2::Digest> for hashin
         d: &crate::pb::build::bazel::remote::execution::v2::Digest,
     ) -> Result<Self, Self::Error> {
         hashing::Fingerprint::from_hex_string(&d.hash)
-            .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", &d.hash, err))
+            .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", d.hash, err))
             .map(|fingerprint| hashing::Digest::new(fingerprint, d.size_bytes as usize))
     }
 }
@@ -37,7 +37,7 @@ impl TryFrom<crate::pb::build::bazel::remote::execution::v2::Digest> for hashing
         d: crate::pb::build::bazel::remote::execution::v2::Digest,
     ) -> Result<Self, Self::Error> {
         hashing::Fingerprint::from_hex_string(&d.hash)
-            .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", &d.hash, err))
+            .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", d.hash, err))
             .map(|fingerprint| hashing::Digest::new(fingerprint, d.size_bytes as usize))
     }
 }

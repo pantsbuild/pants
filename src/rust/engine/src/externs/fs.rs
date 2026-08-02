@@ -679,11 +679,11 @@ impl PyFilespec {
 
     fn __repr__(&self) -> String {
         if self.excludes.is_empty() {
-            format!("Filespec(includes={:?})", &*self.includes)
+            format!("Filespec(includes={:?})", *self.includes)
         } else {
             format!(
                 "Filespec(includes={:?}, excludes={:?})",
-                &*self.includes, &*self.excludes
+                *self.includes, *self.excludes
             )
         }
     }

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import platform
 import shutil
+import sysconfig
 from collections.abc import Mapping
 from pathlib import Path
 from textwrap import dedent
@@ -97,7 +98,10 @@ def test_export(py_resolve_format: PythonResolveExportFormat, py_hermetic_script
         if py_resolve_format == PythonResolveExportFormat.symlinked_immutable_virtualenv:
             assert export_dir.is_symlink(), f"expected export dir '{export_dir}' is not a symlink"
 
-        lib_dir = export_dir / "lib" / f"python{py_minor_version}" / "site-packages"
+        abi_thread_suffix = sysconfig.get_config_var("abi_thread") or ""
+        lib_dir = (
+            export_dir / "lib" / f"python{py_minor_version}{abi_thread_suffix}" / "site-packages"
+        )
         assert lib_dir.is_dir(), f"expected export lib dir '{lib_dir}' does not exist"
         expected_ansicolors_dir = lib_dir / f"ansicolors-{ansicolors_version}.dist-info"
         assert expected_ansicolors_dir.is_dir(), (

@@ -24,7 +24,6 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 )
 from pants.backend.codegen.protobuf.scala.subsystem import ScalaPBSubsystem
 from pants.backend.codegen.thrift.scrooge.subsystem import ScroogeSubsystem
-from pants.backend.docker.subsystems.dockerfile_parser import DockerfileParser
 from pants.backend.helm.subsystems.k8s_parser import HelmKubeParserSubsystem
 from pants.backend.helm.subsystems.post_renderer import HelmPostRendererSubsystem
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
@@ -48,6 +47,7 @@ from pants.backend.python.subsystems.debugpy import DebugPy
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_tool_base import PythonToolRequirementsBase
+from pants.backend.python.subsystems.setup import Resolver
 from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.subsystems.twine import TwineSubsystem
@@ -70,7 +70,7 @@ from pants.util.dirutil import touch
 logger = logging.getLogger(__name__)
 
 
-default_python_interpreter_constraints = "CPython>=3.9,<3.15"
+default_python_interpreter_constraints = "CPython>=3.10,<3.15"
 
 
 ToolBaseT = TypeVar("ToolBaseT")
@@ -115,7 +115,6 @@ all_python_tools = tuple(
             PythonTool(CoverageSubsystem, "pants.backend.python"),
             PythonTool(DebugPy, "pants.backend.python"),
             PythonTool(Docformatter, "pants.backend.python.lint.docformatter"),
-            PythonTool(DockerfileParser, "pants.backend.docker"),
             PythonTool(Elfdeps, "pants.backend.experimental.nfpm.native_libs"),
             PythonTool(Flake8, "pants.backend.python.lint.flake8"),
             PythonTool(HelmKubeParserSubsystem, "pants.backend.experimental.helm"),
@@ -189,6 +188,13 @@ def create_parser() -> argparse.ArgumentParser:
         "--all-jvm", action="store_true", help="Regenerate all builtin JVM tool lockfiles."
     )
     parser.add_argument(
+        "--resolver",
+        type=Resolver,
+        choices=list(Resolver),
+        default=Resolver.pex,
+        help="The Python resolver (pex or uv) used to generate Python tool lockfiles.",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true", help="Show Pants commands that would be run."
     )
     parser.add_argument(
@@ -210,7 +216,7 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def generate_python_tool_lockfiles(
-    tools: Sequence[PythonTool], dry_run: bool, keep_sandboxes: KeepSandboxes
+    tools: Sequence[PythonTool], resolver: Resolver, dry_run: bool, keep_sandboxes: KeepSandboxes
 ) -> None:
     def req_file(_tool: PythonTool) -> str:
         return f"{_tool.name}-requirements.txt"
@@ -252,7 +258,7 @@ def generate_python_tool_lockfiles(
             "--python-pip-version=latest",
             f"--python-interpreter-constraints=['{default_python_interpreter_constraints}']",
             "--python-enable-resolves",
-            "--python-resolver=uv",
+            f"--python-resolver={resolver.value}",
             # Unset any existing resolve names in the Pants repo, and set to just our temporary ones.
             f"--python-resolves={resolves}",
             f"--python-resolves-to-interpreter-constraints={resolves_to_ics}",
@@ -260,6 +266,8 @@ def generate_python_tool_lockfiles(
             "--python-resolves-to-constraints-file={}",
             "--python-resolves-to-no-binary={}",
             "--python-resolves-to-only-binary={}",
+            # Aligned with Pant's internal value in pants.toml
+            "--python-resolves-to-uploaded-prior-to={'__default__': 'P2D'}",
             "--python-separate-lockfile-metadata-file",
             "--pex-emit-warnings=true",
         ]
@@ -388,7 +396,9 @@ def main() -> None:
             "or via the --all-python/--all-jvm flags."
         )
     if python_tools:
-        generate_python_tool_lockfiles(python_tools, args.dry_run, args.keep_sandboxes)
+        generate_python_tool_lockfiles(
+            python_tools, args.resolver, args.dry_run, args.keep_sandboxes
+        )
     if jvm_tools:
         generate_jvm_tool_lockfiles(jvm_tools, args.dry_run, args.keep_sandboxes)
 
