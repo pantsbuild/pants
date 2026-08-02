@@ -1,5 +1,6 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -309,6 +310,30 @@ async fn stats_for_paths() {
         None,
     ];
     assert_eq!(v, path_stats);
+}
+
+#[tokio::test]
+async fn path_metadata_permission_denied() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let posix_fs = new_posixfs(dir.path());
+    let unreadable_dir = dir.path().join("unreadable");
+    let relative_path = PathBuf::from("unreadable").join("marmoset");
+    std::fs::create_dir(&unreadable_dir).unwrap();
+    make_file(&dir.path().join(&relative_path), &[], 0o600);
+    std::fs::set_permissions(&unreadable_dir, std::fs::Permissions::from_mode(0o000)).unwrap();
+
+    let direct_metadata = std::fs::symlink_metadata(dir.path().join(&relative_path));
+    if !matches!(
+        direct_metadata.as_ref().map_err(|err| err.kind()),
+        Err(std::io::ErrorKind::PermissionDenied)
+    ) {
+        std::fs::set_permissions(&unreadable_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+        return;
+    }
+
+    let result = posix_fs.path_metadata(relative_path, false).await;
+    std::fs::set_permissions(&unreadable_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(result.unwrap(), None);
 }
 
 #[tokio::test]
