@@ -146,6 +146,23 @@ def test_compute_default():
     do_test(LogLevelSimple.INFO, type=LogLevelSimple, default=LogLevelSimple.INFO)
 
 
+def test_get_provider_prefers_package_owner_over_fuzzy_match() -> None:
+    providers = (
+        "pants.backend.python.lint.yapf",
+        "pants.backend.python.lint.isort",
+        "pants.backend.python",
+    )
+
+    assert (
+        HelpInfoExtracter.get_provider(providers, "pants.backend.python.util_rules.pex_environments")
+        == "pants.backend.python"
+    )
+    assert (
+        HelpInfoExtracter.get_provider(providers, "pants.backend.python.subsystems.setup")
+        == "pants.backend.python"
+    )
+
+
 def test_deprecated():
     kwargs = {"removal_version": "999.99.9", "removal_hint": "do not use this"}
     ohi = HelpInfoExtracter("").get_option_help_info(OptionInfo(("--foo",), kwargs))

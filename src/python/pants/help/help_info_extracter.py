@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import ast
 import dataclasses
-import difflib
 import importlib.metadata
 import inspect
 import itertools
@@ -688,10 +687,13 @@ class HelpInfoExtracter:
             # Pick the shortest backend name.
             return sorted(providers, key=len)[0]
 
-        # Pick the one closest to `hint`.
-        # No cutoff and max 1 result guarantees a result with a single element.
-        [provider] = difflib.get_close_matches(hint, providers, n=1, cutoff=0.0)
-        return provider
+        matching_providers = tuple(
+            provider for provider in providers if hint == provider or hint.startswith(f"{provider}.")
+        )
+        if matching_providers:
+            return sorted(matching_providers, key=len)[0]
+
+        return sorted(providers, key=len)[0]
 
     @staticmethod
     def maybe_cleandoc(doc: str | None) -> str | None:
