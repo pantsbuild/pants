@@ -34,7 +34,12 @@ from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
-from pants.core.util_rules.system_binaries import MaybeFlockBinary, RealpathBinary
+from pants.core.util_rules.system_binaries import (
+    DirnameBinary,
+    MaybeFlockBinary,
+    MkdirBinary,
+    RealpathBinary,
+)
 from pants.engine.composite_process import Subprocess
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import (
@@ -180,6 +185,8 @@ async def create_venv_repository_from_uv_lockfile(
     uv_env: UvEnvironment,
     realpath_binary: RealpathBinary,
     buildroot: BuildRoot,
+    dirname_binary: DirnameBinary,
+    mkdir_binary: MkdirBinary,
     maybe_flock_binary: MaybeFlockBinary,
     level: LogLevel,
 ) -> VenvRepository:
@@ -289,7 +296,7 @@ async def create_venv_repository_from_uv_lockfile(
         cache_root="$({realpath_binary.path} {shlex.quote(VenvRepository.cache_dir)})"
         project_env="${{cache_root}}/{venv_path_suffix}"
         lock_path="${{project_env}}.lock"
-        mkdir -p "$(dirname "${{lock_path}}")"
+        {mkdir_binary.path} -p "$({dirname_binary.path} "${{lock_path}}")"
         (
           if [ -x "{flock}" ]; then
             {flock} 200 || exit 1
