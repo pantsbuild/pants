@@ -12,6 +12,9 @@ use parking_lot::Mutex;
 use tokio::runtime::{Builder, Handle, Runtime};
 use tokio::task::{Id, JoinError, JoinHandle, JoinSet};
 
+/// Tokio's own default. A conservative cap would stall clients rather than bound anything useful.
+const MAX_REQUEST_THREADS: usize = 512;
+
 /// Copy our (thread-local or task-local) stdio destination and current workunit parent into
 /// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
 /// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
@@ -119,7 +122,7 @@ impl Executor {
         // flavor spawns no workers, so this runtime is only its blocking pool.
         let mut request_pool_builder = Builder::new_current_thread();
         request_pool_builder
-            .max_blocking_threads(max_threads - num_worker_threads)
+            .max_blocking_threads(MAX_REQUEST_THREADS)
             .thread_name("pants-request");
         request_pool_builder.on_thread_start({
             let f = on_thread_start.clone();
@@ -235,9 +238,10 @@ impl Executor {
     }
 
     ///
-    /// Run a blocking function that hosts a client request on a pool reserved for them: on
-    /// free-threaded CPython a thread retains allocator state until it exits, so requests reuse
-    /// a few dedicated threads instead of spreading that state across the blocking pool.
+    /// Run a blocking function that hosts a client request on a pool reserved for them.
+    ///
+    /// On free-threaded CPython a thread retains the allocator heap it warmed until it exits, so
+    /// requests keep that heap off the long-lived blocking-pool threads.
     ///
     pub fn spawn_request_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
         &self,
