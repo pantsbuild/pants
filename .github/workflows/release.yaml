@@ -83,7 +83,7 @@ jobs:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -100,14 +100,15 @@ jobs:
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
-        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_STEM=dist/src.python.pants/pants-pex-cp314
+        PANTS_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+        PLAT=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
         PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
-        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        mv $PEX_STEM.pex dist/src.python.pants/$PEX_FILENAME
+        mv $PEX_STEM dist/src.python.pants/$PEX_SCIE_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
         echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
@@ -231,7 +232,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -248,14 +249,15 @@ jobs:
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
-        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_STEM=dist/src.python.pants/pants-pex-cp314
+        PANTS_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+        PLAT=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
         PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
-        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        mv $PEX_STEM.pex dist/src.python.pants/$PEX_FILENAME
+        mv $PEX_STEM dist/src.python.pants/$PEX_SCIE_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
         echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
@@ -389,7 +391,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -406,14 +408,15 @@ jobs:
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
-        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_STEM=dist/src.python.pants/pants-pex-cp314
+        PANTS_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+        PLAT=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
         PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
-        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        mv $PEX_STEM.pex dist/src.python.pants/$PEX_FILENAME
+        mv $PEX_STEM dist/src.python.pants/$PEX_SCIE_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
         echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
@@ -525,7 +528,7 @@ jobs:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314t
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314t
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -542,14 +545,15 @@ jobs:
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
-        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_STEM=dist/src.python.pants/pants-pex-cp314t
+        PANTS_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+        PLAT=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
         PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
-        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        mv $PEX_STEM.pex dist/src.python.pants/$PEX_FILENAME
+        mv $PEX_STEM dist/src.python.pants/$PEX_SCIE_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
         echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
@@ -673,7 +677,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314t
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314t
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -690,14 +694,15 @@ jobs:
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
-        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_STEM=dist/src.python.pants/pants-pex-cp314t
+        PANTS_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+        PLAT=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
         PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
-        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        mv $PEX_STEM.pex dist/src.python.pants/$PEX_FILENAME
+        mv $PEX_STEM dist/src.python.pants/$PEX_SCIE_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
         echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'
@@ -846,7 +851,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314t
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314t
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -863,14 +868,15 @@ jobs:
     - if: needs.release_info.outputs.is-release == 'true'
       name: Rename the Pants Pex to its final name for upload
       run: |
-        PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-        PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
-        PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+        PEX_STEM=dist/src.python.pants/pants-pex-cp314t
+        PANTS_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import pants.version;print(pants.version.VERSION)")
+        PY_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+        PLAT=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
         PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
         PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
-        mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-        mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+        mv $PEX_STEM.pex dist/src.python.pants/$PEX_FILENAME
+        mv $PEX_STEM dist/src.python.pants/$PEX_SCIE_FILENAME
         echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
         echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
     - if: needs.release_info.outputs.is-release == 'true'

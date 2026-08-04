@@ -432,7 +432,7 @@ jobs:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -532,7 +532,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -642,7 +642,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -730,7 +730,7 @@ jobs:
         HONEYCOMB_API_KEY: ${{ secrets.HONEYCOMB_API_KEY || '--DISABLED--' }}
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314t
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314t
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -830,7 +830,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         PANTS_PROCESS_EXECUTION_LOCAL_PARALLELISM: '1'
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314t
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314t
     - continue-on-error: true
       if: always()
       name: Upload pants.log
@@ -940,7 +940,7 @@ jobs:
         PANTS_OPENTELEMETRY_ENABLED: ${{ vars.OPENTELEMETRY_ENABLED || 'False' }}
         _PYTHON_HOST_PLATFORM: macosx-14.0-arm64
       name: Build Pants PEX
-      run: ./pants package src/python/pants:pants-pex@scie_pbs_free_threaded=cp314t
+      run: ./pants package src/python/pants:pants-pex@parametrize=cp314t
     - continue-on-error: true
       if: always()
       name: Upload pants.log

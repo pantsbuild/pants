@@ -1117,7 +1117,7 @@ def build_wheels_job(
                 },
                 {
                     "name": "Build Pants PEX",
-                    "run": f"./pants package src/python/pants:pants-pex@scie_pbs_free_threaded={abi}",
+                    "run": f"./pants package src/python/pants:pants-pex@parametrize={abi}",
                     "env": helper.platform_env(),
                 },
                 helper.upload_log_artifacts(name="wheels-and-pex"),
@@ -1134,16 +1134,17 @@ def build_wheels_job(
                         {
                             "name": "Rename the Pants Pex to its final name for upload",
                             "if": "needs.release_info.outputs.is-release == 'true'",
-                            "run": dedent(
+                            "run": f"PEX_STEM=dist/src.python.pants/pants-pex-{abi}\n"
+                            + dedent(
                                 """\
-                                PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
-                                PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+                                PANTS_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import pants.version;print(pants.version.VERSION)")
+                                PY_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+                                PLAT=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
                                 PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
-                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-                                mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+                                mv $PEX_STEM.pex dist/src.python.pants/$PEX_FILENAME
+                                mv $PEX_STEM dist/src.python.pants/$PEX_SCIE_FILENAME
                                 echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
                                 echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
                                 """
