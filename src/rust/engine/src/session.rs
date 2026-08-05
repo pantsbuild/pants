@@ -159,9 +159,10 @@ impl Session {
         }
         // Only queue workunit messages for consumers which will actually poll for them: the
         // streaming channel is enabled later iff a streaming workunit consumer registers (see
-        // `enable_streaming_workunits`), and the heavy hitters consumer only exists for the
-        // dynamic UI.
-        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level, false, dynamic_ui);
+        // `enable_streaming_workunits`). The heavy hitters channel is always enabled because it
+        // feeds both the dynamic UI (via `heavy_hitters`) and the non-dynamic-UI straggler
+        // logging (via `straggling_workunits`).
+        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level, false, true);
         let display = tokio::sync::Mutex::new(SessionDisplay::new(
             &workunit_store,
             core.local_parallelism,
