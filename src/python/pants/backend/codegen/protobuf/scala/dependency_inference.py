@@ -48,6 +48,7 @@ class InferScalaPBRuntimeDependencyRequest(InferDependenciesRequest):
 @dataclass(frozen=True)
 class ScalaPBRuntimeForResolveRequest:
     resolve_name: str
+    grpc: bool = False
 
 
 @dataclass(frozen=True)
@@ -67,73 +68,34 @@ async def resolve_scalapb_runtime_for_resolve(
     scala_binary_version = scala_version.binary
     version = scalapb.version
 
+    artifact = _SCALAPB_RUNTIME_GRPC_ARTIFACT if request.grpc else _SCALAPB_RUNTIME_ARTIFACT
+    subsystem = "the ScalaPB gRPC runtime" if request.grpc else "the ScalaPB runtime"
+
+    required_coordinates: list[Coordinate | UnversionedCoordinate] = [
+        Coordinate(
+            group=_SCALAPB_RUNTIME_GROUP,
+            artifact=f"{artifact}_{scala_binary_version}",
+            version=version,
+        )
+    ]
+    if request.grpc:
+        # The generated `*Grpc.scala` stubs directly extend `io.grpc.stub.AbstractStub` and
+        # reference other `io.grpc` (grpc-api) types, so `grpc-stub` must be resolvable as its
+        # own classpath entry: Coursier's resolution of `scalapb-runtime-grpc` alone does not
+        # transitively pull in `grpc-api`. Its version isn't controlled by `[scalapb].version`,
+        # so match on group/artifact only.
+        required_coordinates.append(UnversionedCoordinate(group="io.grpc", artifact="grpc-stub"))
+
     addresses = find_jvm_artifacts_or_raise(
-        required_coordinates=[
-            Coordinate(
-                group=_SCALAPB_RUNTIME_GROUP,
-                artifact=f"{_SCALAPB_RUNTIME_ARTIFACT}_{scala_binary_version}",
-                version=version,
-            )
-        ],
+        required_coordinates=required_coordinates,
         resolve=request.resolve_name,
         jvm_artifact_targets=jvm_artifact_targets,
         jvm=jvm,
-        subsystem="the ScalaPB runtime",
+        subsystem=subsystem,
         target_type="protobuf_sources",
         requirement_source="the `[scalapb].version` option",
     )
     return ScalaPBRuntimeForResolve(addresses)
-
-
-@dataclass(frozen=True)
-class ScalaPBGrpcRuntimeForResolveRequest:
-    resolve_name: str
-
-
-@dataclass(frozen=True)
-class ScalaPBGrpcRuntimeForResolve:
-    addresses: frozenset[Address]
-
-
-@rule
-async def resolve_scalapb_grpc_runtime_for_resolve(
-    request: ScalaPBGrpcRuntimeForResolveRequest,
-    jvm_artifact_targets: AllJvmArtifactTargets,
-    jvm: JvmSubsystem,
-    scala_subsystem: ScalaSubsystem,
-    scalapb: ScalaPBSubsystem,
-) -> ScalaPBGrpcRuntimeForResolve:
-    scala_version = scala_subsystem.version_for_resolve(request.resolve_name)
-    scala_binary_version = scala_version.binary
-    version = scalapb.version
-
-    addresses = find_jvm_artifacts_or_raise(
-        required_coordinates=[
-            Coordinate(
-                group=_SCALAPB_RUNTIME_GROUP,
-                artifact=f"{_SCALAPB_RUNTIME_GRPC_ARTIFACT}_{scala_binary_version}",
-                version=version,
-            ),
-            UnversionedCoordinate(
-                group="io.grpc",
-                artifact="grpc-netty-shaded",
-            ),
-            UnversionedCoordinate(
-                group="io.grpc",
-                artifact="grpc-protobuf",
-            ),
-            UnversionedCoordinate(
-                group="io.grpc",
-                artifact="grpc-stub",
-            ),
-        ],
-        resolve=request.resolve_name,
-        jvm_artifact_targets=jvm_artifact_targets,
-        jvm=jvm,
-        subsystem="the ScalaPB gRPC runtime",
-        target_type="protobuf_sources",
-    )
-    return ScalaPBGrpcRuntimeForResolve(addresses)
 
 
 @rule
@@ -149,8 +111,8 @@ async def infer_scalapb_runtime_dependency(
     addresses: set[Address] = set(scalapb_runtime_target_info.addresses)
 
     if request.field_set.grpc.value:
-        grpc_runtime_info = await resolve_scalapb_grpc_runtime_for_resolve(
-            ScalaPBGrpcRuntimeForResolveRequest(resolve), **implicitly()
+        grpc_runtime_info = await resolve_scalapb_runtime_for_resolve(
+            ScalaPBRuntimeForResolveRequest(resolve, grpc=True), **implicitly()
         )
         addresses.update(grpc_runtime_info.addresses)
 
