@@ -13,6 +13,7 @@ permissions: {}
 jobs:
   zizmor-audit:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'pantsbuild'
     permissions:
       security-events: write
     steps:
