@@ -144,6 +144,19 @@ impl RemotingOptions {
             batch_load_enabled: self.store_batch_load_enabled,
         })
     }
+
+    /// Options for the remote ActionCache provider: identical to the store options, except that
+    /// the cache-specific RPC timeout and concurrency limit apply instead of the store ones.
+    fn to_remote_cache_options(
+        &self,
+        tls_config: grpc_util::tls::Config,
+    ) -> Result<RemoteStoreOptions, String> {
+        Ok(RemoteStoreOptions {
+            timeout: self.cache_rpc_timeout,
+            concurrency_limit: self.cache_rpc_concurrency,
+            ..self.to_remote_store_options(tls_config)?
+        })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -393,7 +406,7 @@ impl Core {
                             .append_only_caches_base_path
                             .clone(),
                     },
-                    remoting_opts.to_remote_store_options(tls_config)?,
+                    remoting_opts.to_remote_cache_options(tls_config)?,
                 )
                 .await?,
             );
@@ -1008,5 +1021,59 @@ impl SessionCore {
     ///
     pub fn maybe_start_backtracking(&self, node: &ExecuteProcess) -> usize {
         self.backtrack_levels.lock().get(node).cloned().unwrap_or(0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+    use std::time::Duration;
+
+    use process_execution::CacheContentBehavior;
+    use remote::remote_cache::RemoteCacheWarningsBehavior;
+    use store::RemoteProvider;
+
+    use super::RemotingOptions;
+
+    #[test]
+    fn remote_cache_options_use_cache_rpc_settings() {
+        let remoting_opts = RemotingOptions {
+            provider: RemoteProvider::Reapi,
+            execution_enable: false,
+            store_address: Some("http://localhost:0".to_owned()),
+            execution_address: None,
+            execution_process_cache_namespace: None,
+            instance_name: None,
+            root_ca_certs_path: None,
+            client_certs_path: None,
+            client_key_path: None,
+            store_headers: BTreeMap::new(),
+            store_chunk_bytes: 1024,
+            store_rpc_retries: 2,
+            store_rpc_concurrency: 64,
+            store_rpc_timeout: Duration::from_secs(30),
+            store_batch_api_size_limit: 1024,
+            store_batch_load_enabled: false,
+            cache_warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
+            cache_content_behavior: CacheContentBehavior::Fetch,
+            cache_rpc_concurrency: 128,
+            cache_rpc_timeout: Duration::from_secs(5),
+            execution_headers: BTreeMap::new(),
+            execution_overall_deadline: Duration::from_secs(60),
+            execution_rpc_concurrency: 1,
+            append_only_caches_base_path: None,
+        };
+
+        let tls_config = grpc_util::tls::Config::default();
+
+        let store_options = remoting_opts
+            .to_remote_store_options(tls_config.clone())
+            .unwrap();
+        assert_eq!(store_options.timeout, Duration::from_secs(30));
+        assert_eq!(store_options.concurrency_limit, 64);
+
+        let cache_options = remoting_opts.to_remote_cache_options(tls_config).unwrap();
+        assert_eq!(cache_options.timeout, Duration::from_secs(5));
+        assert_eq!(cache_options.concurrency_limit, 128);
     }
 }
