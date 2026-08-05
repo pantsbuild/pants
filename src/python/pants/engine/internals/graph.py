@@ -1111,7 +1111,7 @@ def _log_or_raise_unmatched_owners(
     msg = (
         f"{prefix} See {doc_url('docs/using-pants/key-concepts/targets-and-build-files')} for more information on target definitions."
         f"\n\nYou may want to run `{bin_name()} tailor` to autogenerate your BUILD files. See "
-        f"{doc_url('create-initial-build-files')}.{option_msg}"
+        f"{doc_url('docs/getting-started/initial-configuration')}.{option_msg}"
     )
 
     if owners_not_found_behavior == GlobMatchErrorBehavior.warn:

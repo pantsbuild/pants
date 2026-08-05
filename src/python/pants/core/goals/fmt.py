@@ -75,7 +75,7 @@ class FmtSubsystem(GoalSubsystem):
 
         - Documentation about formatters for various ecosystems, such as:
           [Python]({doc_url("docs/python/overview/linters-and-formatters")}), [Go]({doc_url("docs/go#gofmt")}),
-          [JVM]({doc_url("jvm/java-and-scala#lint-and-format")}), [Shell]({doc_url("docs/shell#shfmt-autoformatter")}).
+          [JVM]({doc_url("docs/jvm/java-and-scala#lint-and-format")}), [Shell]({doc_url("docs/shell#shfmt-autoformatter")}).
         """
     )
 

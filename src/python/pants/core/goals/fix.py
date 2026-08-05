@@ -222,7 +222,7 @@ class FixSubsystem(GoalSubsystem):
           fixers and checking there's no change.
 
         - Documentation about formatters for various ecosystems, such as:
-          [Python]({doc_url("docs/python/overview/linters-and-formatters")}), [JVM]({doc_url("jvm/java-and-scala#lint-and-format")}),
+          [Python]({doc_url("docs/python/overview/linters-and-formatters")}), [JVM]({doc_url("docs/jvm/java-and-scala#lint-and-format")}),
           [SQL]({doc_url("docs/sql#enable-sqlfluff-linter")})
         """
     )
