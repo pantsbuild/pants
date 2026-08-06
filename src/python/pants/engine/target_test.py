@@ -21,6 +21,7 @@ from pants.engine.target import (
     BoolField,
     CoarsenedTarget,
     CoarsenedTargets,
+    Dependencies,
     DictStringToStringField,
     DictStringToStringSequenceField,
     ExplicitlyProvidedDependencies,
@@ -470,6 +471,48 @@ def test_async_field_mixin() -> None:
 def test_target_validate() -> None:
     with pytest.raises(InvalidTargetException):
         FortranTarget({FortranVersion.alias: "bad"}, Address("", target_name="t"))
+
+
+def test_target_validate_errors_on_multiple_sources_fields() -> None:
+    class Sources1(MultipleSourcesField):
+        alias = "sources1"
+
+    class Sources2(MultipleSourcesField):
+        alias = "sources2"
+
+    class InvalidTarget(Target):
+        alias = "invalid"
+        core_fields = (Sources1, Sources2)
+
+    with pytest.raises(
+        InvalidTargetException,
+        match=(
+            r"The target type `invalid` must not register multiple `SourcesField` subclasses, "
+            r"but registered `sources1`, `sources2`"
+        ),
+    ):
+        InvalidTarget({}, Address("", target_name="t"))
+
+
+def test_target_validate_errors_on_multiple_dependencies_fields() -> None:
+    class Deps1(Dependencies):
+        alias = "deps1"
+
+    class Deps2(Dependencies):
+        alias = "deps2"
+
+    class InvalidTarget(Target):
+        alias = "invalid"
+        core_fields = (Deps1, Deps2)
+
+    with pytest.raises(
+        InvalidTargetException,
+        match=(
+            r"The target type `invalid` must not register multiple `Dependencies` subclasses, "
+            r"but registered `deps1`, `deps2`"
+        ),
+    ):
+        InvalidTarget({}, Address("", target_name="t"))
 
 
 def test_target_residence_dir() -> None:
