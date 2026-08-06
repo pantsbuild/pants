@@ -432,6 +432,7 @@ def test_pex3_venv_create_extra_args_are_passed_through(
         runtime=Mock(),
         architecture=AWSLambdaArchitectureField(FaaSArchitecture.X86_64.value, addr),
         complete_platforms=Mock(),
+        uv_platforms=Mock(),
         output_path=Mock(),
         environment=Mock(),
         layout=Mock(),

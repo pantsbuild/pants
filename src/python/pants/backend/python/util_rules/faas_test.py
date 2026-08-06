@@ -29,6 +29,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
+    PythonFaaSUvPlatforms,
     ResolvedPythonFaaSHandler,
     ResolvePythonFaaSHandlerRequest,
     RuntimePlatforms,
@@ -245,10 +246,22 @@ class TestRuntimeField(PythonFaaSRuntimeField):
 
     known_runtimes = (
         PythonFaaSKnownRuntime(
-            "3.45", 3, 45, "", tag="faas-test-3-45", architecture=FaaSArchitecture.X86_64
+            "3.45",
+            3,
+            45,
+            "",
+            tag="faas-test-3-45",
+            architecture=FaaSArchitecture.X86_64,
+            manylinux="manylinux_2_17",
         ),
         PythonFaaSKnownRuntime(
-            "67.89", 67, 89, "", tag="faas-test-67-89", architecture=FaaSArchitecture.X86_64
+            "67.89",
+            67,
+            89,
+            "",
+            tag="faas-test-67-89",
+            architecture=FaaSArchitecture.X86_64,
+            manylinux="manylinux_2_17",
         ),
     )
 
@@ -286,6 +299,7 @@ def test_infer_runtime_platforms_when_known_runtime_and_no_complete_platforms(
         target_name="unused",
         runtime=TestRuntimeField(value, address),
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
+        uv_platforms=PythonFaaSUvPlatforms(None, address),
         architecture=FaaSArchitecture.X86_64,
     )
 
@@ -294,7 +308,7 @@ def test_infer_runtime_platforms_when_known_runtime_and_no_complete_platforms(
     assert platforms == RuntimePlatforms(
         complete_platforms=CompletePlatforms(expected_complete_platforms),
         interpreter_version=expected_interpreter_version,
-        uv_platform="x86_64-manylinux_2_17",
+        uv_platforms=("x86_64-manylinux_2_17",),
     )
 
 
@@ -308,6 +322,7 @@ def test_infer_runtime_platforms_errors_when_unknown_runtime_and_no_complete_pla
         target_name="unused",
         runtime=TestRuntimeField("98.76", address),
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
+        uv_platforms=PythonFaaSUvPlatforms(None, address),
         architecture=FaaSArchitecture.X86_64,
     )
 
@@ -329,6 +344,7 @@ def test_infer_runtime_platforms_when_complete_platforms(
         runtime=TestRuntimeField("3.45", address),
         architecture=FaaSArchitecture.X86_64,
         complete_platforms=PythonFaaSCompletePlatforms(["path:cp"], address),
+        uv_platforms=PythonFaaSUvPlatforms(None, address),
     )
 
     platforms = rule_runner.request(RuntimePlatforms, [request])
@@ -336,7 +352,7 @@ def test_infer_runtime_platforms_when_complete_platforms(
     assert platforms == RuntimePlatforms(
         complete_platforms=CompletePlatforms(["path/cp.json"]),
         interpreter_version=(3, 45),
-        uv_platform="x86_64-manylinux_2_17",
+        uv_platforms=("x86_64-manylinux_2_17",),
     )
 
 
@@ -373,6 +389,7 @@ def test_infer_runtime_platforms_when_known_narrow_ics_only(
         target_name="example_target",
         runtime=TestRuntimeField(None, address),
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
+        uv_platforms=PythonFaaSUvPlatforms(None, address),
         architecture=FaaSArchitecture.X86_64,
     )
 
@@ -381,7 +398,7 @@ def test_infer_runtime_platforms_when_known_narrow_ics_only(
     assert platforms == RuntimePlatforms(
         complete_platforms=CompletePlatforms(expected_complete_platforms),
         interpreter_version=expected_interpreter_version,
-        uv_platform="x86_64-manylinux_2_17",
+        uv_platforms=("x86_64-manylinux_2_17",),
     )
 
 
@@ -401,6 +418,7 @@ def test_infer_runtime_platforms_errors_when_unknown_narrow_ics(
         target_name="example_target",
         runtime=TestRuntimeField(None, address),
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
+        uv_platforms=PythonFaaSUvPlatforms(None, address),
         architecture=FaaSArchitecture.X86_64,
     )
 
@@ -439,6 +457,7 @@ def test_infer_runtime_platforms_errors_when_wide_ics(
         runtime=TestRuntimeField(None, address),
         architecture=FaaSArchitecture.X86_64,
         complete_platforms=PythonFaaSCompletePlatforms(None, address),
+        uv_platforms=PythonFaaSUvPlatforms(None, address),
     )
 
     with pytest.raises(ExecutionError) as exc:
@@ -462,6 +481,7 @@ def test_venv_create_extra_args_are_passed_through() -> None:
         address=addr,
         target_name="x",
         complete_platforms=Mock(),
+        uv_platforms=Mock(),
         handler=None,
         output_path=OutputPathField(None, addr),
         runtime=Mock(),
@@ -489,7 +509,7 @@ def test_venv_create_extra_args_are_passed_through() -> None:
             "pants.backend.python.util_rules.faas.infer_runtime_platforms": lambda _: RuntimePlatforms(
                 complete_platforms=CompletePlatforms(),
                 interpreter_version=None,
-                uv_platform="aarch64-manylinux_2_17",
+                uv_platforms=("aarch64-manylinux_2_17",),
             ),
             "pants.backend.python.util_rules.pex.create_pex": lambda _: Pex(
                 digest=EMPTY_DIGEST, name="pex", python=None
@@ -520,6 +540,7 @@ def test_layout_should_be_passed_through_and_adjust_filename(input_layout, expec
         address=addr,
         target_name="x",
         complete_platforms=Mock(),
+        uv_platforms=Mock(),
         handler=None,
         output_path=OutputPathField(None, addr),
         runtime=Mock(),
@@ -542,7 +563,7 @@ def test_layout_should_be_passed_through_and_adjust_filename(input_layout, expec
             "pants.backend.python.util_rules.faas.infer_runtime_platforms": lambda _: RuntimePlatforms(
                 complete_platforms=CompletePlatforms(),
                 interpreter_version=None,
-                uv_platform="aarch64-manylinux_2_17",
+                uv_platforms=("aarch64-manylinux_2_17",),
             ),
             "pants.backend.python.util_rules.pex.create_pex": lambda _: Pex(
                 digest=EMPTY_DIGEST, name="pex", python=None
@@ -568,6 +589,7 @@ def test_pex_build_extra_args_passed_through() -> None:
         address=addr,
         target_name="test",
         complete_platforms=Mock(),
+        uv_platforms=Mock(),
         handler=None,
         output_path=OutputPathField(None, addr),
         runtime=Mock(),
@@ -590,7 +612,7 @@ def test_pex_build_extra_args_passed_through() -> None:
             "pants.backend.python.util_rules.faas.infer_runtime_platforms": lambda _: RuntimePlatforms(
                 interpreter_version=None,
                 complete_platforms=CompletePlatforms(),
-                uv_platform="aarch64-manylinux_2_17",
+                uv_platforms=("aarch64-manylinux_2_17",),
             ),
             "pants.backend.python.util_rules.pex.create_pex": mock_build,
             "pants.backend.python.util_rules.pex_venv.pex_venv": Mock(

@@ -23,6 +23,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
+    PythonFaaSUvPlatforms,
     build_python_faas,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
@@ -41,6 +42,7 @@ class _BaseFieldSet(PackageFieldSet):
     runtime: PythonAwsLambdaRuntime
     architecture: AWSLambdaArchitectureField
     complete_platforms: PythonFaaSCompletePlatforms
+    uv_platforms: PythonFaaSUvPlatforms
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
     pex_build_extra_args: PythonFaaSPexBuildExtraArgs
     layout: PythonFaaSLayoutField
@@ -73,6 +75,7 @@ async def package_python_aws_lambda_function(
             address=field_set.address,
             target_name=PythonAWSLambda.alias,
             complete_platforms=field_set.complete_platforms,
+            uv_platforms=field_set.uv_platforms,
             runtime=field_set.runtime,
             architecture=FaaSArchitecture(field_set.architecture.value),
             handler=field_set.handler,
@@ -98,6 +101,7 @@ async def package_python_aws_lambda_layer(
             address=field_set.address,
             target_name=PythonAWSLambdaLayer.alias,
             complete_platforms=field_set.complete_platforms,
+            uv_platforms=field_set.uv_platforms,
             runtime=field_set.runtime,
             architecture=FaaSArchitecture(field_set.architecture.value),
             output_path=field_set.output_path,
