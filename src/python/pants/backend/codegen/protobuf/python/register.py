@@ -8,6 +8,7 @@ See https://www.pantsbuild.org/docs/protobuf.
 
 from pants.backend.codegen.protobuf import protobuf_dependency_inference
 from pants.backend.codegen.protobuf import tailor as protobuf_tailor
+from pants.backend.codegen.protobuf.buf import fields as buf_fields
 from pants.backend.codegen.protobuf.python import (
     additional_fields,
     python_protobuf_module_mapper,
@@ -25,6 +26,7 @@ from pants.core.util_rules import stripped_source_files
 
 def rules():
     return [
+        *buf_fields.rules(),
         *additional_fields.rules(),
         *python_protobuf_subsystem.rules(),
         *python_rules(),
