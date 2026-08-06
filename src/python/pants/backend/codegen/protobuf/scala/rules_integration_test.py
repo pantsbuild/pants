@@ -346,9 +346,6 @@ def scalapb_grpc_lockfile_def() -> JVMLockfileFixtureDefinition:
             "com.thesamet.scalapb:scalapb-runtime_2.13:0.11.6",
             "com.thesamet.scalapb:scalapb-runtime-grpc_2.13:0.11.6",
             "org.scala-lang:scala-library:2.13.6",
-            "io.grpc:grpc-netty-shaded:1.78.0",
-            "io.grpc:grpc-protobuf:1.78.0",
-            "io.grpc:grpc-stub:1.78.0",
         ],
     )
 

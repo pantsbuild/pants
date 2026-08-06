@@ -16,7 +16,6 @@ from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDepe
 from pants.engine.unions import UnionRule
 from pants.jvm.dependency_inference.artifact_mapper import (
     AllJvmArtifactTargets,
-    UnversionedCoordinate,
     find_jvm_artifacts_or_raise,
 )
 from pants.jvm.resolve.coordinate import Coordinate
@@ -71,23 +70,14 @@ async def resolve_scalapb_runtime_for_resolve(
     artifact = _SCALAPB_RUNTIME_GRPC_ARTIFACT if request.grpc else _SCALAPB_RUNTIME_ARTIFACT
     subsystem = "the ScalaPB gRPC runtime" if request.grpc else "the ScalaPB runtime"
 
-    required_coordinates: list[Coordinate | UnversionedCoordinate] = [
-        Coordinate(
-            group=_SCALAPB_RUNTIME_GROUP,
-            artifact=f"{artifact}_{scala_binary_version}",
-            version=version,
-        )
-    ]
-    if request.grpc:
-        # The generated `*Grpc.scala` stubs directly extend `io.grpc.stub.AbstractStub` and
-        # reference other `io.grpc` (grpc-api) types, so `grpc-stub` must be resolvable as its
-        # own classpath entry: Coursier's resolution of `scalapb-runtime-grpc` alone does not
-        # transitively pull in `grpc-api`. Its version isn't controlled by `[scalapb].version`,
-        # so match on group/artifact only.
-        required_coordinates.append(UnversionedCoordinate(group="io.grpc", artifact="grpc-stub"))
-
     addresses = find_jvm_artifacts_or_raise(
-        required_coordinates=required_coordinates,
+        required_coordinates=[
+            Coordinate(
+                group=_SCALAPB_RUNTIME_GROUP,
+                artifact=f"{artifact}_{scala_binary_version}",
+                version=version,
+            )
+        ],
         resolve=request.resolve_name,
         jvm_artifact_targets=jvm_artifact_targets,
         jvm=jvm,
