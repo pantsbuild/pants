@@ -252,7 +252,7 @@ class TestRuntimeField(PythonFaaSRuntimeField):
             "",
             tag="faas-test-3-45",
             architecture=FaaSArchitecture.X86_64,
-            manylinux="manylinux_2_17",
+            manylinux="manylinux_5_77",
         ),
         PythonFaaSKnownRuntime(
             "67.89",
@@ -261,7 +261,7 @@ class TestRuntimeField(PythonFaaSRuntimeField):
             "",
             tag="faas-test-67-89",
             architecture=FaaSArchitecture.X86_64,
-            manylinux="manylinux_2_17",
+            manylinux="manylinux_6_99",
         ),
     )
 
@@ -278,11 +278,21 @@ class TestRuntimeField(PythonFaaSRuntimeField):
 
 
 @pytest.mark.parametrize(
-    ("value", "expected_interpreter_version", "expected_complete_platforms"),
+    ("value", "expected_interpreter_version", "expected_complete_platforms", "expected_uv_platforms"),
     [
-        pytest.param("3.45", (3, 45), ["complete_platform_faas-test-3-45.json"], id="known 3.45"),
         pytest.param(
-            "67.89", (67, 89), ["complete_platform_faas-test-67-89.json"], id="known 67.89"
+            "3.45",
+            (3, 45),
+            ["complete_platform_faas-test-3-45.json"],
+            ("x86_64-manylinux_5_77",),
+            id="known 3.45",
+        ),
+        pytest.param(
+            "67.89",
+            (67, 89),
+            ["complete_platform_faas-test-67-89.json"],
+            ("x86_64-manylinux_6_99",),
+            id="known 67.89",
         ),
     ],
 )
@@ -290,6 +300,7 @@ def test_infer_runtime_platforms_when_known_runtime_and_no_complete_platforms(
     value: str,
     expected_interpreter_version: tuple[int, int],
     expected_complete_platforms: list[str],
+    expected_uv_platforms: tuple[str, ...],
     rule_runner: RuleRunner,
 ) -> None:
     address = Address("path", target_name="target")
@@ -308,7 +319,7 @@ def test_infer_runtime_platforms_when_known_runtime_and_no_complete_platforms(
     assert platforms == RuntimePlatforms(
         complete_platforms=CompletePlatforms(expected_complete_platforms),
         interpreter_version=expected_interpreter_version,
-        uv_platforms=("x86_64-manylinux_2_17",),
+        uv_platforms=expected_uv_platforms,
     )
 
 
@@ -352,7 +363,7 @@ def test_infer_runtime_platforms_when_complete_platforms(
     assert platforms == RuntimePlatforms(
         complete_platforms=CompletePlatforms(["path/cp.json"]),
         interpreter_version=(3, 45),
-        uv_platforms=("x86_64-manylinux_2_17",),
+        uv_platforms=("x86_64-manylinux_5_77",),
     )
 
 
@@ -398,7 +409,7 @@ def test_infer_runtime_platforms_when_known_narrow_ics_only(
     assert platforms == RuntimePlatforms(
         complete_platforms=CompletePlatforms(expected_complete_platforms),
         interpreter_version=expected_interpreter_version,
-        uv_platforms=("x86_64-manylinux_2_17",),
+        uv_platforms=("x86_64-manylinux_5_77",),
     )
 
 
