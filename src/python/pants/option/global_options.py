@@ -368,6 +368,17 @@ class GlobalOptions(BootstrapOptions, Subsystem):
         )
         return tuple(invalidation_globs)
 
+    @staticmethod
+    def should_print_stacktrace(bootstrap_options: OptionValueContainer) -> bool:
+        """Whether full stack traces should be shown for errors.
+
+        An explicit `--[no-]print-stacktrace` always wins. Otherwise, stack traces are shown
+        implicitly at verbose log levels (`-ldebug` / `-ltrace`).
+        """
+        if not bootstrap_options.is_default("print_stacktrace"):
+            return bootstrap_options.print_stacktrace
+        return bootstrap_options.level in (LogLevel.DEBUG, LogLevel.TRACE)
+
     @memoized_classmethod
     def get_options_flags(cls) -> GlobalOptionsFlags:
         return GlobalOptionsFlags.create(cast("Type[GlobalOptions]", cls))

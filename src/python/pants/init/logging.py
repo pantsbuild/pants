@@ -16,6 +16,7 @@ from pathlib import PurePath
 
 import pants.util.logging as pants_logging
 from pants.engine.internals import native_engine
+from pants.option.global_options import GlobalOptions
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.docutil import doc_url
@@ -176,7 +177,7 @@ def initialize_stdio(global_bootstrap_options: OptionValueContainer) -> Iterator
         global_bootstrap_options.log_show_rust_3rdparty,
         global_bootstrap_options.show_log_target,
         _get_log_levels_by_target(global_bootstrap_options),
-        global_bootstrap_options.print_stacktrace,
+        GlobalOptions.should_print_stacktrace(global_bootstrap_options),
         global_bootstrap_options.ignore_warnings,
         global_bootstrap_options.pants_workdir,
     ):

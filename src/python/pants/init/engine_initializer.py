@@ -228,7 +228,7 @@ class EngineInitializer:
             ca_certs_path=bootstrap_options.ca_certs_path,
             build_root=build_root,
             pants_workdir=bootstrap_options.pants_workdir,
-            include_trace_on_error=bootstrap_options.print_stacktrace,
+            include_trace_on_error=GlobalOptions.should_print_stacktrace(bootstrap_options),
             engine_visualize_to=bootstrap_options.engine_visualize_to,
             watch_filesystem=bootstrap_options.watch_filesystem,
             is_bootstrap=is_bootstrap,
