@@ -109,6 +109,6 @@ async def run_spectral(
 def rules():
     return [
         *collect_rules(),
-        *nodejs_tool.rules(),
+        *nodejs_tool.rules_for_tool(SpectralSubsystem),
         *SpectralRequest.rules(),
     ]
