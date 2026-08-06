@@ -278,7 +278,12 @@ class TestRuntimeField(PythonFaaSRuntimeField):
 
 
 @pytest.mark.parametrize(
-    ("value", "expected_interpreter_version", "expected_complete_platforms", "expected_uv_platforms"),
+    (
+        "value",
+        "expected_interpreter_version",
+        "expected_complete_platforms",
+        "expected_uv_platforms",
+    ),
     [
         pytest.param(
             "3.45",

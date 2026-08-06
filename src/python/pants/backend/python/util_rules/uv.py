@@ -28,6 +28,8 @@ from pants.backend.python.util_rules.lockfile_metadata import (
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
+    ResolveConfigRequest,
+    determine_resolve_config,
     generate_uv_index_config,
 )
 from pants.base.build_root import BuildRoot
@@ -204,11 +206,16 @@ async def create_venv_repository_from_uv_lockfile(
             )
         )
     metadata: PythonLockfileMetadataV8 = cast(PythonLockfileMetadataV8, request.lockfile.metadata)
+    resolve_config = await determine_resolve_config(
+        ResolveConfigRequest(metadata.resolve), **implicitly()
+    )
 
     pyproject_content = generate_pyproject_toml(
         metadata.resolve,
         metadata.valid_for_interpreter_constraints,
         tuple(str(req) for req in metadata.requirements),
+        indexes=resolve_config.indexes,
+        sources=resolve_config.sources,
     )
 
     uv_config_digest, uv_lock_contents = await concurrently(
