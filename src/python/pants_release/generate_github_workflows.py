@@ -745,8 +745,7 @@ def bootstrap_jobs(
         human_readable_job_name += ", test Rust"
         human_readable_step_name = "Test Rust"
         # We pass --tests to skip doc tests because our generated protos contain
-        # invalid doc tests in their comments. We do not pass --all as BRFS tests don't
-        # pass on GHA MacOS containers.
+        # invalid doc tests in their comments.
         step_cmd = helper.wrap_cmd("./cargo test --locked --tests -- --nocapture")
     elif rust_testing == RustTesting.ALL:
         human_readable_job_name += ", test and lint Rust"
@@ -763,9 +762,6 @@ def bootstrap_jobs(
     else:
         raise ValueError(f"Unrecognized RustTesting value: {rust_testing}")
 
-    if helper.platform in [Platform.LINUX_X86_64]:
-        # The fs/brfs tests need the fusermount3 binary at runtime.
-        step_cmd = "sudo apt-get install -y fuse3\n" + step_cmd
     human_readable_job_name += f" ({helper.platform_name()})"
 
     return {

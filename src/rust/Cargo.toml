@@ -27,7 +27,6 @@ members = [
   "dep_inference",
   "engine",
   "fs",
-  "fs/brfs",
   "fs/fs_util",
   "fs/store",
   "graph",
@@ -70,9 +69,6 @@ members = [
 # This is the set of packages which are expected to work on any arbitrary system that checks out the code.
 # It should be exactly equivalent to members, except without any packages that require more system
 # configuration than we're comfortable doing in our bootstrap scripts.
-#
-# In particular, it does not contain the fs/brfs package, which on macOS will not compile without
-# macFUSE installed, and on Linux needs the fusermount binary (e.g. the fuse3 package) at runtime.
 default-members = [
   "address",
   "async_latch",
