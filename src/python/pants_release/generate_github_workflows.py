@@ -745,7 +745,7 @@ def bootstrap_jobs(
         human_readable_job_name += ", test Rust"
         human_readable_step_name = "Test Rust"
         # We pass --tests to skip doc tests because our generated protos contain
-        # invalid doc tests in their comments. 
+        # invalid doc tests in their comments.
         step_cmd = helper.wrap_cmd("./cargo test --locked --tests -- --nocapture")
     elif rust_testing == RustTesting.ALL:
         human_readable_job_name += ", test and lint Rust"
