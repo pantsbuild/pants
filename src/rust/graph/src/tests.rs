@@ -465,6 +465,26 @@ async fn uncacheable_deps_is_cleaned_for_the_session() {
 }
 
 #[tokio::test]
+async fn live_runs_released_when_last_holder_drops() {
+    let _logger = env_logger::try_init();
+    let graph = empty_graph();
+
+    let context_a = graph.context(TContext::new());
+    let context_b = graph.context(TContext::new());
+    assert_eq!(graph.live_runs_len(), 2);
+
+    let context_a2 = context_a.clone();
+    drop(context_a);
+    assert_eq!(graph.live_runs_len(), 2);
+
+    drop(context_a2);
+    assert_eq!(graph.live_runs_len(), 1);
+
+    drop(context_b);
+    assert_eq!(graph.live_runs_len(), 0);
+}
+
+#[tokio::test]
 async fn dirtied_uncacheable_deps_node_re_runs() {
     let _logger = env_logger::try_init();
     let graph = empty_graph();
