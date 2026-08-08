@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
+import shlex
 import textwrap
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -15,6 +18,10 @@ from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.system_binaries import (
     BashBinary,
     BinaryShimsRequest,
+    CatBinary,
+    CpBinary,
+    MkdirBinary,
+    PwdBinary,
     create_binary_shims,
 )
 from pants.engine.env_vars import EnvironmentVarsRequest
@@ -25,6 +32,21 @@ from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+
+_MODULE_CACHE_PARTITION_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}")
+
+# Environment variables that decide where a module download comes from and whether its contents
+# are checked, and so decide which downloads may share a module cache partition.
+_MODULE_INTEGRITY_ENV_VARS = (
+    "GOAUTH",
+    "GOFLAGS",
+    "GOINSECURE",
+    "GONOPROXY",
+    "GONOSUMDB",
+    "GOPRIVATE",
+    "GOPROXY",
+    "GOSUMDB",
+)
 
 
 @dataclass(frozen=True)
@@ -38,6 +60,8 @@ class GoSdkProcess:
     output_directories: tuple[str, ...]
     replace_sandbox_root_in_args: bool
 
+    module_cache_partition: str | None
+
     def __init__(
         self,
         command: Iterable[str],
@@ -50,6 +74,7 @@ class GoSdkProcess:
         output_directories: Iterable[str] = (),
         allow_downloads: bool = False,
         replace_sandbox_root_in_args: bool = False,
+        module_cache_partition: str | None = None,
     ) -> None:
         object.__setattr__(self, "command", tuple(command))
         object.__setattr__(self, "description", description)
@@ -67,6 +92,22 @@ class GoSdkProcess:
         object.__setattr__(self, "output_files", tuple(output_files))
         object.__setattr__(self, "output_directories", tuple(output_directories))
         object.__setattr__(self, "replace_sandbox_root_in_args", replace_sandbox_root_in_args)
+        if module_cache_partition is not None and not _MODULE_CACHE_PARTITION_RE.fullmatch(
+            module_cache_partition
+        ):
+            raise ValueError(
+                "A module cache partition must be a short identifier of letters, digits, `_` and "
+                "`-` starting with a letter or digit (it names a directory inside the shared "
+                f"module cache), got {module_cache_partition!r}."
+            )
+        object.__setattr__(self, "module_cache_partition", module_cache_partition)
+        if GoSdkRunSetup.FETCH_MODULE_ENV in self.env and module_cache_partition is None:
+            # Without a partition there is no shared module cache, and the fetch step would look
+            # for the downloaded module under a path that is never populated.
+            raise ValueError(
+                "Fetching a module through the shared module cache requires a "
+                "`module_cache_partition`."
+            )
 
 
 @dataclass(frozen=True)
@@ -76,22 +117,83 @@ class GoSdkRunSetup:
 
     CHDIR_ENV = "__PANTS_CHDIR_TO"
     SANDBOX_ROOT_ENV = "__PANTS_REPLACE_SANDBOX_ROOT"
+    MODCACHE_ENV = "__PANTS_GO_MODCACHE"
+    FETCH_MODULE_ENV = "__PANTS_GO_FETCH_MODULE"
 
 
 @rule
-async def go_sdk_invoke_setup(goroot: GoRoot) -> GoSdkRunSetup:
+async def go_sdk_invoke_setup(
+    goroot: GoRoot,
+    cat: CatBinary,
+    cp: CpBinary,
+    mkdir: MkdirBinary,
+    pwd: PwdBinary,
+) -> GoSdkRunSetup:
     # Note: The `go` tool requires GOPATH to be an absolute path which can only be resolved
     # from within the execution sandbox. Thus, this code uses a bash script to be able to resolve
     # absolute paths inside the sandbox.
+    cat_path = shlex.quote(cat.path)
+    cp_path = shlex.quote(cp.path)
+    mkdir_path = shlex.quote(mkdir.path)
+    pwd_path = shlex.quote(pwd.path)
     go_run_script = FileContent(
         "__run_go.sh",
         textwrap.dedent(
             f"""\
             export GOROOT={goroot.path}
-            sandbox_root="$(/bin/pwd)"
+            # `-P` is explicit: `go` needs the resolved physical path, and the shell
+            # builtin would otherwise hand back a logical path containing symlinks.
+            sandbox_root="$({pwd_path} -P)"
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/cache"
-            /bin/mkdir -p "$GOPATH" "$GOCACHE"
+            {mkdir_path} -p "$GOPATH" "$GOCACHE"
+            modcache_partition="${GoSdkRunSetup.MODCACHE_ENV}"
+            if [ -n "$modcache_partition" ]; then
+              # The named cache is partitioned: each partition holds modules whose content
+              # the caller has already pinned (see `module_cache_partition`). Two builds that
+              # disagree about the bytes behind one module@version therefore never share a
+              # cache entry, so a stale entry can never poison a later build.
+              export GOMODCACHE="${{sandbox_root}}/__gomodcache/${{modcache_partition}}"
+              export GOFLAGS="${{GOFLAGS:+${{GOFLAGS}} }}-modcacherw"
+              {mkdir_path} -p "$GOMODCACHE"
+            fi
+            if [ -n "${GoSdkRunSetup.FETCH_MODULE_ENV}" ]; then
+              module_version="${GoSdkRunSetup.FETCH_MODULE_ENV}"
+              "{goroot.path}/bin/go" mod download -json "$module_version" > __module_metadata.json
+              download_status=$?
+              {cat_path} __module_metadata.json
+              if [ "$download_status" -ne 0 ]; then
+                exit "$download_status"
+              fi
+              # Parse the Dir/GoMod paths from the metadata with shell string operations only:
+              # the sandbox PATH cannot be assumed to provide grep/sed.
+              dir=""
+              gomod=""
+              while IFS= read -r line; do
+                case "$line" in
+                  *'"Dir": "'*) if [ -z "$dir" ]; then dir=${{line#*'"Dir": "'}}; dir=${{dir%'"'*}}; fi ;;
+                  *'"GoMod": "'*) if [ -z "$gomod" ]; then gomod=${{line#*'"GoMod": "'}}; gomod=${{gomod%'"'*}}; fi ;;
+                esac
+              done < __module_metadata.json
+              marker="__gomodcache/${{modcache_partition}}/"
+              dir_rel="${{dir#*${{marker}}}}"
+              gomod_rel="${{gomod#*${{marker}}}}"
+              if [ -z "$dir" ] || [ -z "$gomod" ] || [ "$dir_rel" = "$dir" ] || [ "$gomod_rel" = "$gomod" ]; then
+                echo "Failed to locate module $module_version under GOMODCACHE after download." 1>&2
+                exit 1
+              fi
+              dest_dir="$GOPATH/pkg/mod/$dir_rel"
+              dest_gomod="$GOPATH/pkg/mod/$gomod_rel"
+              {mkdir_path} -p "$dest_dir" "${{dest_gomod%/*}}" || exit 1
+              {cp_path} -Rp "$dir/." "$dest_dir/" || exit 1
+              {cp_path} -p "$gomod" "$dest_gomod" || exit 1
+              # Assert the copy produced the exact artifacts the Python rule will capture.
+              if [ ! -f "$dest_gomod" ] || [ ! -d "$dest_dir" ]; then
+                echo "Module $module_version was not copied into GOPATH/pkg/mod as expected." 1>&2
+                exit 1
+              fi
+              exit 0
+            fi
             if [ -n "${GoSdkRunSetup.CHDIR_ENV}" ]; then
               cd "${GoSdkRunSetup.CHDIR_ENV}"
             fi
@@ -164,6 +266,22 @@ async def setup_go_sdk_process(
     if request.replace_sandbox_root_in_args:
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
 
+    append_only_caches: dict[str, str] = {}
+    if request.module_cache_partition is not None:
+        # The caller's partition covers the checksums it expects, but where a module has no
+        # recorded checksums the integrity of a download depends on the environment instead: which
+        # proxy served it, and whether the checksum database was consulted at all. Builds
+        # configuring those differently must not share downloads, so the environment is part of the
+        # partition too.
+        integrity_env = "\n".join(
+            f"{name}={env[name]}" for name in _MODULE_INTEGRITY_ENV_VARS if name in env
+        )
+        integrity_fingerprint = hashlib.sha256(integrity_env.encode()).hexdigest()[:16]
+        env[GoSdkRunSetup.MODCACHE_ENV] = (
+            f"{request.module_cache_partition}-{integrity_fingerprint}"
+        )
+        append_only_caches["go_mod_cache"] = "__gomodcache"
+
     # Disable the "coverage redesign" experiment on Go v1.20+ for now since Pants does not yet support it.
     if goroot.is_compatible_version("1.20") and not goroot.is_compatible_version("1.25"):
         exp_str = env.get("GOEXPERIMENT", "")
@@ -181,6 +299,7 @@ async def setup_go_sdk_process(
         description=request.description,
         output_files=request.output_files,
         output_directories=request.output_directories,
+        append_only_caches=append_only_caches,
         level=LogLevel.DEBUG,
     )
 

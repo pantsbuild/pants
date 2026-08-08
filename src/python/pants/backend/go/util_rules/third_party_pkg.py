@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import logging
 import os
@@ -19,7 +20,7 @@ from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
-from pants.backend.go.util_rules.sdk import GoSdkProcess
+from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkRunSetup
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.fs import (
@@ -147,11 +148,13 @@ class ThirdPartyPkgAnalysisRequest(EngineAwareParameter):
 
 @dataclass(frozen=True)
 class AllThirdPartyPackages:
-    """All the packages downloaded from a go.mod, along with a digest of the downloaded files.
+    """All the packages downloaded from a go.mod.
 
-    The digest has files in the format `gopath/pkg/mod`, which is what `GoSdkProcess` sets `GOPATH`
-    to. This means that you can include the digest in a process and Go will properly consume it as
-    the `GOPATH`.
+    The top-level ``digest`` is always empty since module downloads were deduplicated
+    across go.mods. Each ``ThirdPartyPkgAnalysis`` instead carries its own module's
+    digest with files in ``gopath/pkg/mod/<module@version>/...`` layout; consumers
+    slice it per package (see ``resolve_third_party_pkg_sources_digest``) or merge
+    whichever digests they need into their own input digest.
     """
 
     digest: Digest
@@ -184,7 +187,6 @@ class ModuleDescriptor:
 @dataclass(frozen=True)
 class ModuleDescriptors:
     modules: FrozenOrderedSet[ModuleDescriptor]
-    go_mods_digest: Digest
 
 
 @dataclass(frozen=True)
@@ -265,17 +267,22 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
             GoSdkProcess(
                 command=["list", "-mod=readonly", "-e", "-m", "-json", "all"],
                 input_digest=request.digest,
-                output_directories=("gopath",),
                 working_dir=request.path if request.path else None,
                 # Allow downloads of the module metadata (i.e., go.mod files).
                 allow_downloads=True,
+                # The `go.mod`/`go.sum` pair in the input digest pins every `go.mod` file this
+                # step may fetch, so it also identifies the cache partition those files belong
+                # in. Editing a dependency moves this module graph to a new partition and
+                # re-fetches the `.mod` files, which is cheap (they are small text files) and
+                # keeps a re-tagged module version from ever reusing the previous bytes.
+                module_cache_partition=_module_cache_partition("graph", request.digest.fingerprint),
                 description="Analyze Go module dependencies.",
             )
         )
     )
 
     if len(mod_list_result.stdout) == 0:
-        return ModuleDescriptors(FrozenOrderedSet(), EMPTY_DIGEST)
+        return ModuleDescriptors(FrozenOrderedSet())
 
     descriptors: dict[tuple[str, str], ModuleDescriptor] = {}
 
@@ -309,7 +316,17 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
     # Gazelle does this, mainly to store the sum on the go_repository rule. We could store it (or its
     # absence) to be able to download sums automatically.
 
-    return ModuleDescriptors(FrozenOrderedSet(descriptors.values()), mod_list_result.output_digest)
+    return ModuleDescriptors(FrozenOrderedSet(descriptors.values()))
+
+
+def _module_cache_partition(kind: str, *content: str) -> str:
+    """Name the `go_mod_cache` partition that may hold `content`'s downloads.
+
+    Partitions are directories inside the named cache, so the name has to be short and free of
+    path or shell metacharacters; `content` is therefore hashed rather than used verbatim.
+    """
+    digest = hashlib.sha256("\n".join(content).encode()).hexdigest()
+    return f"{kind}-{digest[:32]}"
 
 
 def strip_sandbox_prefix(path: str, marker: str) -> str:
@@ -324,6 +341,25 @@ def strip_sandbox_prefix(path: str, marker: str) -> str:
         return path[marker_pos:]
     else:
         return path
+
+
+_MODULE_CACHE_MARKER = "__gomodcache/"
+
+
+def _module_cache_relpath(path: str) -> str | None:
+    """Return `path` relative to GOMODCACHE, or None if it does not point into the module cache.
+
+    The `go` tool reports absolute sandbox paths, and the shared module cache is mounted at
+    `__gomodcache/<partition>/`. The partition directory is not part of the result: the fetch step
+    copies the tree out of GOMODCACHE itself, so what lands in `gopath/pkg/mod` starts below it.
+    """
+    from_marker = strip_sandbox_prefix(path, _MODULE_CACHE_MARKER)
+    if not from_marker.startswith(_MODULE_CACHE_MARKER):
+        return None
+    partition, _, relpath = from_marker[len(_MODULE_CACHE_MARKER) :].partition("/")
+    if not partition or not relpath:
+        return None
+    return relpath
 
 
 def _parse_go_sum(go_sum_content: bytes) -> dict[tuple[str, str], tuple[str, ...]]:
@@ -563,12 +599,38 @@ async def download_and_analyze_module(
         synthetic_files.append(FileContent("go.sum", synthetic_go_sum.encode()))
     synthetic_digest = await create_digest(CreateDigest(synthetic_files))
 
+    # The module cache partition is derived from the module's identity plus the checksums the
+    # caller expects for it. Go stores an extracted module under `<module>@<version>`, a path
+    # that says nothing about the bytes, so a single shared cache would hand a later build
+    # whatever the first build happened to store there. Whenever that disagrees with the
+    # consumer's `go.sum`, Go refuses to build with a checksum-mismatch SECURITY ERROR that
+    # persists until the cache is wiped by hand. Partitioning by the expected checksums keeps
+    # such builds in separate partitions: re-tagging a private module (or any other change to
+    # the recorded sums) simply lands in a fresh partition and re-downloads. Modules with no
+    # go.sum entries have no checksums to partition by, so they share one partition per
+    # module@version and rely on the checksum database; `setup_go_sdk_process` keeps builds that
+    # configure that database (or the proxy) differently in separate partitions.
+    module_cache_partition = _module_cache_partition(
+        "fetch",
+        f"{request.name}@{request.version}",
+        *sorted(request.go_sum_entries),
+    )
+
+    # Fetch the module into the named cache and copy to gopath/pkg/mod in one process.
+    # The fetch mode in __run_go.sh handles both steps within a single process invocation:
+    # it runs `go mod download -json`, emits the metadata on stdout, then copies the
+    # extracted tree from __gomodcache into gopath/pkg/mod. Combining the steps means the
+    # copy always reads the cache state the download just produced, rather than a separate
+    # later process observing a cache that may have been wiped in between; an external
+    # wipe during the copy itself still fails closed (the script exits non-zero).
     download_result = await fallible_to_exec_result_or_raise(
         **implicitly(
             GoSdkProcess(
-                ("mod", "download", "-json", f"{request.name}@{request.version}"),
+                (),
+                env={GoSdkRunSetup.FETCH_MODULE_ENV: f"{request.name}@{request.version}"},
                 input_digest=synthetic_digest,
                 allow_downloads=True,
+                module_cache_partition=module_cache_partition,
                 output_directories=("gopath",),
                 description=f"Download Go module {request.name}@{request.version}.",
             )
@@ -577,12 +639,24 @@ async def download_and_analyze_module(
 
     if len(download_result.stdout) == 0:
         raise AssertionError(
-            f"Expected output from `go mod download` for {request.name}@{request.version}."
+            f"Expected metadata output from module fetch for {request.name}@{request.version}."
         )
+    module_metadata_json = json.loads(download_result.stdout)
 
-    module_metadata = json.loads(download_result.stdout)
-    module_sources_relpath = strip_sandbox_prefix(module_metadata["Dir"], "gopath/")
-    go_mod_relpath = strip_sandbox_prefix(module_metadata["GoMod"], "gopath/")
+    # Dir/GoMod are absolute sandbox paths into the module cache; the copy step placed the same
+    # trees under gopath/pkg/mod, so what is needed is their path relative to GOMODCACHE.
+    _dir_in_cache = _module_cache_relpath(module_metadata_json["Dir"])
+    _gomod_in_cache = _module_cache_relpath(module_metadata_json["GoMod"])
+    if _dir_in_cache is None or _gomod_in_cache is None:
+        raise AssertionError(
+            f"Module fetch metadata for {request.name}@{request.version} did not point into "
+            f"the module cache: Dir={module_metadata_json['Dir']!r} "
+            f"GoMod={module_metadata_json['GoMod']!r}. This should not happen. Please open an "
+            "issue at https://github.com/pantsbuild/pants/issues/new/choose with this error "
+            "message."
+        )
+    module_sources_relpath = "gopath/pkg/mod/" + _dir_in_cache
+    go_mod_relpath = "gopath/pkg/mod/" + _gomod_in_cache
 
     module_sources_snapshot = await digest_to_snapshot(
         **implicitly(
@@ -597,6 +671,13 @@ async def download_and_analyze_module(
             )
         )
     )
+
+    if not any(p.startswith(module_sources_relpath) for p in module_sources_snapshot.files):
+        raise AssertionError(
+            f"The download of Go module {request.name}@{request.version} captured no files "
+            f"under {module_sources_relpath}. This should not happen. Please open an issue at "
+            "https://github.com/pantsbuild/pants/issues/new/choose with this error message."
+        )
 
     candidate_package_dirs = []
     files_by_dir = group_by_dir(

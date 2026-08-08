@@ -3,7 +3,12 @@
 
 from __future__ import annotations
 
+import os
 import os.path
+import pathlib
+import shutil
+import stat
+import tempfile
 from textwrap import dedent
 
 import pytest
@@ -11,6 +16,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.testutil import gen_module_gomodproxy
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -754,3 +760,356 @@ def test_gotoolchain_local_fail_fast(rule_runner: RuleRunner) -> None:
     )
     with engine_error(ProcessExecutionFailure, contains="go.mod requires go >= 1.99.0"):
         rule_runner.request(ModuleDescriptors, [ModuleDescriptorsRequest(digest, "")])
+
+
+def _make_rule_runner(named_caches_dir: str, local_store_dir: str) -> RuleRunner:
+    """Create a RuleRunner with fixed named-caches and local-store dirs (for named-cache tests).
+
+    An isolated local store is essential: with the developer's shared store, the module
+    fetch process would hit the process cache from a previous test session and never
+    execute, so the named cache under `named_caches_dir` would never be populated and
+    assertions on its contents would fail spuriously.
+    """
+    runner = RuleRunner(
+        rules=[
+            *sdk.rules(),
+            *third_party_pkg.rules(),
+            *first_party_pkg.rules(),
+            *load_go_binary.rules(),
+            *build_pkg.rules(),
+            *import_analysis.rules(),
+            *link.rules(),
+            *assembly.rules(),
+            *target_type_rules.rules(),
+            *go_mod.rules(),
+            QueryRule(AllThirdPartyPackages, [AllThirdPartyPackagesRequest]),
+            QueryRule(ThirdPartyPkgAnalysis, [ThirdPartyPkgAnalysisRequest]),
+            QueryRule(ModuleDescriptors, [ModuleDescriptorsRequest]),
+        ],
+        target_types=[GoModTarget],
+        bootstrap_args=[
+            f"--named-caches-dir={named_caches_dir}",
+            f"--local-store-dir={local_store_dir}",
+        ],
+    )
+    runner.set_options(["--golang-cgo-enabled"], env_inherit={"PATH"})
+    return runner
+
+
+def test_named_cache_digest_equality() -> None:
+    """Digest produced by download_and_analyze_module is identical across cold and warm cache.
+
+    This test is the absolute-path-leak detector: if any sandbox-absolute path leaks
+    into a captured digest, the two digests will differ because the sandbox roots differ.
+    """
+    go_mod_single = dedent(
+        """\
+        module example.com/cache-test
+        go 1.16
+        require github.com/google/uuid v1.3.0
+        """
+    )
+    with tempfile.TemporaryDirectory() as named_caches_dir, tempfile.TemporaryDirectory() as stores:
+        # Run 1: cold cache -- populates go_mod_cache named cache
+        runner1 = _make_rule_runner(named_caches_dir, f"{stores}/1")
+        digest1 = runner1.make_snapshot({"go.mod": go_mod_single, "go.sum": UUID_GO_SUM}).digest
+        result1 = runner1.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("cache-test", target_name="mod"),
+                    digest1,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
+        uuid_pkg1 = result1.import_paths_to_pkg_info["github.com/google/uuid"]
+
+        # Run 2: warm named cache, fresh (isolated) local store -- the fetch process
+        # re-executes but finds the module already extracted in GOMODCACHE.
+        runner2 = _make_rule_runner(named_caches_dir, f"{stores}/2")
+        digest2 = runner2.make_snapshot({"go.mod": go_mod_single, "go.sum": UUID_GO_SUM}).digest
+        result2 = runner2.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("cache-test", target_name="mod"),
+                    digest2,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
+        uuid_pkg2 = result2.import_paths_to_pkg_info["github.com/google/uuid"]
+
+        # Digests must be byte-identical: cold vs warm cache produces the same sources.
+        assert uuid_pkg1.digest == uuid_pkg2.digest, (
+            "Digest differs between cold and warm named cache runs -- "
+            "likely an absolute sandbox path leaked into the captured digest."
+        )
+        assert uuid_pkg1.dir_path == uuid_pkg2.dir_path
+
+        # The captured digest must contain the exact expected artifacts: the module's
+        # sources and its go.mod, in the gopath/pkg/mod layout.
+        snapshot = runner1.request(Snapshot, [uuid_pkg1.digest])
+        module_dir = "gopath/pkg/mod/github.com/google/uuid@v1.3.0"
+        assert f"{module_dir}/uuid.go" in snapshot.files, (
+            f"Expected {module_dir}/uuid.go in the captured digest; got: {snapshot.files[:10]}"
+        )
+        assert f"{module_dir}/go.mod" in snapshot.files
+        assert (
+            "gopath/pkg/mod/cache/download/github.com/google/uuid/@v/v1.3.0.mod" in snapshot.files
+        ), "Expected the download cache's .mod file (the GoMod metadata path) in the digest."
+
+        # Run 3: independent cache dir -- must still produce equal digest
+        with tempfile.TemporaryDirectory() as named_caches_dir2:
+            runner3 = _make_rule_runner(named_caches_dir2, f"{stores}/3")
+            digest3 = runner3.make_snapshot({"go.mod": go_mod_single, "go.sum": UUID_GO_SUM}).digest
+            result3 = runner3.request(
+                AllThirdPartyPackages,
+                [
+                    AllThirdPartyPackagesRequest(
+                        Address("cache-test", target_name="mod"),
+                        digest3,
+                        "go.mod",
+                        build_opts=GoBuildOptions(),
+                    )
+                ],
+            )
+            uuid_pkg3 = result3.import_paths_to_pkg_info["github.com/google/uuid"]
+            assert uuid_pkg1.digest == uuid_pkg3.digest, (
+                "Digest differs across different named-cache directories -- "
+                "likely an absolute sandbox path leaked into the captured digest."
+            )
+
+
+def test_named_cache_populated_and_writable() -> None:
+    """After a download, the go_mod_cache named cache is populated and owner-writable.
+
+    The -modcacherw flag ensures Go writes the cache with writable permissions so
+    Pants can prune or clear the named cache without permission errors.
+    """
+    go_mod_single = dedent(
+        """\
+        module example.com/cache-writability-test
+        go 1.16
+        require rsc.io/quote v1.5.2
+        """
+    )
+    rsc_quote_go_sum = dedent(
+        """\
+        golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c h1:qgOY6WgZOaTkIIMiVjBQcw93ERBE4m30iBm00nkL0i8=
+        golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+        rsc.io/quote v1.5.2 h1:w5fcysjrx7yqtD/aO+QwRjYZOKnaM9Uh2b40tElTs3Y=
+        rsc.io/quote v1.5.2/go.mod h1:LzX7hefJvL54yjefDEDHNONDjII0t9xZLPXsUe+TKr0=
+        rsc.io/sampler v1.3.0 h1:7uVkIFmeBqHfdjD+gZwtXXI+RODJ2Wc4O7MPEh/QiW4=
+        rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
+        """
+    )
+    with tempfile.TemporaryDirectory() as named_caches_dir, tempfile.TemporaryDirectory() as store:
+        runner = _make_rule_runner(named_caches_dir, store)
+        digest = runner.make_snapshot({"go.mod": go_mod_single, "go.sum": rsc_quote_go_sum}).digest
+        runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("cache-writability-test", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
+        cache_dir = pathlib.Path(named_caches_dir) / "go_mod_cache"
+        assert cache_dir.exists(), (
+            f"go_mod_cache named cache directory not created at {cache_dir}; "
+            "the named cache may not be mounted or GOMODCACHE not set correctly."
+        )
+        # The exact expected artifacts must be present: the extracted module tree and
+        # the download cache's .mod file. Both live inside the cache partition that the
+        # module's checksums map to, so look for them under any partition directory.
+        extracted_dirs = list(cache_dir.glob("fetch-*/rsc.io/quote@v1.5.2"))
+        assert len(extracted_dirs) == 1, (
+            f"Expected exactly one cache partition holding rsc.io/quote@v1.5.2 under {cache_dir}, "
+            f"got {extracted_dirs}."
+        )
+        extracted_dir = extracted_dirs[0]
+        assert (extracted_dir / "quote.go").is_file(), (
+            f"Extracted module source rsc.io/quote@v1.5.2/quote.go not found under {extracted_dir}."
+        )
+        download_entry = extracted_dir.parents[1] / "cache/download/rsc.io/quote/@v/v1.5.2.mod"
+        assert download_entry.is_file(), (
+            f"Download cache entry {download_entry} not found; the extracted module and its "
+            "download metadata must live in the same partition."
+        )
+        # Verify the extracted module directory itself is owner-writable: without
+        # -modcacherw, Go leaves extracted module directories read-only, which would
+        # prevent Pants from pruning or clearing the named cache. (Checking arbitrary
+        # files is not sufficient -- cache metadata files are writable regardless.)
+        assert stat.S_IMODE(extracted_dir.stat().st_mode) & stat.S_IWUSR, (
+            f"Extracted module directory {extracted_dir} is not owner-writable; "
+            "-modcacherw flag may not be reaching the Go process."
+        )
+
+
+_PARTITION_TEST_IMPORT_PATH = "pantsbuild.org/go-cache-partition-for-test"
+_PARTITION_TEST_VERSION = "v0.0.1"
+
+
+def _run_module_from_local_proxy(
+    named_caches_dir: str,
+    local_store_dir: str,
+    proxy_dir: str,
+    body: str,
+    *,
+    publish: bool = True,
+) -> ThirdPartyPkgAnalysis:
+    """Resolve a one-package module served by a local proxy, returning the package analysis.
+
+    The proxy lives outside the build root so that several runs can share one `GOPROXY` value:
+    the module cache partition covers the download environment as well as the checksums, and a
+    per-run proxy path would put every run in its own partition regardless of contents.
+
+    With `publish=False` the proxy is left untouched, so the run can only succeed if the module
+    comes out of the shared module cache.
+    """
+    import_path = _PARTITION_TEST_IMPORT_PATH
+    version = _PARTITION_TEST_VERSION
+    files = gen_module_gomodproxy(
+        version,
+        import_path,
+        (("pkg/say/say.go", f"package say\n\nfunc Say() string {{ return {body!r} }}\n"),),
+    )
+    proxy_root = pathlib.Path(proxy_dir)
+    for path, content in files.items():
+        if not path.startswith("go-mod-proxy/"):
+            continue
+        if not publish:
+            continue
+        destination = proxy_root / path[len("go-mod-proxy/") :]
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content.encode() if isinstance(content, str) else content)
+
+    go_mod_content = dedent(
+        f"""\
+        module example.com/cache-partition-test
+        go 1.17
+
+        require {import_path} {version}
+        """
+    )
+    go_sum_content = files["go.sum"]
+    assert isinstance(go_sum_content, str)
+
+    runner = _make_rule_runner(named_caches_dir, local_store_dir)
+    runner.set_options(
+        [
+            f"--golang-subprocess-env-vars=GOPROXY=file://{proxy_dir}",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+            "--golang-cgo-enabled",
+        ],
+        env_inherit={"PATH"},
+    )
+    snapshot_digest = runner.make_snapshot(
+        {"go.mod": go_mod_content, "go.sum": go_sum_content}
+    ).digest
+    result = runner.request(
+        AllThirdPartyPackages,
+        [
+            AllThirdPartyPackagesRequest(
+                Address("", target_name="mod"),
+                snapshot_digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
+    )
+    return result.import_paths_to_pkg_info[f"{import_path}/pkg/say"]
+
+
+def test_module_cache_partition_is_reused_across_runs() -> None:
+    """A second run with an unreachable proxy still resolves, so the cache partition was hit.
+
+    Partitioning would be self-defeating if a partition name were not stable across runs: every
+    build would land in a fresh directory and re-download. Emptying the proxy between the runs
+    makes a re-download impossible, so the second run can only succeed from the cache.
+    """
+    with (
+        tempfile.TemporaryDirectory() as named_caches_dir,
+        tempfile.TemporaryDirectory() as stores,
+        tempfile.TemporaryDirectory() as proxy_dir,
+    ):
+        cold = _run_module_from_local_proxy(named_caches_dir, f"{stores}/1", proxy_dir, "first")
+
+        # Take the module off the proxy. The named cache is the only remaining source, and the
+        # local store is fresh, so every process re-executes rather than replaying a result.
+        shutil.rmtree(pathlib.Path(proxy_dir) / _PARTITION_TEST_IMPORT_PATH.split("/")[0])
+
+        warm = _run_module_from_local_proxy(
+            named_caches_dir, f"{stores}/2", proxy_dir, "first", publish=False
+        )
+
+    assert cold.digest == warm.digest
+
+
+def test_same_module_version_with_different_contents_do_not_collide() -> None:
+    """Two builds that disagree about the bytes behind one module@version both succeed.
+
+    Go stores an extracted module under `<module>@<version>`, a path that says nothing about
+    its contents, so a shared module cache would serve the first build's bytes to the second
+    one and fail its checksum verification with a SECURITY ERROR that survives until the cache
+    is wiped by hand. This happens whenever a version is re-tagged (private modules and
+    internal proxies do this) and, in this test, by construction.
+    """
+    with (
+        tempfile.TemporaryDirectory() as named_caches_dir,
+        tempfile.TemporaryDirectory() as stores,
+        tempfile.TemporaryDirectory() as proxy_dir,
+    ):
+        first = _run_module_from_local_proxy(named_caches_dir, f"{stores}/1", proxy_dir, "first")
+        # The second build has the same module@version but different bytes, and therefore a
+        # different go.sum. It must not be served the first build's cached extraction. Both
+        # builds read from the same proxy path, so the partition is decided by the checksums
+        # and nothing else.
+        second = _run_module_from_local_proxy(named_caches_dir, f"{stores}/2", proxy_dir, "second")
+
+    assert first.digest != second.digest, (
+        "Both builds captured identical sources, so the second one was served the first "
+        "build's cached module instead of its own. (Sharing a partition usually fails louder "
+        "than this, with Go's checksum-mismatch SECURITY ERROR raised out of the second run.)"
+    )
+
+
+def test_analyze_module_dependencies_uses_named_cache() -> None:
+    """analyze_module_dependencies uses the named cache (no output_directories capture).
+
+    Verifies that after running analyze_module_dependencies, the go_mod_cache is
+    populated (named cache is mounted and used), and the returned ModuleDescriptors
+    has the expected modules without a go_mods_digest field.
+    """
+    go_mod_content = dedent(
+        """\
+        module example.com/dep-analysis-test
+        go 1.16
+        require github.com/google/uuid v1.3.0
+        """
+    )
+    with tempfile.TemporaryDirectory() as named_caches_dir, tempfile.TemporaryDirectory() as store:
+        runner = _make_rule_runner(named_caches_dir, store)
+        digest = runner.make_snapshot({"go.mod": go_mod_content, "go.sum": UUID_GO_SUM}).digest
+        result = runner.request(
+            ModuleDescriptors,
+            [ModuleDescriptorsRequest(digest=digest, path="")],
+        )
+        assert any(mod.name == "github.com/google/uuid" for mod in result.modules)
+        # The analysis downloads land in their own partition, keyed on the go.mod/go.sum pair
+        # rather than on any single module's checksums.
+        cache_dir = pathlib.Path(named_caches_dir) / "go_mod_cache"
+        assert list(
+            cache_dir.glob("graph-*/cache/download/github.com/google/uuid/@v/v1.3.0.mod")
+        ), f"Module graph analysis did not populate an analysis partition under {cache_dir}."
+        # go_mods_digest was removed; verify ModuleDescriptors has only 'modules'.
+        assert not hasattr(result, "go_mods_digest"), (
+            "ModuleDescriptors.go_mods_digest should have been removed in this PR."
+        )
