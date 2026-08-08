@@ -28,7 +28,9 @@ from pants.backend.python.target_types import (
     PexCompletePlatformsField,
     PexLayout,
     PythonResolveField,
+    UvPlatformsField,
 )
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
     CompletePlatforms,
     create_pex,
@@ -288,7 +290,18 @@ class PythonFaaSCompletePlatforms(PexCompletePlatformsField):
 
         N.B.: only one of this and `runtime` can be set. If `runtime` is set, a default complete
         platform is chosen, if one is known for that runtime. Explicitly set this to `[]` to use the
-        platform's ambient interpreter, such as when running in an docker environment.
+        platform's ambient interpreter, such as when running in a docker environment.
+        """
+    )
+
+
+class PythonFaaSUvPlatforms(UvPlatformsField):
+    help = help_text(
+        f"""
+        {PexCompletePlatformsField.help}
+
+        N.B.: only one of this and `runtime` can be set. If `runtime` is set, a default
+        platform is chosen, if one is known for that runtime.
         """
     )
 
@@ -306,9 +319,20 @@ class PythonFaaSKnownRuntime:
     docker_repo: str
     tag: str
     architecture: FaaSArchitecture
+    manylinux: str
 
     def file_name(self) -> str:
         return f"complete_platform_{self.tag}.json"
+
+    def uv_python_platform(self) -> str:
+        match self.architecture:
+            case FaaSArchitecture.X86_64:
+                arch_str = "x86_64"
+            case FaaSArchitecture.ARM64:
+                arch_str = "aarch64"
+            case _:
+                raise ValueError(f"Unrecognized FaaSArchitecture value: {self.architecture}")
+        return f"{arch_str}-{self.manylinux}"
 
 
 class PythonFaaSRuntimeField(StringField, ABC):
@@ -365,13 +389,17 @@ class RuntimePlatformsRequest:
 
     runtime: PythonFaaSRuntimeField
     complete_platforms: PythonFaaSCompletePlatforms
+    uv_platforms: PythonFaaSUvPlatforms
     architecture: FaaSArchitecture
 
 
 @dataclass(frozen=True)
 class RuntimePlatforms:
     interpreter_version: None | tuple[int, int]
-    complete_platforms: CompletePlatforms = CompletePlatforms()
+    # For use with pex lockfiles.
+    complete_platforms: CompletePlatforms
+    # For use with uv lockfiles. Typically a singleton.
+    uv_platforms: tuple[str, ...]
 
 
 async def _infer_from_ics(request: RuntimePlatformsRequest) -> tuple[int, int]:
@@ -419,13 +447,18 @@ async def _infer_from_ics(request: RuntimePlatformsRequest) -> tuple[int, int]:
 
 @rule
 async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePlatforms:
-    if request.complete_platforms.value is not None:
-        # explicit complete platforms wins:
+    # We don't yet know if the pex or uv resolver is pertinent (it depends on the resolver used to
+    # generate the lockfile), so we infer for both (complete_platforms for pex, uv_platform for uv).
+    complete_platforms = None
+    uv_platforms = None
 
+    if request.complete_platforms.value is not None:
+        # Explicit complete_platforms wins.
         complete_platforms = await digest_complete_platforms(request.complete_platforms)
-        # Don't bother trying to infer the runtime version if the user has provided their own
-        # complete platform; they probably know what they're doing.
-        return RuntimePlatforms(interpreter_version=None, complete_platforms=complete_platforms)
+
+    if request.uv_platforms.value is not None:
+        # Explicit uv_platforms wins.
+        uv_platforms = request.uv_platforms.value
 
     version = request.runtime.to_interpreter_version()
     inferred_from_ics = False
@@ -434,48 +467,73 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         version = await _infer_from_ics(request)
         inferred_from_ics = True
 
-    try:
-        file_name = next(
-            rt.file_name()
-            for rt in request.runtime.known_runtimes
-            if version == (rt.major, rt.minor) and request.architecture.value == rt.architecture
-        )
-    except StopIteration:
-        # No known runtime, so prompt the user to specify
-        version_modifier = "[inferred from interpreter constraints]" if inferred_from_ics else ""
-        version_adjective = "inferred" if inferred_from_ics else "specified"
-        known_runtimes_str = ", ".join(
-            FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
-        )
-        raise InvalidTargetException(
-            softwrap(
-                f"""
-                Could not find a known runtime for the {version_adjective} Python version and machine architecture!
+    # Infer whatever we still don't have.
+    if not complete_platforms or not uv_platforms:
+        try:
+            (file_name, uv_platform) = next(
+                (rt.file_name(), rt.uv_python_platform())
+                for rt in request.runtime.known_runtimes
+                if version == (rt.major, rt.minor) and request.architecture.value == rt.architecture
+            )
+        except StopIteration:
+            # No known runtime, so prompt the user to specify
+            version_modifier = (
+                "[inferred from interpreter constraints]" if inferred_from_ics else ""
+            )
+            version_adjective = "inferred" if inferred_from_ics else "specified"
+            fixes = []
+            if not complete_platforms:
+                fixes.append(
+                    softwrap(
+                        f"""
+                    - generate a `complete_platforms` file for the given Python version and machine
+                      architecture, or specify a runtime that is known to Pants.
+                      See {doc_url("docs/python/overview/pex#generating-the-complete_platforms-file")}
+                    """
+                    )
+                )
+            if not uv_platforms:
+                fixes.append(
+                    softwrap(
+                        """
+                    - specify `uv_platforms` for the given machine architecture,
+                      or specify a runtime that is known to Pants.
+                    """
+                    )
+                )
+            fixes_str = "\n".join(fixes)
+            known_runtimes_str = ", ".join(
+                FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
+            )
+            raise InvalidTargetException(
+                softwrap(
+                    f"""
+                    Could not find a known runtime for the {version_adjective} Python version and machine architecture!
 
-                * Python version: {version} {version_modifier}
-                * Machine architecture: {request.architecture.value}
-                * Known runtime values: {known_runtimes_str}
+                    * Python version: {version} {version_modifier}
+                    * Machine architecture: {request.architecture.value}
+                    * Known runtime values: {known_runtimes_str}
 
-                To fix, please generate a `complete_platforms` file for the given Python version and
-                machine architecture, or specify a runtime that is known to Pants.
+                    To fix, please:
+                    {fixes_str}
+                    """
+                ),
+                description_of_origin=f"In the {request.target_name!r} target",
+            ) from None
 
-                You can follow the instructions at {doc_url("docs/python/overview/pex#generating-the-complete_platforms-file")}
-                to generate a `complete_platforms` file for your Python version and machine
-                architecture.
-                """
-            ),
-            description_of_origin=f"In the {request.target_name!r} target",
-        ) from None
-
-    module = request.runtime.known_runtimes_complete_platforms_module()
-
-    content = (importlib.resources.files(module) / file_name).read_bytes()
-    snapshot = await digest_to_snapshot(
-        **implicitly(CreateDigest([FileContent(file_name, content)]))
-    )
+        uv_platforms = uv_platforms or (uv_platform,)
+        if complete_platforms is None:
+            module = request.runtime.known_runtimes_complete_platforms_module()
+            content = (importlib.resources.files(module) / file_name).read_bytes()
+            snapshot = await digest_to_snapshot(
+                **implicitly(CreateDigest([FileContent(file_name, content)]))
+            )
+            complete_platforms = CompletePlatforms.from_snapshot(snapshot)
 
     return RuntimePlatforms(
-        interpreter_version=version, complete_platforms=CompletePlatforms.from_snapshot(snapshot)
+        interpreter_version=version,
+        complete_platforms=complete_platforms,
+        uv_platforms=uv_platforms,
     )
 
 
@@ -485,6 +543,7 @@ class BuildPythonFaaSRequest:
     target_name: str
 
     complete_platforms: PythonFaaSCompletePlatforms
+    uv_platforms: PythonFaaSUvPlatforms
     handler: None | PythonFaaSHandlerField
     output_path: OutputPathField
     runtime: PythonFaaSRuntimeField
@@ -505,6 +564,7 @@ class BuildPythonFaaSRequest:
 @rule
 async def build_python_faas(
     request: BuildPythonFaaSRequest,
+    python_setup: PythonSetup,
 ) -> BuiltPackage:
     additional_pex_args = (
         # Ensure we can resolve manylinux wheels in addition to any AMI-specific wheels.
@@ -523,6 +583,7 @@ async def build_python_faas(
             runtime=request.runtime,
             architecture=request.architecture,
             complete_platforms=request.complete_platforms,
+            uv_platforms=request.uv_platforms,
         ),
     )
 
@@ -556,6 +617,17 @@ async def build_python_faas(
         additional_sources = EMPTY_DIGEST
         reexported_handler_func = None
 
+    if platforms.interpreter_version:
+        # If we know the interpreter version implied by the runtime, use it directly.
+        # Specifically, `uv sync` requires a local interpreter of the right version even to
+        # create a venv with foreign platform wheels.
+        major, minor = platforms.interpreter_version
+        interpreter_constraints: InterpreterConstraints | None = InterpreterConstraints(
+            [f"CPython=={major}.{minor}.*"]
+        )
+    else:
+        interpreter_constraints = None
+
     repository_filename = "faas_repository.pex"
     pex_request = PexFromTargetsRequest(
         addresses=[request.address],
@@ -564,10 +636,12 @@ async def build_python_faas(
         include_source_files=request.include_sources,
         output_filename=repository_filename,
         complete_platforms=platforms.complete_platforms,
+        uv_platforms=platforms.uv_platforms,
         layout=PexLayout.PACKED,
         additional_args=additional_pex_args,
         additional_lockfile_args=additional_pex_args,
         additional_sources=additional_sources,
+        hardcoded_interpreter_constraints=interpreter_constraints,
         warn_for_transitive_files_targets=True,
     )
 

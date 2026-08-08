@@ -502,7 +502,7 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
     alias = "complete_platforms"
     help = help_text(
         f"""
-        The platforms the built PEX should be compatible with.
+        The platforms the built PEX should be compatible with, when using the `pex` resolver.
 
         There must be built wheels available for all of the foreign platforms, rather than sdists.
 
@@ -514,6 +514,23 @@ class PexCompletePlatformsField(SpecialCasedDependencies):
         (https://pex.readthedocs.io/en/latest/buildingpex.html#complete-platform).
 
         See {doc_url("docs/python/overview/pex#generating-the-complete_platforms-file")} for details on how to create this file.
+        """
+    )
+
+
+class UvPlatformsField(StringSequenceField):
+    alias = "uv_platforms"
+    help = help_text(
+        """
+        The platforms the built PEX should be compatible with, when using the `uv` resolver.
+
+        There must be built wheels available for all of the foreign platforms, rather than sdists.
+
+        You can give a list of multiple platforms to create a multiplatform PEX,
+        meaning that the PEX will be executable in all of the supported environments.
+
+        Values must be valid values for `uv sync`'s --python-platform flag:
+        https://docs.astral.sh/uv/reference/cli/#uv-sync--python-platform
         """
     )
 

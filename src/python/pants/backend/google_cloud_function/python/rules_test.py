@@ -274,8 +274,8 @@ def test_create_hello_world_gcf(
         }
     )
 
-    extra_log_lines_base = tuple() if complete_platforms_target_type else ("    Runtime: python37",)
-    expected_extra_log_lines = extra_log_lines_base + (
+    expected_extra_log_lines = (
+        "    Runtime: python37",
         f"    Architecture: {FaaSArchitecture.X86_64.value}",
         "    Handler: handler",
     )
@@ -283,7 +283,7 @@ def test_create_hello_world_gcf(
         rule_runner,
         Address("src/python/foo/bar", target_name="gcf"),
         expected_metadata={
-            **({} if complete_platforms_target_type else {"runtime": "python37"}),
+            "runtime": "python37",
             "architecture": FaaSArchitecture.X86_64.value,
             "handler": "handler",
         },
@@ -311,6 +311,7 @@ def test_pex3_venv_create_extra_args_are_passed_through() -> None:
         handler=Mock(),
         runtime=Mock(),
         complete_platforms=Mock(),
+        uv_platforms=Mock(),
         type=Mock(),
         output_path=Mock(),
         environment=Mock(),

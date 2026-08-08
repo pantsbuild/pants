@@ -537,6 +537,25 @@ class PythonSetup(Subsystem):
         advanced=True,
     )
 
+    _resolves_to_uv_platforms = DictOption[list[str]](
+        help=softwrap(
+            f"""
+            A mapping of resolve names (from `[python].resolves`) to lists of uv platform
+            targets for cross-platform/multiplatform builds when using the uv resolver.
+
+            Each entry is a uv `--python-platform` value (e.g. `x86_64-unknown-linux-gnu`,
+            `aarch64-apple-darwin`, `x86_64-manylinux_2_34`).
+
+            Example:
+            `{{'my-resolve': ['x86_64-unknown-linux-gnu', 'aarch64-apple-darwin']}}`
+
+            You can use the key `{RESOLVE_OPTION_KEY__DEFAULT}` to set a default value for all
+            resolves.
+            """
+        ),
+        advanced=True,
+    )
+
     _resolves_to_uploaded_prior_to = DictOption[str](
         help=softwrap(
             f"""
@@ -966,6 +985,13 @@ class PythonSetup(Subsystem):
         return self._resolves_to_option_helper(
             self._resolves_to_complete_platforms,
             "resolves_to_complete_platforms",
+        )
+
+    @memoized_method
+    def resolves_to_uv_platforms(self) -> dict[str, list[str]]:
+        return self._resolves_to_option_helper(
+            self._resolves_to_uv_platforms,
+            "resolves_to_uv_platforms",
         )
 
     @memoized_method
