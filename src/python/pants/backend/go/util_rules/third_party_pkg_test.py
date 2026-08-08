@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import os.path
 import pathlib
+import shutil
 import stat
 import tempfile
 from textwrap import dedent
@@ -15,6 +16,7 @@ import pytest
 from pants.backend.go import target_type_rules
 from pants.backend.go.go_sources import load_go_binary
 from pants.backend.go.target_types import GoModTarget
+from pants.backend.go.testutil import gen_module_gomodproxy
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
@@ -925,14 +927,22 @@ def test_named_cache_populated_and_writable() -> None:
             "the named cache may not be mounted or GOMODCACHE not set correctly."
         )
         # The exact expected artifacts must be present: the extracted module tree and
-        # the download cache's .mod file.
-        extracted_dir = cache_dir / "rsc.io" / "quote@v1.5.2"
-        assert (extracted_dir / "quote.go").is_file(), (
-            f"Extracted module source rsc.io/quote@v1.5.2/quote.go not found under {cache_dir}."
+        # the download cache's .mod file. Both live inside the cache partition that the
+        # module's checksums map to, so look for them under any partition directory.
+        extracted_dirs = list(cache_dir.glob("fetch-*/rsc.io/quote@v1.5.2"))
+        assert len(extracted_dirs) == 1, (
+            f"Expected exactly one cache partition holding rsc.io/quote@v1.5.2 under {cache_dir}, "
+            f"got {extracted_dirs}."
         )
-        assert (
-            cache_dir / "cache" / "download" / "rsc.io" / "quote" / "@v" / "v1.5.2.mod"
-        ).is_file(), f"Download cache entry rsc.io/quote/@v/v1.5.2.mod not found under {cache_dir}."
+        extracted_dir = extracted_dirs[0]
+        assert (extracted_dir / "quote.go").is_file(), (
+            f"Extracted module source rsc.io/quote@v1.5.2/quote.go not found under {extracted_dir}."
+        )
+        download_entry = extracted_dir.parents[1] / "cache/download/rsc.io/quote/@v/v1.5.2.mod"
+        assert download_entry.is_file(), (
+            f"Download cache entry {download_entry} not found; the extracted module and its "
+            "download metadata must live in the same partition."
+        )
         # Verify the extracted module directory itself is owner-writable: without
         # -modcacherw, Go leaves extracted module directories read-only, which would
         # prevent Pants from pruning or clearing the named cache. (Checking arbitrary
@@ -941,6 +951,134 @@ def test_named_cache_populated_and_writable() -> None:
             f"Extracted module directory {extracted_dir} is not owner-writable; "
             "-modcacherw flag may not be reaching the Go process."
         )
+
+
+_PARTITION_TEST_IMPORT_PATH = "pantsbuild.org/go-cache-partition-for-test"
+_PARTITION_TEST_VERSION = "v0.0.1"
+
+
+def _run_module_from_local_proxy(
+    named_caches_dir: str,
+    local_store_dir: str,
+    proxy_dir: str,
+    body: str,
+    *,
+    publish: bool = True,
+) -> ThirdPartyPkgAnalysis:
+    """Resolve a one-package module served by a local proxy, returning the package analysis.
+
+    The proxy lives outside the build root so that several runs can share one `GOPROXY` value:
+    the module cache partition covers the download environment as well as the checksums, and a
+    per-run proxy path would put every run in its own partition regardless of contents.
+
+    With `publish=False` the proxy is left untouched, so the run can only succeed if the module
+    comes out of the shared module cache.
+    """
+    import_path = _PARTITION_TEST_IMPORT_PATH
+    version = _PARTITION_TEST_VERSION
+    files = gen_module_gomodproxy(
+        version,
+        import_path,
+        (("pkg/say/say.go", f"package say\n\nfunc Say() string {{ return {body!r} }}\n"),),
+    )
+    proxy_root = pathlib.Path(proxy_dir)
+    for path, content in files.items():
+        if not path.startswith("go-mod-proxy/"):
+            continue
+        if not publish:
+            continue
+        destination = proxy_root / path[len("go-mod-proxy/") :]
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(content.encode() if isinstance(content, str) else content)
+
+    go_mod_content = dedent(
+        f"""\
+        module example.com/cache-partition-test
+        go 1.17
+
+        require {import_path} {version}
+        """
+    )
+    go_sum_content = files["go.sum"]
+    assert isinstance(go_sum_content, str)
+
+    runner = _make_rule_runner(named_caches_dir, local_store_dir)
+    runner.set_options(
+        [
+            f"--golang-subprocess-env-vars=GOPROXY=file://{proxy_dir}",
+            "--golang-subprocess-env-vars=GOSUMDB=off",
+            "--golang-cgo-enabled",
+        ],
+        env_inherit={"PATH"},
+    )
+    snapshot_digest = runner.make_snapshot(
+        {"go.mod": go_mod_content, "go.sum": go_sum_content}
+    ).digest
+    result = runner.request(
+        AllThirdPartyPackages,
+        [
+            AllThirdPartyPackagesRequest(
+                Address("", target_name="mod"),
+                snapshot_digest,
+                "go.mod",
+                build_opts=GoBuildOptions(),
+            )
+        ],
+    )
+    return result.import_paths_to_pkg_info[f"{import_path}/pkg/say"]
+
+
+def test_module_cache_partition_is_reused_across_runs() -> None:
+    """A second run with an unreachable proxy still resolves, so the cache partition was hit.
+
+    Partitioning would be self-defeating if a partition name were not stable across runs: every
+    build would land in a fresh directory and re-download. Emptying the proxy between the runs
+    makes a re-download impossible, so the second run can only succeed from the cache.
+    """
+    with (
+        tempfile.TemporaryDirectory() as named_caches_dir,
+        tempfile.TemporaryDirectory() as stores,
+        tempfile.TemporaryDirectory() as proxy_dir,
+    ):
+        cold = _run_module_from_local_proxy(named_caches_dir, f"{stores}/1", proxy_dir, "first")
+
+        # Take the module off the proxy. The named cache is the only remaining source, and the
+        # local store is fresh, so every process re-executes rather than replaying a result.
+        shutil.rmtree(pathlib.Path(proxy_dir) / _PARTITION_TEST_IMPORT_PATH.split("/")[0])
+
+        warm = _run_module_from_local_proxy(
+            named_caches_dir, f"{stores}/2", proxy_dir, "first", publish=False
+        )
+
+    assert cold.digest == warm.digest
+
+
+def test_same_module_version_with_different_contents_do_not_collide() -> None:
+    """Two builds that disagree about the bytes behind one module@version both succeed.
+
+    Go stores an extracted module under `<module>@<version>`, a path that says nothing about
+    its contents, so a shared module cache would serve the first build's bytes to the second
+    one and fail its checksum verification with a SECURITY ERROR that survives until the cache
+    is wiped by hand. This happens whenever a version is re-tagged (private modules and
+    internal proxies do this) and, in this test, by construction.
+    """
+    with (
+        tempfile.TemporaryDirectory() as named_caches_dir,
+        tempfile.TemporaryDirectory() as stores,
+        tempfile.TemporaryDirectory() as proxy_dir,
+    ):
+        first = _run_module_from_local_proxy(named_caches_dir, f"{stores}/1", proxy_dir, "first")
+        # The second build has the same module@version but different bytes, and therefore a
+        # different go.sum. It must not be served the first build's cached extraction. Both
+        # builds read from the same proxy path, so the partition is decided by the checksums
+        # and nothing else.
+        second = _run_module_from_local_proxy(named_caches_dir, f"{stores}/2", proxy_dir, "second")
+
+    assert first.digest != second.digest, (
+        "Both builds captured identical sources, so the second one was served the first "
+        "build's cached module instead of its own. (Sharing a partition usually fails louder "
+        "than this, with Go's checksum-mismatch SECURITY ERROR raised out of the second run.)"
+    )
 
 
 def test_analyze_module_dependencies_uses_named_cache() -> None:
@@ -965,6 +1103,12 @@ def test_analyze_module_dependencies_uses_named_cache() -> None:
             [ModuleDescriptorsRequest(digest=digest, path="")],
         )
         assert any(mod.name == "github.com/google/uuid" for mod in result.modules)
+        # The analysis downloads land in their own partition, keyed on the go.mod/go.sum pair
+        # rather than on any single module's checksums.
+        cache_dir = pathlib.Path(named_caches_dir) / "go_mod_cache"
+        assert list(
+            cache_dir.glob("graph-*/cache/download/github.com/google/uuid/@v/v1.3.0.mod")
+        ), f"Module graph analysis did not populate an analysis partition under {cache_dir}."
         # go_mods_digest was removed; verify ModuleDescriptors has only 'modules'.
         assert not hasattr(result, "go_mods_digest"), (
             "ModuleDescriptors.go_mods_digest should have been removed in this PR."

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import re
 import shlex
 import textwrap
 from collections.abc import Iterable, Mapping
@@ -31,6 +33,21 @@ from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
+_MODULE_CACHE_PARTITION_RE = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}")
+
+# Environment variables that decide where a module download comes from and whether its contents
+# are checked, and so decide which downloads may share a module cache partition.
+_MODULE_INTEGRITY_ENV_VARS = (
+    "GOAUTH",
+    "GOFLAGS",
+    "GOINSECURE",
+    "GONOPROXY",
+    "GONOSUMDB",
+    "GOPRIVATE",
+    "GOPROXY",
+    "GOSUMDB",
+)
+
 
 @dataclass(frozen=True)
 class GoSdkProcess:
@@ -43,7 +60,7 @@ class GoSdkProcess:
     output_directories: tuple[str, ...]
     replace_sandbox_root_in_args: bool
 
-    use_module_cache: bool
+    module_cache_partition: str | None
 
     def __init__(
         self,
@@ -57,7 +74,7 @@ class GoSdkProcess:
         output_directories: Iterable[str] = (),
         allow_downloads: bool = False,
         replace_sandbox_root_in_args: bool = False,
-        use_module_cache: bool = False,
+        module_cache_partition: str | None = None,
     ) -> None:
         object.__setattr__(self, "command", tuple(command))
         object.__setattr__(self, "description", description)
@@ -75,7 +92,22 @@ class GoSdkProcess:
         object.__setattr__(self, "output_files", tuple(output_files))
         object.__setattr__(self, "output_directories", tuple(output_directories))
         object.__setattr__(self, "replace_sandbox_root_in_args", replace_sandbox_root_in_args)
-        object.__setattr__(self, "use_module_cache", use_module_cache)
+        if module_cache_partition is not None and not _MODULE_CACHE_PARTITION_RE.fullmatch(
+            module_cache_partition
+        ):
+            raise ValueError(
+                "A module cache partition must be a short identifier of letters, digits, `_` and "
+                "`-` starting with a letter or digit (it names a directory inside the shared "
+                f"module cache), got {module_cache_partition!r}."
+            )
+        object.__setattr__(self, "module_cache_partition", module_cache_partition)
+        if GoSdkRunSetup.FETCH_MODULE_ENV in self.env and module_cache_partition is None:
+            # Without a partition there is no shared module cache, and the fetch step would look
+            # for the downloaded module under a path that is never populated.
+            raise ValueError(
+                "Fetching a module through the shared module cache requires a "
+                "`module_cache_partition`."
+            )
 
 
 @dataclass(frozen=True)
@@ -115,8 +147,13 @@ async def go_sdk_invoke_setup(
             export GOPATH="${{sandbox_root}}/gopath"
             export GOCACHE="${{sandbox_root}}/cache"
             {mkdir_path} -p "$GOPATH" "$GOCACHE"
-            if [ -n "${GoSdkRunSetup.MODCACHE_ENV}" ]; then
-              export GOMODCACHE="${{sandbox_root}}/__gomodcache"
+            modcache_partition="${GoSdkRunSetup.MODCACHE_ENV}"
+            if [ -n "$modcache_partition" ]; then
+              # The named cache is partitioned: each partition holds modules whose content
+              # the caller has already pinned (see `module_cache_partition`). Two builds that
+              # disagree about the bytes behind one module@version therefore never share a
+              # cache entry, so a stale entry can never poison a later build.
+              export GOMODCACHE="${{sandbox_root}}/__gomodcache/${{modcache_partition}}"
               export GOFLAGS="${{GOFLAGS:+${{GOFLAGS}} }}-modcacherw"
               {mkdir_path} -p "$GOMODCACHE"
             fi
@@ -138,7 +175,7 @@ async def go_sdk_invoke_setup(
                   *'"GoMod": "'*) if [ -z "$gomod" ]; then gomod=${{line#*'"GoMod": "'}}; gomod=${{gomod%'"'*}}; fi ;;
                 esac
               done < __module_metadata.json
-              marker="__gomodcache/"
+              marker="__gomodcache/${{modcache_partition}}/"
               dir_rel="${{dir#*${{marker}}}}"
               gomod_rel="${{gomod#*${{marker}}}}"
               if [ -z "$dir" ] || [ -z "$gomod" ] || [ "$dir_rel" = "$dir" ] || [ "$gomod_rel" = "$gomod" ]; then
@@ -230,8 +267,19 @@ async def setup_go_sdk_process(
         env[GoSdkRunSetup.SANDBOX_ROOT_ENV] = "1"
 
     append_only_caches: dict[str, str] = {}
-    if request.use_module_cache:
-        env[GoSdkRunSetup.MODCACHE_ENV] = "1"
+    if request.module_cache_partition is not None:
+        # The caller's partition covers the checksums it expects, but where a module has no
+        # recorded checksums the integrity of a download depends on the environment instead: which
+        # proxy served it, and whether the checksum database was consulted at all. Builds
+        # configuring those differently must not share downloads, so the environment is part of the
+        # partition too.
+        integrity_env = "\n".join(
+            f"{name}={env[name]}" for name in _MODULE_INTEGRITY_ENV_VARS if name in env
+        )
+        integrity_fingerprint = hashlib.sha256(integrity_env.encode()).hexdigest()[:16]
+        env[GoSdkRunSetup.MODCACHE_ENV] = (
+            f"{request.module_cache_partition}-{integrity_fingerprint}"
+        )
         append_only_caches["go_mod_cache"] = "__gomodcache"
 
     # Disable the "coverage redesign" experiment on Go v1.20+ for now since Pants does not yet support it.

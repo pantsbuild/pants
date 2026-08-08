@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import logging
 import os
@@ -269,7 +270,12 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
                 working_dir=request.path if request.path else None,
                 # Allow downloads of the module metadata (i.e., go.mod files).
                 allow_downloads=True,
-                use_module_cache=True,
+                # The `go.mod`/`go.sum` pair in the input digest pins every `go.mod` file this
+                # step may fetch, so it also identifies the cache partition those files belong
+                # in. Editing a dependency moves this module graph to a new partition and
+                # re-fetches the `.mod` files, which is cheap (they are small text files) and
+                # keeps a re-tagged module version from ever reusing the previous bytes.
+                module_cache_partition=_module_cache_partition("graph", request.digest.fingerprint),
                 description="Analyze Go module dependencies.",
             )
         )
@@ -313,6 +319,16 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
     return ModuleDescriptors(FrozenOrderedSet(descriptors.values()))
 
 
+def _module_cache_partition(kind: str, *content: str) -> str:
+    """Name the `go_mod_cache` partition that may hold `content`'s downloads.
+
+    Partitions are directories inside the named cache, so the name has to be short and free of
+    path or shell metacharacters; `content` is therefore hashed rather than used verbatim.
+    """
+    digest = hashlib.sha256("\n".join(content).encode()).hexdigest()
+    return f"{kind}-{digest[:32]}"
+
+
 def strip_sandbox_prefix(path: str, marker: str) -> str:
     """Strip a path prefix from a path using a marker string to find the start of the portion to not
     strip. This is used to strip absolute paths used in the execution sandbox by `go`.
@@ -325,6 +341,25 @@ def strip_sandbox_prefix(path: str, marker: str) -> str:
         return path[marker_pos:]
     else:
         return path
+
+
+_MODULE_CACHE_MARKER = "__gomodcache/"
+
+
+def _module_cache_relpath(path: str) -> str | None:
+    """Return `path` relative to GOMODCACHE, or None if it does not point into the module cache.
+
+    The `go` tool reports absolute sandbox paths, and the shared module cache is mounted at
+    `__gomodcache/<partition>/`. The partition directory is not part of the result: the fetch step
+    copies the tree out of GOMODCACHE itself, so what lands in `gopath/pkg/mod` starts below it.
+    """
+    from_marker = strip_sandbox_prefix(path, _MODULE_CACHE_MARKER)
+    if not from_marker.startswith(_MODULE_CACHE_MARKER):
+        return None
+    partition, _, relpath = from_marker[len(_MODULE_CACHE_MARKER) :].partition("/")
+    if not partition or not relpath:
+        return None
+    return relpath
 
 
 def _parse_go_sum(go_sum_content: bytes) -> dict[tuple[str, str], tuple[str, ...]]:
@@ -564,6 +599,23 @@ async def download_and_analyze_module(
         synthetic_files.append(FileContent("go.sum", synthetic_go_sum.encode()))
     synthetic_digest = await create_digest(CreateDigest(synthetic_files))
 
+    # The module cache partition is derived from the module's identity plus the checksums the
+    # caller expects for it. Go stores an extracted module under `<module>@<version>`, a path
+    # that says nothing about the bytes, so a single shared cache would hand a later build
+    # whatever the first build happened to store there. Whenever that disagrees with the
+    # consumer's `go.sum`, Go refuses to build with a checksum-mismatch SECURITY ERROR that
+    # persists until the cache is wiped by hand. Partitioning by the expected checksums keeps
+    # such builds in separate partitions: re-tagging a private module (or any other change to
+    # the recorded sums) simply lands in a fresh partition and re-downloads. Modules with no
+    # go.sum entries have no checksums to partition by, so they share one partition per
+    # module@version and rely on the checksum database; `setup_go_sdk_process` keeps builds that
+    # configure that database (or the proxy) differently in separate partitions.
+    module_cache_partition = _module_cache_partition(
+        "fetch",
+        f"{request.name}@{request.version}",
+        *sorted(request.go_sum_entries),
+    )
+
     # Fetch the module into the named cache and copy to gopath/pkg/mod in one process.
     # The fetch mode in __run_go.sh handles both steps within a single process invocation:
     # it runs `go mod download -json`, emits the metadata on stdout, then copies the
@@ -578,7 +630,7 @@ async def download_and_analyze_module(
                 env={GoSdkRunSetup.FETCH_MODULE_ENV: f"{request.name}@{request.version}"},
                 input_digest=synthetic_digest,
                 allow_downloads=True,
-                use_module_cache=True,
+                module_cache_partition=module_cache_partition,
                 output_directories=("gopath",),
                 description=f"Download Go module {request.name}@{request.version}.",
             )
@@ -591,17 +643,11 @@ async def download_and_analyze_module(
         )
     module_metadata_json = json.loads(download_result.stdout)
 
-    # Dir/GoMod point into __gomodcache (absolute sandbox paths). Extract the
-    # portion after __gomodcache/ to get the relative path within the cache tree,
-    # then re-prefix with gopath/pkg/mod/ to match where the copy step placed them.
-    # strip_sandbox_prefix returns path[marker_pos:] (includes the marker), so we
-    # strip the marker length to get just the relative tail.
-    _modcache_marker = "__gomodcache/"
-    _dir_from_marker = strip_sandbox_prefix(module_metadata_json["Dir"], _modcache_marker)
-    _gomod_from_marker = strip_sandbox_prefix(module_metadata_json["GoMod"], _modcache_marker)
-    if not _dir_from_marker.startswith(_modcache_marker) or not _gomod_from_marker.startswith(
-        _modcache_marker
-    ):
+    # Dir/GoMod are absolute sandbox paths into the module cache; the copy step placed the same
+    # trees under gopath/pkg/mod, so what is needed is their path relative to GOMODCACHE.
+    _dir_in_cache = _module_cache_relpath(module_metadata_json["Dir"])
+    _gomod_in_cache = _module_cache_relpath(module_metadata_json["GoMod"])
+    if _dir_in_cache is None or _gomod_in_cache is None:
         raise AssertionError(
             f"Module fetch metadata for {request.name}@{request.version} did not point into "
             f"the module cache: Dir={module_metadata_json['Dir']!r} "
@@ -609,8 +655,8 @@ async def download_and_analyze_module(
             "issue at https://github.com/pantsbuild/pants/issues/new/choose with this error "
             "message."
         )
-    module_sources_relpath = "gopath/pkg/mod/" + _dir_from_marker[len(_modcache_marker) :]
-    go_mod_relpath = "gopath/pkg/mod/" + _gomod_from_marker[len(_modcache_marker) :]
+    module_sources_relpath = "gopath/pkg/mod/" + _dir_in_cache
+    go_mod_relpath = "gopath/pkg/mod/" + _gomod_in_cache
 
     module_sources_snapshot = await digest_to_snapshot(
         **implicitly(
