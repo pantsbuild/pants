@@ -227,13 +227,78 @@ impl<N: Node> EntryState<N> {
 }
 
 ///
+/// Storage for the state of an Entry.
+///
+#[derive(Debug)]
+enum EntryStorage<N: Node> {
+    Shared(EntryState<N>),
+}
+
+///
+/// The mutable portion of an Entry: its storage, plus a RunToken allocator which guarantees
+/// that attempt tokens are unique across all of the Entry's states.
+///
+#[derive(Debug)]
+struct EntryMutable<N: Node> {
+    next_run_token: RunToken,
+    storage: EntryStorage<N>,
+}
+
+impl<N: Node> EntryStorage<N> {
+    /// Returns the state for the given Run.
+    fn state_for_run_mut(&mut self, _run_id: RunId) -> &mut EntryState<N> {
+        match self {
+            EntryStorage::Shared(state) => state,
+        }
+    }
+}
+
+impl<N: Node> EntryMutable<N> {
+    /// Returns the state for the given Run, if it exists.
+    fn state_for_run(&self, _run_id: RunId) -> Option<&EntryState<N>> {
+        match &self.storage {
+            EntryStorage::Shared(state) => Some(state),
+        }
+    }
+
+    /// Returns the state which is Running with the given RunToken, if any.
+    fn state_for_token_mut(&mut self, run_token: RunToken) -> Option<&mut EntryState<N>> {
+        let is_match = |state: &EntryState<N>| matches!(*state, EntryState::Running { run_token: t, .. } if t == run_token);
+        match &mut self.storage {
+            EntryStorage::Shared(state) => is_match(state).then_some(state),
+        }
+    }
+
+    fn states_mut(&mut self) -> Box<dyn Iterator<Item = &mut EntryState<N>> + '_> {
+        match &mut self.storage {
+            EntryStorage::Shared(state) => Box::new(std::iter::once(state)),
+        }
+    }
+
+    fn states(&self) -> Box<dyn Iterator<Item = &EntryState<N>> + '_> {
+        match &self.storage {
+            EntryStorage::Shared(state) => Box::new(std::iter::once(state)),
+        }
+    }
+
+    /// Installs the state produced by a completion for the given Run.
+    fn finish_completion(&mut self, _run_id: RunId, state: EntryState<N>) {
+        match &mut self.storage {
+            EntryStorage::Shared(shared) => {
+                *shared = state;
+            }
+        }
+    }
+}
+
+///
 /// An Entry and its adjacencies.
 ///
 #[derive(Clone, Debug)]
 pub(crate) struct Entry<N: Node> {
     node: Arc<N>,
 
-    state: Arc<Mutex<EntryState<N>>>,
+    state: Arc<Mutex<EntryMutable<N>>>,
 }
 
 impl<N: Node> Entry<N> {
@@ -245,7 +310,10 @@ impl<N: Node> Entry<N> {
     pub(crate) fn new(node: N) -> Entry<N> {
         Entry {
             node: Arc::new(node),
-            state: Arc::new(Mutex::new(EntryState::initial())),
+            state: Arc::new(Mutex::new(EntryMutable {
+                next_run_token: RunToken::initial().next(),
+                storage: EntryStorage::Shared(EntryState::initial()),
+            })),
         }
     }
 
@@ -270,7 +338,8 @@ impl<N: Node> Entry<N> {
     ///
     pub async fn poll(&self, context: &Context<N>, last_seen_generation: Generation) {
         let recv = {
-            let mut state = self.state.lock();
+            let mut inner = self.state.lock();
+            let state = inner.storage.state_for_run_mut(context.run_id());
             let pollers = match *state {
                 EntryState::Completed {
                     ref result,
@@ -312,9 +381,9 @@ impl<N: Node> Entry<N> {
     /// If the Future for this Node has already completed, returns a clone of its result.
     ///
     pub fn peek(&self, context: &Context<N>) -> Option<N::Item> {
-        let state = self.state.lock();
-        match *state {
-            EntryState::Completed { ref result, .. } => result.peek(context),
+        let inner = self.state.lock();
+        match inner.state_for_run(context.run_id()) {
+            Some(EntryState::Completed { result, .. }) => result.peek(context),
             _ => None,
         }
     }
@@ -332,8 +401,7 @@ impl<N: Node> Entry<N> {
         previous_dep_generations: Option<Vec<(EntryId, Generation)>>,
         previous_result: Option<EntryResult<N>>,
     ) -> (EntryState<N>, AsyncValueReceiver<NodeResult<N>>, Generation) {
-        // Increment the RunToken to uniquely identify this work.
-        let run_token = run_token.next();
+        // NB: The RunToken is freshly allocated by the caller to uniquely identify this work.
         let context = context_factory.clone_for(entry_id);
         let context2 = context.clone();
         let entry2 = entry.clone();
@@ -466,7 +534,12 @@ impl<N: Node> Entry<N> {
         context: &Context<N>,
         entry_id: EntryId,
     ) -> BoxFuture<'_, NodeResult<N>> {
-        let mut state = self.state.lock();
+        let inner = &mut *self.state.lock();
+        let EntryMutable {
+            next_run_token,
+            storage,
+        } = inner;
+        let state = storage.state_for_run_mut(context.run_id());
 
         // First check whether the Node is already complete, or is currently running: in both of these
         // cases we return early without swapping the state of the Node.
@@ -501,17 +574,18 @@ impl<N: Node> Entry<N> {
             _ => (),
         };
 
-        // Otherwise, we'll need to swap the state of the Node, so take it by value.
+        // Otherwise, we'll need to swap the state of the Node, so take it by value, and allocate
+        // a RunToken to uniquely identify the new attempt.
+        let run_token = *next_run_token;
+        *next_run_token = run_token.next();
         let (next_state, receiver, generation) =
             match mem::replace(&mut *state, EntryState::initial()) {
                 EntryState::NotStarted {
-                    run_token,
                     generation,
                     previous_result,
                     ..
                 }
                 | EntryState::Running {
-                    run_token,
                     generation,
                     previous_result,
                     ..
@@ -525,7 +599,6 @@ impl<N: Node> Entry<N> {
                     previous_result,
                 ),
                 EntryState::Completed {
-                    run_token,
                     generation,
                     result,
                     dep_generations,
@@ -582,18 +655,16 @@ impl<N: Node> Entry<N> {
     /// See also: `Self::complete`.
     ///
     pub(crate) fn cancel(&self, result_run_token: RunToken) {
-        let mut state = self.state.lock();
+        let mut inner = self.state.lock();
 
-        // We care about exactly one case: a Running state with the same run_token. All other states
-        // represent various (legal) race conditions. See `RunToken`'s docs for more information.
-        match *state {
-            EntryState::Running { run_token, .. } if result_run_token == run_token => {}
-            _ => {
-                return;
-            }
-        }
+        // We care about exactly one case: a state which is Running with the same run_token. All
+        // other states represent various (legal) race conditions. See `RunToken`'s docs for more
+        // information.
+        let Some(state) = inner.state_for_token_mut(result_run_token) else {
+            return;
+        };
 
-        *state = match mem::replace(&mut *state, EntryState::initial()) {
+        *state = match mem::replace(state, EntryState::initial()) {
             EntryState::Running {
                 run_token,
                 generation,
@@ -602,7 +673,7 @@ impl<N: Node> Entry<N> {
             } => {
                 test_trace_log!("Canceling {:?} of {}.", run_token, self.node);
                 EntryState::NotStarted {
-                    run_token: run_token.next(),
+                    run_token,
                     generation,
                     pollers: Vec::new(),
                     previous_result,
@@ -630,94 +701,92 @@ impl<N: Node> Entry<N> {
         has_uncacheable_deps: bool,
         result: Option<Result<N::Item, N::Error>>,
     ) {
-        let mut state = self.state.lock();
+        let mut inner = self.state.lock();
 
-        // We care about exactly one case: a Running state with the same run_token. All other states
-        // represent various (legal) race conditions. See `RunToken`'s docs for more information.
-        match *state {
-            EntryState::Running { run_token, .. } if result_run_token == run_token => {}
-            _ => {
-                // We care about exactly one case: a Running state with the same run_token. All other states
-                // represent various (legal) race conditions.
+        // We care about exactly one case: a state which is Running with the same run_token. All
+        // other states represent various (legal) race conditions. See `RunToken`'s docs for more
+        // information.
+        let old_state = match inner.state_for_token_mut(result_run_token) {
+            Some(state) => mem::replace(state, EntryState::initial()),
+            None => {
                 test_trace_log!(
                     "Not completing node {:?} because it was invalidated.",
                     self.node
                 );
                 return;
             }
-        }
+        };
+        let EntryState::Running {
+            run_token,
+            mut generation,
+            mut previous_result,
+            ..
+        } = old_state
+        else {
+            unreachable!("state_for_token_mut returns only Running states");
+        };
 
-        *state = match mem::replace(&mut *state, EntryState::initial()) {
-            EntryState::Running {
-                run_token,
-                mut generation,
-                mut previous_result,
-                ..
-            } => {
-                match result {
-                    Some(Err(e)) => {
-                        if let Some(previous_result) = previous_result.as_mut() {
-                            previous_result.dirty();
-                        }
-                        generation = generation.next();
-                        sender.send((Err(e), generation, true));
-                        EntryState::NotStarted {
-                            run_token: run_token.next(),
-                            generation,
-                            pollers: Vec::new(),
-                            previous_result,
-                        }
-                    }
-                    Some(Ok(result)) => {
-                        let cacheable = self.cacheable_with_output(Some(&result));
-                        let next_result: EntryResult<N> =
-                            EntryResult::new(result, context, cacheable, has_uncacheable_deps);
-                        if Some(next_result.as_ref())
-                            != previous_result.as_ref().map(EntryResult::as_ref)
-                        {
-                            // Node was re-executed (ie not cleaned) and had a different result value.
-                            generation = generation.next()
-                        };
-                        sender.send((
-                            Ok(next_result.as_ref().clone()),
-                            generation,
-                            next_result.has_uncacheable_deps(),
-                        ));
-                        EntryState::Completed {
-                            result: next_result,
-                            pollers: Vec::new(),
-                            dep_generations,
-                            run_token,
-                            generation,
-                        }
-                    }
-                    None => {
-                        // Node was clean.
-                        // NB: The `expect` here avoids a clone and a comparison: see the method docs.
-                        let mut result = previous_result
-                            .expect("A Node cannot be marked clean without a previous result.");
-                        result.clean(
-                            context,
-                            self.cacheable_with_output(Some(result.as_ref())),
-                            has_uncacheable_deps,
-                        );
-                        sender.send((
-                            Ok(result.as_ref().clone()),
-                            generation,
-                            result.has_uncacheable_deps(),
-                        ));
-                        EntryState::Completed {
-                            result,
-                            pollers: Vec::new(),
-                            dep_generations,
-                            run_token,
-                            generation,
-                        }
-                    }
+        let next_state = match result {
+            Some(Err(e)) => {
+                if let Some(previous_result) = previous_result.as_mut() {
+                    previous_result.dirty();
+                }
+                generation = generation.next();
+                sender.send((Err(e), generation, true));
+                EntryState::NotStarted {
+                    run_token,
+                    generation,
+                    pollers: Vec::new(),
+                    previous_result,
                 }
             }
-            s => s,
+            Some(Ok(result)) => {
+                let cacheable = self.cacheable_with_output(Some(&result));
+                let next_result: EntryResult<N> =
+                    EntryResult::new(result, context, cacheable, has_uncacheable_deps);
+                if Some(next_result.as_ref()) != previous_result.as_ref().map(EntryResult::as_ref) {
+                    // Node was re-executed (ie not cleaned) and had a different result value.
+                    generation = generation.next()
+                };
+                sender.send((
+                    Ok(next_result.as_ref().clone()),
+                    generation,
+                    next_result.has_uncacheable_deps(),
+                ));
+                EntryState::Completed {
+                    result: next_result,
+                    pollers: Vec::new(),
+                    dep_generations,
+                    run_token,
+                    generation,
+                }
+            }
+            None => {
+                // Node was clean.
+                // NB: The `expect` here avoids a clone and a comparison: see the method docs.
+                let mut result = previous_result
+                    .expect("A Node cannot be marked clean without a previous result.");
+                result.clean(
+                    context,
+                    self.cacheable_with_output(Some(result.as_ref())),
+                    has_uncacheable_deps,
+                );
+                sender.send((
+                    Ok(result.as_ref().clone()),
+                    generation,
+                    result.has_uncacheable_deps(),
+                ));
+                EntryState::Completed {
+                    result,
+                    pollers: Vec::new(),
+                    dep_generations,
+                    run_token,
+                    generation,
+                }
+            }
         };
+
+        inner.finish_completion(context.run_id(), next_state);
     }
 
     ///
@@ -731,47 +800,54 @@ impl<N: Node> Entry<N> {
     ///   acquiring the graph lock here, which we currently don't do.
     ///
     pub(crate) fn clear(&mut self, graph_still_contains_edges: bool) {
-        let mut state = self.state.lock();
-
-        let (run_token, generation, mut previous_result) =
-            match mem::replace(&mut *state, EntryState::initial()) {
-                EntryState::NotStarted {
-                    run_token,
-                    generation,
-                    previous_result,
-                    ..
-                } => (run_token, generation, previous_result),
-                EntryState::Running {
-                    run_token,
-                    pending_value,
-                    generation,
-                    previous_result,
-                    ..
-                } => {
-                    std::mem::drop(pending_value);
-                    (run_token, generation, previous_result)
-                }
-                EntryState::Completed {
-                    run_token,
-                    generation,
-                    result,
-                    ..
-                } => (run_token, generation, Some(result)),
-            };
+        let inner = &mut *self.state.lock();
 
         test_trace_log!("Clearing node {:?}", self.node);
 
-        if graph_still_contains_edges && let Some(previous_result) = previous_result.as_mut() {
-            previous_result.dirty();
-        }
+        // NB: Dropping a Running state's AsyncValue cancels its outstanding work, and fresh
+        // RunTokens are allocated per attempt, so stale completions can never match.
+        match &mut inner.storage {
+            EntryStorage::Shared(state) => {
+                let (run_token, generation, mut previous_result) =
+                    match mem::replace(state, EntryState::initial()) {
+                        EntryState::NotStarted {
+                            run_token,
+                            generation,
+                            previous_result,
+                            ..
+                        } => (run_token, generation, previous_result),
+                        EntryState::Running {
+                            run_token,
+                            pending_value,
+                            generation,
+                            previous_result,
+                            ..
+                        } => {
+                            std::mem::drop(pending_value);
+                            (run_token, generation, previous_result)
+                        }
+                        EntryState::Completed {
+                            run_token,
+                            generation,
+                            result,
+                            ..
+                        } => (run_token, generation, Some(result)),
+                    };
 
-        // Swap in a state with a new RunToken value, which invalidates any outstanding work.
-        *state = EntryState::NotStarted {
-            run_token: run_token.next(),
-            generation,
-            pollers: Vec::new(),
-            previous_result,
-        };
+                if graph_still_contains_edges
+                    && let Some(previous_result) = previous_result.as_mut()
+                {
+                    previous_result.dirty();
+                }
+
+                *state = EntryState::NotStarted {
+                    run_token,
+                    generation,
+                    pollers: Vec::new(),
+                    previous_result,
+                };
+            }
+        }
     }
 
     ///
@@ -779,8 +855,14 @@ impl<N: Node> Entry<N> {
     /// requested, and re-run if any of them have changed generations.
     ///
     pub(crate) fn dirty(&mut self) {
-        let state = &mut *self.state.lock();
+        let inner = &mut *self.state.lock();
         test_trace_log!("Dirtying node {:?}", self.node);
+        for state in inner.states_mut() {
+            self.dirty_state(state);
+        }
+    }
+
+    fn dirty_state(&self, state: &mut EntryState<N>) {
         match state {
             &mut EntryState::Completed {
                 ref mut result,
@@ -811,7 +893,7 @@ impl<N: Node> Entry<N> {
             }
         };
 
-        *state = match mem::replace(&mut *state, EntryState::initial()) {
+        *state = match mem::replace(state, EntryState::initial()) {
             EntryState::Running {
                 run_token,
                 pending_value,
@@ -843,33 +925,31 @@ impl<N: Node> Entry<N> {
     /// has been terminated, and to update the state of the Node.
     ///
     pub(crate) fn terminate(&mut self, err: N::Error) {
-        let state = &mut *self.state.lock();
+        let inner = &mut *self.state.lock();
         test_trace_log!("Terminating node {:?} with {:?}", self.node, err);
-        if let EntryState::Running {
-            pending_value,
-            generation,
-            ..
-        } = state
-        {
-            let _ = pending_value.try_interrupt(NodeInterrupt::Aborted((
-                Err(err),
-                generation.next(),
-                true,
-            )));
-        };
+        for state in inner.states_mut() {
+            if let EntryState::Running {
+                pending_value,
+                generation,
+                ..
+            } = state
+            {
+                let _ = pending_value.try_interrupt(NodeInterrupt::Aborted((
+                    Err(err.clone()),
+                    generation.next(),
+                    true,
+                )));
+            };
+        }
     }
 
     ///
     /// Indicates that cleaning this Node has failed, returning an error if the RunToken has changed.
     ///
     pub(crate) fn cleaning_failed(&mut self, expected_run_token: RunToken) -> Result<(), ()> {
-        let state = &mut *self.state.lock();
-        match state {
-            EntryState::Running {
-                is_cleaning,
-                run_token,
-                ..
-            } if *run_token == expected_run_token => {
+        let inner = &mut *self.state.lock();
+        match inner.state_for_token_mut(expected_run_token) {
+            Some(EntryState::Running { is_cleaning, .. }) => {
                 *is_cleaning = false;
                 Ok(())
             }
@@ -878,24 +958,24 @@ impl<N: Node> Entry<N> {
     }
 
     pub fn is_started(&self) -> bool {
-        match *self.state.lock() {
-            EntryState::NotStarted { .. } => false,
-            EntryState::Completed { .. } | EntryState::Running { .. } => true,
-        }
+        self.state
+            .lock()
+            .states()
+            .any(|state| !matches!(state, EntryState::NotStarted { .. }))
     }
 
     pub fn is_running(&self) -> bool {
-        match *self.state.lock() {
-            EntryState::Running { .. } => true,
-            EntryState::Completed { .. } | EntryState::NotStarted { .. } => false,
-        }
+        self.state
+            .lock()
+            .states()
+            .any(|state| matches!(state, EntryState::Running { .. }))
     }
 
     pub fn is_cleaning(&self) -> bool {
-        match *self.state.lock() {
-            EntryState::Running { is_cleaning, .. } => is_cleaning,
-            EntryState::Completed { .. } | EntryState::NotStarted { .. } => false,
-        }
+        self.state
+            .lock()
+            .states()
+            .any(|state| matches!(state, EntryState::Running { is_cleaning, .. } if *is_cleaning))
     }
 
     pub(crate) fn format(&self, context: &Context<N>) -> String {
