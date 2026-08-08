@@ -12,6 +12,9 @@ use parking_lot::Mutex;
 use tokio::runtime::{Builder, Handle, Runtime};
 use tokio::task::{Id, JoinError, JoinHandle, JoinSet};
 
+/// Tokio's own default. A conservative cap would stall clients rather than bound anything useful.
+const MAX_REQUEST_THREADS: usize = 512;
+
 /// Copy our (thread-local or task-local) stdio destination and current workunit parent into
 /// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
 /// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
@@ -47,6 +50,8 @@ fn future_with_correct_context<F: Future>(future: F) -> impl Future<Output = F::
 pub struct Executor {
     runtime: Arc<Mutex<Option<Runtime>>>,
     handle: Handle,
+    request_pool: Arc<Mutex<Option<Runtime>>>,
+    request_pool_handle: Option<Handle>,
 }
 
 impl Executor {
@@ -63,6 +68,8 @@ impl Executor {
         Self {
             runtime: Arc::new(Mutex::new(None)),
             handle: Handle::current(),
+            request_pool: Arc::new(Mutex::new(None)),
+            request_pool_handle: None,
         }
     }
 
@@ -84,6 +91,9 @@ impl Executor {
         F: Fn() + Send + Sync + 'static,
         G: Fn() + Send + Sync + 'static,
     {
+        let on_thread_start = Arc::new(on_thread_start);
+        let on_thread_stop = Arc::new(on_thread_stop);
+
         let mut runtime_builder = Builder::new_multi_thread();
 
         runtime_builder
@@ -95,17 +105,45 @@ impl Executor {
         // tokio expires after an idle keep-alive and respawns on demand. Any per-thread state
         // created in `on_thread_start` must be torn down in `on_thread_stop`: a leak here is per
         // thread created, not per pool slot, and so grows without bound in a long-lived pantsd.
-        runtime_builder.on_thread_start(on_thread_start);
-        runtime_builder.on_thread_stop(on_thread_stop);
+        runtime_builder.on_thread_start({
+            let f = on_thread_start.clone();
+            move || f()
+        });
+        runtime_builder.on_thread_stop({
+            let f = on_thread_stop.clone();
+            move || f()
+        });
 
         let runtime = runtime_builder
             .build()
             .map_err(|e| format!("Failed to start the runtime: {e}"))?;
 
+        // A pool reserved for client requests: see `spawn_request_blocking`. The current-thread
+        // flavor spawns no workers, so this runtime is only its blocking pool.
+        let mut request_pool_builder = Builder::new_current_thread();
+        request_pool_builder
+            .max_blocking_threads(MAX_REQUEST_THREADS)
+            .thread_name("pants-request");
+        request_pool_builder.on_thread_start({
+            let f = on_thread_start.clone();
+            move || f()
+        });
+        request_pool_builder.on_thread_stop({
+            let f = on_thread_stop.clone();
+            move || f()
+        });
+
+        let request_pool = request_pool_builder
+            .build()
+            .map_err(|e| format!("Failed to start the request pool: {e}"))?;
+
         let handle = runtime.handle().clone();
+        let request_pool_handle = request_pool.handle().clone();
         Ok(Executor {
             runtime: Arc::new(Mutex::new(Some(runtime))),
             handle,
+            request_pool: Arc::new(Mutex::new(Some(request_pool))),
+            request_pool_handle: Some(request_pool_handle),
         })
     }
 
@@ -117,6 +155,8 @@ impl Executor {
         Self {
             runtime: Arc::new(Mutex::new(None)),
             handle: self.handle.clone(),
+            request_pool: Arc::new(Mutex::new(None)),
+            request_pool_handle: self.request_pool_handle.clone(),
         }
     }
 
@@ -197,6 +237,32 @@ impl Executor {
         })
     }
 
+    ///
+    /// Run a blocking function that hosts a client request on a pool reserved for them.
+    ///
+    /// On free-threaded CPython a thread retains the allocator heap it warmed until it exits, so
+    /// requests keep that heap off the long-lived blocking-pool threads.
+    ///
+    pub fn spawn_request_blocking<F: FnOnce() -> R + Send + 'static, R: Send + 'static>(
+        &self,
+        f: F,
+    ) -> JoinHandle<R> {
+        let stdio_destination = stdio::get_destination();
+        let workunit_store_handle = workunit_store::get_workunit_store_handle();
+        let main_handle = self.handle.clone();
+        let f = move || {
+            // This pool's runtime is driverless: resolve ambient tokio APIs to the main runtime.
+            let _main_runtime = main_handle.enter();
+            stdio::set_thread_destination(stdio_destination);
+            workunit_store::set_thread_workunit_store_handle(workunit_store_handle);
+            f()
+        };
+        match &self.request_pool_handle {
+            Some(handle) => handle.spawn_blocking(f),
+            None => self.handle.spawn_blocking(f),
+        }
+    }
+
     /// Return a reference to this executor's runtime handle.
     pub fn handle(&self) -> &Handle {
         &self.handle
@@ -214,6 +280,10 @@ impl Executor {
         };
 
         let start = Instant::now();
+        // The request pool first: an in-flight run needs the main runtime to complete.
+        if let Some(request_pool) = self.request_pool.lock().take() {
+            request_pool.shutdown_timeout(timeout + Duration::from_millis(250));
+        }
         runtime.shutdown_timeout(timeout + Duration::from_millis(250));
         if start.elapsed() > timeout {
             // Leaked tasks could lead to panics in some cases (see #16105), so warn for them.
