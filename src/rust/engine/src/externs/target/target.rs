@@ -732,15 +732,13 @@ impl Target {
         for (key, _) in aliases_to_field_types.iter() {
             valid_aliases.add(key)?;
         }
-        if let Ok(tg_cls) = target_generator_cls(py)
-            && cls.is_subclass(&tg_cls)?
-        {
+        let tg_cls = target_generator_cls(py)?;
+        if cls.is_subclass(&tg_cls)? {
             for ft in cls.getattr(intern!(py, "moved_fields"))?.try_iter()? {
                 let ft = ft?;
                 valid_aliases.add(ft.getattr(intern!(py, "alias"))?)?;
-                if let Ok(dep_alias) = ft.getattr(intern!(py, "deprecated_alias"))
-                    && !dep_alias.is_none()
-                {
+                let dep_alias = ft.getattr(intern!(py, "deprecated_alias"))?;
+                if !dep_alias.is_none() {
                     valid_aliases.add(dep_alias)?;
                 }
             }
@@ -915,9 +913,8 @@ impl Target {
             let field_type = field_type?;
             let alias = field_type.getattr(intern!(py, "alias"))?;
             result.set_item(&alias, &field_type)?;
-            if let Ok(deprecated_alias) = field_type.getattr(intern!(py, "deprecated_alias"))
-                && !deprecated_alias.is_none()
-            {
+            let deprecated_alias = field_type.getattr(intern!(py, "deprecated_alias"))?;
+            if !deprecated_alias.is_none() {
                 result.set_item(&deprecated_alias, &field_type)?;
             }
         }
