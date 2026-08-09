@@ -22,6 +22,8 @@ import toml
 import yaml
 from pants_release.common import die
 
+from pants.backend.python.util_rules.pex_cli import PEX_BINARY_HASH, PEX_VERSION
+
 
 class Pin(NamedTuple):
     ref: str
@@ -108,7 +110,12 @@ class Platform(Enum):
 # We don't specify a patch version so that we get the latest, which comes pre-installed:
 #  https://github.com/actions/setup-python#available-versions-of-python
 # NOTE: The last entry becomes the default
-_BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+_BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.14t"]
+
+
+def pants_interpreter_constraints() -> list[str]:
+    return cast("list[str]", toml.load("pants.toml")["python"]["interpreter_constraints"])
+
 
 PYTHON_VERSIONS_PER_PLATFORM: dict[Platform, list[str]] = {
     Platform.LINUX_X86_64: _BASE_PYTHON_VERSIONS,
@@ -986,8 +993,18 @@ def build_wheels_job(
     platform: Platform,
     for_deploy_ref: str | None,
     needs: list[str] | None,
+    free_threaded: bool = True,
 ) -> Jobs:
     helper = Helper(platform)
+    abi = "cp314t" if free_threaded else "cp314"
+    abi_extra = "free-threaded" if free_threaded else "gil"
+    lane_ics = [
+        f"CPython[{abi_extra}]{ic.removeprefix('CPython')}"
+        for ic in pants_interpreter_constraints()
+    ]
+    ic_flags = " ".join(f"--interpreter-constraint '{ic}'" for ic in lane_ics)
+    ic_env = "[" + ",".join(f"'{ic}'" for ic in lane_ics) + "]"
+    sha256_check = "shasum -a 256" if platform == Platform.MACOS14_ARM64 else "sha256sum"
     # For manylinux compatibility, we build Linux wheels in a container rather than directly
     # on the Ubuntu runner. As a result, we have custom steps here to check out
     # the code, install rustup and expose Pythons.
@@ -1019,6 +1036,7 @@ def build_wheels_job(
                     echo "/opt/python/cp312-cp312/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp313-cp313/bin" >> $GITHUB_PATH
                     echo "/opt/python/cp314-cp314/bin" >> $GITHUB_PATH
+                    echo "/opt/python/cp314-cp314t/bin" >> $GITHUB_PATH
                     """
                 ),
             },
@@ -1039,9 +1057,9 @@ def build_wheels_job(
         IS_PANTS_OWNER if for_deploy_ref else f"({IS_PANTS_OWNER}) && ({DONT_SKIP_WHEELS})"
     )
     return {
-        helper.job_name("build_wheels"): {
+        helper.job_name("build_wheels" if free_threaded else "build_wheels_cp314"): {
             "if": if_condition,
-            "name": f"Build wheels ({str(platform.value)})",
+            "name": f"Build wheels ({str(platform.value)}, {abi})",
             "runs-on": helper.runs_on(),
             "permissions": {
                 "id-token": "write",
@@ -1070,13 +1088,28 @@ def build_wheels_job(
                     else install_go()
                 ),
                 {
+                    # `which python3.14` can't tell the two ABIs apart; Pex can.
+                    "name": "Select the distribution interpreter",
+                    "run": dedent(
+                        f"""\
+                        curl -fL -o /tmp/pex.pex \\
+                        https://github.com/pex-tool/pex/releases/download/{PEX_VERSION}/pex
+                        echo "{PEX_BINARY_HASH}  /tmp/pex.pex" | {sha256_check} -c -
+                        PY="$(python3.14 /tmp/pex.pex {ic_flags} \\
+                        -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+                        echo "PY=$PY" >> "$GITHUB_ENV"
+                        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS={ic_env}" >> "$GITHUB_ENV"
+                        """
+                    ),
+                },
+                {
                     "name": "Build wheels",
                     "run": "./pants run src/python/pants_release/release.py -- build-wheels",
                     "env": helper.platform_env(),
                 },
                 {
                     "name": "Build Pants PEX",
-                    "run": "./pants package src/python/pants:pants-pex",
+                    "run": f"./pants package src/python/pants:pants-pex@parametrize={abi}",
                     "env": helper.platform_env(),
                 },
                 helper.upload_log_artifacts(name="wheels-and-pex"),
@@ -1093,16 +1126,17 @@ def build_wheels_job(
                         {
                             "name": "Rename the Pants Pex to its final name for upload",
                             "if": "needs.release_info.outputs.is-release == 'true'",
-                            "run": dedent(
+                            "run": f"PEX_STEM=dist/src.python.pants/pants-pex-{abi}\n"
+                            + dedent(
                                 """\
-                                PANTS_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import pants.version;print(pants.version.VERSION)")
-                                PY_VER=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
-                                PLAT=$(PEX_INTERPRETER=1 dist/src.python.pants/pants-pex.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
+                                PANTS_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import pants.version;print(pants.version.VERSION)")
+                                PY_VER=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import sys;print(f'cp{sys.version_info[0]}{sys.version_info[1]}{sys.abiflags}')")
+                                PLAT=$(PEX_INTERPRETER=1 $PEX_STEM.pex -c "import os;print(f'{os.uname().sysname.lower()}_{os.uname().machine.lower()}')")
                                 PEX_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT.pex
                                 PEX_SCIE_FILENAME=pants.$PANTS_VER-$PY_VER-$PLAT
 
-                                mv dist/src.python.pants/pants-pex.pex dist/src.python.pants/$PEX_FILENAME
-                                mv dist/src.python.pants/pants-pex dist/src.python.pants/$PEX_SCIE_FILENAME
+                                mv $PEX_STEM.pex dist/src.python.pants/$PEX_FILENAME
+                                mv $PEX_STEM dist/src.python.pants/$PEX_SCIE_FILENAME
                                 echo "PEX_FILENAME=$PEX_FILENAME" | tee -a "$GITHUB_ENV"
                                 echo "PEX_SCIE_FILENAME=$PEX_SCIE_FILENAME" | tee -a "$GITHUB_ENV"
                                 """
@@ -1176,7 +1210,10 @@ def build_wheels_job(
                                     ),
                                 },
                             ]
-                            if platform == Platform.LINUX_X86_64
+                            # `testutil` is a pure-Python `py3-none-any` wheel, so both ABI lanes
+                            # produce an identical artifact. Upload it from a single lane to avoid
+                            # a duplicate release-asset name collision.
+                            if platform == Platform.LINUX_X86_64 and free_threaded
                             else []
                         ),
                     ]
@@ -1195,6 +1232,9 @@ def build_wheels_jobs(*, for_deploy_ref: str | None = None, needs: list[str] | N
         **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs),
         **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs),
         **build_wheels_job(Platform.MACOS14_ARM64, for_deploy_ref, needs),
+        **build_wheels_job(Platform.LINUX_X86_64, for_deploy_ref, needs, free_threaded=False),
+        **build_wheels_job(Platform.LINUX_ARM64, for_deploy_ref, needs, free_threaded=False),
+        **build_wheels_job(Platform.MACOS14_ARM64, for_deploy_ref, needs, free_threaded=False),
     }
 
 

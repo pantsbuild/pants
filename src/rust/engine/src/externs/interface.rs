@@ -62,7 +62,7 @@ use crate::{
     TypeId, Types, Value, externs, nodes,
 };
 
-#[pymodule]
+#[pymodule(gil_used = false)]
 fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     intrinsics::register(py, m)?;
     externs::register(py, m)?;

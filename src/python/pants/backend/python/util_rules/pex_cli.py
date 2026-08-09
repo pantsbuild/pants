@@ -41,8 +41,8 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-_PEX_VERSION = "v2.98.4"
-_PEX_BINARY_HASH = "78d4bae9f6f4d7e63465e79aff2bd9b199a18340f1d6624cb5af236aa90218b6"
+PEX_VERSION = "v2.98.4"
+PEX_BINARY_HASH = "78d4bae9f6f4d7e63465e79aff2bd9b199a18340f1d6624cb5af236aa90218b6"
 _PEX_BINARY_SIZE = 5129912
 
 
@@ -51,7 +51,7 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = _PEX_VERSION
+    default_version = PEX_VERSION
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
     version_constraints = ">=2.97.1,<3.0"
 
@@ -68,7 +68,7 @@ class PexCli(TemplatedExternalTool):
     )
 
     default_known_versions = [
-        f"{_PEX_VERSION}|{platform}|{_PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}"
+        f"{PEX_VERSION}|{platform}|{PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}"
         for platform in ["macos_x86_64", "macos_arm64", "linux_x86_64", "linux_arm64"]
     ]
 
