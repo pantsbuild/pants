@@ -87,6 +87,10 @@ impl SourceBlock {
         PyComparedBool::eq_ne(op, self.start == other.start && self.end == other.end)
     }
 
+    fn __getnewargs__(&self) -> (i64, i64) {
+        (self.start, self.end)
+    }
+
     fn is_touched_by(&self, other: PyRef<'_, TextBlock>) -> bool {
         let (start, end) = if other.count == 0 {
             let adjusted = other.start + 1;

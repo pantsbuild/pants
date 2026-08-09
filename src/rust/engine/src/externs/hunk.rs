@@ -59,6 +59,10 @@ impl TextBlock {
         PyComparedBool::eq_ne(op, self.start == other.start && self.count == other.count)
     }
 
+    fn __getnewargs__(&self) -> (i64, i64) {
+        (self.start, self.count)
+    }
+
     fn __repr__(&self) -> String {
         self.repr_string()
     }
@@ -118,6 +122,13 @@ impl Hunk {
         let is_eq =
             text_blocks_eq(&self.left, &other.left) && text_blocks_eq(&self.right, &other.right);
         PyComparedBool::eq_ne(op, is_eq)
+    }
+
+    fn __getnewargs__<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> (Option<Bound<'py, TextBlock>>, Option<Bound<'py, TextBlock>>) {
+        (self.left(py), self.right(py))
     }
 
     fn __repr__(&self) -> String {
