@@ -460,9 +460,7 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         return RuntimePlatforms(
             interpreter_version=None,
             complete_platforms=explicit_complete_platforms,
-            uv_platforms=tuple(
-                INVALID_UV_PLATFORM,
-            ),
+            uv_platforms=(INVALID_UV_PLATFORM,),
         )
 
     # We don't yet know if the pex or uv resolver is pertinent (it depends on the resolver used to

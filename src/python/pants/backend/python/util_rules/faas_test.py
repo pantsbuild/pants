@@ -367,8 +367,10 @@ def test_infer_runtime_platforms_when_complete_platforms(
 
     assert platforms == RuntimePlatforms(
         complete_platforms=CompletePlatforms(["path/cp.json"]),
-        interpreter_version=(3, 45),
-        uv_platforms=("x86_64-manylinux_5_77",),
+        interpreter_version=None,
+        # An explicit complete_platforms was provided, in which case we don't infer uv_platforms,
+        # to preserve pre-uv short-circuit behavior.
+        uv_platforms=("INVALID_UV_PLATFORM",),
     )
 
 
