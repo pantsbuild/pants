@@ -22,6 +22,8 @@ import toml
 import yaml
 from pants_release.common import die
 
+from pants.backend.python.util_rules.pex_cli import PEX_BINARY_HASH, PEX_VERSION
+
 
 class Pin(NamedTuple):
     ref: str
@@ -113,15 +115,6 @@ _BASE_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3
 
 def pants_interpreter_constraints() -> list[str]:
     return cast("list[str]", toml.load("pants.toml")["python"]["interpreter_constraints"])
-
-
-def pinned_pex() -> tuple[str, str]:
-    # visibility forbids `pants_release` depending on `pants.backend`.
-    text = Path("src/python/pants/backend/python/util_rules/pex_cli.py").read_text()
-    version = re.search(r'_PEX_VERSION = "(?P<v>v[0-9.]+)"', text)
-    sha256 = re.search(r'_PEX_BINARY_HASH = "(?P<h>[0-9a-f]{64})"', text)
-    assert version is not None and sha256 is not None, "Could not find Pex pins in pex_cli.py"
-    return version.group("v"), sha256.group("h")
 
 
 PYTHON_VERSIONS_PER_PLATFORM: dict[Platform, list[str]] = {
@@ -1011,7 +1004,6 @@ def build_wheels_job(
     ]
     ic_flags = " ".join(f"--interpreter-constraint '{ic}'" for ic in lane_ics)
     ic_env = "[" + ",".join(f"'{ic}'" for ic in lane_ics) + "]"
-    pex_version, pex_sha256 = pinned_pex()
     sha256_check = "shasum -a 256" if platform == Platform.MACOS14_ARM64 else "sha256sum"
     # For manylinux compatibility, we build Linux wheels in a container rather than directly
     # on the Ubuntu runner. As a result, we have custom steps here to check out
@@ -1101,8 +1093,8 @@ def build_wheels_job(
                     "run": dedent(
                         f"""\
                         curl -fL -o /tmp/pex.pex \\
-                        https://github.com/pex-tool/pex/releases/download/{pex_version}/pex
-                        echo "{pex_sha256}  /tmp/pex.pex" | {sha256_check} -c -
+                        https://github.com/pex-tool/pex/releases/download/{PEX_VERSION}/pex
+                        echo "{PEX_BINARY_HASH}  /tmp/pex.pex" | {sha256_check} -c -
                         PY="$(python3.14 /tmp/pex.pex {ic_flags} \\
                         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
                         echo "PY=$PY" >> "$GITHUB_ENV"

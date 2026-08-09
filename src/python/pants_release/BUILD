@@ -7,10 +7,7 @@ python_tests(
     name="test",
     overrides={
         "generate_github_workflows_test.py": {
-            "dependencies": [
-                "//pants.toml:files",
-                "src/python/pants/backend/python/util_rules/pex_cli.py",
-            ],
+            "dependencies": ["//pants.toml:files"],
         },
     },
 )
