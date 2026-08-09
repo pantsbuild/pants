@@ -156,6 +156,15 @@ impl Target {
         py.None()
     }
 
+    /// NB: Python's `Target.__init__` is split into `__new__` and `__init__` here.
+    ///
+    /// Everything that only needs the arguments happens in `__new__`, which is a `#[classmethod]`
+    /// so that field resolution sees the concrete subclass rather than `Target`. Validation cannot
+    /// happen there: `validate` is overridden in Python, and dispatching to an override requires
+    /// the constructed instance, which `__new__` does not have (it returns `Self` by value). So
+    /// `__init__` receives that instance, ignores the arguments `__new__` already consumed, and
+    /// only calls `validate`. As in the Python original, a failure from either half is re-raised
+    /// as `InvalidTargetException`.
     #[new]
     #[classmethod]
     #[pyo3(signature = (
