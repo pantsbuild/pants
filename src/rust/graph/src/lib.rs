@@ -41,10 +41,56 @@ pub struct InvalidationResult {
 
 type Nodes<N> = HashMap<N, EntryId>;
 
+///
+/// The set of Runs which are currently live.
+///
+/// Membership is reference counted: each holder of a Run registers with `register`, receiving a
+/// `RunGuard` which deregisters the Run when the last holder drops it. A Run therefore stays live
+/// exactly while some holder can still refer to it, and can never be leaked.
+///
+#[derive(Debug, Default)]
+pub(crate) struct LiveRuns(Mutex<HashMap<RunId, usize>>);
+
+impl LiveRuns {
+    fn register(self: &Arc<Self>, run_id: RunId) -> RunGuard {
+        *self.0.lock().entry(run_id).or_insert(0) += 1;
+        RunGuard {
+            live_runs: self.clone(),
+            run_id,
+        }
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.0.lock().len()
+    }
+}
+
+///
+/// A holder's registration of a live Run. Dropping the last guard for a Run deregisters it.
+///
+pub struct RunGuard {
+    live_runs: Arc<LiveRuns>,
+    run_id: RunId,
+}
+
+impl Drop for RunGuard {
+    fn drop(&mut self) {
+        let mut live = self.live_runs.0.lock();
+        if let Some(count) = live.get_mut(&self.run_id) {
+            *count -= 1;
+            if *count == 0 {
+                live.remove(&self.run_id);
+            }
+        }
+    }
+}
+
 struct InnerGraph<N: Node> {
     nodes: Nodes<N>,
     pg: PGraph<N>,
     run_id_generator: u32,
+    live_runs: Arc<LiveRuns>,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -382,6 +428,7 @@ impl<N: Node> Graph<N> {
             nodes: HashMap::default(),
             pg: DiGraph::new(),
             run_id_generator: 0,
+            live_runs: Arc::new(LiveRuns::default()),
         }));
         let _join = executor.native_spawn(Self::cycle_check_task(Arc::downgrade(&inner)));
 
@@ -397,17 +444,30 @@ impl<N: Node> Graph<N> {
         self.context_with_run_id(context, self.generate_run_id())
     }
 
-    /// Create a Context wrapping an opaque Node::Context type.
+    /// Create a Context wrapping an opaque Node::Context type. The returned Context holds a
+    /// registration for the RunId which is released when its last clone drops.
     pub fn context_with_run_id(&self, context: N::Context, run_id: RunId) -> Context<N> {
-        Context::new(self.clone(), context, run_id)
+        let run_guard = self.register_run(run_id);
+        Context::new(self.clone(), context, run_id, run_guard)
     }
 
-    /// Generate a unique RunId for this Graph which can be reused in `context_with_run_id`.
+    /// Register a holder of the given RunId, keeping it live until the returned guard drops.
+    pub fn register_run(&self, run_id: RunId) -> RunGuard {
+        self.inner.lock().live_runs.register(run_id)
+    }
+
+    /// Generate a unique RunId for this Graph which can be registered via `register_run` or
+    /// `context_with_run_id`.
     pub fn generate_run_id(&self) -> RunId {
         let mut inner = self.inner.lock();
         let run_id = inner.run_id_generator;
         inner.run_id_generator += 1;
         RunId(run_id)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn live_runs_len(&self) -> usize {
+        self.inner.lock().live_runs.len()
     }
 
     ///
