@@ -32,6 +32,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex import (
+    INVALID_UV_PLATFORM,
     CompletePlatforms,
     create_pex,
     digest_complete_platform_addresses,
@@ -447,17 +448,29 @@ async def _infer_from_ics(request: RuntimePlatformsRequest) -> tuple[int, int]:
 
 @rule
 async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePlatforms:
+    if request.complete_platforms.value is not None:
+        # Explicit complete_platforms wins. For continuity of legacy behavior we short-circuit
+        # in this case, meaning you cannot use a uv lockfile. If you want to, you must first delete
+        # the explicit complete_platforms from the target.
+        explicit_complete_platforms: CompletePlatforms = await digest_complete_platforms(
+            request.complete_platforms
+        )
+        # Don't bother trying to infer the runtime version if the user has provided their own
+        # complete platform; they probably know what they're doing.
+        return RuntimePlatforms(
+            interpreter_version=None,
+            complete_platforms=explicit_complete_platforms,
+            uv_platforms=tuple(
+                INVALID_UV_PLATFORM,
+            ),
+        )
+
     # We don't yet know if the pex or uv resolver is pertinent (it depends on the resolver used to
     # generate the lockfile), so we infer for both (complete_platforms for pex, uv_platform for uv).
     complete_platforms = None
     uv_platforms = None
 
-    if request.complete_platforms.value is not None:
-        # Explicit complete_platforms wins.
-        complete_platforms = await digest_complete_platforms(request.complete_platforms)
-
     if request.uv_platforms.value is not None:
-        # Explicit uv_platforms wins.
         uv_platforms = request.uv_platforms.value
 
     version = request.runtime.to_interpreter_version()
@@ -467,68 +480,64 @@ async def infer_runtime_platforms(request: RuntimePlatformsRequest) -> RuntimePl
         version = await _infer_from_ics(request)
         inferred_from_ics = True
 
-    # Infer whatever we still don't have.
-    if not complete_platforms or not uv_platforms:
-        try:
-            (file_name, uv_platform) = next(
-                (rt.file_name(), rt.uv_python_platform())
-                for rt in request.runtime.known_runtimes
-                if version == (rt.major, rt.minor) and request.architecture.value == rt.architecture
-            )
-        except StopIteration:
-            # No known runtime, so prompt the user to specify
-            version_modifier = (
-                "[inferred from interpreter constraints]" if inferred_from_ics else ""
-            )
-            version_adjective = "inferred" if inferred_from_ics else "specified"
-            fixes = []
-            if not complete_platforms:
-                fixes.append(
-                    softwrap(
-                        f"""
-                    - generate a `complete_platforms` file for the given Python version and machine
-                      architecture, or specify a runtime that is known to Pants.
-                      See {doc_url("docs/python/overview/pex#generating-the-complete_platforms-file")}
-                    """
-                    )
-                )
-            if not uv_platforms:
-                fixes.append(
-                    softwrap(
-                        """
-                    - specify `uv_platforms` for the given machine architecture,
-                      or specify a runtime that is known to Pants.
-                    """
-                    )
-                )
-            fixes_str = "\n".join(fixes)
-            known_runtimes_str = ", ".join(
-                FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
-            )
-            raise InvalidTargetException(
+    try:
+        (file_name, uv_platform) = next(
+            (rt.file_name(), rt.uv_python_platform())
+            for rt in request.runtime.known_runtimes
+            if version == (rt.major, rt.minor) and request.architecture.value == rt.architecture
+        )
+    except StopIteration:
+        # No known runtime, so prompt the user to specify
+        version_modifier = "[inferred from interpreter constraints]" if inferred_from_ics else ""
+        version_adjective = "inferred" if inferred_from_ics else "specified"
+        fixes = []
+        if not complete_platforms:
+            fixes.append(
                 softwrap(
                     f"""
-                    Could not find a known runtime for the {version_adjective} Python version and machine architecture!
-
-                    * Python version: {version} {version_modifier}
-                    * Machine architecture: {request.architecture.value}
-                    * Known runtime values: {known_runtimes_str}
-
-                    To fix, please:
-                    {fixes_str}
-                    """
-                ),
-                description_of_origin=f"In the {request.target_name!r} target",
-            ) from None
-
-        uv_platforms = uv_platforms or (uv_platform,)
-        if complete_platforms is None:
-            module = request.runtime.known_runtimes_complete_platforms_module()
-            content = (importlib.resources.files(module) / file_name).read_bytes()
-            snapshot = await digest_to_snapshot(
-                **implicitly(CreateDigest([FileContent(file_name, content)]))
+                - generate a `complete_platforms` file for the given Python version and machine
+                    architecture, or specify a runtime that is known to Pants.
+                    See {doc_url("docs/python/overview/pex#generating-the-complete_platforms-file")}
+                """
+                )
             )
-            complete_platforms = CompletePlatforms.from_snapshot(snapshot)
+        if not uv_platforms:
+            fixes.append(
+                softwrap(
+                    """
+                - specify `uv_platforms` for the given machine architecture,
+                    or specify a runtime that is known to Pants.
+                """
+                )
+            )
+        fixes_str = "\n".join(fixes)
+        known_runtimes_str = ", ".join(
+            FrozenOrderedSet(r.name for r in request.runtime.known_runtimes)
+        )
+        raise InvalidTargetException(
+            softwrap(
+                f"""
+                Could not find a known runtime for the {version_adjective} Python version and machine architecture!
+
+                * Python version: {version} {version_modifier}
+                * Machine architecture: {request.architecture.value}
+                * Known runtime values: {known_runtimes_str}
+
+                Please apply one of these fixes, as relevant:
+                {fixes_str}
+                """
+            ),
+            description_of_origin=f"In the {request.target_name!r} target",
+        ) from None
+
+    uv_platforms = uv_platforms or (uv_platform,)
+    if complete_platforms is None:
+        module = request.runtime.known_runtimes_complete_platforms_module()
+        content = (importlib.resources.files(module) / file_name).read_bytes()
+        snapshot = await digest_to_snapshot(
+            **implicitly(CreateDigest([FileContent(file_name, content)]))
+        )
+        complete_platforms = CompletePlatforms.from_snapshot(snapshot)
 
     return RuntimePlatforms(
         interpreter_version=version,

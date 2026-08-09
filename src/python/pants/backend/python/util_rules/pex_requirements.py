@@ -456,7 +456,7 @@ class ResolveConfig:
     complete_platforms: tuple[str, ...]
     uv_platforms: tuple[
         str, ...
-    ]  # Each entry is "uv_platform:python_version", e.g. "x86_64-unknown-linux-gnu:3.12"
+    ]  # Each entry must be a valid value for the `uv sync` option `--python-platform`.
     uploaded_prior_to: str | None
 
     def pex_args(self) -> Iterator[str]:

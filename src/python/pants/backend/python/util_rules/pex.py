@@ -743,6 +743,9 @@ async def _setup_pex_requirements(
     return _BuildPexRequirementsSetup(digests, argv, concurrency_available=concurrency_available)
 
 
+INVALID_UV_PLATFORM = "INVALID_UV_PLATFORM"
+
+
 @rule(level=LogLevel.DEBUG)
 async def build_pex(
     request: PexRequest,
@@ -820,6 +823,18 @@ async def build_pex(
         else:
             python = pex_python_setup.python
         uv_platforms = requirements_setup.uv_platforms or (None,)
+
+        if INVALID_UV_PLATFORM in uv_platforms:
+            raise ValueError(
+                softwrap(
+                    """
+                    A uv platform is required but could not be determined. This can happen if you
+                    explicitly provide pex complete_platforms to a target that should now use the
+                    uv resolver. If this is the case, delete the complete_platforms config for that
+                    target.
+                    """
+                )
+            )
 
         venv_repos = list(
             await concurrently(

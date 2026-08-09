@@ -57,9 +57,7 @@ from pants.backend.python.util_rules.pex_test_utils import (
     create_pex_and_get_pex_info,
     parse_requirements,
 )
-from pants.backend.python.util_rules.uv import (
-    rules as uv_rules,
-)
+from pants.backend.python.util_rules.uv import rules as uv_rules
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
 from pants.core.register import wrap_as_resources
 from pants.core.target_types import FileTarget, ResourceTarget
