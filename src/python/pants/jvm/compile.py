@@ -28,7 +28,6 @@ from pants.engine.target import (
     Field,
     FieldSet,
     GenerateSourcesRequest,
-    SourcesField,
     Target,
     TargetFilesGenerator,
 )
@@ -93,7 +92,15 @@ class ClasspathEntryRequest(metaclass=ABCMeta):
 @dataclass(frozen=True)
 class ClasspathEntryRequestFactory:
     impls: tuple[type[ClasspathEntryRequest], ...]
-    generator_sources: FrozenDict[type[ClasspathEntryRequest], frozenset[type[SourcesField]]]
+    # For each `ClasspathEntryRequest` impl, the `GenerateSourcesRequest` subclasses whose
+    # `output` maps to that impl (see `calculate_jvm_request_types`). Multiple `
+    # GenerateSourcesRequest`s may map to the same impl while sharing the same `input`
+    # SourcesField: for example, both the Java and Scala protobuf codegen backends consume
+    # `ProtobufSourceField`. In that case, `GenerateSourcesRequest.skip_field` allows a target to
+    # opt out of one of the two, so that `classify_impl` does not consider both impls compatible
+    # with the same `protobuf_sources` target (which would otherwise raise
+    # `ClasspathSourceAmbiguity`).
+    generators: FrozenDict[type[ClasspathEntryRequest], tuple[type[GenerateSourcesRequest], ...]]
 
     def for_targets(
         self,
@@ -158,7 +165,12 @@ class ClasspathEntryRequestFactory:
         self, impl: type[ClasspathEntryRequest], component: CoarsenedTarget
     ) -> _ClasspathEntryRequestClassification:
         targets = component.members
-        generator_sources = self.generator_sources.get(impl) or frozenset()
+        generators = self.generators.get(impl) or ()
+
+        def is_skipped(target: Target, generator: type[GenerateSourcesRequest]) -> bool:
+            # `target.get()` returns the field's default (`False`, for a `BoolField`) if the
+            # field isn't registered on this target type, so it's safe to call unconditionally.
+            return generator.skip_field is not None and target.get(generator.skip_field).value
 
         def is_compatible(target: Target) -> bool:
             return (
@@ -166,14 +178,18 @@ class ClasspathEntryRequestFactory:
                 any(fs.is_applicable(target) for fs in impl.field_sets)
                 or
                 # Is applicable via generated sources.
-                any(target.has_field(g) for g in generator_sources)
+                any(
+                    target.has_field(generator.input) and not is_skipped(target, generator)
+                    for generator in generators
+                )
                 or
                 # Is applicable via a generator.
                 (
                     isinstance(target, TargetFilesGenerator)
                     and any(
-                        field in target.generated_target_cls.core_fields
-                        for field in generator_sources
+                        generator.input in target.generated_target_cls.core_fields
+                        and not is_skipped(target, generator)
+                        for generator in generators
                     )
                 )
             )
@@ -206,17 +222,19 @@ async def calculate_jvm_request_types(
                 # (note that subsequently, we only check for `SourceFields`, so no need to filter)
                 impls_by_source[field] = impl
 
-    # Classify code generator sources by their CPE impl
-    sources_by_impl_: dict[type[ClasspathEntryRequest], list[type[SourcesField]]] = defaultdict(
-        list
+    # Classify code generators by their CPE impl.
+    generators_by_impl_: dict[type[ClasspathEntryRequest], list[type[GenerateSourcesRequest]]] = (
+        defaultdict(list)
     )
 
     for g in union_membership.get(GenerateSourcesRequest):
         if g.output in impls_by_source:
-            sources_by_impl_[impls_by_source[g.output]].append(g.input)
-    sources_by_impl = FrozenDict((key, frozenset(value)) for key, value in sources_by_impl_.items())
+            generators_by_impl_[impls_by_source[g.output]].append(g)
+    generators_by_impl = FrozenDict(
+        (key, tuple(value)) for key, value in generators_by_impl_.items()
+    )
 
-    return ClasspathEntryRequestFactory(tuple(cpe_impls), sources_by_impl)
+    return ClasspathEntryRequestFactory(tuple(cpe_impls), generators_by_impl)
 
 
 @dataclass(frozen=True)

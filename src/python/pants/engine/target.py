@@ -2013,6 +2013,14 @@ class GenerateSourcesRequest:
 
     exportable: ClassVar[bool] = True
 
+    # Optional field that, when present and set to `True` on the `protocol_target`, indicates
+    # that this particular codegen implementation should be treated as inapplicable to that
+    # target. This is consulted by JVM classpath resolution (`pants.jvm.compile`) to disambiguate
+    # between multiple codegen implementations that share the same `input` SourcesField but
+    # produce different JVM-compilable `output` SourcesFields (e.g. Java and Scala protobuf
+    # codegen both consuming `ProtobufSourceField`). It has no effect outside of that use.
+    skip_field: ClassVar[type[BoolField] | None] = None
+
 
 @dataclass(frozen=True)
 class GeneratedSources:

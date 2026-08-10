@@ -297,6 +297,32 @@ def test_top_level_proto_root(
     )
 
 
+@maybe_skip_jdk_test
+def test_skip_scala_field(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "protos/f.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                package protos;
+                """
+            ),
+            "protos/BUILD": "protobuf_sources(skip_scala=True)",
+        }
+    )
+    tgt = rule_runner.get_target(Address("protos", relative_file_path="f.proto"))
+    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    protocol_sources = rule_runner.request(
+        HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSourceField])]
+    )
+    generated_sources = rule_runner.request(
+        GeneratedSources,
+        [GenerateScalaFromProtobufRequest(protocol_sources.snapshot, tgt)],
+    )
+    assert generated_sources.snapshot.files == ()
+
+
 def test_generates_fs2_grpc_via_jvm_plugin(
     rule_runner: RuleRunner, scalapb_lockfile: JVMLockfileFixture
 ) -> None:

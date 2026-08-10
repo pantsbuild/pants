@@ -250,6 +250,32 @@ def test_generates_java(
     _ = rule_runner.request(RenderedClasspath, [request])
 
 
+@maybe_skip_jdk_test
+def test_skip_java_field(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                package dir1;
+
+                message Person {
+                  string name = 1;
+                }
+                """
+            ),
+            "src/protobuf/dir1/BUILD": "protobuf_sources(skip_java=True)",
+        }
+    )
+    generated_sources = _run_codegen(
+        rule_runner,
+        Address("src/protobuf/dir1", relative_file_path="f.proto"),
+        source_roots=["/src/protobuf"],
+    )
+    assert generated_sources == frozenset()
+
+
 @pytest.fixture
 def protobuf_java_grpc_lockfile_def() -> JVMLockfileFixtureDefinition:
     return JVMLockfileFixtureDefinition(

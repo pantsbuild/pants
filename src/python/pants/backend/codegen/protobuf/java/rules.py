@@ -22,6 +22,7 @@ from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.fs import (
+    EMPTY_SNAPSHOT,
     AddPrefix,
     CreateDigest,
     Digest,
@@ -41,7 +42,12 @@ from pants.engine.intrinsics import (
 from pants.engine.platform import Platform
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
-from pants.engine.target import GeneratedSources, GenerateSourcesRequest, TransitiveTargetsRequest
+from pants.engine.target import (
+    BoolField,
+    GeneratedSources,
+    GenerateSourcesRequest,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
@@ -50,9 +56,23 @@ from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.logging import LogLevel
 
 
+class SkipJavaProtobufField(BoolField):
+    alias = "skip_java"
+    default = False
+    help = (
+        "If true, skips generation of Java sources from this target.\n\n"
+        "This is required to disambiguate JVM compilation when both the Java and Scala "
+        "protobuf codegen backends (`pants.backend.codegen.protobuf.java` and "
+        "`pants.backend.codegen.protobuf.scala`) are active, and a `java_sources` or "
+        "`scala_sources` target directly depends on this target: without disambiguation, "
+        "Pants cannot tell whether javac or scalac should compile the generated code."
+    )
+
+
 class GenerateJavaFromProtobufRequest(GenerateSourcesRequest):
     input = ProtobufSourceField
     output = JavaSourceField
+    skip_field = SkipJavaProtobufField
 
 
 @dataclass(frozen=True)
@@ -113,6 +133,9 @@ async def generate_java_from_protobuf(
     grpc_plugin: ProtobufJavaGrpcPlugin,  # TODO: Don't access grpc plugin unless gRPC codegen is enabled.
     platform: Platform,
 ) -> GeneratedSources:
+    if request.protocol_target.get(SkipJavaProtobufField).value:
+        return GeneratedSources(EMPTY_SNAPSHOT)
+
     download_protoc_request = download_external_tool(protoc.get_request(platform))
 
     output_dir = "_generated_files"
@@ -211,6 +234,8 @@ def rules():
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
+        ProtobufSourceTarget.register_plugin_field(SkipJavaProtobufField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(SkipJavaProtobufField),
         # Bring in the Java backend (since this backend compiles Java code) to avoid rule graph errors.
         # TODO: Figure out whether a subset of rules can be brought in to still avoid rule graph errors.
         *java_backend_rules(),
