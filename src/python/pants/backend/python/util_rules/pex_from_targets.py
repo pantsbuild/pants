@@ -84,6 +84,7 @@ class PexFromTargetsRequest:
     inject_env: FrozenDict[str, str]
     platforms: PexPlatforms
     complete_platforms: CompletePlatforms
+    uv_platforms: tuple[str, ...]
     additional_args: tuple[str, ...]
     additional_lockfile_args: tuple[str, ...]
     include_source_files: bool
@@ -109,6 +110,7 @@ class PexFromTargetsRequest:
         inject_env: Mapping[str, str] = FrozenDict(),
         platforms: PexPlatforms = PexPlatforms(),
         complete_platforms: CompletePlatforms = CompletePlatforms(),
+        uv_platforms: Iterable[str] = (),
         additional_args: Iterable[str] = (),
         additional_lockfile_args: Iterable[str] = (),
         include_source_files: bool = True,
@@ -168,6 +170,7 @@ class PexFromTargetsRequest:
         object.__setattr__(self, "inject_env", FrozenDict(inject_env))
         object.__setattr__(self, "platforms", platforms)
         object.__setattr__(self, "complete_platforms", complete_platforms)
+        object.__setattr__(self, "uv_platforms", tuple(uv_platforms))
         object.__setattr__(self, "additional_args", tuple(additional_args))
         object.__setattr__(self, "additional_lockfile_args", tuple(additional_lockfile_args))
         object.__setattr__(self, "include_source_files", include_source_files)
@@ -759,6 +762,7 @@ async def create_pex_from_targets(
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
         complete_platforms=request.complete_platforms,
+        uv_platforms=request.uv_platforms,
         main=request.main,
         inject_args=request.inject_args,
         inject_env=request.inject_env,

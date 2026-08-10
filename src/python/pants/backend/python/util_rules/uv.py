@@ -28,6 +28,8 @@ from pants.backend.python.util_rules.lockfile_metadata import (
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.backend.python.util_rules.pex_requirements import (
     LoadedLockfile,
+    ResolveConfigRequest,
+    determine_resolve_config,
     generate_uv_index_config,
 )
 from pants.base.build_root import BuildRoot
@@ -68,6 +70,9 @@ class VenvFromUvLockfileRequest:
 
     lockfile: LoadedLockfile
     python: PythonExecutable
+    # If set, install packages for this uv --python-platform value (e.g. "x86_64-unknown-linux-gnu")
+    # instead of the local platform. python is still the local interpreter used to create the venv.
+    uv_platform: str | None = None
 
 
 @dataclass(frozen=True)
@@ -201,11 +206,16 @@ async def create_venv_repository_from_uv_lockfile(
             )
         )
     metadata: PythonLockfileMetadataV8 = cast(PythonLockfileMetadataV8, request.lockfile.metadata)
+    resolve_config = await determine_resolve_config(
+        ResolveConfigRequest(metadata.resolve), **implicitly()
+    )
 
     pyproject_content = generate_pyproject_toml(
         metadata.resolve,
         metadata.valid_for_interpreter_constraints,
         tuple(str(req) for req in metadata.requirements),
+        indexes=resolve_config.indexes,
+        sources=resolve_config.sources,
     )
 
     uv_config_digest, uv_lock_contents = await concurrently(
@@ -234,12 +244,26 @@ async def create_venv_repository_from_uv_lockfile(
         )
     )
 
-    # We maintain one cached venv per buildroot+interpreter+resolve. uv will efficiently
-    # incrementally update the venv as the lockfile changes. We lock around the `uv sync`
-    # invocations to ensure that they don't step on each others' toes (`uv sync` claims to
-    # be safe for concurrent invocation but it is not in practice, see above).
+    # We maintain one cached venv per buildroot+interpreter+resolve+platform. uv will efficiently
+    # incrementally update the venv as the lockfile changes, and will handle concurrency of
+    # `uv sync` with appropriate locking.
     buildroot_entropy = hashlib.sha256(buildroot.path.encode()).hexdigest()
-    venv_path_suffix = os.path.join(buildroot_entropy, metadata.resolve, request.python.fingerprint)
+    if request.uv_platform is not None:
+        platform_key = hashlib.sha256(
+            f"{request.uv_platform}:{request.python.fingerprint}".encode()
+        ).hexdigest()[:16]
+        venv_path_suffix = os.path.join(buildroot_entropy, metadata.resolve, platform_key)
+        python_args: tuple[str, ...] = (
+            "--python",
+            request.python.path,
+            "--python-platform",
+            request.uv_platform,
+        )
+    else:
+        venv_path_suffix = os.path.join(
+            buildroot_entropy, metadata.resolve, request.python.fingerprint
+        )
+        python_args = ("--python", request.python.path)
 
     uv_cmd = shlex.join(
         (
@@ -251,8 +275,7 @@ async def create_venv_repository_from_uv_lockfile(
             # TODO: extras can conflict, so we might need to be more selective.
             "--all-extras",
             "--no-progress",
-            "--python",
-            request.python.path,
+            *python_args,
         )
     )
     # We use `realpath` to resolve the named cache symlink to an absolute path in whatever
