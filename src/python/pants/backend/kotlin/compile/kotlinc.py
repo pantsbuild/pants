@@ -20,9 +20,10 @@ from pants.backend.kotlin.target_types import (
     KotlinSourceField,
 )
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
+from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST, MergeDigests
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.intrinsics import create_digest, execute_process, merge_digests
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import CoarsenedTarget, SourcesField
 from pants.engine.unions import UnionRule
@@ -36,13 +37,15 @@ from pants.jvm.compile import (
     compile_classpath_entries,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkRequest, JvmProcess, prepare_jdk_environment
+from pants.jvm.jdk_rules import JdkRequest, JvmProcess, jvm_argfile_content, prepare_jdk_environment
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coordinate import Coordinate
 from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+_KOTLINC_ARGUMENT_FILE = "__kotlinc_args.txt"
 
 
 class CompileKotlinSourceRequest(ClasspathEntryRequest):
@@ -167,6 +170,22 @@ async def compile_kotlin_source(
     classpath_arg = ":".join(user_classpath.immutable_inputs_args(prefix=usercp))
 
     output_file = compute_output_jar_filename(request.component)
+    compiler_args = [
+        *(("-classpath", classpath_arg) if classpath_arg else ()),
+        "-d",
+        output_file,
+        *local_plugins.args(local_kotlinc_plugins_relpath),
+        *kotlinc.args,
+        *sorted(
+            itertools.chain.from_iterable(
+                sources.snapshot.files for _, sources in component_members_and_kotlin_source_files
+            )
+        ),
+    ]
+    compiler_args_digest = await create_digest(
+        CreateDigest([FileContent(_KOTLINC_ARGUMENT_FILE, jvm_argfile_content(compiler_args))])
+    )
+    process_input_digest = await merge_digests(MergeDigests([sources_digest, compiler_args_digest]))
     process_result = await execute_process(
         **implicitly(
             JvmProcess(
@@ -174,19 +193,9 @@ async def compile_kotlin_source(
                 classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
                 argv=[
                     "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
-                    *(("-classpath", classpath_arg) if classpath_arg else ()),
-                    "-d",
-                    output_file,
-                    *(local_plugins.args(local_kotlinc_plugins_relpath)),
-                    *kotlinc.args,
-                    *sorted(
-                        itertools.chain.from_iterable(
-                            sources.snapshot.files
-                            for _, sources in component_members_and_kotlin_source_files
-                        )
-                    ),
+                    f"@{_KOTLINC_ARGUMENT_FILE}",
                 ],
-                input_digest=sources_digest,
+                input_digest=process_input_digest,
                 extra_immutable_input_digests=extra_immutable_input_digests,
                 extra_nailgun_keys=extra_nailgun_keys,
                 output_files=(output_file,),

@@ -27,7 +27,7 @@ from pants.backend.scala.util_rules.versions import (
 )
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Directory, MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Directory, FileContent, MergeDigests
 from pants.engine.intrinsics import create_digest, execute_process, merge_digests
 from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -43,7 +43,7 @@ from pants.jvm.compile import (
     compile_classpath_entries,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkRequest, JvmProcess, prepare_jdk_environment
+from pants.jvm.jdk_rules import JdkRequest, JvmProcess, jvm_argfile_content, prepare_jdk_environment
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.strip_jar import strip_jar
@@ -53,6 +53,8 @@ from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+_SCALAC_ARGUMENT_FILE = "__scalac_args.txt"
 
 
 class CompileScalaSourceRequest(ClasspathEntryRequest):
@@ -185,8 +187,29 @@ async def compile_scala_source(
 
     output_file = compute_output_jar_filename(request.component)
     compilation_output_dir = "__out"
-    compilation_empty_dir = await create_digest(CreateDigest([Directory(compilation_output_dir)]))
-    merged_digest = await merge_digests(MergeDigests([sources_digest, compilation_empty_dir]))
+    compiler_args = [
+        "-bootclasspath",
+        ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
+        *local_plugins.args(local_scalac_plugins_relpath),
+        *(("-classpath", classpath_arg) if classpath_arg else ()),
+        *scalac.parsed_args_for_resolve(request.resolve.name),
+        "-d",
+        compilation_output_dir,
+        *sorted(
+            chain.from_iterable(
+                sources.snapshot.files for _, sources in component_members_and_scala_source_files
+            )
+        ),
+    ]
+    compiler_args_digest, compilation_empty_dir = await concurrently(
+        create_digest(
+            CreateDigest([FileContent(_SCALAC_ARGUMENT_FILE, jvm_argfile_content(compiler_args))])
+        ),
+        create_digest(CreateDigest([Directory(compilation_output_dir)])),
+    )
+    merged_digest = await merge_digests(
+        MergeDigests([sources_digest, compilation_empty_dir, compiler_args_digest])
+    )
     compile_result = await execute_process(
         **implicitly(
             JvmProcess(
@@ -194,19 +217,7 @@ async def compile_scala_source(
                 classpath_entries=tool_classpath.classpath_entries(toolcp_relpath),
                 argv=[
                     scala_artifacts.compiler_main,
-                    "-bootclasspath",
-                    ":".join(tool_classpath.classpath_entries(toolcp_relpath)),
-                    *local_plugins.args(local_scalac_plugins_relpath),
-                    *(("-classpath", classpath_arg) if classpath_arg else ()),
-                    *scalac.parsed_args_for_resolve(request.resolve.name),
-                    "-d",
-                    compilation_output_dir,
-                    *sorted(
-                        chain.from_iterable(
-                            sources.snapshot.files
-                            for _, sources in component_members_and_scala_source_files
-                        )
-                    ),
+                    f"@{_SCALAC_ARGUMENT_FILE}",
                 ],
                 input_digest=merged_digest,
                 extra_immutable_input_digests=extra_immutable_input_digests,

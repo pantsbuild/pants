@@ -407,7 +407,7 @@ def _java_argfile_escape(arg: str) -> str:
     return '"' + arg.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def _java_argfile_content(args: Iterable[str]) -> bytes:
+def jvm_argfile_content(args: Iterable[str]) -> bytes:
     return "\n".join(_java_argfile_escape(arg) for arg in args).encode("utf-8") + b"\n"
 
 
@@ -479,7 +479,7 @@ async def jvm_process(
                 [
                     FileContent(
                         _JVM_ARGUMENT_FILE,
-                        _java_argfile_content(java_args),
+                        jvm_argfile_content(java_args),
                     )
                 ]
             )

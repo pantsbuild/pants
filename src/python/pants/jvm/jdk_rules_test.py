@@ -14,7 +14,12 @@ from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
-from pants.jvm.jdk_rules import InternalJdk, JvmProcess, parse_jre_major_version
+from pants.jvm.jdk_rules import (
+    InternalJdk,
+    JvmProcess,
+    jvm_argfile_content,
+    parse_jre_major_version,
+)
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -97,6 +102,12 @@ def get_jvm_argfile(rule_runner: RuleRunner, proc: Process) -> str:
     digest_contents = rule_runner.request(DigestContents, [proc.input_digest])
     argfile = next(fc for fc in digest_contents if fc.path == "__jvm_args.txt")
     return argfile.content.decode("utf-8")
+
+
+def test_jvm_argfile_content() -> None:
+    assert jvm_argfile_content(["hello world", "a#b", r"a\b", 'a"b', "@literal"]) == (
+        b'"hello world"\n"a#b"\n"a\\\\b"\n"a\\"b"\n"@literal"\n'
+    )
 
 
 @maybe_skip_jdk_test
