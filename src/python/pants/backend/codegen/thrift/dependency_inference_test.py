@@ -75,7 +75,7 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
             "src/thrifts/project/f1.thrift": dedent(
                 """\
                 include 'tests/f.thrift';
-                include 'unrelated_path/foo.thrift";
+                include 'unrelated_path/foo.thrift';
                 """
             ),
             "src/thrifts/project/f2.thrift": "include 'project/f1.thrift';",
@@ -89,7 +89,7 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
             "src/thrifts/ambiguous/main.thrift": dedent(
                 """\
                 include 'ambiguous/dep.thrift';
-                include 'ambiguous/disambiguated.thrift";
+                include 'ambiguous/disambiguated.thrift';
                 """
             ),
             "src/thrifts/ambiguous/BUILD": dedent(
@@ -142,3 +142,22 @@ def test_dependency_inference(rule_runner: RuleRunner, caplog) -> None:
         in caplog.text
     )
     assert "disambiguated.thrift" not in caplog.text
+
+
+def test_infer_same_directory_dependency(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "src/thrift/BUILD": "thrift_sources()",
+            "src/thrift/foo.thrift": "include 'bar.thrift'",
+            "src/thrift/bar.thrift": "",
+        }
+    )
+
+    target = rule_runner.get_target(Address("src/thrift", relative_file_path="foo.thrift"))
+    inferred = rule_runner.request(
+        InferredDependencies,
+        [InferThriftDependencies(ThriftDependenciesInferenceFieldSet.create(target))],
+    )
+    assert inferred == InferredDependencies(
+        [Address("src/thrift", relative_file_path="bar.thrift")]
+    )
