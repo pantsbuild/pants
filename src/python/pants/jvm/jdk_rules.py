@@ -452,7 +452,15 @@ async def jvm_process(
         *[valid_jvm_opt(opt) for opt in jvm_user_options],
     ]
 
-    use_argfile = jdk.jre_major_version >= 9
+    # The `{chroot}` placeholder (see `RunRequest`) is only substituted by the engine within a
+    # `Process`'s `argv`, not within file contents. `JvmProcess`es whose classpath or argv rely
+    # on that substitution (as `run.py` and `run_deploy_jar.py` do, to build a `RunRequest` that
+    # runs in the workspace) can't have those arguments moved into an argfile, since the
+    # placeholder would never get resolved.
+    contains_chroot_placeholder = any(
+        "{chroot}" in value for value in (*request.classpath_entries, *request.argv)
+    )
+    use_argfile = jdk.jre_major_version >= 9 and not contains_chroot_placeholder
     use_nailgun = []
     if request.use_nailgun and not use_argfile:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
