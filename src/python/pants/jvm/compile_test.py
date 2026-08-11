@@ -280,7 +280,9 @@ def test_request_classification(
         ],
     )
     all_members = [CompileJavaSourceRequest, CompileScalaSourceRequest, CoursierFetchRequest]
-    generators = FrozenDict(
+    generators: FrozenDict[
+        type[ClasspathEntryRequest], tuple[type[GenerateSourcesRequest], ...]
+    ] = FrozenDict(
         {
             CompileJavaSourceRequest: (MockGenerateJavaFromProtobufRequest,),
             CompileScalaSourceRequest: (),
@@ -314,7 +316,9 @@ def test_request_classification(
     # Two codegen backends can both claim the same `input` SourcesField (as with the real Java
     # and Scala protobuf codegen backends both consuming `ProtobufSourceField`): without a
     # `skip_field` on one side, this is ambiguous...
-    ambiguous_generators = FrozenDict(
+    ambiguous_generators: FrozenDict[
+        type[ClasspathEntryRequest], tuple[type[GenerateSourcesRequest], ...]
+    ] = FrozenDict(
         {
             CompileJavaSourceRequest: (MockGenerateJavaFromProtobufRequest,),
             CompileScalaSourceRequest: (MockGenerateScalaFromProtobufRequest,),
