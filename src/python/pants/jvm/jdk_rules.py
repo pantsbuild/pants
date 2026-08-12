@@ -460,7 +460,13 @@ async def jvm_process(
     contains_chroot_placeholder = any(
         "{chroot}" in value for value in (*request.classpath_entries, *request.argv)
     )
-    use_argfile = jdk.jre_major_version >= 9 and not contains_chroot_placeholder
+    # Nailgun sends the classpath and program arguments to the already-running server over a
+    # socket rather than via argv, so it isn't subject to the OS argument-length limit the argfile
+    # works around, and doesn't benefit from one. Route through the argfile only when nailgun
+    # won't be used, rather than disabling nailgun to make room for it.
+    use_argfile = (
+        jdk.jre_major_version >= 9 and not request.use_nailgun and not contains_chroot_placeholder
+    )
     use_nailgun = []
     if request.use_nailgun and not use_argfile:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
