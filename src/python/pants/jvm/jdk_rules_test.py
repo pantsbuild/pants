@@ -179,11 +179,13 @@ def test_include_child_mem_constraint_in_jvm_options(rule_runner: RuleRunner) ->
 
 
 @maybe_skip_jdk_test
-def test_uses_jvm_argfile_instead_of_nailgun_for_java_9_plus(rule_runner: RuleRunner) -> None:
+def test_uses_nailgun_instead_of_jvm_argfile_for_java_9_plus(rule_runner: RuleRunner) -> None:
+    # Nailgun sends the classpath and args to the running server over a socket rather than via
+    # argv, so it isn't subject to the argument-length limit the argfile works around: prefer it
+    # over the argfile whenever it's requested (the default), even on a Java 9+ JDK.
     proc = javac_version_proc_with_nailgun(rule_runner)
-    assert proc.argv[-1] == "@__jvm_args.txt"
-    assert not proc.use_nailgun
-    assert '"-Xmx512m"' in get_jvm_argfile(rule_runner, proc)
+    assert proc.argv[-1] == "-version"
+    assert proc.use_nailgun
 
 
 @maybe_skip_jdk_test

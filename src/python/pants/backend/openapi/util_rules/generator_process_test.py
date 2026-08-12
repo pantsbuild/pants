@@ -8,7 +8,7 @@ import pytest
 from pants.backend.openapi.util_rules import generator_process
 from pants.backend.openapi.util_rules.generator_process import OpenAPIGeneratorProcess
 from pants.core.util_rules import config_files, external_tool, source_files, system_binaries
-from pants.engine.fs import EMPTY_DIGEST, DigestContents
+from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.process import Process
 from pants.jvm.testutil import maybe_skip_jdk_test
 from pants.testutil.rule_runner import PYTHON_BOOTSTRAP_ENV, QueryRule, RuleRunner
@@ -41,11 +41,5 @@ def test_generator_process(rule_runner: RuleRunner) -> None:
     )
 
     process = rule_runner.request(Process, [generator_process])
-    # For Java 9+ JDKs, the classpath and program arguments are passed via an `@argfile`
-    # (see `pants.jvm.jdk_rules.jvm_process`) rather than directly on `process.argv`.
-    digest_contents = rule_runner.request(DigestContents, [process.input_digest])
-    argfile_content = "\n".join(
-        fc.content.decode("utf-8") for fc in digest_contents if fc.path == "__jvm_args.txt"
-    )
-    assert '"java"' in argfile_content
-    assert '"org.openapitools.codegen.OpenAPIGenerator"' in argfile_content
+    assert "java" in process.argv
+    assert "org.openapitools.codegen.OpenAPIGenerator" in process.argv
