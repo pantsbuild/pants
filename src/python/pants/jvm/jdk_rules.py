@@ -37,6 +37,9 @@ from pants.util.strutil import fmt_memory_size, softwrap
 logger = logging.getLogger(__name__)
 
 
+_JVM_ARGUMENT_FILE = "__jvm_args.txt"
+
+
 @dataclass(frozen=True)
 class Nailgun:
     classpath_entry: ClasspathEntry
@@ -102,9 +105,7 @@ class JdkEnvironment:
     jdk_preparation_script: ClassVar[str] = f"{bin_dir}/jdk.sh"
     java_home: ClassVar[str] = "__java_home"
 
-    def args(
-        self, bash: BashBinary, classpath_entries: Iterable[str], chroot: str | None = None
-    ) -> tuple[str, ...]:
+    def java_binary_args(self, bash: BashBinary, chroot: str | None = None) -> tuple[str, ...]:
         def in_chroot(path: str) -> str:
             if not chroot:
                 return path
@@ -114,6 +115,18 @@ class JdkEnvironment:
             bash.path,
             in_chroot(self.jdk_preparation_script),
             f"{self.java_home}/bin/java",
+        )
+
+    def args(
+        self, bash: BashBinary, classpath_entries: Iterable[str], chroot: str | None = None
+    ) -> tuple[str, ...]:
+        def in_chroot(path: str) -> str:
+            if not chroot:
+                return path
+            return os.path.join(chroot, path)
+
+        return (
+            *self.java_binary_args(bash, chroot),
             "-cp",
             ":".join([in_chroot(self.nailgun_jar), *classpath_entries]),
         )
@@ -390,6 +403,14 @@ class JvmProcess:
 _JVM_HEAP_SIZE_UNITS = ["", "k", "m", "g"]
 
 
+def _java_argfile_escape(arg: str) -> str:
+    return '"' + arg.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def jvm_argfile_content(args: Iterable[str]) -> bytes:
+    return "\n".join(_java_argfile_escape(arg) for arg in args).encode("utf-8") + b"\n"
+
+
 @rule
 async def jvm_process(
     bash: BashBinary, request: JvmProcess, jvm: JvmSubsystem, global_options: GlobalOptions
@@ -431,8 +452,23 @@ async def jvm_process(
         *[valid_jvm_opt(opt) for opt in jvm_user_options],
     ]
 
+    # The `{chroot}` placeholder (see `RunRequest`) is only substituted by the engine within a
+    # `Process`'s `argv`, not within file contents. `JvmProcess`es whose classpath or argv rely
+    # on that substitution (as `run.py` and `run_deploy_jar.py` do, to build a `RunRequest` that
+    # runs in the workspace) can't have those arguments moved into an argfile, since the
+    # placeholder would never get resolved.
+    contains_chroot_placeholder = any(
+        "{chroot}" in value for value in (*request.classpath_entries, *request.argv)
+    )
+    # Nailgun sends the classpath and program arguments to the already-running server over a
+    # socket rather than via argv, so it isn't subject to the OS argument-length limit the argfile
+    # works around, and doesn't benefit from one. Route through the argfile only when nailgun
+    # won't be used, rather than disabling nailgun to make room for it.
+    use_argfile = (
+        jdk.jre_major_version >= 9 and not request.use_nailgun and not contains_chroot_placeholder
+    )
     use_nailgun = []
-    if request.use_nailgun:
+    if request.use_nailgun and not use_argfile:
         use_nailgun = [*jdk.immutable_input_digests, *request.extra_nailgun_keys]
         if jvm.nailgun_enable_agent:
             jvm_options.append(f"-javaagent:{request.jdk.nailgun_jar}")
@@ -441,12 +477,36 @@ async def jvm_process(
     remote_cache_speculation_delay_millis = 0
     if request.remote_cache_speculation_delay is not None:
         remote_cache_speculation_delay_millis = request.remote_cache_speculation_delay
-    elif request.use_nailgun:
+    elif use_nailgun:
         remote_cache_speculation_delay_millis = jvm.nailgun_remote_cache_speculation_delay
 
+    java_args = [
+        "-cp",
+        ":".join([jdk.nailgun_jar, *request.classpath_entries]),
+        *jvm_options,
+        *request.argv,
+    ]
+
+    if use_argfile:
+        jvm_args_digest = await create_digest(
+            CreateDigest(
+                [
+                    FileContent(
+                        _JVM_ARGUMENT_FILE,
+                        jvm_argfile_content(java_args),
+                    )
+                ]
+            )
+        )
+        input_digest = await merge_digests(MergeDigests([request.input_digest, jvm_args_digest]))
+        process_argv = [*jdk.java_binary_args(bash), f"@{_JVM_ARGUMENT_FILE}"]
+    else:
+        input_digest = request.input_digest
+        process_argv = [*jdk.java_binary_args(bash), *java_args]
+
     return Process(
-        [*jdk.args(bash, request.classpath_entries), *jvm_options, *request.argv],
-        input_digest=request.input_digest,
+        process_argv,
+        input_digest=input_digest,
         immutable_input_digests=immutable_input_digests,
         use_nailgun=use_nailgun,
         description=request.description,
