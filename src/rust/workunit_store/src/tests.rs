@@ -50,6 +50,20 @@ fn straggling_workunits_basic() {
 }
 
 #[test]
+fn straggling_workunits_after_refresh() {
+    let ws = create_store(vec![wu_root(0), wu(1, 0)], vec![], vec![]);
+    ws.refresh_heavy_hitters();
+    ws.refresh_heavy_hitters();
+    assert_eq!(
+        vec!["1"],
+        ws.straggling_workunits(Duration::from_secs(0))
+            .into_iter()
+            .map(|(_, n)| n)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn straggling_workunits_blocked_leaf() {
     // Test that a blocked leaf does not cause its parents to be rendered.
     let ws = create_store(vec![wu_root(0)], vec![wu(1, 0)], vec![]);
@@ -90,7 +104,7 @@ async fn disabled_workunit_is_filtered() {
 #[tokio::test]
 async fn workunit_escalation_is_recorded() {
     // Create a store which will disable Debug level workunits.
-    let ws = WorkunitStore::new(true, Level::Info, true, true);
+    let ws = WorkunitStore::new(true, Level::Info, true);
     ws.init_thread_state(None);
 
     // Start a workunit at Debug (below the level of the store).
@@ -165,7 +179,7 @@ fn create_store(
         .iter()
         .map(|(_, span_id, _, _)| *span_id)
         .collect::<HashSet<_>>();
-    let ws = WorkunitStore::new(true, log::Level::Debug, true, true);
+    let ws = WorkunitStore::new(true, log::Level::Debug, true);
 
     // Collect and sort by SpanId.
     let mut all = started
