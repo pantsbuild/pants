@@ -160,11 +160,9 @@ impl Session {
         if dynamic_ui {
             max_workunit_level = std::cmp::max(max_workunit_level, log::Level::Debug);
         }
-        // Only queue workunit messages for consumers which will actually poll for them: the
-        // streaming channel is enabled later iff a streaming workunit consumer registers (see
-        // `enable_streaming_workunits`), and the heavy hitters consumer only exists for the
-        // dynamic UI.
-        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level, false, dynamic_ui);
+        // The streaming channel is enabled later iff a streaming workunit consumer registers (see
+        // `enable_streaming_workunits`).
+        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level, false);
         let display = tokio::sync::Mutex::new(SessionDisplay::new(
             &workunit_store,
             core.local_parallelism,
@@ -351,6 +349,9 @@ impl Session {
     }
 
     pub fn maybe_display_render(&self) {
+        // Neither display mode consumes the heavy hitters queue on every tick, so drain it here
+        // (outside of the display lock) to keep it from growing between renders.
+        self.state.workunit_store.refresh_heavy_hitters();
         let mut display = if let Ok(display) = self.handle.display.try_lock() {
             display
         } else {
