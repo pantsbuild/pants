@@ -29,6 +29,7 @@ from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import (
+    EMPTY_SNAPSHOT,
     AddPrefix,
     CreateDigest,
     Digest,
@@ -50,7 +51,12 @@ from pants.engine.intrinsics import (
 from pants.engine.platform import Platform
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import GeneratedSources, GenerateSourcesRequest, TransitiveTargetsRequest
+from pants.engine.target import (
+    BoolField,
+    GeneratedSources,
+    GenerateSourcesRequest,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.dependency_inference import artifact_mapper
@@ -73,9 +79,23 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.resources import read_resource
 
 
+class SkipScalaProtobufField(BoolField):
+    alias = "skip_scala"
+    default = False
+    help = (
+        "If true, skips generation of Scala sources from this target.\n\n"
+        "This is required to disambiguate JVM compilation when both the Java and Scala "
+        "protobuf codegen backends (`pants.backend.codegen.protobuf.java` and "
+        "`pants.backend.codegen.protobuf.scala`) are active, and a `java_sources` or "
+        "`scala_sources` target directly depends on this target: without disambiguation, "
+        "Pants cannot tell whether javac or scalac should compile the generated code."
+    )
+
+
 class GenerateScalaFromProtobufRequest(GenerateSourcesRequest):
     input = ProtobufSourceField
     output = ScalaSourceField
+    skip_field = SkipScalaProtobufField
 
 
 class ScalaPBShimCompiledClassfiles(ClasspathEntry):
@@ -148,6 +168,9 @@ async def generate_scala_from_protobuf(
     jdk: InternalJdk,
     platform: Platform,
 ) -> GeneratedSources:
+    if request.protocol_target.get(SkipScalaProtobufField).value:
+        return GeneratedSources(EMPTY_SNAPSHOT)
+
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
     shimcp_relpath = "__shimcp"
@@ -348,6 +371,8 @@ def rules():
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
+        ProtobufSourceTarget.register_plugin_field(SkipScalaProtobufField),
+        ProtobufSourcesGeneratorTarget.register_plugin_field(SkipScalaProtobufField),
         # Rules to avoid rule graph errors.
         *artifact_mapper.rules(),
         *distdir.rules(),

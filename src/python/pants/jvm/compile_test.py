@@ -22,7 +22,10 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
     JVMLockfileFixture,
     JVMLockfileFixtureDefinition,
 )
-from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
+from pants.backend.codegen.protobuf.java.rules import (
+    GenerateJavaFromProtobufRequest,
+    SkipJavaProtobufField,
+)
 from pants.backend.codegen.protobuf.java.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
@@ -36,13 +39,14 @@ from pants.backend.java.dependency_inference.rules import rules as java_dep_inf_
 from pants.backend.java.target_types import (
     JavaFieldSet,
     JavaGeneratorFieldSet,
+    JavaSourceField,
     JavaSourcesGeneratorTarget,
 )
 from pants.backend.java.target_types import rules as java_target_types_rules
 from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
 from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
-from pants.backend.scala.target_types import ScalaSourcesGeneratorTarget
+from pants.backend.scala.target_types import ScalaSourceField, ScalaSourcesGeneratorTarget
 from pants.backend.scala.target_types import rules as scala_target_types_rules
 from pants.build_graph.address import Address
 from pants.core.target_types import FilesGeneratorTarget, RelocatedFiles
@@ -53,9 +57,9 @@ from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.target import (
     CoarsenedTarget,
     GeneratedSources,
+    GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
-    SourcesField,
     Target,
     UnexpandedTargets,
 )
@@ -213,6 +217,17 @@ class CompileMockSourceRequest(ClasspathEntryRequest):
     field_sets = (JavaFieldSet, JavaGeneratorFieldSet)
 
 
+class MockGenerateJavaFromProtobufRequest(GenerateSourcesRequest):
+    input = ProtobufSourceField
+    output = JavaSourceField
+    skip_field = SkipJavaProtobufField
+
+
+class MockGenerateScalaFromProtobufRequest(GenerateSourcesRequest):
+    input = ProtobufSourceField
+    output = ScalaSourceField
+
+
 @maybe_skip_jdk_test
 def test_request_classification(
     rule_runner: RuleRunner, scala_stdlib_jvm_lockfile: JVMLockfileFixture
@@ -220,7 +235,9 @@ def test_request_classification(
     def classify(
         targets: Sequence[Target],
         members: Sequence[type[ClasspathEntryRequest]],
-        generators: FrozenDict[type[ClasspathEntryRequest], frozenset[type[SourcesField]]],
+        generators: FrozenDict[
+            type[ClasspathEntryRequest], tuple[type[GenerateSourcesRequest], ...]
+        ],
     ) -> tuple[type[ClasspathEntryRequest], type[ClasspathEntryRequest] | None]:
         factory = ClasspathEntryRequestFactory(tuple(members), generators)
 
@@ -239,6 +256,7 @@ def test_request_classification(
                 jvm_artifact(name='jvm_artifact', group='ex', artifact='ex', version='0.0.0')
                 protobuf_source(name='proto', source="f.proto")
                 protobuf_sources(name='protos')
+                protobuf_source(name='proto_scala_only', source="f.proto", skip_java=True)
                 """
             ),
             "f.proto": proto_source(),
@@ -246,7 +264,7 @@ def test_request_classification(
             "3rdparty/jvm/default.lock": scala_stdlib_jvm_lockfile.serialized_lockfile,
         }
     )
-    scala, java, jvm_artifact, proto, protos = rule_runner.request(
+    scala, java, jvm_artifact, proto, protos, proto_scala_only = rule_runner.request(
         UnexpandedTargets,
         [
             Addresses(
@@ -256,15 +274,18 @@ def test_request_classification(
                     Address("", target_name="jvm_artifact"),
                     Address("", target_name="proto"),
                     Address("", target_name="protos"),
+                    Address("", target_name="proto_scala_only"),
                 ]
             )
         ],
     )
     all_members = [CompileJavaSourceRequest, CompileScalaSourceRequest, CoursierFetchRequest]
-    generators = FrozenDict(
+    generators: FrozenDict[
+        type[ClasspathEntryRequest], tuple[type[GenerateSourcesRequest], ...]
+    ] = FrozenDict(
         {
-            CompileJavaSourceRequest: frozenset([cast(type[SourcesField], ProtobufSourceField)]),
-            CompileScalaSourceRequest: frozenset(),
+            CompileJavaSourceRequest: (MockGenerateJavaFromProtobufRequest,),
+            CompileScalaSourceRequest: (),
         }
     )
 
@@ -291,6 +312,26 @@ def test_request_classification(
     # Too many compatible.
     with pytest.raises(ClasspathSourceAmbiguity):
         classify([java], [CompileJavaSourceRequest, CompileMockSourceRequest], generators)
+
+    # Two codegen backends can both claim the same `input` SourcesField (as with the real Java
+    # and Scala protobuf codegen backends both consuming `ProtobufSourceField`): without a
+    # `skip_field` on one side, this is ambiguous...
+    ambiguous_generators: FrozenDict[
+        type[ClasspathEntryRequest], tuple[type[GenerateSourcesRequest], ...]
+    ] = FrozenDict(
+        {
+            CompileJavaSourceRequest: (MockGenerateJavaFromProtobufRequest,),
+            CompileScalaSourceRequest: (MockGenerateScalaFromProtobufRequest,),
+        }
+    )
+    with pytest.raises(ClasspathSourceAmbiguity):
+        classify([proto], all_members, ambiguous_generators)
+
+    # ...but is resolved once the target opts out of one of the two via the relevant
+    # `skip_field` (here, `skip_java=True`).
+    assert (CompileScalaSourceRequest, None) == classify(
+        [proto_scala_only], all_members, ambiguous_generators
+    )
 
 
 @maybe_skip_jdk_test
