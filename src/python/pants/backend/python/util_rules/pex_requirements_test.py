@@ -459,8 +459,6 @@ class TestResolveConfigPexArgs:
 
 def _uv_config(
     indexes=None,
-    find_links=None,
-    extra_find_links=(),
     sources=None,
     only_binary=None,
     no_binary=None,
@@ -468,7 +466,7 @@ def _uv_config(
 ):
     cfg = ResolveConfig(
         indexes=indexes if indexes is not None else ["https://pypi.org/simple"],
-        find_links=find_links or [],
+        find_links=[],
         manylinux=None,
         constraints_file=None,
         no_binary=FrozenOrderedSet(no_binary or []),
@@ -482,7 +480,7 @@ def _uv_config(
         uv_platforms=(),
         uploaded_prior_to=uploaded_prior_to,
     )
-    return tomllib.loads(cfg.uv_config(extra_find_links=extra_find_links))
+    return tomllib.loads(cfg.uv_config())
 
 
 def test_uv_config_indexes():
@@ -519,20 +517,6 @@ def test_uv_config_indexes():
     assert indexes[1]["url"] == "https://secondary.example.com/simple"
     assert indexes[1].get("name") == "fallback"
     assert indexes[1]["default"] is True
-
-
-def test_uv_config_find_links():
-    parsed = _uv_config(find_links=["https://example.com/wheels"])
-    assert parsed["find-links"] == ["https://example.com/wheels"]
-
-    parsed = _uv_config(
-        find_links=["https://a.example.com/wheels"],
-        extra_find_links=("https://b.example.com/wheels",),
-    )
-    assert parsed["find-links"] == [
-        "https://a.example.com/wheels",
-        "https://b.example.com/wheels",
-    ]
 
 
 def test_uv_config_sources():

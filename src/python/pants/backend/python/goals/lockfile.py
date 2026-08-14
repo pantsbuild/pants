@@ -369,6 +369,7 @@ async def generate_uv_lockfile(
         req.interpreter_constraints,
         req.requirements,
         indexes=resolve_config.indexes,
+        find_links=tuple(*resolve_config.find_links, *req.find_links),
         sources=resolve_config.sources,
     )
 
@@ -407,7 +408,7 @@ async def generate_uv_lockfile(
             # is generated.
             pass
 
-    uv_config = resolve_config.uv_config(extra_find_links=req.find_links)
+    uv_config = resolve_config.uv_config()
 
     uv_config_digest = await create_digest(
         CreateDigest(

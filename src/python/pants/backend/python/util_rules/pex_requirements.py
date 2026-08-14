@@ -410,30 +410,36 @@ class ResolvePexConstraintsFile:
     constraints: FrozenOrderedSet[PipRequirement]
 
 
-def generate_uv_index_config(indexes: Iterable[str] | None, table_name: str) -> Iterable[str]:
+def generate_uv_index_config(
+    indexes: Iterable[str] | None, find_links: Iterable[str] | None, table_name: str
+) -> Iterable[str]:
     if not indexes:
         return ["no-index = true"]
 
-    parsed_indexes = []
+    parsed_indexes: list[dict[str, str]] = []
     for index in indexes:
         part1, _, part2 = index.partition("=")
         (name, url) = (part1, part2) if part2 else ("", part1)
-        parsed_indexes.append((name, url))
+        val = {"url": f'"{url}"'}
+        if name:
+            val["name"] = f'"{name}"'
+        parsed_indexes.append(val)
+    for url in find_links or []:
+        parsed_indexes.append({"url": url, "format": '"flat"'})
 
-    lines = []
+    # To turn off uv's fallback to PyPI we must set some other index to be the default.
+    # In uv the default index has the lowest priority, regardless of its position in the
+    # list of indexes, so we set the last index to be that default, to match user intent.
     if parsed_indexes:
-        # To turn off uv's fallback to PyPI we must set some other index to be the default.
-        # In uv the default index has the lowest priority, regardless of its position in the
-        # list of indexes, so we set the last index to be that default, to match user intent.
-        table_header = f"[[{table_name}]]"
-        for i, (name, url) in enumerate(parsed_indexes):
-            is_default = i == len(parsed_indexes) - 1
-            lines.append(table_header)
-            if name:
-                lines.append(f'name = "{name}"')
-            lines.append(f'url = "{url}"')
-            if is_default:
-                lines.append("default = true")
+        parsed_indexes[-1]["default"] = "true"
+
+    table_header = f"[[{table_name}]]"
+    lines = []
+    for parsed_index in parsed_indexes:
+        lines.append(table_header)
+        for k, v in parsed_index.items():
+            lines.append(f"{k} = {v}")
+
     lines.append("")
     return lines
 
@@ -511,21 +517,13 @@ class ResolveConfig:
         if self.uploaded_prior_to:
             yield f"--uploaded-prior-to={self.uploaded_prior_to}"
 
-    def uv_config(self, extra_find_links: Iterable[str] = ()) -> str:
+    def uv_config(self) -> str:
         """Content for uv.toml based on this resolve's configuration.
 
         Only uv-supported fields are used. Call validate_for_uv() first to ensure no
         pex-specific fields are set.
         """
         config_lines: list[str] = []
-
-        all_find_links = (*self.find_links, *extra_find_links)
-        if all_find_links:
-            config_lines.append("find-links = [")
-            for fl in all_find_links:
-                config_lines.append(f'    "{fl}",')
-            config_lines.append("]")
-            config_lines.append("")
 
         if self.no_binary:
             if ":all:" in self.no_binary:
@@ -555,7 +553,7 @@ class ResolveConfig:
         # index config from pyproject.toml for lockfile generation, and we must write it to uv.toml.
         # However we also write it to pyproject.toml so that uv can validate the source names
         # in `sources`.
-        config_lines.extend(generate_uv_index_config(self.indexes, "index"))
+        config_lines.extend(generate_uv_index_config(self.indexes, self.find_links, "index"))
 
         return "\n".join(config_lines) + "\n" if config_lines else ""
 
