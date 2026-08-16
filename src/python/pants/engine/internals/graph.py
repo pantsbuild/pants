@@ -56,6 +56,8 @@ from pants.engine.target import (
     CoarsenedTargets,
     CoarsenedTargetsRequest,
     Dependencies,
+    DependenciesMultiRequest,
+    DependenciesMultiResult,
     DependenciesRequest,
     DepsTraversalBehavior,
     ExplicitlyProvidedDependencies,
@@ -72,12 +74,15 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     HydratedSources,
     HydrateSourcesRequest,
+    InferDependenciesMultiRequest,
+    InferDependenciesMultiResult,
     InferDependenciesRequest,
     InferredDependencies,
     InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
     RegisteredTargetTypes,
+    ShouldTraverseDepsPredicate,
     SourcesField,
     SourcesPaths,
     SourcesPathsRequest,
@@ -1613,6 +1618,61 @@ async def determine_explicitly_provided_dependencies(
     )
 
 
+async def _determine_explicitly_provided_dependencies_or_raise(
+    tgt: Target,
+    field: Dependencies,
+    should_traverse_deps_predicate: ShouldTraverseDepsPredicate,
+) -> ExplicitlyProvidedDependencies:
+    try:
+        return await determine_explicitly_provided_dependencies(
+            **implicitly(DependenciesRequest(field, should_traverse_deps_predicate))
+        )
+    except Exception as e:
+        raise InvalidFieldException(
+            f"{tgt.description_of_origin}: Failed to get dependencies for {tgt.address}: {e}"
+        )
+
+
+async def _infer_dependencies_for_request_type(
+    inference_request_type: Type[InferDependenciesRequest],
+    tgts: Sequence[Target],
+    environment_name: EnvironmentName,
+) -> list[InferredDependencies]:
+    """Infer dependencies for all `tgts` that are applicable to `inference_request_type`.
+
+    If the request type declares a `multi_request`, all of `tgts` are dispatched to it in a
+    single batched call. Otherwise, we fall back to one `infer_dependencies` call per target.
+    """
+    if inference_request_type.multi_request is not None:
+        multi_request_type = inference_request_type.multi_request
+        field_sets = tuple(inference_request_type.infer_from.create(tgt) for tgt in tgts)
+        result = await infer_dependencies_multi(
+            **implicitly(
+                {
+                    multi_request_type(field_sets): InferDependenciesMultiRequest,
+                    environment_name: EnvironmentName,
+                }
+            )
+        )
+        return list(result.inferred_dependencies)
+
+    return list(
+        await concurrently(
+            infer_dependencies(
+                **implicitly(
+                    {
+                        inference_request_type(
+                            inference_request_type.infer_from.create(tgt)
+                        ): InferDependenciesRequest,
+                        environment_name: EnvironmentName,
+                    },
+                )
+            )
+            for tgt in tgts
+        )
+    )
+
+
 async def _fill_parameters(
     field_alias: str,
     consumer_tgt: Target,
@@ -1655,6 +1715,14 @@ async def infer_dependencies(
 
 
 @rule(polymorphic=True)
+async def infer_dependencies_multi(
+    request: InferDependenciesMultiRequest,
+    environment_name: EnvironmentName,
+) -> InferDependenciesMultiResult:
+    raise NotImplementedError()
+
+
+@rule(polymorphic=True)
 async def validate_dependencies(
     request: ValidateDependenciesRequest,
     environment_name: EnvironmentName,
@@ -1662,156 +1730,227 @@ async def validate_dependencies(
     raise NotImplementedError()
 
 
-@rule(desc="Resolve direct dependencies of target", _masked_types=[EnvironmentName])
-async def resolve_dependencies(
-    request: DependenciesRequest,
+@rule(desc="Resolve direct dependencies of target")
+async def resolve_dependencies(request: DependenciesRequest) -> Addresses:
+    # Legacy single-file API.
+    result = await resolve_dependencies_multi(
+        DependenciesMultiRequest((request.field,), request.should_traverse_deps_predicate),
+        **implicitly(),
+    )
+    return result.dependencies[0]
+
+
+@rule(desc="Resolve direct dependencies of multiple targets", _masked_types=[EnvironmentName])
+async def resolve_dependencies_multi(
+    request: DependenciesMultiRequest,
     target_types_to_generate_requests: TargetTypesToGenerateTargetsRequests,
     union_membership: UnionMembership,
     subproject_roots: SubprojectRoots,
     field_defaults: FieldDefaults,
     local_environment_name: ChosenLocalEnvironmentName,
-) -> Addresses:
+) -> DependenciesMultiResult:
     environment_name = local_environment_name.val
-    wrapped_tgt = await resolve_target(
-        WrappedTargetRequest(request.field.address, description_of_origin="<infallible>"),
-        **implicitly(),
+
+    wrapped_tgts = await concurrently(
+        resolve_target(
+            WrappedTargetRequest(field.address, description_of_origin="<infallible>"),
+            **implicitly(),
+        )
+        for field in request.fields
     )
-    tgt = wrapped_tgt.target
+    tgts = tuple(wrapped_tgt.target for wrapped_tgt in wrapped_tgts)
 
     # This predicate allows the dep graph to ignore dependencies of selected targets
     # including any explicit deps and any inferred deps.
     # For example, to avoid traversing the deps of package targets.
-    if request.should_traverse_deps_predicate(tgt, request.field) == DepsTraversalBehavior.EXCLUDE:
-        return Addresses([])
+    included_fields: list[Dependencies] = []
+    included_tgts: list[Target] = []
+    for tgt, field in zip(tgts, request.fields):
+        if request.should_traverse_deps_predicate(tgt, field) != DepsTraversalBehavior.EXCLUDE:
+            included_fields.append(field)
+            included_tgts.append(tgt)
 
-    try:
-        explicitly_provided = await determine_explicitly_provided_dependencies(
-            **implicitly(request)
+    explicitly_provided_per_tgt = await concurrently(
+        _determine_explicitly_provided_dependencies_or_raise(
+            tgt, field, request.should_traverse_deps_predicate
         )
-    except Exception as e:
-        raise InvalidFieldException(
-            f"{tgt.description_of_origin}: Failed to get dependencies for {tgt.address}: {e}"
-        )
+        for tgt, field in zip(included_tgts, included_fields)
+    )
 
-    # Infer any dependencies (based on `SourcesField` field).
+    # Infer any dependencies (based on `SourcesField` field). For each inference request type,
+    # batch all applicable targets into a single `multi_request` call if one is available;
+    # otherwise fall back to one `infer_dependencies` call per applicable target.
     inference_request_types = cast(
         "Sequence[Type[InferDependenciesRequest]]", union_membership.get(InferDependenciesRequest)
     )
-    inferred: tuple[InferredDependencies, ...] = ()
-    if inference_request_types:
-        relevant_inference_request_types = [
-            inference_request_type
-            for inference_request_type in inference_request_types
-            if inference_request_type.infer_from.is_applicable(tgt)
-        ]
-        inferred = await concurrently(
-            infer_dependencies(
-                **implicitly(
-                    {
-                        inference_request_type(
-                            inference_request_type.infer_from.create(tgt)
-                        ): InferDependenciesRequest,
-                        environment_name: EnvironmentName,
-                    },
-                )
-            )
-            for inference_request_type in relevant_inference_request_types
+    applicable_indices_by_request_type = [
+        (
+            inference_request_type,
+            [
+                i
+                for i, tgt in enumerate(included_tgts)
+                if inference_request_type.infer_from.is_applicable(tgt)
+            ],
         )
+        for inference_request_type in inference_request_types
+    ]
+    applicable_indices_by_request_type = [
+        (inference_request_type, indices)
+        for inference_request_type, indices in applicable_indices_by_request_type
+        if indices
+    ]
+    inferred_by_request_type = await concurrently(
+        _infer_dependencies_for_request_type(
+            inference_request_type, [included_tgts[i] for i in indices], environment_name
+        )
+        for inference_request_type, indices in applicable_indices_by_request_type
+    )
+
+    inferred_per_tgt: list[list[InferredDependencies]] = [[] for _ in included_tgts]
+    for (_, indices), inferred_for_request_type in zip(
+        applicable_indices_by_request_type, inferred_by_request_type
+    ):
+        for i, single_inferred in zip(indices, inferred_for_request_type):
+            inferred_per_tgt[i].append(single_inferred)
 
     # If it's a target generator, inject dependencies on all of its generated targets.
-    generated_addresses: tuple[Address, ...] = ()
-    if target_types_to_generate_requests.is_generator(tgt) and not tgt.address.is_generated_target:
-        parametrizations = await resolve_target_parametrizations(
+    generator_indices = [
+        i
+        for i, tgt in enumerate(included_tgts)
+        if target_types_to_generate_requests.is_generator(tgt)
+        and not tgt.address.is_generated_target
+    ]
+    generator_parametrizations = await concurrently(
+        resolve_target_parametrizations(
             **implicitly(
                 {
                     _TargetParametrizationsRequest(
-                        tgt.address.maybe_convert_to_target_generator(),
+                        included_tgts[i].address.maybe_convert_to_target_generator(),
                         description_of_origin=(
-                            f"the target generator {tgt.address.maybe_convert_to_target_generator()}"
+                            "the target generator "
+                            f"{included_tgts[i].address.maybe_convert_to_target_generator()}"
                         ),
                     ): _TargetParametrizationsRequest,
                     environment_name: EnvironmentName,
                 }
             )
         )
-        generated_addresses = tuple(parametrizations.generated_for(tgt.address).keys())
+        for i in generator_indices
+    )
+    generated_addresses_by_index = {
+        i: tuple(parametrizations.generated_for(included_tgts[i].address).keys())
+        for i, parametrizations in zip(generator_indices, generator_parametrizations)
+    }
 
     # See whether any explicitly provided dependencies are parametrized, but with partial/no
     # parameters. If so, fill them in.
-    explicitly_provided_includes: Iterable[Address] = explicitly_provided.includes
-    if explicitly_provided_includes:
-        explicitly_provided_includes = await _fill_parameters(
-            request.field.alias,
-            tgt,
-            explicitly_provided_includes,
+    fill_includes_indices = [
+        i
+        for i, explicitly_provided in enumerate(explicitly_provided_per_tgt)
+        if explicitly_provided.includes
+    ]
+    filled_includes = await concurrently(
+        _fill_parameters(
+            included_fields[i].alias,
+            included_tgts[i],
+            explicitly_provided_per_tgt[i].includes,
             target_types_to_generate_requests,
             field_defaults,
             local_environment_name,
         )
-    explicitly_provided_ignores: FrozenOrderedSet[Address] = explicitly_provided.ignores
-    if explicitly_provided_ignores:
-        explicitly_provided_ignores = FrozenOrderedSet(
-            await _fill_parameters(
-                request.field.alias,
-                tgt,
-                tuple(explicitly_provided_ignores),
-                target_types_to_generate_requests,
-                field_defaults,
-                local_environment_name,
-            )
+        for i in fill_includes_indices
+    )
+    filled_includes_by_index: dict[int, Iterable[Address]] = dict(
+        zip(fill_includes_indices, filled_includes)
+    )
+
+    fill_ignores_indices = [
+        i
+        for i, explicitly_provided in enumerate(explicitly_provided_per_tgt)
+        if explicitly_provided.ignores
+    ]
+    filled_ignores = await concurrently(
+        _fill_parameters(
+            included_fields[i].alias,
+            included_tgts[i],
+            tuple(explicitly_provided_per_tgt[i].ignores),
+            target_types_to_generate_requests,
+            field_defaults,
+            local_environment_name,
         )
+        for i in fill_ignores_indices
+    )
+    filled_ignores_by_index: dict[int, FrozenOrderedSet[Address]] = {
+        i: FrozenOrderedSet(addrs) for i, addrs in zip(fill_ignores_indices, filled_ignores)
+    }
 
     # If the target has `SpecialCasedDependencies`, such as the `archive` target having
     # `files` and `packages` fields, then we possibly include those too. We don't want to always
     # include those dependencies because they should often be excluded from the result due to
     # being handled elsewhere in the calling code. So, we only include fields based on
     # the should_traverse_deps_predicate.
-
+    #
     # Unlike normal, we don't use `tgt.get()` because there may be >1 subclass of
     # SpecialCasedDependencies.
-    special_cased_fields = tuple(
-        field
-        for field in tgt.field_values.values()
-        if isinstance(field, SpecialCasedDependencies)
-        and request.should_traverse_deps_predicate(tgt, field) == DepsTraversalBehavior.INCLUDE
-    )
-    # We can't use `resolve_unparsed_address_inputs()` directly due to a graph cycle.
-    special_cased = await concurrently(
-        resolve_address(
-            **implicitly(
-                {
-                    AddressInput.parse(
-                        addr,
-                        relative_to=tgt.address.spec_path,
-                        subproject_roots=subproject_roots,
-                        description_of_origin=(
-                            f"the `{special_cased_field.alias}` field from the target {tgt.address}"
-                        ),
-                    ): AddressInput
-                }
+    special_cased_addr_inputs_per_tgt = [
+        [
+            AddressInput.parse(
+                addr,
+                relative_to=tgt.address.spec_path,
+                subproject_roots=subproject_roots,
+                description_of_origin=(
+                    f"the `{special_cased_field.alias}` field from the target {tgt.address}"
+                ),
             )
+            for special_cased_field in tgt.field_values.values()
+            if isinstance(special_cased_field, SpecialCasedDependencies)
+            and request.should_traverse_deps_predicate(tgt, special_cased_field)
+            == DepsTraversalBehavior.INCLUDE
+            for addr in special_cased_field.to_unparsed_address_inputs().values
+        ]
+        for tgt in included_tgts
+    ]
+    # We can't use `resolve_unparsed_address_inputs()` directly due to a graph cycle.
+    special_cased_per_tgt = await concurrently(
+        concurrently(
+            resolve_address(**implicitly({address_input: AddressInput}))
+            for address_input in address_inputs
         )
-        for special_cased_field in special_cased_fields
-        for addr in special_cased_field.to_unparsed_address_inputs().values
+        for address_inputs in special_cased_addr_inputs_per_tgt
     )
 
-    excluded = explicitly_provided_ignores.union(
-        *itertools.chain(deps.exclude for deps in inferred)
-    )
-    result = Addresses(
-        sorted(
-            {
-                addr
-                for addr in (
-                    *generated_addresses,
-                    *explicitly_provided_includes,
-                    *itertools.chain.from_iterable(deps.include for deps in inferred),
-                    *special_cased,
-                )
-                if addr not in excluded
-            }
+    included_results: list[Addresses] = []
+    for i in range(len(included_tgts)):
+        explicitly_provided = explicitly_provided_per_tgt[i]
+        explicitly_provided_includes: Iterable[Address] = filled_includes_by_index.get(
+            i, explicitly_provided.includes
         )
-    )
+        explicitly_provided_ignores: FrozenOrderedSet[Address] = filled_ignores_by_index.get(
+            i, explicitly_provided.ignores
+        )
+        generated_addresses = generated_addresses_by_index.get(i, ())
+        inferred = inferred_per_tgt[i]
+        special_cased = special_cased_per_tgt[i]
+
+        excluded = explicitly_provided_ignores.union(
+            *itertools.chain(deps.exclude for deps in inferred)
+        )
+        included_results.append(
+            Addresses(
+                sorted(
+                    {
+                        addr
+                        for addr in (
+                            *generated_addresses,
+                            *explicitly_provided_includes,
+                            *itertools.chain.from_iterable(deps.include for deps in inferred),
+                            *special_cased,
+                        )
+                        if addr not in excluded
+                    }
+                )
+            )
+        )
 
     # Validate dependencies.
     _ = await concurrently(
@@ -1826,11 +1965,20 @@ async def resolve_dependencies(
                 }
             ),
         )
+        for tgt, result in zip(included_tgts, included_results)
         for vd_request_type in union_membership.get(ValidateDependenciesRequest)
         if vd_request_type.field_set_type.is_applicable(tgt)  # type: ignore[misc]
     )
 
-    return result
+    included_results_iter = iter(included_results)
+    return DependenciesMultiResult(
+        tuple(
+            next(included_results_iter)
+            if request.should_traverse_deps_predicate(tgt, field) != DepsTraversalBehavior.EXCLUDE
+            else Addresses([])
+            for tgt, field in zip(tgts, request.fields)
+        )
+    )
 
 
 # -----------------------------------------------------------------------------------------------
