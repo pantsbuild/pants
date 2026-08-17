@@ -516,9 +516,11 @@ def test_uv_config_indexes():
     assert indexes[0]["url"] == "https://primary.example.com/simple"
     assert "name" not in indexes[0]
     assert "default" not in indexes[0]
+    assert "explicit" not in indexes[0]
     assert indexes[1]["url"] == "https://secondary.example.com/simple"
     assert indexes[1].get("name") == "fallback"
     assert indexes[1]["default"] is True
+    assert indexes[1]["explicit"] is True
 
 
 def test_uv_config_find_links():
