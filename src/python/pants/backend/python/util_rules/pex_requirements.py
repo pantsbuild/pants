@@ -423,24 +423,26 @@ def generate_uv_index_config(
         val = {"url": f'"{url}"'}
         if name:
             val["name"] = f'"{name}"'
+            # All named indexes must be referenced explicitly in `sources`, to match the
+            # preexisting pex resolver behavior.
+            val["explicit"] = "true"
         parsed_indexes.append(val)
     for url in find_links or []:
         parsed_indexes.append({"url": url, "format": '"flat"'})
 
-    # To turn off uv's fallback to PyPI we must set some other index to be the default.
-    # In uv the default index has the lowest priority, regardless of its position in the
-    # list of indexes, so we set the last index to be that default, to match user intent.
     if parsed_indexes:
+        # To turn off uv's fallback to PyPI we must set some other index to be the default.
+        # In uv the default index has the lowest priority, regardless of its position in the
+        # list of indexes, so we set the last index to be that default, to match user intent.
         parsed_indexes[-1]["default"] = "true"
+        table_header = f"[[{table_name}]]"
+        lines = []
+        for parsed_index in parsed_indexes:
+            lines.append(table_header)
+            for k, v in parsed_index.items():
+                lines.append(f"{k} = {v}")
 
-    table_header = f"[[{table_name}]]"
-    lines = []
-    for parsed_index in parsed_indexes:
-        lines.append(table_header)
-        for k, v in parsed_index.items():
-            lines.append(f"{k} = {v}")
-
-    lines.append("")
+        lines.append("")
     return lines
 
 
