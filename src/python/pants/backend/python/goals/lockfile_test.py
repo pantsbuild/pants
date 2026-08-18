@@ -715,6 +715,7 @@ def test_uv_lockfile_generation(
     )
 
     # Verify the sidecar metadata.
+    assert by_path["test.lock.metadata"].content.endswith(b"\n")
     metadata = json.loads(by_path["test.lock.metadata"].content.decode())
     assert metadata["version"] == 8
     assert metadata["lockfile_format"] == LockfileFormat.UV
@@ -811,6 +812,7 @@ def test_pex_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
         path_to_file_content = {fc.path: fc for fc in digest_contents}
         assert "test.lock" in path_to_file_content
         assert "test.lock.metadata" in path_to_file_content
+        assert path_to_file_content["test.lock.metadata"].content.endswith(b"\n")
         lock_data = json.loads(path_to_file_content["test.lock"].content.decode())
         package_to_version = {
             pkg["project_name"]: pkg["version"]
@@ -876,6 +878,7 @@ def test_uv_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
         path_to_file_content = {fc.path: fc for fc in digest_contents}
         assert "test.lock" in path_to_file_content
         assert "test.lock.metadata" in path_to_file_content
+        assert path_to_file_content["test.lock.metadata"].content.endswith(b"\n")
         lock_data = tomllib.loads(path_to_file_content["test.lock"].content.decode())
         package_to_version = {pkg["name"]: pkg["version"] for pkg in lock_data.get("package", [])}
         del package_to_version["pants-lockfile-for-test"]

@@ -312,7 +312,7 @@ async def generate_pex_lockfile(
                 [
                     FileContent(
                         PythonLockfileMetadata.metadata_location_for_lockfile(req.lockfile_dest),
-                        metadata.to_json(with_description=descr).encode(),
+                        f"{metadata.to_json(with_description=descr)}\n".encode(),
                     ),
                 ]
             )
@@ -480,7 +480,7 @@ async def generate_uv_lockfile(
             [
                 FileContent(
                     PythonLockfileMetadata.metadata_location_for_lockfile(req.lockfile_dest),
-                    metadata.to_json(with_description=descr).encode(),
+                    f"{metadata.to_json(with_description=descr)}\n".encode(),
                 ),
             ]
         )
