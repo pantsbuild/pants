@@ -720,9 +720,7 @@ def test_uv_lockfile_generation(
     )
 
     # Verify the sidecar metadata.
-    assert_exactly_one_trailing_newline(
-        by_path["test.lock.metadata"].content, "test.lock.metadata"
-    )
+    assert_exactly_one_trailing_newline(by_path["test.lock.metadata"].content, "test.lock.metadata")
     metadata = json.loads(by_path["test.lock.metadata"].content.decode())
     assert metadata["version"] == 8
     assert metadata["lockfile_format"] == LockfileFormat.UV
