@@ -44,11 +44,21 @@ from pants.option.option_types import (
     TargetListOption,
 )
 from pants.util.docutil import doc_url
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
+
+# Candidate config filenames, in priority order (within a single directory, an earlier filename
+# wins over a later one; but a closer directory always wins over a farther one, regardless of
+# which candidate filename it has). Used for both single, repo-root-only discovery (via
+# `MyPy.config_request`) and per-source-root hierarchical discovery (see `mypy/rules.py`).
+CONFIG_DISCOVERY_FILENAMES = ("mypy.ini", ".mypy.ini", "pyproject.toml", "setup.cfg")
+CONFIG_DISCOVERY_CONTENT_CHECKS = FrozenDict(
+    {"pyproject.toml": b"[tool.mypy", "setup.cfg": b"[mypy"}
+)
 
 
 class MyPyCacheMode(StrEnum):
@@ -108,7 +118,12 @@ class MyPy(PythonToolBase):
         help=lambda cls: softwrap(
             f"""
             If true, Pants will include any relevant config files during runs
-            (`mypy.ini`, `.mypy.ini`, and `setup.cfg`).
+            (`mypy.ini`, `.mypy.ini`, `pyproject.toml`, and `setup.cfg`).
+
+            Pants looks for a config file in each source root and its ancestor directories. For a
+            given source root, Pants uses the config file in the nearest ancestor directory
+            (including the source root itself), following mypy's file-preference order if multiple
+            candidate config files exist in that directory.
 
             Use `[{cls.options_scope}].config` instead if your config is in a non-standard location.
             """
@@ -150,8 +165,12 @@ class MyPy(PythonToolBase):
             specified=self.config,
             specified_option_name=f"{self.options_scope}.config",
             discovery=self.config_discovery,
-            check_existence=["mypy.ini", ".mypy.ini"],
-            check_content={"setup.cfg": b"[mypy", "pyproject.toml": b"[tool.mypy"},
+            check_existence=[
+                filename
+                for filename in CONFIG_DISCOVERY_FILENAMES
+                if filename not in CONFIG_DISCOVERY_CONTENT_CHECKS
+            ],
+            check_content=CONFIG_DISCOVERY_CONTENT_CHECKS,
         )
 
     @property
@@ -207,6 +226,7 @@ class MyPy(PythonToolBase):
 @dataclass(frozen=True)
 class MyPyConfigFile:
     digest: Digest
+    path: str | None
     _python_version_configured: bool
 
     def python_version_to_autoset(
@@ -223,10 +243,13 @@ class MyPyConfigFile:
 async def setup_mypy_config(mypy: MyPy) -> MyPyConfigFile:
     config_files = await find_config_file(mypy.config_request)
     digest_contents = await get_digest_contents(config_files.snapshot.digest)
-    python_version_configured = mypy.check_and_warn_if_python_version_configured(
-        digest_contents[0] if digest_contents else None
+    config_content = digest_contents[0] if digest_contents else None
+    python_version_configured = mypy.check_and_warn_if_python_version_configured(config_content)
+    return MyPyConfigFile(
+        config_files.snapshot.digest,
+        config_content.path if config_content else None,
+        python_version_configured,
     )
-    return MyPyConfigFile(config_files.snapshot.digest, python_version_configured)
 
 
 # --------------------------------------------------------------------------------------
