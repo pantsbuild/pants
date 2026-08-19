@@ -186,11 +186,10 @@ def test_config_file(
         ("setup.cfg", "[mypy]"),
     ],
 )
-def test_config_file_discovery_is_per_source_root(
+def test_config_file_discovery_is_per_source_dir(
     rule_runner: PythonRuleRunner, config_filetype: str, config_header: str
 ) -> None:
     """Ensures all mypy config filetypes are discovered hierarchically."""
-    # TOML requires a lowercase boolean literal; other formats accept `True`.
     bool_literal = "true" if config_filetype == "pyproject.toml" else "True"
     rule_runner.write_files(
         {
@@ -226,9 +225,11 @@ def test_config_file_discovery_is_per_source_root(
 
 
 def test_config_file_discovery_prefers_nearest_ancestor(rule_runner: PythonRuleRunner) -> None:
-    """A closer ancestor config file wins, even over a farther ancestor with a higher-priority
-    filename (e.g. `mypy.ini` beats `setup.cfg` within a directory, but a directory's own
-    `setup.cfg` still beats an ancestor's `mypy.ini`)."""
+    """
+    A closer ancestor config file wins, even over a farther ancestor with a higher-priority
+    filename (e.g. `mypy.ini` preferred over `setup.cfg` within a directory, but a directory's own
+    `setup.cfg` still takes precedence over an ancestor's `mypy.ini`).
+    """
     rule_runner.write_files(
         {
             f"{PACKAGE}/mypy.ini": "[mypy]\ndisallow_any_expr = True\n",

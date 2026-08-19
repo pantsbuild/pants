@@ -6,7 +6,7 @@ from __future__ import annotations
 import dataclasses
 import os
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 from textwrap import dedent  # noqa: PNT20
@@ -52,7 +52,6 @@ from pants.core.goals.check import (
     CheckSubsystem,
 )
 from pants.core.util_rules.config_files import (
-    GatheredPrioritizedConfigFilesByDirectories,
     GatherPrioritizedConfigFilesByDirectoriesRequest,
     OrphanFilepathConfigBehavior,
     gather_prioritized_config_files_by_workspace_dir,
@@ -70,6 +69,7 @@ from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
+    Digest,
     DigestSubset,
     FileContent,
     MergeDigests,
@@ -291,8 +291,7 @@ async def mypy_typecheck_partition(
     if partition.resolve_description:
         mypy_cache_dir += f"/{partition.resolve_description}"
     if partition.config_file.path:
-        config_key = sha256(partition.config_file.path.encode()).hexdigest()[:12]
-        mypy_cache_dir += f"/{config_key}"
+        mypy_cache_dir += f"/{sha256(partition.config_file.path.encode()).hexdigest()}"
     run_cache_dir = ".tmp_cache/mypy_cache"
     argv = await _generate_argv(
         mypy,
@@ -457,14 +456,14 @@ async def mypy_typecheck_partition(
 
 
 async def _mypy_config_file_for_path(
-    config_path: str | None, gathered: GatheredPrioritizedConfigFilesByDirectories, mypy: MyPy
+    config_path: str | None, all_configs: Digest, mypy: MyPy
 ) -> MyPyConfigFile:
     if config_path is None:
         return MyPyConfigFile(
             EMPTY_DIGEST, None, mypy.check_and_warn_if_python_version_configured(None)
         )
     config_digest = await digest_subset_to_digest(
-        DigestSubset(gathered.snapshot.digest, PathGlobs([config_path]))
+        DigestSubset(all_configs, PathGlobs([config_path]))
     )
     digest_contents = await get_digest_contents(config_digest)
     config_content = digest_contents[0] if digest_contents else None
@@ -473,21 +472,19 @@ async def _mypy_config_file_for_path(
 
 
 async def _mypy_field_set_to_config_file(
-    field_sets: Iterable[MyPyFieldSet], mypy: MyPy
+    field_sets: Sequence[MyPyFieldSet], mypy: MyPy
 ) -> dict[MyPyFieldSet, MyPyConfigFile]:
     """Map each field set to the MyPyConfigFile that applies to it.
 
     If an explicit config is set, or config discovery is disabled, every field set shares the
     single repo-wide config (mirroring the pre-existing, non-hierarchical behavior). Otherwise,
-    Pants looks for the nearest ancestor mypy config file for each field set's source root, so
+    Pants looks for the nearest ancestor mypy config file for each field set's source file, so
     different parts of the repo can use different MyPy configs.
     """
-    field_sets = list(field_sets)
     if mypy.config or not mypy.config_discovery:
         config_file = await setup_mypy_config(**implicitly())
-        return {field_set: config_file for field_set in field_sets}
+        return dict.fromkeys(field_sets, config_file)
 
-    source_dirs = {os.path.dirname(field_set.sources.file_path) for field_set in field_sets}
     gathered = await gather_prioritized_config_files_by_workspace_dir(
         GatherPrioritizedConfigFilesByDirectoriesRequest(
             tool_name=mypy.options_scope,
@@ -498,23 +495,26 @@ async def _mypy_field_set_to_config_file(
         )
     )
 
-    config_paths = list(
-        {gathered.source_dir_to_config_file.get(source_dir) for source_dir in source_dirs}
-    )
-    config_files_by_path = dict(
+    # `None` for a field set whose source directory has no config file in any ancestor directory.
+    config_path_by_field_set = {
+        field_set: gathered.source_dir_to_config_file.get(
+            os.path.dirname(field_set.sources.file_path)
+        )
+        for field_set in field_sets
+    }
+    unique_config_paths = sorted(set(config_path_by_field_set.values()), key=lambda p: p or "")
+    config_file_by_path = dict(
         zip(
-            config_paths,
+            unique_config_paths,
             await concurrently(
-                _mypy_config_file_for_path(config_path, gathered, mypy)
-                for config_path in config_paths
+                _mypy_config_file_for_path(config_path, gathered.snapshot.digest, mypy)
+                for config_path in unique_config_paths
             ),
         )
     )
     return {
-        field_set: config_files_by_path[
-            gathered.source_dir_to_config_file.get(os.path.dirname(field_set.sources.file_path))
-        ]
-        for field_set in field_sets
+        field_set: config_file_by_path[config_path]
+        for field_set, config_path in config_path_by_field_set.items()
     }
 
 
