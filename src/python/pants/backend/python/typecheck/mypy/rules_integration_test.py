@@ -177,6 +177,88 @@ def test_config_file(
     assert f"{PACKAGE}/f.py:3" in result[0].stdout
 
 
+@pytest.mark.parametrize(
+    "config_filetype, config_header",
+    [
+        ("mypy.ini", "[mypy]"),
+        (".mypy.ini", "[mypy]"),
+        ("pyproject.toml", "[tool.mypy]"),
+        ("setup.cfg", "[mypy]"),
+    ],
+)
+def test_config_file_discovery_is_per_source_root(
+    rule_runner: PythonRuleRunner, config_filetype: str, config_header: str
+) -> None:
+    """Ensures all mypy config filetypes are discovered hierarchically."""
+    # TOML requires a lowercase boolean literal; other formats accept `True`.
+    bool_literal = "true" if config_filetype == "pyproject.toml" else "True"
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/strict/strict.py": NEEDS_CONFIG_FILE,
+            f"{PACKAGE}/strict/BUILD": "python_sources()",
+            f"{PACKAGE}/strict/{config_filetype}": (
+                f"{config_header}\ndisallow_any_expr = {bool_literal}\n"
+            ),
+            f"{PACKAGE}/lax/lax.py": NEEDS_CONFIG_FILE,
+            f"{PACKAGE}/lax/BUILD": "python_sources()",
+        }
+    )
+    strict_tgt = rule_runner.get_target(
+        Address(f"{PACKAGE}/strict", relative_file_path="strict.py")
+    )
+    lax_tgt = rule_runner.get_target(Address(f"{PACKAGE}/lax", relative_file_path="lax.py"))
+
+    partitions = rule_runner.request(
+        MyPyPartitions, [MyPyRequest(MyPyFieldSet.create(t) for t in (strict_tgt, lax_tgt))]
+    )
+    assert len(partitions) == 2
+
+    result = run_mypy(rule_runner, [strict_tgt, lax_tgt])
+    assert len(result) == 2
+    strict_result, lax_result = (
+        (result[0], result[1])
+        if f"{PACKAGE}/strict" in (result[0].partition_description or "")
+        else (result[1], result[0])
+    )
+    assert strict_result.exit_code == 1
+    assert f"{PACKAGE}/strict/strict.py:3" in strict_result.stdout
+    assert lax_result.exit_code == 0
+
+
+def test_config_file_discovery_prefers_nearest_ancestor(rule_runner: PythonRuleRunner) -> None:
+    """A closer ancestor config file wins, even over a farther ancestor with a higher-priority
+    filename (e.g. `mypy.ini` beats `setup.cfg` within a directory, but a directory's own
+    `setup.cfg` still beats an ancestor's `mypy.ini`)."""
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/mypy.ini": "[mypy]\ndisallow_any_expr = True\n",
+            f"{PACKAGE}/nested/setup.cfg": "[mypy]\n",
+            f"{PACKAGE}/nested/f.py": NEEDS_CONFIG_FILE,
+            f"{PACKAGE}/nested/BUILD": "python_sources()",
+            f"{PACKAGE}/other/f.py": NEEDS_CONFIG_FILE,
+            f"{PACKAGE}/other/BUILD": "python_sources()",
+        }
+    )
+    nested_tgt = rule_runner.get_target(Address(f"{PACKAGE}/nested", relative_file_path="f.py"))
+    other_tgt = rule_runner.get_target(Address(f"{PACKAGE}/other", relative_file_path="f.py"))
+
+    partitions = rule_runner.request(
+        MyPyPartitions, [MyPyRequest(MyPyFieldSet.create(t) for t in (nested_tgt, other_tgt))]
+    )
+    assert len(partitions) == 2
+
+    result = run_mypy(rule_runner, [nested_tgt, other_tgt])
+    assert len(result) == 2
+    nested_result, other_result = (
+        (result[0], result[1])
+        if f"{PACKAGE}/nested" in (result[0].partition_description or "")
+        else (result[1], result[0])
+    )
+    assert nested_result.exit_code == 0
+    assert other_result.exit_code == 1
+    assert f"{PACKAGE}/other/f.py:3" in other_result.stdout
+
+
 def test_passthrough_args(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {f"{PACKAGE}/f.py": NEEDS_CONFIG_FILE, f"{PACKAGE}/BUILD": "python_sources()"}

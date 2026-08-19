@@ -11,10 +11,14 @@ from pants.core.util_rules.config_files import (
     ConfigFilesRequest,
     GatherConfigFilesByDirectoriesRequest,
     GatheredConfigFilesByDirectories,
+    GatheredPrioritizedConfigFilesByDirectories,
+    GatherPrioritizedConfigFilesByDirectoriesRequest,
+    OrphanFilepathConfigBehavior,
 )
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.frozendict import FrozenDict
 
 
 @pytest.fixture
@@ -24,6 +28,10 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             QueryRule(ConfigFiles, [ConfigFilesRequest]),
             QueryRule(GatheredConfigFilesByDirectories, [GatherConfigFilesByDirectoriesRequest]),
+            QueryRule(
+                GatheredPrioritizedConfigFilesByDirectories,
+                [GatherPrioritizedConfigFilesByDirectoriesRequest],
+            ),
         ]
     )
 
@@ -104,3 +112,74 @@ def test_gather_config_files(rule_runner: RuleRunner) -> None:
         ("hello", f"hello/{TEST_CONFIG_FILENAME}"),
         ("hello/world", f"hello/{TEST_CONFIG_FILENAME}"),
     ]
+
+
+CANDIDATE_CONF_FILENAMES = ("mypy.ini", ".mypy.ini", "pyproject.toml", "setup.cfg")
+CONTENT_MARKER_BY_FILENAME = FrozenDict({"pyproject.toml": b"[tool.mypy", "setup.cfg": b"[mypy"})
+
+
+def test_gather_prioritized_config_files(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "mypy.ini": "[mypy]",
+            "foo/bar/setup.cfg": "[mypy]",
+            "foo/bar/Foo.x": "",
+            "foo/bar/xyyzzy/Foo.x": "",
+            "foo/blah/Foo.x": "",
+            "hello/.mypy.ini": "[mypy]",
+            "hello/pyproject.toml": "[tool.other]",
+            "hello/Foo.x": "",
+            "hello/world/Foo.x": "",
+        }
+    )
+
+    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.x"])])
+    request = rule_runner.request(
+        GatheredPrioritizedConfigFilesByDirectories,
+        [
+            GatherPrioritizedConfigFilesByDirectoriesRequest(
+                tool_name="test",
+                candidate_conf_filenames=CANDIDATE_CONF_FILENAMES,
+                filepaths=snapshot.files,
+                content_marker_by_filename=CONTENT_MARKER_BY_FILENAME,
+            )
+        ],
+    )
+    assert sorted(request.source_dir_to_config_file.items()) == [
+        # Nearer ancestor config wins, even though `mypy.ini` outranks `setup.cfg` in priority.
+        ("foo/bar", "foo/bar/setup.cfg"),
+        ("foo/bar/xyyzzy", "foo/bar/setup.cfg"),
+        # No config in `foo/blah` or any of its ancestors besides the build root.
+        ("foo/blah", "mypy.ini"),
+        # `pyproject.toml` is present but lacks the `[tool.mypy]` marker, so `.mypy.ini` wins.
+        ("hello", "hello/.mypy.ini"),
+        ("hello/world", "hello/.mypy.ini"),
+    ]
+
+
+def test_gather_prioritized_config_files_orphan_behavior(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"foo/Foo.x": ""})
+    snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.x"])])
+
+    def gather(
+        orphan_filepath_behavior: OrphanFilepathConfigBehavior,
+    ) -> GatheredPrioritizedConfigFilesByDirectories:
+        return rule_runner.request(
+            GatheredPrioritizedConfigFilesByDirectories,
+            [
+                GatherPrioritizedConfigFilesByDirectoriesRequest(
+                    tool_name="test",
+                    candidate_conf_filenames=CANDIDATE_CONF_FILENAMES,
+                    filepaths=snapshot.files,
+                    content_marker_by_filename=CONTENT_MARKER_BY_FILENAME,
+                    orphan_filepath_behavior=orphan_filepath_behavior,
+                )
+            ],
+        )
+
+    with pytest.raises(ExecutionError) as exc:
+        gather(OrphanFilepathConfigBehavior.ERROR)
+    assert "foo" in str(exc.value)
+
+    assert gather(OrphanFilepathConfigBehavior.WARN).source_dir_to_config_file == FrozenDict()
+    assert gather(OrphanFilepathConfigBehavior.IGNORE).source_dir_to_config_file == FrozenDict()
