@@ -495,7 +495,6 @@ async def _mypy_field_set_to_config_file(
         )
     )
 
-    # `None` for a field set whose source directory has no config file in any ancestor directory.
     config_path_by_field_set = {
         field_set: gathered.source_dir_to_config_file.get(
             os.path.dirname(field_set.sources.file_path)

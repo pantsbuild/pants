@@ -52,10 +52,7 @@ from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
 
-# Candidate config filenames, in priority order (within a single directory, an earlier filename
-# wins over a later one; but a closer directory always wins over a farther one, regardless of
-# which candidate filename it has). Used for both single, repo-root-only discovery (via
-# `MyPy.config_request`) and per-source-root hierarchical discovery (see `mypy/rules.py`).
+# Candidate config filenames, in priority order
 CONFIG_DISCOVERY_FILENAMES: Final[tuple[str, ...]] = (
     "mypy.ini",
     ".mypy.ini",
