@@ -416,8 +416,15 @@ def generate_uv_index_config(
     if not indexes:
         return ["no-index = true"]
 
+    # List of pairs (index string, is_find_links).
+    unparsed_indexes = []
+    for index in indexes or []:
+        unparsed_indexes.append((index, False))
+    for index in find_links or []:
+        unparsed_indexes.append((index, True))
+
     parsed_indexes: list[dict[str, str]] = []
-    for index in indexes:
+    for index, is_find_links in unparsed_indexes:
         part1, _, part2 = index.partition("=")
         (name, url) = (part1, part2) if part2 else ("", part1)
         val = {"url": f'"{url}"'}
@@ -426,9 +433,9 @@ def generate_uv_index_config(
             # All named indexes must be referenced explicitly in `sources`, to match the
             # preexisting pex resolver behavior.
             val["explicit"] = "true"
+        if is_find_links:
+            val["format"] = '"flat"'
         parsed_indexes.append(val)
-    for url in find_links or []:
-        parsed_indexes.append({"url": url, "format": '"flat"'})
 
     if parsed_indexes:
         # To turn off uv's fallback to PyPI we must set some other index to be the default.

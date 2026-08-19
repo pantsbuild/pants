@@ -369,7 +369,7 @@ async def generate_uv_lockfile(
         req.interpreter_constraints,
         req.requirements,
         indexes=resolve_config.indexes,
-        find_links=tuple(*resolve_config.find_links, *req.find_links),
+        find_links=(*resolve_config.find_links, *req.find_links),
         sources=resolve_config.sources,
     )
 

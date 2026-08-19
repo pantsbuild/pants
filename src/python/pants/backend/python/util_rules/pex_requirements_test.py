@@ -507,18 +507,30 @@ def test_uv_config_indexes():
                 "https://primary.example.com/simple",
                 "fallback=https://secondary.example.com/simple",
             ],
+            find_links=[
+                "https://findlinks.example.com/index",
+                "other=https://findlinks.other.com/index",
+            ],
         )
     )
     indexes = parsed["tool"]["uv"]["index"]
-    assert len(indexes) == 2
+    assert len(indexes) == 4
     assert indexes[0]["url"] == "https://primary.example.com/simple"
     assert "name" not in indexes[0]
     assert "default" not in indexes[0]
     assert "explicit" not in indexes[0]
     assert indexes[1]["url"] == "https://secondary.example.com/simple"
     assert indexes[1].get("name") == "fallback"
-    assert indexes[1]["default"] is True
+    assert "default" not in indexes[1]
     assert indexes[1]["explicit"] is True
+    assert indexes[2]["url"] == "https://findlinks.example.com/index"
+    assert "name" not in indexes[2]
+    assert "default" not in indexes[2]
+    assert "explicit" not in indexes[2]
+    assert indexes[3]["url"] == "https://findlinks.other.com/index"
+    assert indexes[3].get("name") == "other"
+    assert indexes[3]["default"] is True
+    assert indexes[3]["explicit"] is True
 
 
 def test_uv_config_sources():
