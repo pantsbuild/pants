@@ -452,3 +452,22 @@ def find_nearest_ancestor_file(files: set[str], dir: str, filename: str) -> str 
         if dir == "":
             return None
         dir = os.path.dirname(dir)
+
+
+def find_nearest_ancestor_file_by_priority_order(
+    files: set[str], dir: str, candidate_filenames: Iterable[str]
+) -> str | None:
+    """
+    Like `find_nearest_ancestor_file`, but checks multiple candidate filenames in order of priority
+    at each directory, returning the first match.
+    """
+    candidate_filenames = tuple(candidate_filenames)
+    while True:
+        for filename in candidate_filenames:
+            candidate_config_file_path = os.path.join(dir, filename)
+            if candidate_config_file_path in files:
+                return candidate_config_file_path
+
+        if dir == "":
+            return None
+        dir = os.path.dirname(dir)
