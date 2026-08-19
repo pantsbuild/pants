@@ -1,5 +1,8 @@
 // Copyright 2025 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::hash::{Hash, Hasher};
+use std::sync::OnceLock;
+
 use pyo3::exceptions::{PyKeyError, PyTypeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::{IntoPyObjectExt, intern};
@@ -11,10 +14,18 @@ use pyo3::types::{
 
 use super::collection::FrozenCollectionData;
 
+static EMPTY_FROZEN_DICT: OnceLock<Py<FrozenDict>> = OnceLock::new();
+
 #[pyclass(subclass, frozen, mapping, generic)]
 #[derive(Debug)]
 pub struct FrozenDict {
     inner: FrozenCollectionData,
+}
+
+impl Hash for FrozenDict {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.inner.cached_hash().hash(state);
+    }
 }
 
 #[pymethods]
@@ -26,7 +37,7 @@ impl FrozenDict {
     }
 
     #[classmethod]
-    fn deep_freeze<'py>(
+    pub fn deep_freeze<'py>(
         cls: &Bound<'py, PyType>,
         data: &Bound<'py, PyMapping>,
     ) -> PyResult<Bound<'py, PyAny>> {
@@ -184,8 +195,7 @@ impl FrozenDict {
     }
 
     fn keys<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
-        let dict = slf.get().inner.data.bind_borrowed(slf.py());
-        dict.call_method0(intern!(slf.py(), "keys"))
+        Self::py_keys(slf)
     }
 
     fn values<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
@@ -292,15 +302,54 @@ impl FrozenDict {
         Self::from_pydict(dict)
     }
 
-    fn from_pydict(dict: Bound<PyDict>) -> PyResult<Self> {
+    pub fn from_pydict(dict: Bound<PyDict>) -> PyResult<Self> {
         let hash = compute_frozendict_hash(&dict)?;
         Ok(Self {
             inner: FrozenCollectionData::new(dict, hash),
         })
     }
 
+    pub fn py_keys<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, PyAny>> {
+        let dict = slf.get().inner.data.bind_borrowed(slf.py());
+        dict.call_method0(intern!(slf.py(), "keys"))
+    }
+
+    pub fn contains(&self, key: &Bound<PyAny>) -> PyResult<bool> {
+        self.inner.contains(key)
+    }
+
+    pub fn get_opt<'py>(&self, key: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner_get(key.as_borrowed(), None)
+    }
+
+    pub fn cached_hash(&self) -> isize {
+        self.inner.cached_hash()
+    }
+
     pub fn iter(slf: Bound<Self>) -> PyResult<KeyValueIter> {
         KeyValueIter::new(slf.get().inner.data.bind_borrowed(slf.py()).as_mapping())
+    }
+
+    pub fn empty<'py>(py: Python<'py>) -> Bound<'py, FrozenDict> {
+        EMPTY_FROZEN_DICT
+            .get_or_init(|| {
+                let fd = Self {
+                    inner: FrozenCollectionData::new(PyDict::new(py), 0),
+                };
+                Py::new(py, fd).expect("failed to create empty FrozenDict")
+            })
+            .bind(py)
+            .clone()
+    }
+
+    pub fn eq(&self, other: &Self, py: Python) -> PyResult<bool> {
+        if self.inner.cached_hash() != other.inner.cached_hash() {
+            return Ok(false);
+        }
+        self.inner
+            .data
+            .bind_borrowed(py)
+            .eq(other.inner.data.bind_borrowed(py))
     }
 
     fn inner_get<'a, 'py>(
