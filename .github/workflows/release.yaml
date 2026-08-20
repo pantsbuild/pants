@@ -68,8 +68,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.98.4/pex
-        echo "78d4bae9f6f4d7e63465e79aff2bd9b199a18340f1d6624cb5af236aa90218b6  /tmp/pex.pex" | sha256sum -c -
+        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
+        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | sha256sum -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[gil]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -215,8 +215,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.98.4/pex
-        echo "78d4bae9f6f4d7e63465e79aff2bd9b199a18340f1d6624cb5af236aa90218b6  /tmp/pex.pex" | sha256sum -c -
+        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
+        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | sha256sum -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[gil]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -372,8 +372,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.98.4/pex
-        echo "78d4bae9f6f4d7e63465e79aff2bd9b199a18340f1d6624cb5af236aa90218b6  /tmp/pex.pex" | shasum -a 256 -c -
+        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
+        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | shasum -a 256 -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[gil]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -513,8 +513,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.98.4/pex
-        echo "78d4bae9f6f4d7e63465e79aff2bd9b199a18340f1d6624cb5af236aa90218b6  /tmp/pex.pex" | sha256sum -c -
+        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
+        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | sha256sum -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[free-threaded]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -660,8 +660,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.98.4/pex
-        echo "78d4bae9f6f4d7e63465e79aff2bd9b199a18340f1d6624cb5af236aa90218b6  /tmp/pex.pex" | sha256sum -c -
+        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
+        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | sha256sum -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[free-threaded]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -832,8 +832,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.98.4/pex
-        echo "78d4bae9f6f4d7e63465e79aff2bd9b199a18340f1d6624cb5af236aa90218b6  /tmp/pex.pex" | shasum -a 256 -c -
+        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
+        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | shasum -a 256 -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[free-threaded]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
