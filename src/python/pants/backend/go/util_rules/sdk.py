@@ -36,6 +36,7 @@ class GoSdkProcess:
     working_dir: str | None
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
+    allow_downloads: bool
     replace_sandbox_root_in_args: bool
 
     def __init__(
@@ -66,6 +67,7 @@ class GoSdkProcess:
         object.__setattr__(self, "working_dir", working_dir)
         object.__setattr__(self, "output_files", tuple(output_files))
         object.__setattr__(self, "output_directories", tuple(output_directories))
+        object.__setattr__(self, "allow_downloads", allow_downloads)
         object.__setattr__(self, "replace_sandbox_root_in_args", replace_sandbox_root_in_args)
 
 
@@ -141,6 +143,17 @@ async def setup_go_sdk_process(
         # GOTOOLCHAIN via `[golang].subprocess_env_vars` from accidentally re-enabling switching.
         "GOTOOLCHAIN": "local",
     }
+
+    if request.allow_downloads:
+        # Downloading a module extracts it into GOMODCACHE (which sits under the sandbox
+        # GOPATH). Go marks the extracted module directories read-only, so Pants' sandbox
+        # cleanup cannot remove them; the removal error is swallowed and every download
+        # silently leaks its whole sandbox. `-modcacherw` keeps the module cache
+        # owner-writable so the sandbox can be torn down. It is scoped to download-enabled
+        # processes through GOFLAGS rather than the shared SDK wrapper script, so the cache
+        # key of every other Go process is unaffected. Appending after the env merge above
+        # preserves a GOFLAGS supplied by the caller or via `[golang].subprocess_env_vars`.
+        env["GOFLAGS"] = f"{env.get('GOFLAGS', '')} -modcacherw".strip()
 
     immutable_input_digests: dict[str, Digest] = {}
 
