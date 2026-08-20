@@ -3,6 +3,7 @@
 from textwrap import dedent
 
 from pants.backend.codegen.protobuf import target_types
+from pants.backend.codegen.protobuf.buf import fields as buf_fields
 from pants.backend.codegen.protobuf.python import additional_fields, python_protobuf_subsystem
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     InferPythonProtobufDependencies,
@@ -29,6 +30,7 @@ def test_find_protobuf_python_requirement() -> None:
             *module_mapper.rules(),
             *stripped_source_files.rules(),
             *additional_fields.rules(),
+            *buf_fields.rules(),
             QueryRule(InferredDependencies, (InferPythonProtobufDependencies,)),
         ],
         target_types=[ProtobufSourcesGeneratorTarget, PythonRequirementTarget],
@@ -112,6 +114,74 @@ def test_find_protobuf_python_requirement() -> None:
     )
 
 
+def test_buf_target_infers_runtime_deps_from_gen_yaml_plugins() -> None:
+    """For `protobuf_generator='buf'` targets, runtime-dep inference is driven by
+    the plugins present in `buf.gen.yaml`, not by `grpc=True`. Connect, grpcio,
+    and grpclib plugins each contribute their respective runtime requirement."""
+    rule_runner = RuleRunner(
+        rules=[
+            *python_protobuf_subsystem.rules(),
+            *target_types.rules(),
+            *module_mapper.rules(),
+            *stripped_source_files.rules(),
+            *additional_fields.rules(),
+            *buf_fields.rules(),
+            QueryRule(InferredDependencies, (InferPythonProtobufDependencies,)),
+        ],
+        target_types=[ProtobufSourcesGeneratorTarget, PythonRequirementTarget],
+    )
+
+    rule_runner.write_files(
+        {
+            "buf.yaml": "version: v2\nmodules:\n  - path: .\n",
+            "buf.gen.yaml": dedent(
+                """\
+                version: v2
+                plugins:
+                  - remote: buf.build/protocolbuffers/python:v34.1
+                    revision: 1
+                    out: gen
+                  - remote: buf.build/connectrpc/python:v0.10.0
+                    revision: 1
+                    out: gen
+                  - remote: buf.build/grpc/python:v1.80.0
+                    revision: 1
+                    out: gen
+                """
+            ),
+            "codegen/dir/f.proto": "",
+            "codegen/dir/BUILD": "protobuf_sources(protobuf_generator='buf')",
+            # 3rdparty stand-ins for the runtimes.
+            "thirdparty/BUILD": dedent(
+                """\
+                python_requirement(name='protobuf', requirements=['protobuf'])
+                python_requirement(name='grpcio', requirements=['grpcio'])
+                python_requirement(name='connectrpc', requirements=['connectrpc'])
+                """
+            ),
+        }
+    )
+    rule_runner.set_options(
+        [
+            "--python-resolves={'python-default': ''}",
+            "--python-enable-resolves",
+            "--no-python-enable-lockfile-targets",
+        ]
+    )
+
+    proto_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.proto"))
+    request = InferPythonProtobufDependencies(
+        PythonProtobufDependenciesInferenceFieldSet.create(proto_tgt)
+    )
+    inferred = rule_runner.request(InferredDependencies, [request])
+    # protobuf is always inferred; grpcio + connectrpc come from the plugins.
+    assert set(inferred.include) == {
+        Address("thirdparty", target_name="protobuf"),
+        Address("thirdparty", target_name="grpcio"),
+        Address("thirdparty", target_name="connectrpc"),
+    }
+
+
 def test_find_protobuf_grpclib_python_requirement() -> None:
     rule_runner = RuleRunner(
         rules=[
@@ -120,6 +190,7 @@ def test_find_protobuf_grpclib_python_requirement() -> None:
             *module_mapper.rules(),
             *stripped_source_files.rules(),
             *additional_fields.rules(),
+            *buf_fields.rules(),
             QueryRule(InferredDependencies, (InferPythonProtobufDependencies,)),
         ],
         target_types=[ProtobufSourcesGeneratorTarget, PythonRequirementTarget],
