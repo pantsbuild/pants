@@ -431,6 +431,9 @@ def generate_uv_index_config(indexes: Iterable[str] | None, table_name: str) -> 
             lines.append(table_header)
             if name:
                 lines.append(f'name = "{name}"')
+                # All named indexes must be referenced explicitly in `sources`, to match the
+                # preexisting pex resolver behavior.
+                lines.append("explicit = true")
             lines.append(f'url = "{url}"')
             if is_default:
                 lines.append("default = true")

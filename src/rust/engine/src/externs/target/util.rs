@@ -24,17 +24,40 @@ pub fn combine_hashes(hashes: &[isize]) -> isize {
     hasher.finish() as isize
 }
 
-pub fn import_target_attr<'py>(
+pub fn import_attr<'py>(
     py: Python<'py>,
     cache: &OnceLock<Py<PyAny>>,
+    module: &str,
     name: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
     if let Some(attr) = cache.get() {
         return Ok(attr.bind(py).clone());
     }
-    let attr = py.import("pants.engine.target")?.getattr(name)?;
+    let attr = py.import(module)?.getattr(name)?;
     let _ = cache.set(attr.clone().unbind());
     Ok(attr)
+}
+
+pub fn import_type<'py>(
+    py: Python<'py>,
+    cache: &OnceLock<Py<pyo3::types::PyType>>,
+    module: &str,
+    name: &str,
+) -> PyResult<Bound<'py, pyo3::types::PyType>> {
+    if let Some(cls) = cache.get() {
+        return Ok(cls.bind(py).clone());
+    }
+    let cls: Bound<'_, pyo3::types::PyType> = py.import(module)?.getattr(name)?.extract()?;
+    let _ = cache.set(cls.clone().unbind());
+    Ok(cls)
+}
+
+pub fn import_target_attr<'py>(
+    py: Python<'py>,
+    cache: &OnceLock<Py<PyAny>>,
+    name: &str,
+) -> PyResult<Bound<'py, PyAny>> {
+    import_attr(py, cache, "pants.engine.target", name)
 }
 
 pub fn raise_invalid_field_type(
@@ -150,7 +173,9 @@ pub fn raise_invalid_field(py: Python, msg: String) -> PyErr {
     }
 }
 
-#[pyclass(name = "_NoValue", from_py_object)]
+static NO_VALUE_SINGLETON: OnceLock<Py<NoFieldValue>> = OnceLock::new();
+
+#[pyclass(name = "_NoValue", frozen, from_py_object)]
 #[derive(Clone)]
 pub struct NoFieldValue;
 
@@ -162,6 +187,19 @@ impl NoFieldValue {
 
     fn __repr__(&self) -> &'static str {
         "<NO_VALUE>"
+    }
+}
+
+impl NoFieldValue {
+    pub fn init_singleton(py: Python) {
+        NO_VALUE_SINGLETON
+            .get_or_init(|| Py::new(py, NoFieldValue).expect("failed to create NO_VALUE"));
+    }
+
+    pub fn expect_singleton() -> &'static Py<NoFieldValue> {
+        NO_VALUE_SINGLETON
+            .get()
+            .expect("NO_VALUE singleton not initialized — module not loaded?")
     }
 }
 
