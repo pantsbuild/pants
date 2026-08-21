@@ -45,7 +45,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.97.1
+        rustup default 1.98.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -184,7 +184,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.97.1
+        rustup default 1.98.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -345,7 +345,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.97.1-*
+          ~/.rustup/toolchains/1.98.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -490,7 +490,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.97.1
+        rustup default 1.98.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -629,7 +629,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.97.1
+        rustup default 1.98.0
         cargo version
     - name: Expose Pythons
       run: |
@@ -805,7 +805,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.97.1-*
+          ~/.rustup/toolchains/1.98.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -954,7 +954,7 @@ jobs:
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.97.1-*
+          ~/.rustup/toolchains/1.98.0-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
