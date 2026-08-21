@@ -74,6 +74,6 @@ async def prettier_fmt(request: PrettierFmtRequest.Batch, prettier: Prettier) ->
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
-        *nodejs_tool.rules(),
+        *nodejs_tool.rules_for_tool(Prettier),
         *PrettierFmtRequest.rules(),
     )

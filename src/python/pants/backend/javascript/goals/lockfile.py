@@ -13,9 +13,22 @@ from pants.backend.javascript.nodejs_project_environment import (
     NodeJsProjectEnvironmentProcess,
 )
 from pants.backend.javascript.package_json import PackageJsonTarget
+from pants.backend.javascript.package_manager import PackageManager
 from pants.backend.javascript.resolve import NodeJSProjectResolves
-from pants.backend.javascript.subsystems.nodejs import UserChosenNodeJSResolveAliases
+from pants.backend.javascript.subsystems.nodejs import (
+    NodeJS,
+    UserChosenNodeJSResolveAliases,
+)
+from pants.backend.javascript.subsystems.nodejs_tool import (
+    NodeJSToolBase,
+    _active_package_manager,
+    _ensure_bundled_lockfile_supported,
+    _nodejs_pm_process,
+    _parse_package_name_and_version,
+    _tool_package_json_bytes,
+)
 from pants.core.goals.generate_lockfiles import (
+    DEFAULT_TOOL_LOCKFILE,
     GenerateLockfile,
     GenerateLockfileResult,
     KnownUserResolveNames,
@@ -23,12 +36,15 @@ from pants.core.goals.generate_lockfiles import (
     RequestedUserResolveNames,
     UserGenerateLockfiles,
 )
+from pants.core.goals.resolves import ExportableTool
 from pants.core.goals.tailor import TailorGoal
+from pants.engine.fs import CreateDigest, FileContent
 from pants.engine.internals.native_engine import AddPrefix
-from pants.engine.intrinsics import add_prefix
+from pants.engine.intrinsics import add_prefix, create_digest, get_digest_contents
 from pants.engine.process import fallible_to_exec_result_or_raise
-from pants.engine.rules import Rule, collect_rules, implicitly, rule
-from pants.engine.unions import UnionRule
+from pants.engine.rules import Rule, collect_rules, concurrently, implicitly, rule
+from pants.engine.unions import UnionMembership, UnionRule
+from pants.option.subsystem import _construct_subsystem
 from pants.util.docutil import bin_name
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize, softwrap
@@ -125,6 +141,167 @@ async def generate_lockfile_from_package_jsons(
     return GenerateLockfileResult(output_digest, request.resolve_name, request.lockfile_dest)
 
 
+@dataclass(frozen=True)
+class GenerateNodeJSToolLockfile(GenerateLockfile):
+    package: str
+    package_manager: PackageManager | None
+
+
+class KnownNodeJSToolResolveNamesRequest(KnownUserResolveNamesRequest):
+    pass
+
+
+class RequestedNodeJSToolResolveNames(RequestedUserResolveNames):
+    pass
+
+
+def _bundled_lockfile_tool_classes(
+    union_membership: UnionMembership,
+) -> dict[str, type[NodeJSToolBase]]:
+    """The NodeJS tool subsystems (keyed by scope) that ship a bundled lockfile."""
+    return {
+        scope: tool_cls
+        for scope, tool_cls in ExportableTool.filter_for_subclasses(
+            union_membership, NodeJSToolBase
+        ).items()
+        if tool_cls.default_lockfile_resources
+    }
+
+
+@rule
+async def determine_nodejs_tool_resolves(
+    _: KnownNodeJSToolResolveNamesRequest,
+    union_membership: UnionMembership,
+) -> KnownUserResolveNames:
+    tool_classes = _bundled_lockfile_tool_classes(union_membership).values()
+    tools = await concurrently(_construct_subsystem(tool_cls) for tool_cls in tool_classes)
+    names = tuple(
+        sorted(
+            # A tool installed from a named resolve takes its dependencies from that resolve's
+            # lockfile, so there is no standalone tool lockfile to generate. Excluding it also
+            # keeps the tool's scope from colliding with the resolve's name — e.g.
+            # `[prettier].install_from_resolve = "prettier"` — which would otherwise make every
+            # `generate-lockfiles` run fail with an ambiguous-resolve-name error.
+            tool.options_scope
+            for tool in tools
+            if tool.install_from_resolve is None
+        )
+    )
+    return KnownUserResolveNames(
+        names=names,
+        # These resolve names are the NodeJS tool subsystems' own `options_scope`s, not values of a
+        # single `[nodejs]` option, so there is no real option to name here. Using a label distinct
+        # from `[nodejs].resolves` (the package.json resolve provider) means that if a tool scope
+        # ever collides with a package.json resolve name, `generate-lockfiles` reports it as
+        # ambiguous rather than silently picking one provider.
+        option_name="the NodeJS tool subsystems (e.g. `[prettier]`, `[pyright]`)",
+        requested_resolve_names_cls=RequestedNodeJSToolResolveNames,
+    )
+
+
+@rule
+async def setup_nodejs_tool_lockfile_requests(
+    requested: RequestedNodeJSToolResolveNames,
+    nodejs: NodeJS,
+    union_membership: UnionMembership,
+) -> UserGenerateLockfiles:
+    tool_classes_by_scope = _bundled_lockfile_tool_classes(union_membership)
+
+    names = [name for name in requested if name in tool_classes_by_scope]
+    tools = await concurrently(_construct_subsystem(tool_classes_by_scope[name]) for name in names)
+
+    requests = []
+    pkg_manager: PackageManager | None = None
+    for name, tool in zip(names, tools):
+        # Mirror `determine_nodejs_tool_resolves`: a tool installed from a named resolve takes its
+        # dependencies from that resolve's lockfile, so there is no standalone lockfile to generate.
+        if tool.install_from_resolve is not None:
+            continue
+        # These tools ship a bundled lockfile, so by default we do NOT generate one: the
+        # `DEFAULT_TOOL_LOCKFILE` sentinel tells `generate-lockfiles` to skip them (or, for an
+        # explicit `--resolve`, print help) rather than writing Pants' internal bundled paths into
+        # the invoking repo. Generation only happens when `[<tool>].lockfile` points at a real file
+        # -- either a user's own path, or the destination the builtin-lockfile generator passes in.
+        should_generate = bool(tool.lockfile) and tool.lockfile != DEFAULT_TOOL_LOCKFILE
+        lockfile_dest = tool.lockfile if should_generate else DEFAULT_TOOL_LOCKFILE
+        # Only resolve the active package manager when something will actually be generated:
+        # sentinel requests are filtered out by the goal, and a bare `generate-lockfiles` must
+        # not fail on unrelated resolves just because no package-manager version is configured.
+        if should_generate and pkg_manager is None:
+            pkg_manager = _active_package_manager(nodejs, "to generate NodeJS tool lockfiles")
+        requests.append(
+            GenerateNodeJSToolLockfile(
+                resolve_name=name,
+                lockfile_dest=lockfile_dest,
+                diff=False,
+                package=tool.version,
+                package_manager=pkg_manager if should_generate else None,
+            )
+        )
+    return UserGenerateLockfiles(requests)
+
+
+@rule
+async def generate_nodejs_tool_lockfile(
+    request: GenerateNodeJSToolLockfile,
+) -> GenerateLockfileResult:
+    pkg_manager = request.package_manager
+    assert pkg_manager is not None, (
+        f"Cannot generate a lockfile for '{request.resolve_name}': requests with the "
+        f"`{DEFAULT_TOOL_LOCKFILE}` sentinel should have been filtered out by the goal."
+    )
+    _ensure_bundled_lockfile_supported(pkg_manager, request.resolve_name)
+    package_name, package_version = _parse_package_name_and_version(request.package)
+
+    input_digest = await create_digest(
+        CreateDigest(
+            [
+                FileContent(
+                    "package.json",
+                    _tool_package_json_bytes(request.resolve_name, package_name, package_version),
+                )
+            ]
+        ),
+        **implicitly(),
+    )
+
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            _nodejs_pm_process(
+                pkg_manager,
+                # `--ignore-scripts` prevents dependency lifecycle (e.g. postinstall) scripts
+                # from executing during generation; yarn classic's bare `install` would
+                # otherwise run them. (Yarn Berry, which rejects this flag, is refused above.)
+                args=(*pkg_manager.generate_lockfile_args, "--ignore-scripts"),
+                description=f"Generate {pkg_manager.lockfile_name} for '{request.resolve_name}'.",
+                input_digest=input_digest,
+                output_files=(pkg_manager.lockfile_name,),
+            )
+        )
+    )
+
+    # The sandbox output is `<lockfile_name>` at the digest root (`output_files` restricts the
+    # capture to exactly that path); relocate to `lockfile_dest` so `workspace.write_digest`
+    # lands it at the expected path (and filename).
+    digest_contents = await get_digest_contents(result.output_digest)
+    if not digest_contents:
+        raise ValueError(
+            softwrap(
+                f"""
+                Expected `{pkg_manager.name}` to produce
+                `{pkg_manager.lockfile_name}` when generating the lockfile for
+                '{request.resolve_name}', but the process produced no output.
+                """
+            )
+        )
+    [file_content] = digest_contents
+    output_digest = await create_digest(
+        CreateDigest([FileContent(request.lockfile_dest, file_content.content)]),
+        **implicitly(),
+    )
+    return GenerateLockfileResult(output_digest, request.resolve_name, request.lockfile_dest)
+
+
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
@@ -132,4 +309,7 @@ def rules() -> Iterable[Rule | UnionRule]:
         UnionRule(GenerateLockfile, GeneratePackageLockJsonFile),
         UnionRule(KnownUserResolveNamesRequest, KnownPackageJsonUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedPackageJsonUserResolveNames),
+        UnionRule(GenerateLockfile, GenerateNodeJSToolLockfile),
+        UnionRule(KnownUserResolveNamesRequest, KnownNodeJSToolResolveNamesRequest),
+        UnionRule(RequestedUserResolveNames, RequestedNodeJSToolResolveNames),
     )
