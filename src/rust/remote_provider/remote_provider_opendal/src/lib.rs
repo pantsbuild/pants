@@ -52,6 +52,8 @@ impl Provider {
         scope: String,
         options: RemoteStoreOptions,
     ) -> Result<Provider, String> {
+        // Operator::new returns a finished operator in OpenDAL 0.58+; layers are
+        // applied on the Operator directly (no OperatorBuilder / finish()).
         let operator = Operator::new(builder)
             .map_err(|e| format!("failed to initialise {scheme} remote store provider: {e}"))?
             .layer(ConcurrentLimitLayer::new(options.concurrency_limit))
@@ -62,8 +64,7 @@ impl Provider {
                     .with_io_timeout(options.timeout),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
-            .layer(RetryLayer::new().with_max_times(options.retries + 1))
-            .finish();
+            .layer(RetryLayer::new().with_max_times(options.retries + 1));
 
         let base_path = match options.instance_name {
             Some(instance_name) => format!("{instance_name}/{scope}"),
