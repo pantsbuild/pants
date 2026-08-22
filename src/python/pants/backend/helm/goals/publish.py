@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import override
 
 from pants.backend.helm.goals.package import BuiltHelmArtifact
 from pants.backend.helm.resolve.remotes import HelmRegistry
@@ -48,6 +49,7 @@ class HelmPublishFieldSet(HelmChartFieldSet, PublishFieldSet):
     repository: HelmChartRepositoryField
     skip_push: HelmSkipPushField
 
+    @override
     def check_skip_request(self, package_fs: PackageFieldSet) -> PublishHelmChartSkipRequest | None:
         return PublishHelmChartSkipRequest(publish_fs=self, package_fs=package_fs)
 
