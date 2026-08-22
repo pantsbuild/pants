@@ -209,12 +209,11 @@ def test_check_if_skip_push(
         if artifact_name
         else None
     )
+    skip_request = publish_fs.check_skip_request(package_fs)
+    assert isinstance(skip_request, PublishHelmChartSkipRequest)
     result = run_rule_with_mocks(
         check_if_skip_push,
-        rule_args=[
-            PublishHelmChartSkipRequest(publish_fs=publish_fs, package_fs=package_fs),
-            helm_subsystem,
-        ],
+        rule_args=[skip_request, helm_subsystem],
         mock_calls=mock_calls,
     )
     assert result == expected
