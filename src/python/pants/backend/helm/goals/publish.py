@@ -48,7 +48,7 @@ class HelmPublishFieldSet(HelmChartFieldSet, PublishFieldSet):
     repository: HelmChartRepositoryField
     skip_push: HelmSkipPushField
 
-    def make_skip_request(self, package_fs: PackageFieldSet) -> PublishHelmChartSkipRequest | None:
+    def check_skip_request(self, package_fs: PackageFieldSet) -> PublishHelmChartSkipRequest | None:
         return PublishHelmChartSkipRequest(publish_fs=self, package_fs=package_fs)
 
     def get_output_data(self) -> PublishOutputData:

@@ -53,7 +53,7 @@ class PublishDockerImageFieldSet(PublishFieldSet, DockerPackageFieldSet):
 
     skip_push: DockerImageSkipPushField
 
-    def make_skip_request(
+    def check_skip_request(
         self, package_fs: PackageFieldSet
     ) -> PublishDockerImageSkipRequest | None:
         return (
