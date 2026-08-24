@@ -11,6 +11,7 @@ But this module should include `@rules` for multiple languages, even though the 
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Sequence
 from textwrap import dedent
 from typing import cast
@@ -221,12 +222,26 @@ def test_request_classification(
         targets: Sequence[Target],
         members: Sequence[type[ClasspathEntryRequest]],
         generators: FrozenDict[type[ClasspathEntryRequest], frozenset[type[SourcesField]]],
+        preferred_impl: type[ClasspathEntryRequest] | None = None,
     ) -> tuple[type[ClasspathEntryRequest], type[ClasspathEntryRequest] | None]:
-        factory = ClasspathEntryRequestFactory(tuple(members), generators)
+        impls_by_generator_source: dict[type[SourcesField], set[type[ClasspathEntryRequest]]] = (
+            defaultdict(set)
+        )
+        for impl, fields in generators.items():
+            for field in fields:
+                impls_by_generator_source[field].add(impl)
+        factory = ClasspathEntryRequestFactory(
+            tuple(members),
+            generators,
+            FrozenDict(
+                (field, frozenset(impls)) for field, impls in impls_by_generator_source.items()
+            ),
+        )
 
         req = factory.for_targets(
             CoarsenedTarget(targets, ()),
             CoursierResolveKey("example", "path", EMPTY_DIGEST),
+            preferred_impl=preferred_impl,
         )
         return (type(req), type(req.prerequisite) if req.prerequisite else None)
 
@@ -291,6 +306,35 @@ def test_request_classification(
     # Too many compatible.
     with pytest.raises(ClasspathSourceAmbiguity):
         classify([java], [CompileJavaSourceRequest, CompileMockSourceRequest], generators)
+
+    # A codegen input consumed by more than one impl (e.g. protobuf, generated into both Java and
+    # Scala) is ambiguous in the abstract...
+    shared_generators = FrozenDict(
+        {
+            CompileJavaSourceRequest: frozenset([cast(type[SourcesField], ProtobufSourceField)]),
+            CompileScalaSourceRequest: frozenset([cast(type[SourcesField], ProtobufSourceField)]),
+        }
+    )
+    with pytest.raises(ClasspathSourceAmbiguity):
+        classify([protos], all_members, shared_generators)
+    with pytest.raises(ClasspathSourceAmbiguity):
+        classify([proto], all_members, shared_generators)
+
+    # ...but is resolved unambiguously once a `preferred_impl` is supplied, as happens when the
+    # component is being resolved as the dependency of a concrete Java or Scala compile request
+    # (see `classpath_dependency_requests`).
+    assert (CompileJavaSourceRequest, None) == classify(
+        [protos], all_members, shared_generators, preferred_impl=CompileJavaSourceRequest
+    )
+    assert (CompileScalaSourceRequest, None) == classify(
+        [protos], all_members, shared_generators, preferred_impl=CompileScalaSourceRequest
+    )
+    assert (CompileJavaSourceRequest, None) == classify(
+        [proto], all_members, shared_generators, preferred_impl=CompileJavaSourceRequest
+    )
+    assert (CompileScalaSourceRequest, None) == classify(
+        [proto], all_members, shared_generators, preferred_impl=CompileScalaSourceRequest
+    )
 
 
 @maybe_skip_jdk_test
