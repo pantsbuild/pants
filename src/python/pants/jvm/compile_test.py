@@ -359,18 +359,6 @@ def protobuf_multi_lang_lockfile(
 
 
 @maybe_skip_jdk_test
-@pytest.mark.xfail(
-    reason=(
-        "The `preferred_impl` mechanism in `classpath_dependency_requests` resolves the "
-        "classpath-entry-level ambiguity (which `ClasspathEntryRequest` impl to use), but "
-        "`compile_scala_source` hydrates its component's own sources with "
-        "`for_sources_types=(ScalaSourceField, JavaSourceField)` (to support scalac's mixed "
-        "Java/Scala compilation), so `hydrate_sources` still can't choose between "
-        "`GenerateJavaFromProtobufRequest` and `GenerateScalaFromProtobufRequest` for `protos` "
-        "and raises `AmbiguousCodegenImplementationsException`. See follow-up fix."
-    ),
-    strict=True,
-)
 def test_protobuf_consumed_by_java_and_scala(
     rule_runner: RuleRunner, protobuf_multi_lang_lockfile: JVMLockfileFixture
 ) -> None:
@@ -431,20 +419,16 @@ def test_protobuf_consumed_by_java_and_scala(
     assert rendered_classpath.content["java.C.java.javac.jar"] == {
         "org/pantsbuild/example/java/C.class",
     }
-    assert any(
-        key.endswith(".f.proto.protos.javac.jar") for key in rendered_classpath.content.keys()
-    )
+    assert "protos.f.proto.javac.jar" in rendered_classpath.content
 
     # The Scala root's dependency on the *same* `protos` target was resolved via
     # `CompileScalaSourceRequest`: the generated sources are Scala, compiled by scalac -- proving
     # that the same, single, unparametrized `protobuf_sources` declaration serves both languages.
-    assert rendered_classpath.content["scala.Main.scala.main.scalac.jar"] == {
+    assert rendered_classpath.content["scala.Main.scala.scalac.jar"] == {
         "org/pantsbuild/example/scala/Main$.class",
         "org/pantsbuild/example/scala/Main.class",
     }
-    assert any(
-        key.endswith(".f.proto.protos.scalac.jar") for key in rendered_classpath.content.keys()
-    )
+    assert "protos.f.proto.scalac.jar" in rendered_classpath.content
 
 
 @maybe_skip_jdk_test

@@ -1429,9 +1429,25 @@ async def hydrate_sources(
         and issubclass(generate_request_type.output, request.for_sources_types)
     ]
     if request.enable_codegen and len(relevant_generate_request_types) > 1:
-        raise AmbiguousCodegenImplementationsException.create(
-            relevant_generate_request_types, for_sources_types=request.for_sources_types
-        )
+        # `for_sources_types` is ordered by the caller's preference (e.g. `compile_scala_source`
+        # requests `(ScalaSourceField, JavaSourceField)` to also accept Java sources coarsened
+        # into the same compile, but would rather generate Scala than Java from a shared codegen
+        # input like protobuf). If narrowing to the first `for_sources_types` entry that has any
+        # matching generator leaves exactly one candidate, use it instead of raising.
+        preferred_generate_request_types: list[type[GenerateSourcesRequest]] = []
+        for preferred_sources_type in request.for_sources_types:
+            preferred_generate_request_types = [
+                generate_request_type
+                for generate_request_type in relevant_generate_request_types
+                if issubclass(generate_request_type.output, preferred_sources_type)
+            ]
+            if preferred_generate_request_types:
+                break
+        if len(preferred_generate_request_types) != 1:
+            raise AmbiguousCodegenImplementationsException.create(
+                relevant_generate_request_types, for_sources_types=request.for_sources_types
+            )
+        relevant_generate_request_types = preferred_generate_request_types
     generate_request_type = next(iter(relevant_generate_request_types), None)
 
     # Now, determine if any of the `for_sources_types` may be used, either because the
