@@ -135,6 +135,7 @@ def generate_pyproject_toml(
     ics: InterpreterConstraints,
     reqs: Iterable[str],
     indexes: Iterable[str] | None = None,
+    find_links: Iterable[str] | None = None,
     sources: Iterable[str] = tuple(),
 ) -> str:
     def escape_double_quotes(s: str) -> str:
@@ -161,7 +162,7 @@ def generate_pyproject_toml(
     # The indexes must be in pyproject.toml so uv can validate the index names in sources.
     # (Technically we only need those referenced in sources and not all of them, but it's fine
     # if the others are mentioned too).
-    extra_lines = list(generate_uv_index_config(indexes, "tool.uv.index"))
+    extra_lines = list(generate_uv_index_config(indexes, find_links, "tool.uv.index"))
     extra_lines.append("")
 
     sources = tuple(sources)
@@ -215,6 +216,15 @@ async def create_venv_repository_from_uv_lockfile(
         metadata.valid_for_interpreter_constraints,
         tuple(str(req) for req in metadata.requirements),
         indexes=resolve_config.indexes,
+        # NB: At lockfile generation time we pass in extra find_links from the target.
+        #  That information is not easily available to us here, so we omit it.
+        #  This is OK in practice because those extra find_links are only used to inject
+        #  https://wheels.pantsbuild.org/simple for pants_requirements() targets.
+        #  We know that those are not referenced by name in any `sources`, and that
+        # they don't involve auth, so they are not strictly needed after lockfile generation.
+        # TODO: Get rid of "extra find_links" entirely, and simply hard-code an explicit
+        #  source for pants_requirements.
+        find_links=resolve_config.find_links,
         sources=resolve_config.sources,
     )
 
