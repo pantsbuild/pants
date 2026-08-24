@@ -566,6 +566,7 @@ def test_build_pex_from_uv_lockfile_with_uv_platforms(rule_runner: RuleRunner) -
     lock = Lockfile("test.lock", url_description_of_origin="test uv lockfile", resolve_name="test")
     pex_data = create_pex_and_get_all_data(
         rule_runner,
+        pex_type=VenvPex,
         requirements=EntireLockfile(lock),
         interpreter_constraints=ic,
         layout=PexLayout.ZIPAPP,
@@ -577,10 +578,10 @@ def test_build_pex_from_uv_lockfile_with_uv_platforms(rule_runner: RuleRunner) -
     )
 
     speedup_files = [f for f in pex_data.files if "_speedups" in f]
-    assert any("linux" in f for f in speedup_files), (
+    assert any("cp312-cp312-manylinux" in f for f in speedup_files), (
         f"Expected linux markupsafe native extension; got: {speedup_files}"
     )
-    assert any("macosx" in f for f in speedup_files), (
+    assert any("cp312-cp312-macosx" in f for f in speedup_files), (
         f"Expected macosx markupsafe native extension; got: {speedup_files}"
     )
 
