@@ -20,10 +20,13 @@ from pants.option.bootstrap_options import (
 )
 from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptions
+from pants.option.option_value_container import OptionValueContainerBuilder
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.ranked_value import Rank, RankedValue
 from pants.testutil.option_util import create_dynamic_remote_options
 from pants.testutil.pytest_util import no_exception
 from pants.util.dirutil import safe_mkdir_for
+from pants.util.logging import LogLevel
 from pants.version import VERSION
 
 
@@ -147,6 +150,29 @@ def test_invalidation_globs() -> None:
     )
     for glob in globs:
         assert suffix not in glob
+
+
+@pytest.mark.parametrize(
+    "print_stacktrace, rank, level, expected",
+    [
+        (False, Rank.HARDCODED, LogLevel.INFO, False),
+        (False, Rank.HARDCODED, LogLevel.DEBUG, True),
+        (False, Rank.HARDCODED, LogLevel.TRACE, True),
+        (True, Rank.FLAG, LogLevel.INFO, True),
+        (True, Rank.FLAG, LogLevel.ERROR, True),
+        (False, Rank.FLAG, LogLevel.DEBUG, False),
+        (False, Rank.FLAG, LogLevel.TRACE, False),
+        (True, Rank.CONFIG, LogLevel.INFO, True),
+        (False, Rank.CONFIG, LogLevel.DEBUG, False),
+    ],
+)
+def test_should_print_stacktrace(
+    print_stacktrace: bool, rank: Rank, level: LogLevel, expected: bool
+) -> None:
+    builder = OptionValueContainerBuilder()
+    builder.print_stacktrace = RankedValue(rank, print_stacktrace)
+    builder.level = RankedValue(Rank.FLAG, level)
+    assert GlobalOptions.should_print_stacktrace(builder.build()) is expected
 
 
 @pytest.mark.parametrize(
