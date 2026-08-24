@@ -598,6 +598,30 @@ pub struct Process {
     pub env: BTreeMap<String, String>,
 
     ///
+    /// Environment variables to set for the execution which do NOT contribute to the process's
+    /// identity: they are excluded from the `Command` proto, and so from the action digest that
+    /// keys the local and remote caches.
+    ///
+    /// This exists for values that are observably irrelevant to a process's output but unavoidably
+    /// vary per run — a CI build id used only to label a report, an upload token. Putting such a
+    /// value in `env` gives every run a distinct cache key and destroys reuse.
+    ///
+    /// This is a deliberate hole in the hermeticity contract, and the caller owns the invariant:
+    /// if a value here can change what the process produces, cached results will be wrong. Two
+    /// consequences worth stating, because neither is fixable here:
+    ///
+    ///   * On a cache hit the process does not run at all, so nothing observes these values.
+    ///     They cannot be used to make something happen on every run.
+    ///   * Under remote execution the `Command` proto is the only channel to the worker, so
+    ///     values excluded from it cannot be delivered. They are dropped, and
+    ///     `remote::CommandRunner` warns.
+    ///
+    /// Merged into `env` by `bounded::CommandRunner`, below every caching layer.
+    ///
+    #[derivative(PartialEq = "ignore", Hash = "ignore")]
+    pub uncached_env: BTreeMap<String, String>,
+
+    ///
     /// A relative path to a directory existing in the `input_files` digest to execute the process
     /// from. Defaults to the `input_files` root.
     ///
@@ -694,6 +718,7 @@ impl Process {
         Process {
             argv,
             env: BTreeMap::new(),
+            uncached_env: BTreeMap::new(),
             working_directory: None,
             input_digests: InputDigests::default(),
             output_files: BTreeSet::new(),
@@ -723,6 +748,14 @@ impl Process {
     ///
     pub fn env(mut self, env: BTreeMap<String, String>) -> Process {
         self.env = env;
+        self
+    }
+
+    ///
+    /// Replaces the cache-excluded environment for this process. See `uncached_env`.
+    ///
+    pub fn uncached_env(mut self, uncached_env: BTreeMap<String, String>) -> Process {
+        self.uncached_env = uncached_env;
         self
     }
 

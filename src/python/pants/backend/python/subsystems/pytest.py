@@ -16,6 +16,7 @@ from pants.backend.python.target_types import (
     PythonTestsExtraEnvVarsField,
     PythonTestSourceField,
     PythonTestsTimeoutField,
+    PythonTestsUncachedEnvVarsField,
     PythonTestsXdistConcurrencyField,
     SkipPythonTestsField,
 )
@@ -41,6 +42,7 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeoutField
     runtime_package_dependencies: RuntimePackageDependenciesField
     extra_env_vars: PythonTestsExtraEnvVarsField
+    uncached_env_vars: PythonTestsUncachedEnvVarsField
     xdist_concurrency: PythonTestsXdistConcurrencyField
     batch_compatibility_tag: PythonTestsBatchCompatibilityTagField
     resolve: PythonResolveField

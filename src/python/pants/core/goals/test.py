@@ -568,6 +568,30 @@ class TestSubsystem(GoalSubsystem):
                 """
             ),
         )
+        uncached_env_vars = StrListOption(
+            help=softwrap(
+                f"""
+                Additional environment variables to include in test processes, which do NOT
+                contribute to the test's cache key.
+
+                {EXTRA_ENV_VARS_USAGE_HELP}
+
+                Use this only for values that cannot change a test's result but unavoidably vary
+                between runs — a CI build id or job id used to label a report, a token for
+                uploading results. Such a value in `[test].extra_env_vars` gives every run a
+                distinct cache key, so no test result is ever reused.
+
+                Anything that can change whether a test passes belongs in `extra_env_vars`
+                instead. Putting it here means a cached result produced with a different value
+                gets reused.
+
+                Two limits are worth knowing. On a cache hit the test does not run, so these
+                values are not observed at all — they cannot be used to make something happen on
+                every run. And under remote execution they are dropped, because the only channel
+                to the worker is the request that the cache key is computed from.
+                """
+            ),
+        )
 
     debug = BoolOption(
         default=False,
@@ -811,6 +835,27 @@ class TestExtraEnvVarsField(StringSequenceField, metaclass=ABCMeta):
         {EXTRA_ENV_VARS_USAGE_HELP}
 
         This will be merged with and override values from `[test].extra_env_vars`.
+        """
+    )
+
+    def sorted(self) -> tuple[str, ...]:
+        return tuple(sorted(self.value or ()))
+
+
+class TestUncachedEnvVarsField(StringSequenceField, metaclass=ABCMeta):
+    alias = "uncached_env_vars"
+    help = help_text(
+        f"""
+        Additional environment variables to include in test processes, which do NOT contribute to
+        the test's cache key.
+
+        {EXTRA_ENV_VARS_USAGE_HELP}
+
+        This will be merged with and override values from `[test].uncached_env_vars`.
+
+        See that option for when this is the right tool: values that unavoidably vary between runs
+        but cannot change whether a test passes. Anything that can change the result belongs in
+        `extra_env_vars`.
         """
     )
 
@@ -1189,15 +1234,20 @@ def _format_test_rerun_command(results: Iterable[TestResult]) -> None | str:
 @dataclass(frozen=True)
 class TestExtraEnv:
     env: EnvironmentVars
+    uncached_env: EnvironmentVars
 
 
 @rule
 async def get_filtered_environment(test_env_aware: TestSubsystem.EnvironmentAware) -> TestExtraEnv:
-    return TestExtraEnv(
-        await environment_vars_subset(
+    env, uncached_env = await concurrently(
+        environment_vars_subset(
             EnvironmentVarsRequest(test_env_aware.extra_env_vars), **implicitly()
-        )
+        ),
+        environment_vars_subset(
+            EnvironmentVarsRequest(test_env_aware.uncached_env_vars), **implicitly()
+        ),
     )
+    return TestExtraEnv(env, uncached_env)
 
 
 @memoized

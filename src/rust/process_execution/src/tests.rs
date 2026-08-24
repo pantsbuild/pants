@@ -12,6 +12,7 @@ use fs::RelativePath;
 use prost_types::Timestamp;
 use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
+use store::Store;
 use tempfile::TempDir;
 use tokio::io::AsyncWriteExt;
 use workunit_store::RunId;
@@ -55,6 +56,72 @@ fn process_equality() {
     // Absence of timeout is included in hash.
     assert_ne!(a, d);
     assert_ne!(hash(&a), hash(&d));
+}
+
+#[test]
+fn process_equality_ignores_uncached_env() {
+    fn hash<Hashable: Hash>(hashable: &Hashable) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        hashable.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    let uncached = |value: &str| {
+        Process::new(vec![])
+            .uncached_env(BTreeMap::from([("BUILD_ID".to_owned(), value.to_owned())]))
+    };
+    let cached = |value: &str| {
+        Process::new(vec![]).env(BTreeMap::from([("BUILD_ID".to_owned(), value.to_owned())]))
+    };
+
+    // The whole point: differing only in `uncached_env` must not change the process's identity,
+    // otherwise each value gets its own graph node and its own cache lookup.
+    assert_eq!(uncached("first"), uncached("second"));
+    assert_eq!(hash(&uncached("first")), hash(&uncached("second")));
+
+    // The same values in `env` must still separate them, or the exemption has leaked.
+    assert_ne!(cached("first"), cached("second"));
+    assert_ne!(hash(&cached("first")), hash(&cached("second")));
+}
+
+#[tokio::test]
+async fn uncached_env_is_absent_from_the_action_digest() {
+    let store_dir = TempDir::new().unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor, store_dir.path()).unwrap();
+
+    let digest_of = |process: Process| {
+        let store = store.clone();
+        async move { crate::get_digest(&process, None, None, &store, None).await }
+    };
+
+    let base = Process::new(vec!["/bin/true".to_owned()]);
+    let with_uncached = base
+        .clone()
+        .uncached_env(BTreeMap::from([("BUILD_ID".to_owned(), "1234".to_owned())]));
+    let with_other_uncached = base
+        .clone()
+        .uncached_env(BTreeMap::from([("BUILD_ID".to_owned(), "5678".to_owned())]));
+    let with_cached = base
+        .clone()
+        .env(BTreeMap::from([("BUILD_ID".to_owned(), "1234".to_owned())]));
+
+    let (base_action, base_command) = digest_of(base).await;
+    let (uncached_action, uncached_command) = digest_of(with_uncached).await;
+    let (other_action, _) = digest_of(with_other_uncached).await;
+    let (cached_action, cached_command) = digest_of(with_cached).await;
+
+    // Adding an uncached var, or changing its value, must leave both digests untouched: the
+    // command digest is what the action digest is built from, and the action digest is the cache
+    // key.
+    assert_eq!(base_command, uncached_command);
+    assert_eq!(base_action, uncached_action);
+    assert_eq!(base_action, other_action);
+
+    // The identical name/value in `env` must change them, confirming this test would catch a
+    // regression that started folding `uncached_env` into the request.
+    assert_ne!(base_command, cached_command);
+    assert_ne!(base_action, cached_action);
 }
 
 #[test]

@@ -418,6 +418,7 @@ async fn make_request_from_flat_args(
         append_only_caches: BTreeMap::new(),
         jdk_home: args.command.jdk.clone(),
         execution_slot_variable: None,
+        uncached_env: BTreeMap::new(),
         concurrency_available: args.command.concurrency_available.unwrap_or(0),
         concurrency: args.command.concurrency.clone(),
         cache_scope: ProcessCacheScope::Always,
@@ -529,6 +530,7 @@ async fn extract_request_from_action_digest(
             Duration::from_nanos(timeout.nanos as u64 + timeout.seconds as u64 * 1000000000)
         }),
         execution_slot_variable: None,
+        uncached_env: BTreeMap::new(),
         concurrency_available: 0,
         concurrency: None,
         description: "".to_string(),
