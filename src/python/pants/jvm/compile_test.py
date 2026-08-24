@@ -25,6 +25,7 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
 )
 from pants.backend.codegen.protobuf.java.rules import GenerateJavaFromProtobufRequest
 from pants.backend.codegen.protobuf.java.rules import rules as protobuf_rules
+from pants.backend.codegen.protobuf.scala.rules import rules as scala_protobuf_rules
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
@@ -122,6 +123,7 @@ def rule_runner() -> RuleRunner:
             *util_rules(),
             *testutil.rules(),
             *protobuf_rules(),
+            *scala_protobuf_rules(),
             *stripped_source_files.rules(),
             *protobuf_target_types_rules(),
             QueryRule(Classpath, (Addresses,)),
@@ -334,6 +336,114 @@ def test_request_classification(
     )
     assert (CompileScalaSourceRequest, None) == classify(
         [proto], all_members, shared_generators, preferred_impl=CompileScalaSourceRequest
+    )
+
+
+@pytest.fixture
+def protobuf_multi_lang_lockfile_def() -> JVMLockfileFixtureDefinition:
+    return JVMLockfileFixtureDefinition(
+        "protobuf-multi-lang.test.lock",
+        [
+            "com.google.protobuf:protobuf-java:4.33.2",
+            "com.thesamet.scalapb:scalapb-runtime_2.13:0.11.6",
+            "org.scala-lang:scala-library:2.13.6",
+        ],
+    )
+
+
+@pytest.fixture
+def protobuf_multi_lang_lockfile(
+    protobuf_multi_lang_lockfile_def: JVMLockfileFixtureDefinition, request
+) -> JVMLockfileFixture:
+    return protobuf_multi_lang_lockfile_def.load(request)
+
+
+@maybe_skip_jdk_test
+@pytest.mark.xfail(
+    reason=(
+        "The `preferred_impl` mechanism in `classpath_dependency_requests` resolves the "
+        "classpath-entry-level ambiguity (which `ClasspathEntryRequest` impl to use), but "
+        "`compile_scala_source` hydrates its component's own sources with "
+        "`for_sources_types=(ScalaSourceField, JavaSourceField)` (to support scalac's mixed "
+        "Java/Scala compilation), so `hydrate_sources` still can't choose between "
+        "`GenerateJavaFromProtobufRequest` and `GenerateScalaFromProtobufRequest` for `protos` "
+        "and raises `AmbiguousCodegenImplementationsException`. See follow-up fix."
+    ),
+    strict=True,
+)
+def test_protobuf_consumed_by_java_and_scala(
+    rule_runner: RuleRunner, protobuf_multi_lang_lockfile: JVMLockfileFixture
+) -> None:
+    """A single, unparametrized `protobuf_sources` target can be depended on by both a
+    `java_sources` and a `scala_sources` target without any disambiguating field, and each
+    consumer resolves its own compiled classpath entry for it via the `preferred_impl` mechanism
+    in `classpath_dependency_requests` -- rather than raising `ClasspathSourceAmbiguity`.
+    """
+    rule_runner.set_options(
+        args=["--scala-version-for-resolve={'jvm-default': '2.13.6'}"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    rule_runner.write_files(
+        {
+            "3rdparty/jvm/default.lock": protobuf_multi_lang_lockfile.serialized_lockfile,
+            "3rdparty/jvm/BUILD": protobuf_multi_lang_lockfile.requirements_as_jvm_artifact_targets(),
+            "protos/BUILD": "protobuf_sources()",
+            "protos/f.proto": proto_source(),
+            "java/BUILD": "java_sources(dependencies=['//protos'])",
+            "java/C.java": dedent(
+                """\
+                package org.pantsbuild.example.java;
+
+                public class C {
+                    public static String HELLO = "hello!";
+                }
+                """
+            ),
+            "scala/BUILD": "scala_sources(dependencies=['//protos'])",
+            "scala/Main.scala": dedent(
+                """\
+                package org.pantsbuild.example.scala
+
+                object Main {
+                    def main(args: Array[String]): Unit = {
+                        println("hello!")
+                    }
+                }
+                """
+            ),
+        }
+    )
+
+    rendered_classpath = rule_runner.request(
+        RenderedClasspath,
+        [
+            Addresses(
+                [
+                    Address("java", relative_file_path="C.java"),
+                    Address("scala", relative_file_path="Main.scala"),
+                ]
+            )
+        ],
+    )
+
+    # The Java root's dependency on `protos` was resolved via `CompileJavaSourceRequest`: the
+    # generated sources are Java, compiled by javac.
+    assert rendered_classpath.content["java.C.java.javac.jar"] == {
+        "org/pantsbuild/example/java/C.class",
+    }
+    assert any(
+        key.endswith(".f.proto.protos.javac.jar") for key in rendered_classpath.content.keys()
+    )
+
+    # The Scala root's dependency on the *same* `protos` target was resolved via
+    # `CompileScalaSourceRequest`: the generated sources are Scala, compiled by scalac -- proving
+    # that the same, single, unparametrized `protobuf_sources` declaration serves both languages.
+    assert rendered_classpath.content["scala.Main.scala.main.scalac.jar"] == {
+        "org/pantsbuild/example/scala/Main$.class",
+        "org/pantsbuild/example/scala/Main.class",
+    }
+    assert any(
+        key.endswith(".f.proto.protos.scalac.jar") for key in rendered_classpath.content.keys()
     )
 
 
