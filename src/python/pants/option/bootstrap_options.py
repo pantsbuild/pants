@@ -820,6 +820,10 @@ class BootstrapOptions:
         ),
     )
     plugins = StrListOption(
+        # `pantsd` loads these onto its own `sys.path`, and `PluginResolver.resolve` constrains
+        # each resolve to whatever that `sys.path` already holds. Reinitializing the scheduler
+        # alone leaves the old versions there, constraining later resolves (#23649).
+        daemon=True,
         advanced=True,
         help=softwrap(
             """
