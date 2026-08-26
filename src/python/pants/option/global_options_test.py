@@ -151,8 +151,8 @@ def test_invalidation_globs() -> None:
 
 
 def test_plugins_is_daemon_fingerprinted() -> None:
-    # pantsd resolves plugins onto its own `sys.path` and constrains each later resolve to what is
-    # already there, so a changed value needs a new process, not just a new scheduler (#23649).
+    # A surviving `pantsd` constrains later plugin resolves to the versions already on its
+    # `sys.path`, so this option must invalidate the process itself (#23649).
     ob = OptionsBootstrapper.create(
         args=["--pants-config-files=[]", "--plugins=ansicolors==1.1.8"],
         env={},
