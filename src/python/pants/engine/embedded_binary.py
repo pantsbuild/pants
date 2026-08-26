@@ -16,7 +16,7 @@ def get_embedded_binary(binary_name: str) -> str | None:
     with importlib.resources.as_file(
         importlib.resources.files("pants.bin").joinpath(binary_name)
     ) as bin_path:
-        if os.path.isfile(bin_path):
+        if os.path.isfile(bin_path) and not os.access(bin_path, os.X_OK):
             os.chmod(bin_path, 0o755)
             return str(bin_path)
     return None
