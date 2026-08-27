@@ -27,6 +27,7 @@ from pants.backend.go.util_rules.third_party_pkg import (
     AllThirdPartyPackagesRequest,
     ModuleDescriptors,
     ModuleDescriptorsRequest,
+    ModuleDownloadRequest,
     ThirdPartyPkgAnalysis,
     ThirdPartyPkgAnalysisRequest,
     _extract_go_sum_entries_for_module,
@@ -620,7 +621,7 @@ UUID_GO_SUM = dedent(
 def test_cross_go_mod_dedup_produces_identical_results(rule_runner: RuleRunner) -> None:
     """Two go.mods depending on the same module@version produce byte-identical analyses.
 
-    The dedup path is keyed on (name, version, minimum_go_version, build_opts,
+    The dedup path is keyed on (name, version, minimum_go_version, cgo_enabled,
     go_sum_entries). go.sum entries are content-addressable, so two well-formed
     go.mods sharing a dep produce equal ModuleDownloadRequests -- the engine
     memoizes and both requests share a single download. The observable property
@@ -754,3 +755,69 @@ def test_gotoolchain_local_fail_fast(rule_runner: RuleRunner) -> None:
     )
     with engine_error(ProcessExecutionFailure, contains="go.mod requires go >= 1.99.0"):
         rule_runner.request(ModuleDescriptors, [ModuleDescriptorsRequest(digest, "")])
+
+
+def test_module_download_key_ignores_build_options_that_cannot_affect_it() -> None:
+    """Only `cgo_enabled` may split the module download/analysis cache key.
+
+    `go mod download` does not consult build options at all, and the package analyzer reads only
+    `CGO_ENABLED`. Carrying the whole `GoBuildOptions` meant callers that differed in an
+    irrelevant field each re-downloaded every module in the graph: target generation passes
+    `GoBuildOptions()` defaults (see the rule-graph-cycle TODO in `target_type_rules.py`) while a
+    compile resolves the real options, so a repo building with `race=True` paid exactly twice.
+    """
+
+    def key(build_opts: GoBuildOptions) -> ModuleDownloadRequest:
+        return ModuleDownloadRequest(
+            name="github.com/google/uuid",
+            version="v1.3.0",
+            minimum_go_version="1.16",
+            cgo_enabled=build_opts.cgo_enabled,
+            go_sum_entries=(),
+        )
+
+    # The case we actually hit: target generation's defaults vs. a compile with the race detector.
+    assert key(GoBuildOptions()) == key(GoBuildOptions(with_race_detector=True))
+
+    # Options that genuinely change nothing about the download must not split the key either.
+    assert key(GoBuildOptions()) == key(GoBuildOptions(with_msan=True))
+    assert key(GoBuildOptions()) == key(GoBuildOptions(compiler_flags=("-N",)))
+    assert key(GoBuildOptions()) == key(GoBuildOptions(linker_flags=("-s",)))
+
+    # `cgo_enabled` reaches the analyzer as CGO_ENABLED, so it must still split the key.
+    assert key(GoBuildOptions(cgo_enabled=True)) != key(GoBuildOptions(cgo_enabled=False))
+
+
+def test_race_detector_does_not_duplicate_module_downloads(rule_runner: RuleRunner) -> None:
+    """The same module requested with and without `race=True` shares one download.
+
+    This is the end-to-end form of the key narrowing: identical analysis digests imply both
+    requests resolved to the same engine-memoized `ModuleDownloadRequest`.
+    """
+    go_mod = dedent(
+        """\
+        module example.com/mod
+        go 1.16
+        require github.com/google/uuid v1.3.0
+        """
+    )
+    digest = set_up_go_mod(rule_runner, go_mod, UUID_GO_SUM)
+
+    def analyze(build_opts: GoBuildOptions) -> ThirdPartyPkgAnalysis:
+        result = rule_runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=build_opts,
+                )
+            ],
+        )
+        return result.import_paths_to_pkg_info["github.com/google/uuid"]
+
+    default = analyze(GoBuildOptions())
+    with_race = analyze(GoBuildOptions(with_race_detector=True))
+
+    assert default.digest == with_race.digest

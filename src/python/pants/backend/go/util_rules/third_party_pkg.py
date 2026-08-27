@@ -190,7 +190,7 @@ class ModuleDescriptors:
 @dataclass(frozen=True)
 class ModuleDownloadRequest:
     """Download and analyze a Go module, keyed by (name, version, minimum_go_version,
-    build_opts, go_sum_entries).
+    cgo_enabled, go_sum_entries).
 
     This enables cross-go.mod deduplication: if mod-a and mod-b both depend on
     grpc@v1.60.0 with the same go.sum entries, the download and analysis only
@@ -213,7 +213,13 @@ class ModuleDownloadRequest:
     name: str
     version: str
     minimum_go_version: str | None
-    build_opts: GoBuildOptions
+    # NB: Only `cgo_enabled` is carried here, rather than the whole `GoBuildOptions`. Downloading
+    # and analyzing a module is independent of every other build option -- `go mod download` does
+    # not consult them, and the package analyzer only reads `CGO_ENABLED`. Keying on the full
+    # options object meant that callers differing in an irrelevant field (e.g. target generation
+    # using defaults while a compile resolves `race=True`) each paid for their own download of
+    # every module in the graph.
+    cgo_enabled: bool
     go_sum_entries: tuple[str, ...]
 
 
@@ -526,9 +532,9 @@ async def download_and_analyze_module(
 ) -> AnalyzedThirdPartyModule:
     """Download and analyze a single Go module via a synthetic go.mod + go.sum.
 
-    Keyed by (name, version, minimum_go_version, build_opts, go_sum_entries),
+    Keyed by (name, version, minimum_go_version, cgo_enabled, go_sum_entries),
     which lets the Pants engine deduplicate identical module downloads across
-    go.mods.
+    go.mods and across callers using different build options.
 
     A synthetic go.mod + go.sum pair is written into the sandbox so that Go's
     normal checksum verification still runs -- the go.sum entries come straight
@@ -623,7 +629,7 @@ async def download_and_analyze_module(
                 },
                 description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
                 level=LogLevel.DEBUG,
-                env={"CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0"},
+                env={"CGO_ENABLED": "1" if request.cgo_enabled else "0"},
             )
         )
     )
@@ -680,7 +686,7 @@ async def download_and_analyze_third_party_packages(
     # Parse the go.sum once into a dict for O(1) lookup per module.
     go_sum_index = _parse_go_sum(go_sum_content)
 
-    # The engine memoizes by (name, version, minimum_go_version, build_opts,
+    # The engine memoizes by (name, version, minimum_go_version, cgo_enabled,
     # go_sum_entries), so identical modules across go.mods are downloaded
     # once -- reducing downloads from O(N*M) to O(M).
     analyzed_modules = await concurrently(
@@ -689,7 +695,7 @@ async def download_and_analyze_third_party_packages(
                 name=mod.name,
                 version=mod.version,
                 minimum_go_version=mod.minimum_go_version,
-                build_opts=request.build_opts,
+                cgo_enabled=request.build_opts.cgo_enabled,
                 go_sum_entries=go_sum_index.get((mod.name, mod.version), ()),
             ),
             **implicitly(),
