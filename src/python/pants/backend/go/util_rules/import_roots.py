@@ -25,6 +25,7 @@ import ijson
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
+from pants.engine.environment import EnvironmentName
 from pants.engine.fs import GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.intrinsics import (
     digest_to_snapshot,
@@ -34,6 +35,7 @@ from pants.engine.intrinsics import (
 )
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.unions import union
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -57,6 +59,39 @@ class FirstPartyImportRoots:
     """Import paths referenced by first-party code, before stdlib/module filtering."""
 
     import_paths: FrozenOrderedSet[str]
+
+
+@union(in_scope_types=[EnvironmentName])
+@dataclass(frozen=True)
+class GoCodegenImportRootsRequest:
+    """Entry point for contributing roots from Go sources that do not exist yet.
+
+    Generated sources -- `.pb.go` and friends -- are not on disk when the scan runs, so nothing
+    reports the third-party packages they import. Without this, `imported` mode would decline to
+    generate targets for those packages and the generated code would fail to build.
+
+    Implementations name whole *modules* rather than individual import paths. Precision would buy
+    nothing: a module is downloaded and analyzed as a unit, so treating all of its packages as
+    reachable costs no extra downloads -- only a handful of extra targets in the one or two
+    runtime modules involved.
+    """
+
+    go_mod_address: Address
+    go_mod_path: str
+
+
+@dataclass(frozen=True)
+class GoCodegenImportRoots:
+    """Modules whose packages are all reachable because generated code may import them."""
+
+    module_paths: tuple[str, ...]
+
+
+@rule(polymorphic=True)
+async def determine_codegen_import_roots(
+    req: GoCodegenImportRootsRequest, env_name: EnvironmentName
+) -> GoCodegenImportRoots:
+    raise NotImplementedError()
 
 
 def _is_nested_module_path(path: str, base_dir: str, nested_module_dirs: frozenset[str]) -> bool:

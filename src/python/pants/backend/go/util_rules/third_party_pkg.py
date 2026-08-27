@@ -28,6 +28,8 @@ from pants.backend.go.util_rules.import_analysis import (
 )
 from pants.backend.go.util_rules.import_roots import (
     FirstPartyImportRootsRequest,
+    GoCodegenImportRootsRequest,
+    determine_codegen_import_roots,
     determine_first_party_import_roots,
 )
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
@@ -55,6 +57,7 @@ from pants.engine.intrinsics import (
 )
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.unions import UnionMembership
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -692,6 +695,7 @@ async def _analyze_imported_packages(
     request: AllThirdPartyPackagesRequest,
     module_analysis: ModuleDescriptors,
     go_sum_index: dict[tuple[str, str], tuple[str, ...]],
+    union_membership: UnionMembership,
 ) -> dict[str, ThirdPartyPkgAnalysis]:
     """Resolve only the third-party packages reachable from first-party code.
 
@@ -729,12 +733,65 @@ async def _analyze_imported_packages(
             return False
         return True
 
+    # Sources that do not exist yet -- generated `.pb.go` and friends -- cannot be scanned, so
+    # codegen backends name the runtime modules their output imports. These are pulled in whole:
+    # see `GoCodegenImportRootsRequest` for why package-level precision would buy nothing.
+    codegen_roots = await concurrently(
+        determine_codegen_import_roots(
+            **implicitly(
+                {
+                    hook(
+                        go_mod_address=request.go_mod_address,
+                        go_mod_path=request.go_mod_path,
+                    ): GoCodegenImportRootsRequest
+                }
+            )
+        )
+        for hook in union_membership.get(GoCodegenImportRootsRequest)
+    )
+    codegen_module_names = {
+        module_path
+        for codegen_root in codegen_roots
+        for module_path in codegen_root.module_paths
+        if module_path in modules_by_name
+    }
+
     known_packages: dict[str, ThirdPartyPkgAnalysis] = {}
     reachable: dict[str, ThirdPartyPkgAnalysis] = {}
     analyzed_module_names: set[str] = set()
     seen_import_paths: set[str] = set()
 
+    if codegen_module_names:
+        codegen_analyzed = await concurrently(
+            download_and_analyze_module(
+                ModuleDownloadRequest(
+                    name=modules_by_name[module_name].name,
+                    version=modules_by_name[module_name].version,
+                    minimum_go_version=modules_by_name[module_name].minimum_go_version,
+                    cgo_enabled=request.build_opts.cgo_enabled,
+                    go_sum_entries=go_sum_index.get(
+                        (
+                            modules_by_name[module_name].name,
+                            modules_by_name[module_name].version,
+                        ),
+                        (),
+                    ),
+                ),
+                **implicitly(),
+            )
+            for module_name in sorted(codegen_module_names)
+        )
+        for module_name, analyzed_module in zip(sorted(codegen_module_names), codegen_analyzed):
+            analyzed_module_names.add(module_name)
+            for pkg in analyzed_module.packages:
+                known_packages[pkg.import_path] = pkg
+                reachable[pkg.import_path] = pkg
+
     frontier = {ip for ip in roots.import_paths if is_third_party(ip)}
+    # Whatever the codegen modules themselves import has to resolve too.
+    for pkg in reachable.values():
+        frontier.update(ip for ip in pkg.imports if is_third_party(ip))
+    seen_import_paths |= set(reachable)
 
     while frontier:
         seen_import_paths |= frontier
@@ -744,9 +801,9 @@ async def _analyze_imported_packages(
         # cost nothing here.
         pending_modules = {}
         for import_path in frontier:
-            module_name = _resolve_import_path_to_module(import_path, module_names_longest_first)
-            if module_name is not None and module_name not in analyzed_module_names:
-                pending_modules[module_name] = modules_by_name[module_name]
+            owning_module = _resolve_import_path_to_module(import_path, module_names_longest_first)
+            if owning_module is not None and owning_module not in analyzed_module_names:
+                pending_modules[owning_module] = modules_by_name[owning_module]
 
         if pending_modules:
             newly_analyzed = await concurrently(
@@ -791,6 +848,7 @@ async def _analyze_imported_packages(
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
     golang_subsystem: GolangSubsystem,
+    union_membership: UnionMembership,
 ) -> AllThirdPartyPackages:
     module_analysis = await analyze_module_dependencies(
         ModuleDescriptorsRequest(
@@ -817,7 +875,11 @@ async def download_and_analyze_third_party_packages(
     if golang_subsystem.third_party_target_generation is GoThirdPartyTargetGeneration.IMPORTED:
         return AllThirdPartyPackages(
             EMPTY_DIGEST,
-            FrozenDict(await _analyze_imported_packages(request, module_analysis, go_sum_index)),
+            FrozenDict(
+                await _analyze_imported_packages(
+                    request, module_analysis, go_sum_index, union_membership
+                )
+            ),
         )
 
     # The engine memoizes by (name, version, minimum_go_version, cgo_enabled,
