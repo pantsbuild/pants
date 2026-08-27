@@ -65,6 +65,22 @@ type Package struct {
 	TestImports  []string `json:",omitempty"`
 	XTestImports []string `json:",omitempty"`
 
+	// Every import appearing in any .go file in this directory, regardless of whether the file
+	// is selected by the current build constraints and regardless of whether its `package`
+	// directive agrees with the rest of the directory.
+	//
+	// Imports/TestImports/XTestImports above describe what *this* build would compile, so they
+	// are filtered by GOOS/GOARCH/build tags and are only reported when the directory forms a
+	// single valid package. Import-scoped third-party target generation needs the opposite: a
+	// superset that still resolves build-tag-gated imports, imports for other platforms, and the
+	// `tools.go` pattern (a constraint-excluded file whose package name deliberately differs).
+	// Missing a root there means failing to generate a target the user asked for.
+	//
+	// Files Go ignores outright -- those prefixed with `_` or `.` -- are excluded, as is the
+	// pseudo-import "C".
+	AllImports     []string `json:",omitempty"`
+	AllTestImports []string `json:",omitempty"`
+
 	// //go:embed patterns found in Go source files
 	// For example, if a source file says
 	//	//go:embed a* b.c
@@ -232,6 +248,29 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	testImportsMap := make(map[string]bool)
 	xtestImportsMap := make(map[string]bool)
 
+	allImportsMap := make(map[string]bool)
+	allTestImportsMap := make(map[string]bool)
+
+	// Record a file's imports into the constraint-free sets. Test files are split out by filename
+	// rather than by package name, since a constraint-excluded file's package directive is exactly
+	// what we are declining to trust here. NB: declared before the loop because the loop shadows
+	// the `fileInfo` type with a variable of the same name.
+	harvestAllImports := func(name string, analysis *fileInfo) {
+		if analysis == nil {
+			return
+		}
+		target := allImportsMap
+		if strings.HasSuffix(name, "_test.go") {
+			target = allTestImportsMap
+		}
+		for _, imp := range analysis.imports {
+			if imp.path == "C" {
+				continue
+			}
+			target[imp.path] = true
+		}
+	}
+
 	embedsMap := make(map[string]bool)
 	testEmbedsMap := make(map[string]bool)
 	xtestEmbedsMap := make(map[string]bool)
@@ -274,6 +313,13 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 				// build constraints, do not report it as an ignored file. Fall through.
 			} else if ext == ".go" {
 				pkg.IgnoredGoFiles = append(pkg.IgnoredGoFiles, name)
+				// This file lost to a build constraint, but its imports are still real: a
+				// `//go:build` guarded file, an other-platform file, or `tools.go`. Parse it
+				// solely to harvest roots. Parse failures are ignored -- the file is excluded
+				// from the build either way, and matchFile already recorded genuine errors.
+				if excludedAnalysis, err := analyzeFile(fileSet, filepath.Join(directory, name)); err == nil {
+					harvestAllImports(name, excludedAnalysis)
+				}
 			} else if fileListForExt(pkg, ext) != nil {
 				pkg.IgnoredOtherFiles = append(pkg.IgnoredOtherFiles, name)
 			}
@@ -382,6 +428,11 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 			}
 		}
 
+		// NB: unconditional, and deliberately not gated on importsMapForFile -- a cgo file with
+		// cgo disabled lands in IgnoredGoFiles with a nil imports map, but its imports are still
+		// roots for target generation.
+		harvestAllImports(name, analysis)
+
 		if embedsMapForFile != nil && len(analysis.embeds) > 0 {
 			for _, e := range analysis.embeds {
 				embedsMapForFile[e.pattern] = true
@@ -394,6 +445,12 @@ func analyzePackage(directory string, buildContext *build.Context) (*Package, er
 	pkg.Imports = cleanStringSet(importsMap)
 	pkg.TestImports = cleanStringSet(testImportsMap)
 	pkg.XTestImports = cleanStringSet(xtestImportsMap)
+
+	// NB: assigned here, before the "multiple package names" and "no buildable Go source files"
+	// errors below can return. Those are precisely the cases -- e.g. a `tools.go`-only directory --
+	// where the caller still needs the roots, and `main` marshals the package even when Error is set.
+	pkg.AllImports = cleanStringSet(allImportsMap)
+	pkg.AllTestImports = cleanStringSet(allTestImportsMap)
 
 	pkg.EmbedPatterns = cleanStringSet(embedsMap)
 	pkg.TestEmbedPatterns = cleanStringSet(testEmbedsMap)
