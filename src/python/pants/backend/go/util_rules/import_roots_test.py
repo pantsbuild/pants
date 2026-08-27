@@ -132,7 +132,6 @@ def _roots(rule_runner: RuleRunner, *, go_mod_path: str = "go.mod") -> set[str]:
             FirstPartyImportRootsRequest(
                 go_mod_address=Address("", target_name="mod"),
                 go_mod_path=go_mod_path,
-                module_import_path="example.com/m",
                 cgo_enabled=True,
             )
         ],

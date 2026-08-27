@@ -46,7 +46,6 @@ class FirstPartyImportRootsRequest(EngineAwareParameter):
 
     go_mod_address: Address
     go_mod_path: str
-    module_import_path: str
     cgo_enabled: bool
 
     def debug_hint(self) -> str:
