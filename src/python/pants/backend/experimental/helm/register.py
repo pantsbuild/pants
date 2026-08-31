@@ -3,6 +3,7 @@
 
 from pants.backend.helm.dependency_inference import deployment
 from pants.backend.helm.goals import deploy, lint, package, publish, tailor
+from pants.backend.helm.util_rules import chart_values
 from pants.backend.helm.subsystems.helm import HelmSubsystem
 from pants.backend.helm.target_types import (
     HelmArtifactTarget,
@@ -33,6 +34,7 @@ def rules():
         *deploy.rules(),
         *deployment.rules(),
         *package.rules(),
+        *chart_values.rules(),
         *publish.rules(),
         *tailor.rules(),
         *unittest_rules(),
