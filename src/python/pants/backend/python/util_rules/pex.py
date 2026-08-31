@@ -806,6 +806,7 @@ async def build_pex(
         req_strings = ()
 
     venv_repos: list[VenvRepository] = []
+    python: PythonExecutable | None = None
     if requirements_setup.uv_lockfile is not None:
         if request.platforms:
             raise ValueError(
@@ -936,6 +937,7 @@ async def build_pex(
 
     pex_process = await setup_pex_cli_process(
         PexCliProcess(
+            interpreter=python,
             subcommand=(),
             extra_args=argv,
             additional_input_digest=merged_digest,

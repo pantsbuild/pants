@@ -62,8 +62,7 @@ impl Provider {
                     .with_io_timeout(options.timeout),
             )
             // TODO: RetryLayer doesn't seem to retry stores, but we should
-            .layer(RetryLayer::new().with_max_times(options.retries + 1))
-            .finish();
+            .layer(RetryLayer::new().with_max_times(options.retries + 1));
 
         let base_path = match options.instance_name {
             Some(instance_name) => format!("{instance_name}/{scope}"),

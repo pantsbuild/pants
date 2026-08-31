@@ -338,6 +338,7 @@ pub fn fingerprinted_options(build_root: &BuildRoot) -> Result<Vec<Fingerprinted
         // FingerprintedOption::new(option_id!("log", "levels", "by", "target"), ...),
         FingerprintedOption::new(option_id!("log", "show", "rust", "3rdparty"), false),
         FingerprintedOption::new(option_id!("ignore", "warnings"), vec![]),
+        FingerprintedOption::new(option_id!("plugins"), vec![]),
         FingerprintedOption::new(
             option_id!("pants", "version"),
             include_str!("../../engine/VERSION"),

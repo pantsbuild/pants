@@ -21,6 +21,7 @@ from pants.option.bootstrap_options import (
 from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope import GLOBAL_SCOPE
 from pants.testutil.option_util import create_dynamic_remote_options
 from pants.testutil.pytest_util import no_exception
 from pants.util.dirutil import safe_mkdir_for
@@ -147,6 +148,23 @@ def test_invalidation_globs() -> None:
     )
     for glob in globs:
         assert suffix not in glob
+
+
+def test_plugins_is_daemon_fingerprinted() -> None:
+    # A surviving `pantsd` constrains later plugin resolves to the versions already on its
+    # `sys.path`, so this option must invalidate the process itself (#23649).
+    ob = OptionsBootstrapper.create(
+        args=["--pants-config-files=[]", "--plugins=ansicolors==1.1.8"],
+        env={},
+        allow_pantsrc=False,
+    )
+    daemon_fingerprinted = {
+        name
+        for name, _, _ in ob.bootstrap_options.get_fingerprintable_for_scope(
+            GLOBAL_SCOPE, daemon_only=True
+        )
+    }
+    assert "plugins" in daemon_fingerprinted
 
 
 @pytest.mark.parametrize(

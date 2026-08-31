@@ -53,8 +53,6 @@ class TerraformModuleTarget(Target):
         A single Terraform module corresponding to a directory.
 
         There must only be one `terraform_module` in a directory.
-
-        Use `terraform_modules` to generate `terraform_module` targets for less boilerplate.
         """
     )
 

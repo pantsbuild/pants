@@ -284,8 +284,9 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
         if "Main" in mod_json and mod_json["Main"]:
             continue
 
-        # Skip first-party modules referenced from other first-party modules.
-        # TODO Issue #22097: These cross-module references could be used for dependency inference
+        # Skip first-party modules referenced from other first-party modules via a local
+        # directory `replace`. These are not third-party packages; `map_import_paths_to_packages`
+        # folds their import paths into the referencing module's inference map (#22097).
         if "Replace" in mod_json and "Version" not in mod_json["Replace"]:
             continue
 
