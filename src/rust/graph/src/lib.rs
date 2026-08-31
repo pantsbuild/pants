@@ -547,7 +547,7 @@ impl<N: Node> Graph<N> {
         };
 
         if src_id.is_some()
-            && let Err(e) = context.dep_record(entry_id, generation, uncacheable)
+            && let Err(e) = context.dep_record(entry_id, generation, uncacheable.is_some())
         {
             return (Err(e), generation);
         }
@@ -653,7 +653,7 @@ impl<N: Node> Graph<N> {
                 // Cleaning succeeded.
                 //
                 // Return true if any dep was uncacheable.
-                Ok(uncacheable_deps.into_iter().any(|u| u))
+                Ok(uncacheable_deps.into_iter().any(|u| u.is_some()))
             }
             Err(()) => {
                 // Cleaning failed.
