@@ -122,7 +122,8 @@ async def expand_module_import_paths(
             go_mod_info.mod_path,
             # Matches target generation (see `generate_targets_from_go_mod`).
             build_opts=GoBuildOptions(),
-        )
+        ),
+        **implicitly(),
     )
     return ModuleImportPathsExpansion(
         {

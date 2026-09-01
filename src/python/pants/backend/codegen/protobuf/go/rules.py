@@ -465,7 +465,8 @@ async def setup_full_package_build_request(
                 go_mod_info.digest,
                 go_mod_info.mod_path,
                 build_opts=request.build_opts,
-            )
+            ),
+            **implicitly(),
         )
         third_party_index = all_third_party_packages.import_paths_to_pkg_info
 
