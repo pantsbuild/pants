@@ -10,6 +10,7 @@ from pathlib import PurePath
 
 import chevron
 
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess, GoSdkToolIDRequest, compute_go_tool_id
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
@@ -226,12 +227,47 @@ class GenerateCoverageSetupCodeResult:
     digest: Digest
 
 
+# The Go stdlib packages imported by the coverage setup code generated for Go v1.25+.
+#
+# `prepare_go_test_binary` must add these as direct dependencies of the synthetic main package:
+# the package analyzer only ever sees `testmain.go` (that is the sole output of the
+# `generate_testmain` process), so imports which appear only in `pants_cover_setup.go` would
+# otherwise never make it into the `importcfg` for the main package.
+COVERAGE_SETUP_TESTDEPS_IMPORTS: tuple[str, ...] = ("fmt", "io", "os", "sync/atomic")
+
+
+def registers_coverage_via_testdeps(goroot: GoRoot) -> bool:
+    """Whether the coverage setup code must register coverage through `testing/internal/testdeps`.
+
+    Pants instruments Go sources with the "legacy" coverage mechanism (`go tool cover -mode -var`),
+    which stores counters in exported package-level variables. Those counters used to be handed to
+    the `testing` package via `testing.RegisterCover`.
+
+    Go v1.20 replaced that mechanism with the "coverage redesign", under which `RegisterCover` is
+    ignored: `testing.CoverMode()` reads the state registered by `testing.MainStart` instead. Up to
+    Go v1.24 Pants avoided the problem by building everything with
+    `GOEXPERIMENT=nocoverageredesign` (see `sdk.py`), which restores the old implementation. Go
+    v1.25 removed that experiment, and with it `RegisterCover`'s body, so on Go v1.25+ the counters
+    have to be registered the way `cmd/go`'s own generated testmain does it - by pointing the
+    `testing/internal/testdeps` hooks at our own profile writer.
+    """
+    return goroot.is_compatible_version("1.25")
+
+
 COVERAGE_SETUP_CODE = """\
 package main
 
 import (
+{{#use_testdeps}}
+    "fmt"
+    "io"
+    "os"
+    "sync/atomic"
+{{/use_testdeps}}
     "testing"
-
+{{#use_testdeps}}
+    "testing/internal/testdeps"
+{{/use_testdeps}}
 {{#imports}}
     _cover{{i}} "{{import_path}}"
 {{/imports}}
@@ -240,6 +276,12 @@ import (
 var (
     coverCounters = make(map[string][]uint32)
     coverBlocks = make(map[string][]testing.CoverBlock)
+{{#use_testdeps}}
+    // Registration order of `coverCounters`. Iteration order of a Go map is randomized, so the
+    // coverage profile is written by walking this slice instead: `cover.out` ends up in a `Digest`
+    // which is materialized to `dist/`, and unstable output would mean an unstable cache key.
+    coverFileNames []string
+{{/use_testdeps}}
 )
 
 func coverRegisterFile(fileName string, counter []uint32, pos []uint32, numStmts []uint16) {
@@ -250,6 +292,9 @@ func coverRegisterFile(fileName string, counter []uint32, pos []uint32, numStmts
         // Already registered.
         return
     }
+{{#use_testdeps}}
+    coverFileNames = append(coverFileNames, fileName)
+{{/use_testdeps}}
     coverCounters[fileName] = counter
     block := make([]testing.CoverBlock, len(counter))
     for i := range counter {
@@ -269,14 +314,95 @@ func init() {
     coverRegisterFile("{{file_id}}", _cover{{i}}.{{cover_var}}.Count[:], _cover{{i}}.{{cover_var}}.Pos[:], _cover{{i}}.{{cover_var}}.NumStmt[:])
 {{/registrations}}
 }
+{{#use_testdeps}}
+
+// coverSnapshot backs `testing.Coverage()`. It reports the fraction of covered basic blocks,
+// matching what the `testing` package itself used to compute.
+func coverSnapshot() float64 {
+    var n, d int64
+    for _, fileName := range coverFileNames {
+        counters := coverCounters[fileName]
+        for i := range counters {
+            if atomic.LoadUint32(&counters[i]) > 0 {
+                n++
+            }
+            d++
+        }
+    }
+    if d == 0 {
+        return 0
+    }
+    return float64(n) / float64(d)
+}
+
+// coverWriteProfile writes the coverage profile in the "textfmt" format understood by
+// `go tool cover`. It is installed as `testdeps.CoverProcessTestDirFunc` and so is invoked by
+// `testing.M.Run` once the tests have finished.
+func coverWriteProfile(_ string, coverProfile string, coverMode string, coveredPackages string, w io.Writer, _ []string) (err error) {
+    var f *os.File
+    if coverProfile != "" {
+        f, err = os.Create(coverProfile)
+        if err != nil {
+            return err
+        }
+        defer func() {
+            if closeErr := f.Close(); err == nil {
+                err = closeErr
+            }
+        }()
+        if _, err = fmt.Fprintf(f, "mode: %s\\n", coverMode); err != nil {
+            return err
+        }
+    }
+
+    var active, total int64
+    for _, fileName := range coverFileNames {
+        counters := coverCounters[fileName]
+        blocks := coverBlocks[fileName]
+        for i := range counters {
+            stmts := int64(blocks[i].Stmts)
+            total += stmts
+            count := atomic.LoadUint32(&counters[i]) // For -mode=atomic.
+            if count > 0 {
+                active += stmts
+            }
+            if f == nil {
+                continue
+            }
+            if _, err = fmt.Fprintf(f, "%s:%d.%d,%d.%d %d %d\\n", fileName,
+                blocks[i].Line0, blocks[i].Col0,
+                blocks[i].Line1, blocks[i].Col1,
+                stmts,
+                count); err != nil {
+                return err
+            }
+        }
+    }
+
+    if total == 0 {
+        fmt.Fprintln(w, "coverage: [no statements]")
+        return nil
+    }
+    fmt.Fprintf(w, "coverage: %.1f%% of statements%s\\n", 100*float64(active)/float64(total), coveredPackages)
+    return nil
+}
+{{/use_testdeps}}
 
 func registerCover() {
+{{#use_testdeps}}
+    testdeps.CoverMode = "{{cover_mode}}"
+    testdeps.CoverSnapshotFunc = coverSnapshot
+    testdeps.CoverProcessTestDirFunc = coverWriteProfile
+    testdeps.CoverMarkProfileEmittedFunc = func(bool) {}
+{{/use_testdeps}}
+{{^use_testdeps}}
     testing.RegisterCover(testing.Cover{
         Mode: "{{cover_mode}}",
         Counters: coverCounters,
         Blocks: coverBlocks,
         CoveredPackages: "",
     })
+{{/use_testdeps}}
 }
 """
 
@@ -284,21 +410,32 @@ func registerCover() {
 @rule
 async def generate_go_coverage_setup_code(
     request: GenerateCoverageSetupCodeRequest,
+    goroot: GoRoot,
 ) -> GenerateCoverageSetupCodeResult:
+    # Sort the packages, and the per-file registrations within them, so that the generated code (and
+    # thus the order in which the coverage profile is written) does not depend on the order in which
+    # the packages happened to be built.
+    packages = sorted(request.packages, key=lambda pkg: pkg.import_path)
+    registrations = sorted(
+        (
+            (package_index, file_metadata)
+            for package_index, pkg in enumerate(packages)
+            for file_metadata in pkg.cover_file_metadatas
+        ),
+        key=lambda registration: registration[1].file_id,
+    )
     content = chevron.render(
         template=COVERAGE_SETUP_CODE,
         data={
-            "imports": [
-                {"i": i, "import_path": pkg.import_path} for i, pkg in enumerate(request.packages)
-            ],
+            "use_testdeps": registers_coverage_via_testdeps(goroot),
+            "imports": [{"i": i, "import_path": pkg.import_path} for i, pkg in enumerate(packages)],
             "registrations": [
                 {
-                    "i": i,
-                    "file_id": m.file_id,
-                    "cover_var": m.cover_var,
+                    "i": package_index,
+                    "file_id": file_metadata.file_id,
+                    "cover_var": file_metadata.cover_var,
                 }
-                for i, pkg in enumerate(request.packages)
-                for m in pkg.cover_file_metadatas
+                for package_index, file_metadata in registrations
             ],
             "cover_mode": request.cover_mode.value,
         },

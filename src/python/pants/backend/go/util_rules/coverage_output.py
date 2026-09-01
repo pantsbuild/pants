@@ -57,11 +57,23 @@ async def go_render_coverage_report(
         get_digest_contents(request.raw_report.coverage_digest),
     )
 
+    # `run_go_tests` guarantees that the digest holds exactly the coverage profile, but look the
+    # profile up by name rather than by position so that this cannot blow up with an `IndexError` if
+    # that ever stops being true.
+    raw_coverage_profile = next(
+        (
+            file_content.content
+            for file_content in digest_contents
+            if file_content.path == "cover.out"
+        ),
+        None,
+    )
+
     html_coverage_report: FilesystemCoverageReport | None = None
-    if go_test_subsystem.coverage_html:
+    if go_test_subsystem.coverage_html and raw_coverage_profile is not None:
         html_result = await render_go_coverage_profile_to_html(
             RenderGoCoverageProfileToHtmlRequest(
-                raw_coverage_profile=digest_contents[0].content,
+                raw_coverage_profile=raw_coverage_profile,
                 description_of_origin=f"Go package with import path `{request.raw_report.import_path}`",
                 sources_digest=request.raw_report.sources_digest,
                 sources_dir_path=request.raw_report.sources_dir_path,

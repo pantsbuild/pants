@@ -24,11 +24,14 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.coverage import GoCoverageData
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import FileTarget
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
+from pants.engine.fs import DigestContents
+from pants.engine.internals.native_engine import Digest
 from pants.engine.process import ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -56,6 +59,7 @@ def rule_runner() -> RuleRunner:
             get_filtered_environment,
             QueryRule(TestResult, [GoTestRequest.Batch]),
             QueryRule(ProcessResult, [GoSdkProcess]),
+            QueryRule(DigestContents, (Digest,)),
         ],
         target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )
@@ -755,3 +759,9 @@ def test_external_test_with_use_coverage(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
+
+    # An exit code of 0 is not enough: assert that a coverage profile was actually produced.
+    assert isinstance(result.coverage_data, GoCoverageData)
+    digest_contents = rule_runner.request(DigestContents, (result.coverage_data.coverage_digest,))
+    assert [file_content.path for file_content in digest_contents] == ["cover.out"]
+    assert digest_contents[0].content.decode().startswith("mode: set\n")

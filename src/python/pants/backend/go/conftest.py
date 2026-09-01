@@ -80,6 +80,19 @@ def _discover_go_binaries() -> list[tuple[str, tuple[int, int]]]:
     return go_binaries
 
 
+@pytest.fixture
+def go_binary_path() -> str:
+    """The `go` binary a test should use, defaulting to the newest one on `PATH`.
+
+    `pytest_generate_tests` parametrizes this fixture instead for tests marked with
+    `require_go_version_max`.
+    """
+    go_binaries = _discover_go_binaries()
+    if not go_binaries:
+        pytest.skip(reason="`go` not present on PATH")
+    return go_binaries[0][0]
+
+
 def pytest_generate_tests(metafunc):
     """Parametrize tests that require specific Go versions."""
     # Check if the test has the require_go_version_max marker.

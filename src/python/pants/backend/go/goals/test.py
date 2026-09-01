@@ -43,12 +43,14 @@ from pants.backend.go.util_rules.build_pkg_target import (
     setup_build_go_package_target_request,
 )
 from pants.backend.go.util_rules.coverage import (
+    COVERAGE_SETUP_TESTDEPS_IMPORTS,
     GenerateCoverageSetupCodeRequest,
     GenerateCoverageSetupCodeResult,
     GoCoverageConfig,
     GoCoverageData,
     GoCoverMode,
     generate_go_coverage_setup_code,
+    registers_coverage_via_testdeps,
 )
 from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgAnalysis,
@@ -77,11 +79,19 @@ from pants.core.target_types import FileSourceField
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.env_vars import EnvironmentVarsRequest
-from pants.engine.fs import EMPTY_FILE_DIGEST, AddPrefix, Digest, MergeDigests
+from pants.engine.fs import (
+    EMPTY_FILE_DIGEST,
+    AddPrefix,
+    Digest,
+    DigestSubset,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.internals.graph import resolve_targets
 from pants.engine.internals.native_engine import EMPTY_DIGEST, Snapshot
 from pants.engine.intrinsics import (
     add_prefix,
+    digest_subset_to_digest,
     digest_to_snapshot,
     execute_process_with_retry,
     merge_digests,
@@ -261,6 +271,7 @@ def _lift_build_requests_with_coverage(
 async def prepare_go_test_binary(
     request: PrepareGoTestBinaryRequest,
     analyzer: PackageAnalyzerSetup,
+    goroot: GoRoot,
 ) -> FalliblePrepareGoTestBinaryResult:
     go_mod_addr = await find_owning_go_mod(
         OwningGoModRequest(request.field_set.address), **implicitly()
@@ -502,9 +513,30 @@ async def prepare_go_test_binary(
                 packages=FrozenOrderedSet(coverage_metadata),
                 cover_mode=request.coverage.coverage_mode,  # type: ignore[union-attr] # gated on with_coverage
             ),
+            goroot,
         )
         coverage_setup_digest = coverage_setup_result.digest
         coverage_setup_files = [GenerateCoverageSetupCodeResult.PATH]
+
+        # The generated coverage setup code imports stdlib packages which `testmain.go` may not
+        # import. Only `testmain.go` is analyzed for imports, so those packages have to be added to
+        # the main package's direct dependencies explicitly or they will be missing from its
+        # `importcfg`. (Duplicate direct dependencies are de-duplicated by import path when the
+        # `importcfg` is built.)
+        if registers_coverage_via_testdeps(goroot):
+            extra_stdlib_build_requests = await concurrently(
+                setup_build_go_package_target_request_for_stdlib(
+                    BuildGoPackageRequestForStdlibRequest(
+                        import_path=stdlib_import_path,
+                        build_opts=build_opts,
+                    ),
+                    **implicitly(),
+                )
+                for stdlib_import_path in COVERAGE_SETUP_TESTDEPS_IMPORTS
+            )
+            for build_request in extra_stdlib_build_requests:
+                assert build_request.request is not None
+                main_direct_deps.append(build_request.request)
 
     testmain_input_digest = await merge_digests(
         MergeDigests([testmain.digest, coverage_setup_digest])
@@ -727,13 +759,23 @@ async def run_go_tests(
 
     coverage_data: GoCoverageData | None = None
     if test_subsystem.use_coverage:
-        coverage_data = GoCoverageData(
-            coverage_digest=results.last.output_digest,
-            import_path=test_binary.import_path,
-            sources_digest=test_binary.pkg_digest.digest,
-            sources_dir_path=test_binary.pkg_analysis.dir_path,
-            pkg_target_address=field_set.address,
+        # Subset the output digest down to the coverage profile: the digest may also hold the other
+        # profiles requested via `[go-test]` (e.g. `block.out`), which must not be mistaken for the
+        # coverage profile when the report is rendered.
+        #
+        # The profile may also be missing entirely - a `TestMain` which never calls `m.Run()` never
+        # writes one - in which case there is simply no coverage data to report.
+        coverage_profile_digest = await digest_subset_to_digest(
+            DigestSubset(results.last.output_digest, PathGlobs(["cover.out"]))
         )
+        if coverage_profile_digest != EMPTY_DIGEST:
+            coverage_data = GoCoverageData(
+                coverage_digest=coverage_profile_digest,
+                import_path=test_binary.import_path,
+                sources_digest=test_binary.pkg_digest.digest,
+                sources_dir_path=test_binary.pkg_analysis.dir_path,
+                pkg_target_address=field_set.address,
+            )
 
     output_files = [x for x in output_files if x != "cover.out"]
     extra_output: Snapshot | None = None

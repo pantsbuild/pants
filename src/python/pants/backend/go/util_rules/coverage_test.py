@@ -24,8 +24,9 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
-from pants.backend.go.util_rules.coverage import GoCoverageData
+from pants.backend.go.util_rules.coverage import GoCoverageData, registers_coverage_via_testdeps
 from pants.backend.go.util_rules.coverage_output import GoCoverageDataCollection
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.build_graph.address import Address
 from pants.core.goals.test import (
     CoverageReport,
@@ -41,12 +42,6 @@ from pants.engine.internals.native_engine import Digest
 from pants.engine.rules import QueryRule
 from pants.engine.target import Target
 from pants.testutil.rule_runner import RuleRunner
-
-# Coverage tests require Go < 1.25 due to changes in coverage format.
-pytestmark = [
-    pytest.mark.require_go_version_max(1, 24),
-    pytest.mark.no_error_if_skipped,
-]
 
 
 @pytest.fixture
@@ -71,6 +66,7 @@ def rule_runner(go_binary_path: str) -> RuleRunner:
             QueryRule(TestResult, (GoTestRequest.Batch,)),
             QueryRule(CoverageReports, (GoCoverageDataCollection,)),
             QueryRule(DigestContents, (Digest,)),
+            QueryRule(GoRoot, ()),
         ],
         target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )
@@ -234,3 +230,216 @@ def test_coverage_of_multiple_packages(rule_runner: RuleRunner) -> None:
     multi_cover_report = run_test(tgt)
     assert "foo/add.go" in multi_cover_report
     assert "foo/adder/add.go" in multi_cover_report
+
+
+def _run_test(rule_runner: RuleRunner, tgt: Target) -> TestResult:
+    return rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
+
+
+def _coverage_profile(rule_runner: RuleRunner, coverage_data: GoCoverageData) -> str:
+    """Render the coverage reports and return the raw `cover.out` profile."""
+    coverage_reports = rule_runner.request(
+        CoverageReports, [GoCoverageDataCollection([coverage_data])]
+    )
+    go_report = next(
+        report
+        for report in coverage_reports.reports
+        if isinstance(report, FilesystemCoverageReport) and report.report_type == "go_cover"
+    )
+    digest_contents = rule_runner.request(DigestContents, (go_report.result_snapshot.digest,))
+    assert [fc.path for fc in digest_contents] == ["cover.out"]
+    return digest_contents[0].content.decode()
+
+
+def _covered_files(profile: str) -> list[str]:
+    """The file names in a profile, in the order in which they first appear."""
+    file_names: list[str] = []
+    for line in profile.splitlines()[1:]:  # Skip the `mode:` line.
+        file_name = line.split(":", 1)[0]
+        if file_name not in file_names:
+            file_names.append(file_name)
+    return file_names
+
+
+def test_coverage_with_test_main_calling_os_exit(rule_runner: RuleRunner) -> None:
+    """A `TestMain` which ends in `os.Exit(m.Run())` must still produce a coverage profile.
+
+    `os.Exit` skips everything after `m.Run()` in the generated test main, so coverage may only be
+    written from within `m.Run()` itself.
+    """
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """\
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """\
+                package foo
+                import (
+                  "os"
+                  "testing"
+                )
+                func TestMain(m *testing.M) {
+                  os.Exit(m.Run())
+                }
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    result = _run_test(rule_runner, rule_runner.get_target(Address("foo")))
+    assert result.exit_code == 0
+    assert result.coverage_data is not None
+    assert isinstance(result.coverage_data, GoCoverageData)
+
+    profile = _coverage_profile(rule_runner, result.coverage_data)
+    assert profile.startswith("mode: set\n")
+    assert _covered_files(profile) == ["foo/add.go"]
+    # `add` was called, so its block must have a non-zero execution count.
+    counts = [int(line.rsplit(" ", 1)[1]) for line in profile.splitlines()[1:]]
+    assert counts == [1]
+
+
+@pytest.mark.no_error_if_skipped
+def test_coverage_profile_is_deterministic(rule_runner: RuleRunner) -> None:
+    """The profile is written in sorted file order.
+
+    `cover.out` is materialized to `dist/`, so its contents must not depend on Go's randomized map
+    iteration order.
+    """
+    if not registers_coverage_via_testdeps(rule_runner.request(GoRoot, [])):
+        pytest.skip(
+            "Go < 1.25 writes the coverage profile itself, by iterating a map, so Pants cannot "
+            "make its contents deterministic."
+        )
+
+    sources = {
+        "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+        "foo/go.mod": "module foo",
+        "foo/foo_test.go": textwrap.dedent(
+            """\
+            package foo
+            import "testing"
+            func TestAll(t *testing.T) {
+              if a()+b()+c()+d() != 4 {
+                t.Fail()
+              }
+            }
+            """
+        ),
+    }
+    for name in ("a", "b", "c", "d"):
+        sources[f"foo/{name}.go"] = textwrap.dedent(
+            f"""\
+            package foo
+            func {name}() int {{
+              return 1
+            }}
+            """
+        )
+    rule_runner.write_files(sources)
+
+    result = _run_test(rule_runner, rule_runner.get_target(Address("foo")))
+    assert result.exit_code == 0
+    assert isinstance(result.coverage_data, GoCoverageData)
+
+    covered_files = _covered_files(_coverage_profile(rule_runner, result.coverage_data))
+    assert covered_files == [f"foo/{name}.go" for name in ("a", "b", "c", "d")]
+
+
+def test_missing_coverage_profile_is_not_fatal(rule_runner: RuleRunner) -> None:
+    """A test binary which exits without running any tests writes no profile.
+
+    Pants must report that as "no coverage data" rather than crashing on the empty output.
+    """
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """\
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """\
+                package foo
+                import (
+                  "os"
+                  "testing"
+                )
+                func TestMain(m *testing.M) {
+                  os.Exit(0)
+                }
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    result = _run_test(rule_runner, rule_runner.get_target(Address("foo")))
+    assert result.exit_code == 0
+    assert result.coverage_data is None
+
+
+def test_coverage_with_other_profiles_enabled(rule_runner: RuleRunner) -> None:
+    """Other profiles land in the same output digest and must not be read as the cover profile."""
+    rule_runner.set_options(
+        [
+            "--test-use-coverage",
+            "--go-test-block-profile",
+        ],
+        env_inherit={"PATH"},
+    )
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """\
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """\
+                package foo
+                import "testing"
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    result = _run_test(rule_runner, rule_runner.get_target(Address("foo")))
+    assert result.exit_code == 0
+    assert result.extra_output is not None
+    assert "block.out" in result.extra_output.files
+    assert isinstance(result.coverage_data, GoCoverageData)
+
+    profile = _coverage_profile(rule_runner, result.coverage_data)
+    assert profile.startswith("mode: set\n")
