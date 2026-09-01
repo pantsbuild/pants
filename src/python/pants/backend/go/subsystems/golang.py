@@ -25,6 +25,13 @@ class ThirdPartyTargetGranularity(Enum):
     MODULE = "module"
 
 
+class GoThirdPartyTargetGeneration(Enum):
+    """Which third-party packages a `go_mod` generates targets for."""
+
+    BUILD_LIST = "build-list"
+    IMPORTED = "imported"
+
+
 class GolangSubsystem(Subsystem):
     options_scope = "golang"
     help = "Options for Golang support."
@@ -268,6 +275,38 @@ class GolangSubsystem(Subsystem):
             """
         ),
         advanced=True,
+    )
+
+    third_party_target_generation = EnumOption(
+        default=GoThirdPartyTargetGeneration.BUILD_LIST,
+        help=softwrap(
+            """\
+            Which `go_third_party_package` targets to generate for each `go_mod` target.
+
+              * `build-list`: generate a target for every package of every module in the module\
+                build list, i.e. everything `go list -m all` reports.
+              * `imported`: generate targets only for third-party packages reachable through the\
+                import graph from the `go_mod`'s own first-party code.
+
+            The build list over-approximates what a repo actually uses, often by a lot: minimal
+            version selection resolves at module granularity, so importing one package from a
+            module puts that whole module -- and everything it requires -- on the list, and every
+            package of every listed module becomes a target. Because target generation must
+            analyze each of those modules, it also downloads them, whether or not anything
+            imports them.
+
+            Setting `imported` can dramatically reduce target count, memory use and the number of
+            module downloads, at the cost of two behavior changes:
+
+              * third-party packages nothing imports no longer appear in `pants list ::`;
+              * hand-written addresses pointing at an unimported third-party package no longer\
+                resolve.
+
+            Imports guarded by build tags, imports for other platforms, the `tools.go` pattern and
+            `tool` directives in `go.mod` are all treated as imports, so they still generate
+            targets.
+            """
+        ),
     )
 
     cgo_enabled = BoolOption(

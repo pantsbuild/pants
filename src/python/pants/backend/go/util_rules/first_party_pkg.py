@@ -115,6 +115,17 @@ class FallibleFirstPartyPkgAnalysis:
     exit_code: int = 0
     stderr: str | None = None
 
+    # Every import seen in the directory, ignoring build constraints -- see `AllImports` in the
+    # package analyzer. Deliberately carried on the fallible wrapper rather than on
+    # `FirstPartyPkgAnalysis`, because the cases that most need it are exactly the ones where
+    # `analysis` is None: a directory holding only a build-tag-gated `tools.go` fails with "no
+    # buildable Go source files", but its imports are still real target-generation roots.
+    #
+    # Empty when the analyzer process itself failed or its output could not be parsed, since
+    # there is nothing to read in those cases.
+    all_imports: tuple[str, ...] = ()
+    all_test_imports: tuple[str, ...] = ()
+
     @classmethod
     def from_process_result(
         cls,
@@ -158,7 +169,14 @@ class FallibleFirstPartyPkgAnalysis:
                     for filename, error in metadata.get("InvalidGoFiles", {}).items()
                 )
                 error += "\n"
-            return cls(analysis=None, import_path=import_path, exit_code=1, stderr=error)
+            return cls(
+                analysis=None,
+                import_path=import_path,
+                exit_code=1,
+                stderr=error,
+                all_imports=tuple(metadata.get("AllImports", [])),
+                all_test_imports=tuple(metadata.get("AllTestImports", [])),
+            )
 
         analysis = FirstPartyPkgAnalysis(
             dir_path=dir_path,
@@ -191,7 +209,12 @@ class FallibleFirstPartyPkgAnalysis:
             test_embed_patterns=tuple(metadata.get("TestEmbedPatterns", [])),
             xtest_embed_patterns=tuple(metadata.get("XTestEmbedPatterns", [])),
         )
-        return cls(analysis, import_path)
+        return cls(
+            analysis,
+            import_path,
+            all_imports=tuple(metadata.get("AllImports", [])),
+            all_test_imports=tuple(metadata.get("AllTestImports", [])),
+        )
 
 
 @dataclass(frozen=True)

@@ -122,7 +122,8 @@ async def expand_module_import_paths(
             go_mod_info.mod_path,
             # Matches target generation (see `generate_targets_from_go_mod`).
             build_opts=GoBuildOptions(),
-        )
+        ),
+        **implicitly(),
     )
     return ModuleImportPathsExpansion(
         {
@@ -585,8 +586,14 @@ async def generate_targets_from_go_mod(
             # TODO: There is a rule graph cycle in this rule if this rule tries to use GoBuildOptionsFromTargetRequest.
             # For now, just use a default set of options to facilitate analyzing third-party dependencies and
             # generating targets.
+            #
+            # NB: These defaults no longer cost an extra download of every module in the graph.
+            # `ModuleDownloadRequest` is keyed on `cgo_enabled` alone rather than the whole
+            # `GoBuildOptions`, so target generation and a compile resolving e.g. `race=True` share
+            # one memoized download. Only a caller that actually differs in `cgo_enabled` pays twice.
             build_opts=GoBuildOptions(),
-        )
+        ),
+        **implicitly(),
     )
 
     def gen_file_tgt(fp: str) -> TargetGeneratorSourcesHelperTarget:

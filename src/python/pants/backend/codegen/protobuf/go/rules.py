@@ -71,6 +71,10 @@ from pants.backend.go.util_rules.import_analysis import (
     GoStdLibPackagesRequest,
     analyze_go_stdlib_packages,
 )
+from pants.backend.go.util_rules.import_roots import (
+    GoCodegenImportRoots,
+    GoCodegenImportRootsRequest,
+)
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.backend.go.util_rules.third_party_pkg import (
@@ -89,6 +93,7 @@ from pants.engine.fs import (
     Directory,
     FileContent,
     MergeDigests,
+    PathGlobs,
     RemovePrefix,
 )
 from pants.engine.internals.graph import hydrate_sources, resolve_source_paths, transitive_targets
@@ -156,6 +161,53 @@ def parse_go_package_option(content_raw: bytes) -> str | None:
 
 class ProtobufGoModuleImportPathsMappingsHook(GoModuleImportPathsMappingsHook):
     pass
+
+
+class ProtobufGoCodegenImportRootsRequest(GoCodegenImportRootsRequest):
+    pass
+
+
+# The packages `protoc-gen-go` and `protoc-gen-go-grpc` emit into generated files. Named as whole
+# modules rather than individual import paths -- a module is downloaded and analyzed as a unit, so
+# naming every package of it costs no extra downloads.
+_PROTOBUF_RUNTIME_MODULE = "google.golang.org/protobuf"
+_GRPC_RUNTIME_MODULE = "google.golang.org/grpc"
+
+
+@rule(desc="Determine Go import roots contributed by Protobuf codegen", level=LogLevel.DEBUG)
+async def protobuf_go_codegen_import_roots(
+    request: ProtobufGoCodegenImportRootsRequest,
+) -> GoCodegenImportRoots:
+    """Report the runtime modules that generated `.pb.go` files import.
+
+    Generated sources do not exist when the import scan runs, so their imports are invisible to it.
+    Without this, `[golang].third_party_target_generation = "imported"` would drop the protobuf
+    runtime targets and generated code would fail to build.
+
+    NB: this deliberately does not consult the target graph. The only consumer is
+    `generate_targets_from_go_mod`, which is itself a target generator, so requesting targets here
+    deadlocks the engine with "The dependency graph contained a cycle". That also rules out reading
+    each target's `grpc` toggle, so the gRPC runtime is reported whenever any proto generates Go.
+    Over-reporting costs one extra module's targets; under-reporting breaks the build.
+    """
+    base_dir = os.path.dirname(request.go_mod_path)
+    prefix = f"{base_dir}/" if base_dir else ""
+
+    # NB: a `.proto` under a *nested* go.mod is counted for the parent too. That is a harmless
+    # over-approximation of an already over-approximating hook.
+    protos = await digest_to_snapshot(**implicitly(PathGlobs([f"{prefix}**/*.proto"])))
+    if not protos.files:
+        return GoCodegenImportRoots(())
+
+    proto_contents = await get_digest_contents(protos.digest)
+    # `option go_package` is what makes a proto generate Go at all.
+    generates_go = any(
+        parse_go_package_option(entry.content) is not None for entry in proto_contents
+    )
+    if not generates_go:
+        return GoCodegenImportRoots(())
+
+    return GoCodegenImportRoots((_PROTOBUF_RUNTIME_MODULE, _GRPC_RUNTIME_MODULE))
 
 
 @rule(desc="Map import paths for all Go Protobuf targets.", level=LogLevel.DEBUG)
@@ -413,7 +465,8 @@ async def setup_full_package_build_request(
                 go_mod_info.digest,
                 go_mod_info.mod_path,
                 build_opts=request.build_opts,
-            )
+            ),
+            **implicitly(),
         )
         third_party_index = all_third_party_packages.import_paths_to_pkg_info
 
@@ -777,6 +830,7 @@ def rules():
         UnionRule(GenerateSourcesRequest, GenerateGoFromProtobufRequest),
         UnionRule(GoCodegenBuildRequest, GoCodegenBuildProtobufRequest),
         UnionRule(GoModuleImportPathsMappingsHook, ProtobufGoModuleImportPathsMappingsHook),
+        UnionRule(GoCodegenImportRootsRequest, ProtobufGoCodegenImportRootsRequest),
         ProtobufSourcesGeneratorTarget.register_plugin_field(GoOwningGoModAddressField),
         ProtobufSourceTarget.register_plugin_field(GoOwningGoModAddressField),
         *protoc.rules(),

@@ -10,6 +10,7 @@ import pytest
 from pants.backend.codegen.protobuf import protobuf_dependency_inference, target_types
 from pants.backend.codegen.protobuf.go.rules import (
     GenerateGoFromProtobufRequest,
+    ProtobufGoCodegenImportRootsRequest,
     parse_go_package_option,
 )
 from pants.backend.codegen.protobuf.go.rules import rules as go_protobuf_rules
@@ -35,6 +36,7 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.import_roots import GoCodegenImportRoots
 from pants.build_graph.address import Address
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.util_rules import config_files, source_files, stripped_source_files
@@ -77,6 +79,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(GeneratedSources, [GenerateGoFromProtobufRequest]),
             QueryRule(DigestContents, (Digest,)),
             QueryRule(TestResult, (GoTestRequest.Batch,)),
+            QueryRule(GoCodegenImportRoots, [ProtobufGoCodegenImportRootsRequest]),
         ],
         target_types=[
             GoModTarget,
@@ -408,3 +411,66 @@ def test_generates_go_grpc(rule_runner: RuleRunner) -> None:
             "protos/service_grpc.pb.go",
         ],
     )
+
+
+def test_codegen_import_roots_reported_for_go_generating_protos(rule_runner: RuleRunner) -> None:
+    """Protobuf contributes the runtime modules that generated `.pb.go` files import.
+
+    Those files do not exist when the import scan runs, so without this hook
+    `[golang].third_party_target_generation = "imported"` would generate no targets for the
+    protobuf runtime and the generated code would fail to build.
+    """
+    rule_runner.write_files(
+        {
+            "BUILD": "go_mod(name='mod')\n",
+            "go.mod": "module example.com/m\ngo 1.16\n",
+            "f.proto": dedent(
+                """\
+                syntax = "proto3";
+                package example;
+                option go_package = "example.com/m/gen";
+                message Foo { string bar = 1; }
+                """
+            ),
+        }
+    )
+    result = rule_runner.request(
+        GoCodegenImportRoots,
+        [
+            ProtobufGoCodegenImportRootsRequest(
+                go_mod_address=Address("", target_name="mod"),
+                go_mod_path="go.mod",
+            )
+        ],
+    )
+    assert "google.golang.org/protobuf" in result.module_paths
+    # The per-target grpc toggle lives in the target graph, which this hook must not touch, so the
+    # grpc runtime is reported unconditionally.
+    assert "google.golang.org/grpc" in result.module_paths
+
+
+def test_no_codegen_import_roots_without_go_generating_protos(rule_runner: RuleRunner) -> None:
+    """A proto with no `option go_package` generates no Go, so it contributes no roots."""
+    rule_runner.write_files(
+        {
+            "BUILD": "go_mod(name='mod')\n",
+            "go.mod": "module example.com/m\ngo 1.16\n",
+            "f.proto": dedent(
+                """\
+                syntax = "proto3";
+                package example;
+                message Foo { string bar = 1; }
+                """
+            ),
+        }
+    )
+    result = rule_runner.request(
+        GoCodegenImportRoots,
+        [
+            ProtobufGoCodegenImportRootsRequest(
+                go_mod_address=Address("", target_name="mod"),
+                go_mod_path="go.mod",
+            )
+        ],
+    )
+    assert result.module_paths == ()
