@@ -9,7 +9,7 @@ use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -1109,6 +1109,39 @@ pub async fn get_digest(
     ))
 }
 
+/// Env var names whose *values* are kept out of the cache key.
+///
+/// Set once from `[GLOBAL] cache_key_excluded_env_vars` when the scheduler is built. A
+/// global rather than a `Process` field because the variables this exists for -- a
+/// per-job `DOCKER_CONFIG` path, `BUILDKITE_*` build metadata -- are noise for every
+/// process that receives them, not for one rule's process.
+static CACHE_KEY_EXCLUDED_ENV_VARS: OnceLock<Vec<String>> = OnceLock::new();
+
+/// Called once during scheduler construction. Later calls are ignored, which keeps a
+/// second scheduler in the same process (pantsd tests do this) from changing cache keys
+/// underneath the first.
+pub fn set_cache_key_excluded_env_vars(patterns: Vec<String>) {
+    let _ = CACHE_KEY_EXCLUDED_ENV_VARS.set(patterns);
+}
+
+/// Exact name, or a single trailing `*` as a prefix match -- the same two shapes
+/// `[test] extra_env_vars` accepts, so a name can be excluded in the spelling it was
+/// declared in.
+fn env_var_name_matches(patterns: &[String], name: &str) -> bool {
+    patterns
+        .iter()
+        .any(|pattern| match pattern.strip_suffix('*') {
+            Some(prefix) => name.starts_with(prefix),
+            None => name == pattern,
+        })
+}
+
+pub fn is_cache_key_excluded_env_var(name: &str) -> bool {
+    CACHE_KEY_EXCLUDED_ENV_VARS
+        .get()
+        .is_some_and(|patterns| env_var_name_matches(patterns, name))
+}
+
 pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {
     Ok(Digest::of_bytes(&message.to_bytes()))
 }
@@ -1342,6 +1375,14 @@ pub async fn make_execute_request(
             return Err(format!(
                 "Cannot set env var with name {name} as that is reserved for internal use by pants"
             ));
+        }
+
+        // Excluded names stay in `req.env`, so the process still receives them; they are
+        // only absent from the `Command` the action digest is taken over. Deliberately a
+        // hole in the hermeticity contract: an excluded variable that does change output
+        // will now be served a stale result.
+        if is_cache_key_excluded_env_var(name) {
+            continue;
         }
 
         command

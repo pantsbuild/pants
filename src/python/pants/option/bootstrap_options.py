@@ -600,6 +600,7 @@ class ExecutionOptions:
 
     use_sandboxer: bool
     local_cache: bool
+    cache_key_excluded_env_vars: tuple[str, ...]
     process_execution_local_parallelism: int
     process_execution_local_enable_nailgun: bool
     process_execution_remote_parallelism: int
@@ -650,6 +651,7 @@ class ExecutionOptions:
             # Process execution setup.
             use_sandboxer=bootstrap_options.sandboxer,
             local_cache=bootstrap_options.local_cache,
+            cache_key_excluded_env_vars=tuple(bootstrap_options.cache_key_excluded_env_vars),
             process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
             process_execution_remote_parallelism=dynamic_remote_options.parallelism,
             process_execution_cache_namespace=bootstrap_options.process_execution_cache_namespace,
@@ -750,6 +752,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_cache_namespace=None,
     use_sandboxer=False,
     local_cache=True,
+    cache_key_excluded_env_vars=(),
     cache_content_behavior=CacheContentBehavior.fetch,
     process_execution_local_enable_nailgun=True,
     process_execution_graceful_shutdown_timeout=3,
@@ -1338,6 +1341,35 @@ class BootstrapOptions:
             """
             Whether to cache process executions in a local cache persisted to disk at
             `--local-store-dir`.
+            """
+        ),
+    )
+    cache_key_excluded_env_vars = StrListOption(
+        advanced=True,
+        default=list(DEFAULT_EXECUTION_OPTIONS.cache_key_excluded_env_vars),
+        help=softwrap(
+            """
+            Environment variable names whose values must not affect process cache keys.
+
+            A process still receives these variables; they are simply left out of the key
+            its cached result is stored under. Use this for a variable that a process needs
+            but that cannot change its output — a credential-helper config path that is a
+            fresh temporary directory on every CI job, or build metadata such as
+            `BUILDKITE_BUILD_ID` that a test process reads only to report itself.
+
+            Without this, such a variable makes every process that receives it uncacheable
+            across runs, however deterministic the process is.
+
+            Each entry is an exact name or a single trailing `*` for a prefix match, e.g.
+            `BUILDKITE*`.
+
+            Ignored when remote execution is enabled: there the cache key is also the only
+            means of delivering environment variables to the worker, so the named variables
+            are passed to processes and affect their cache keys as usual.
+
+            This is a deliberate hole in the hermeticity Pants otherwise gives you: name a
+            variable that *does* change output and you will be served a stale result with
+            nothing to indicate it. Keep the list short and obviously safe.
             """
         ),
     )
