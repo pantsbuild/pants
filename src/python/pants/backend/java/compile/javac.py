@@ -16,7 +16,7 @@ from pants.backend.java.subsystems.javac import JavacSubsystem
 from pants.backend.java.target_types import JavaFieldSet, JavaGeneratorFieldSet, JavaSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary, ZipBinary
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Directory, MergeDigests
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Directory, FileContent, MergeDigests
 from pants.engine.intrinsics import (
     create_digest,
     digest_to_snapshot,
@@ -39,12 +39,14 @@ from pants.jvm.compile import (
     compile_classpath_entries,
 )
 from pants.jvm.compile import rules as jvm_compile_rules
-from pants.jvm.jdk_rules import JdkRequest, JvmProcess, prepare_jdk_environment
+from pants.jvm.jdk_rules import JdkRequest, JvmProcess, jvm_argfile_content, prepare_jdk_environment
 from pants.jvm.strip_jar.strip_jar import StripJarRequest, strip_jar
 from pants.jvm.subsystems import JvmSubsystem
 from pants.util.logging import LogLevel
 
 logger = logging.getLogger(__name__)
+
+_JAVAC_ARGUMENT_FILE = "__javac_args.txt"
 
 
 class CompileJavaSourceRequest(ClasspathEntryRequest):
@@ -139,13 +141,33 @@ async def compile_java_source(
         )
 
     dest_dir = "classfiles"
-    dest_dir_digest, jdk = await concurrently(
+    usercp = "__cp"
+    user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
+    classpath_arg = ":".join(user_classpath.root_immutable_inputs_args(prefix=usercp))
+    immutable_input_digests = dict(user_classpath.root_immutable_inputs(prefix=usercp))
+
+    compiler_args = [
+        *(("-cp", classpath_arg) if classpath_arg else ()),
+        *javac.args,
+        "-d",
+        dest_dir,
+        *sorted(
+            chain.from_iterable(
+                sources.snapshot.files for _, sources in component_members_and_java_source_files
+            )
+        ),
+    ]
+    compiler_args_digest, dest_dir_digest, jdk = await concurrently(
+        create_digest(
+            CreateDigest([FileContent(_JAVAC_ARGUMENT_FILE, jvm_argfile_content(compiler_args))])
+        ),
         create_digest(CreateDigest([Directory(dest_dir)])),
         prepare_jdk_environment(**implicitly(JdkRequest.from_target(request.component))),
     )
     merged_digest = await merge_digests(
         MergeDigests(
             (
+                compiler_args_digest,
                 dest_dir_digest,
                 *(
                     sources.snapshot.digest
@@ -155,11 +177,6 @@ async def compile_java_source(
         )
     )
 
-    usercp = "__cp"
-    user_classpath = Classpath(direct_dependency_classpath_entries, request.resolve)
-    classpath_arg = ":".join(user_classpath.root_immutable_inputs_args(prefix=usercp))
-    immutable_input_digests = dict(user_classpath.root_immutable_inputs(prefix=usercp))
-
     # Compile.
     compile_result = await execute_process(
         **implicitly(
@@ -168,16 +185,7 @@ async def compile_java_source(
                 classpath_entries=[f"{jdk.java_home}/lib/tools.jar"],
                 argv=[
                     "com.sun.tools.javac.Main",
-                    *(("-cp", classpath_arg) if classpath_arg else ()),
-                    *javac.args,
-                    "-d",
-                    dest_dir,
-                    *sorted(
-                        chain.from_iterable(
-                            sources.snapshot.files
-                            for _, sources in component_members_and_java_source_files
-                        )
-                    ),
+                    f"@{_JAVAC_ARGUMENT_FILE}",
                 ],
                 input_digest=merged_digest,
                 extra_immutable_input_digests=immutable_input_digests,
