@@ -7,7 +7,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
-from typing import DefaultDict, cast
+from typing import DefaultDict, cast, override
 
 from pants.backend.docker.goals.package_image import (
     DockerPackageFieldSet,
@@ -53,7 +53,8 @@ class PublishDockerImageFieldSet(PublishFieldSet, DockerPackageFieldSet):
 
     skip_push: DockerImageSkipPushField
 
-    def make_skip_request(
+    @override
+    def check_skip_request(
         self, package_fs: PackageFieldSet
     ) -> PublishDockerImageSkipRequest | None:
         return (
