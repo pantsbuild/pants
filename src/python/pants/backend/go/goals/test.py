@@ -318,12 +318,25 @@ async def prepare_go_test_binary(
     import_path = pkg_analysis.import_path
 
     with_coverage = False
+    cover_mode: GoCoverMode | None = None
     if request.coverage is not None:
         with_coverage = True
+        cover_mode = request.coverage.coverage_mode
+        # `go test` forces the cover mode to `atomic` when the race detector is enabled, and so must
+        # Pants: `set` and `count` instrumentation updates its counters without synchronization, so
+        # the race detector reports races on the coverage counters themselves rather than on the
+        # code under test. See `go help testflag`: "the default is set unless -race is enabled, in
+        # which case it is atomic".
+        #
+        # NB: this is resolved here rather than in `run_go_tests` because the race detector can be
+        # enabled per-target (`go_mod(race=...)`, `test_race`), so it is only known once the build
+        # options for this specific package have been resolved.
+        if build_opts.with_race_detector:
+            cover_mode = GoCoverMode.ATOMIC
         build_opts = dataclasses.replace(
             build_opts,
             coverage_config=GoCoverageConfig(
-                cover_mode=request.coverage.coverage_mode,
+                cover_mode=cover_mode,
                 import_path_include_patterns=request.coverage.coverage_packages,
             ),
         )
@@ -508,10 +521,11 @@ async def prepare_go_test_binary(
         coverage_metadata = [
             pkg.coverage_metadata for pkg in built_main_direct_deps if pkg.coverage_metadata
         ]
+        assert cover_mode is not None  # Gated on `with_coverage`.
         coverage_setup_result = await generate_go_coverage_setup_code(
             GenerateCoverageSetupCodeRequest(
                 packages=FrozenOrderedSet(coverage_metadata),
-                cover_mode=request.coverage.coverage_mode,  # type: ignore[union-attr] # gated on with_coverage
+                cover_mode=cover_mode,
             ),
             goroot,
         )

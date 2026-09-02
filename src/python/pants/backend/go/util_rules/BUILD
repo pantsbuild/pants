@@ -6,8 +6,9 @@ python_tests(
     name="tests",
     timeout=120,
     overrides={
-        # Runs once per Go coverage registration mechanism, so once per installed toolchain.
-        "coverage_test.py": {"timeout": 300},
+        # Runs once per Go coverage registration mechanism, so once per installed toolchain, and
+        # the race detector cases rebuild the stdlib with race instrumentation.
+        "coverage_test.py": {"timeout": 600},
         "embed_integration_test.py": {"timeout": 240},
         "cgo_test.py": {"timeout": 240},
         "stdlib_archives_test.py": {"timeout": 240},

@@ -19,6 +19,7 @@ from pants.backend.go.util_rules import (
     coverage_output,
     first_party_pkg,
     go_mod,
+    implicit_linker_deps,
     link,
     sdk,
     tests_analysis,
@@ -56,6 +57,8 @@ def rule_runner(go_binary_path: str) -> RuleRunner:
             *coverage_output.rules(),
             *first_party_pkg.rules(),
             *go_mod.rules(),
+            # NB: required for `runtime/race`, which only reaches the linker as an implicit dep.
+            *implicit_linker_deps.rules(),
             *link.rules(),
             *sdk.rules(),
             *target_type_rules.rules(),
@@ -443,3 +446,110 @@ def test_coverage_with_other_profiles_enabled(rule_runner: RuleRunner) -> None:
 
     profile = _coverage_profile(rule_runner, result.coverage_data)
     assert profile.startswith("mode: set\n")
+
+
+def test_coverage_mode_atomic(rule_runner: RuleRunner) -> None:
+    """`--go-test-cover-mode=atomic` must work for a package that does not import `sync/atomic`.
+
+    `go tool cover -mode=atomic` rewrites the sources to call `sync/atomic.AddUint32`, so the
+    covered package needs `sync/atomic` in its `importcfg` even though its own sources never
+    imported it.
+    """
+    rule_runner.set_options(
+        [
+            "--test-use-coverage",
+            "--go-test-cover-mode=atomic",
+        ],
+        env_inherit={"PATH"},
+    )
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "go_mod(name='mod')\ngo_package()",
+            "foo/go.mod": "module foo",
+            # NB: deliberately imports nothing, and `sync/atomic` least of all.
+            "foo/add.go": textwrap.dedent(
+                """\
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """\
+                package foo
+                import "testing"
+                func TestAdd(t *testing.T) {
+                  if add(2, 3) != 5 {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+    result = _run_test(rule_runner, rule_runner.get_target(Address("foo")))
+    assert result.exit_code == 0
+    assert isinstance(result.coverage_data, GoCoverageData)
+
+    profile = _coverage_profile(rule_runner, result.coverage_data)
+    assert profile.startswith("mode: atomic\n")
+    assert _covered_files(profile) == ["foo/add.go"]
+
+
+def test_coverage_with_race_detector(rule_runner: RuleRunner) -> None:
+    """Coverage must not make the race detector fire on the coverage counters.
+
+    `set` and `count` instrumentation updates its counters without synchronization, so `go test`
+    forces `atomic` whenever `-race` is enabled. Pants must do the same, or every covered package
+    in a repo which enables the race detector reports races against itself.
+    """
+    rule_runner.write_files(
+        {
+            # NB: `race=True`, while `[go-test].cover_mode` is left at its `set` default.
+            "foo/BUILD": "go_mod(name='mod', race=True)\ngo_package()",
+            "foo/go.mod": "module foo",
+            "foo/add.go": textwrap.dedent(
+                """\
+                package foo
+                func add(x, y int) int {
+                  return x + y
+                }
+                """
+            ),
+            "foo/add_test.go": textwrap.dedent(
+                """\
+                package foo
+                import (
+                  "sync"
+                  "testing"
+                )
+                func TestAddConcurrently(t *testing.T) {
+                  var wg sync.WaitGroup
+                  for i := 0; i < 8; i++ {
+                    wg.Add(1)
+                    go func() {
+                      defer wg.Done()
+                      for j := 0; j < 200; j++ {
+                        if add(2, 3) != 5 {
+                          t.Error("bad sum")
+                        }
+                      }
+                    }()
+                  }
+                  wg.Wait()
+                }
+                """
+            ),
+        }
+    )
+    result = _run_test(rule_runner, rule_runner.get_target(Address("foo")))
+    assert b"DATA RACE" not in result.stdout_bytes
+    assert b"DATA RACE" not in result.stderr_bytes
+    assert result.exit_code == 0
+    assert isinstance(result.coverage_data, GoCoverageData)
+
+    # The race detector forces `atomic` even though `[go-test].cover_mode` is `set`.
+    profile = _coverage_profile(rule_runner, result.coverage_data)
+    assert profile.startswith("mode: atomic\n")
+    assert _covered_files(profile) == ["foo/add.go"]
