@@ -24,6 +24,8 @@ from pants.backend.go.util_rules import (
     tests_analysis,
     third_party_pkg,
 )
+from pants.backend.go.util_rules.build_opts import race_detector_supported
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.core.goals.test import TestResult, get_filtered_environment
 from pants.core.target_types import FileTarget
@@ -56,6 +58,7 @@ def rule_runner() -> RuleRunner:
             get_filtered_environment,
             QueryRule(TestResult, [GoTestRequest.Batch]),
             QueryRule(ProcessResult, [GoSdkProcess]),
+            QueryRule(GoRoot, []),
         ],
         target_types=[GoModTarget, GoPackageTarget, FileTarget],
     )
@@ -755,3 +758,85 @@ def test_external_test_with_use_coverage(rule_runner: RuleRunner) -> None:
         TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
     )
     assert result.exit_code == 0
+
+
+# A real unsynchronised write, which the race detector reports deterministically.
+# The `race` build constraint is deliberately NOT used as the probe: Pants sets
+# CGO_ENABLED and EXTRA_BUILD_TAGS when analysing a package but never the `race`
+# tag, so `//go:build race` files are not selected even when `-race` is passed to
+# the compiler.
+_RACE_PROBE_SOURCES = {
+    "foo/go.mod": "module foo\n",
+    "foo/race.go": textwrap.dedent(
+        """
+        package foo
+
+        import "sync"
+
+        func Racy() int {
+          total := 0
+          var wg sync.WaitGroup
+          for i := 0; i < 50; i++ {
+            wg.Add(1)
+            go func() {
+              defer wg.Done()
+              total++
+            }()
+          }
+          wg.Wait()
+          return total
+        }
+        """
+    ),
+    "foo/race_test.go": textwrap.dedent(
+        """
+        package foo
+
+        import "testing"
+
+        func TestRacy(t *testing.T) {
+          _ = Racy()
+        }
+        """
+    ),
+}
+
+
+def _run_race_probe(rule_runner: RuleRunner, build_file: str, options: list[str]) -> TestResult:
+    goroot = rule_runner.request(GoRoot, [])
+    if not race_detector_supported(goroot):
+        pytest.skip(f"race detector unsupported on {goroot.goos}/{goroot.goarch}")
+    rule_runner.set_options(options, env_inherit={"PATH"})
+    rule_runner.write_files({**_RACE_PROBE_SOURCES, "foo/BUILD": build_file})
+    tgt = rule_runner.get_target(Address("foo"))
+    return rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
+
+
+def test_race_detector_enabled_by_force_race_option(rule_runner: RuleRunner) -> None:
+    """`[go-test].force_race` must reach the test binary.
+
+    Regression test: the `test` goal built its `GoBuildOptionsFromTargetRequest` without
+    `for_tests=True`, so the test-only fields were never consulted and this option was
+    silently ignored.
+    """
+    result = _run_race_probe(
+        rule_runner, "go_mod(name='mod')\ngo_package()", ["--go-test-force-race"]
+    )
+    assert result.exit_code != 0
+    assert b"DATA RACE" in result.stdout_bytes + result.stderr_bytes
+
+
+def test_race_detector_enabled_by_test_race_field(rule_runner: RuleRunner) -> None:
+    """`go_package(test_race=True)` must reach the test binary."""
+    result = _run_race_probe(rule_runner, "go_mod(name='mod')\ngo_package(test_race=True)", [])
+    assert result.exit_code != 0
+    assert b"DATA RACE" in result.stdout_bytes + result.stderr_bytes
+
+
+def test_race_detector_disabled_by_default(rule_runner: RuleRunner) -> None:
+    """Without either knob the race detector stays off and the race goes unreported."""
+    result = _run_race_probe(rule_runner, "go_mod(name='mod')\ngo_package()", [])
+    assert result.exit_code == 0
+    assert b"DATA RACE" not in result.stdout_bytes + result.stderr_bytes
