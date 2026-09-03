@@ -18,8 +18,8 @@ use workunit_store::RunId;
 
 use crate::{
     CacheName, Platform, Process, ProcessExecutionEnvironment, ProcessExecutionStrategy,
-    ProcessResultMetadata, ProcessResultSource, extract_output_files, local::KeepSandboxes,
-    maybe_make_wrapper_script,
+    ProcessResultMetadata, ProcessResultSource, extract_output_files, get_digest,
+    local::KeepSandboxes, maybe_make_wrapper_script,
 };
 
 #[test]
@@ -370,4 +370,30 @@ async fn wrapper_script_supports_sandbox_root_replacements_in_environmenbt() {
         .await
         .unwrap();
     assert_eq!(content, "xyzzy\n");
+}
+
+// `get_digest` used to `.unwrap()` the `make_execute_request` result, so any failure inside it --
+// including the transient "Failed to store wrapper script for remote execution" seen when a
+// GOSUMDB fetch dies mid-run -- aborted the whole process instead of surfacing an error. Both of
+// its callers are on the cache-key path, so a network blip could take down an entire run.
+#[tokio::test]
+async fn get_digest_propagates_errors_instead_of_panicking() {
+    let store_dir = TempDir::new().unwrap();
+    let store = store::Store::local_only(task_executor::Executor::new(), store_dir.path()).unwrap();
+
+    let mut process = Process::new(vec!["/bin/echo".to_owned()]);
+    process.append_only_caches.insert(
+        CacheName::new("test_cache".into()).unwrap(),
+        RelativePath::new("foo").unwrap(),
+    );
+
+    // A NUL byte in the caches base path makes `quote_path` (and so `make_execute_request`) fail.
+    // The path is only ever shell-quoted into the wrapper script, so nothing validates it earlier.
+    let result = get_digest(&process, None, None, &store, Some("/tmp/ba\0d")).await;
+
+    let err = result.expect_err("get_digest should return an error rather than panicking");
+    assert!(
+        err.contains("nul byte"),
+        "expected the make_execute_request failure to be propagated, got: {err}"
+    );
 }
