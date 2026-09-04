@@ -29,6 +29,7 @@ from pants.core.goals.test import (
     TestExtraEnvVarsField,
     TestsBatchCompatibilityTagField,
     TestSubsystem,
+    TestUncachedEnvVarsField,
 )
 from pants.core.target_types import ResolveLikeField, ResolveLikeFieldToValueRequest
 from pants.engine.addresses import Address, Addresses
@@ -1357,6 +1358,10 @@ class PythonTestsExtraEnvVarsField(TestExtraEnvVarsField):
     pass
 
 
+class PythonTestsUncachedEnvVarsField(TestUncachedEnvVarsField):
+    pass
+
+
 class PythonTestsXdistConcurrencyField(IntField):
     alias = "xdist_concurrency"
     help = help_text(
@@ -1397,6 +1402,7 @@ _PYTHON_TEST_MOVED_FIELDS = (
     PythonTestsBatchCompatibilityTagField,
     RuntimePackageDependenciesField,
     PythonTestsExtraEnvVarsField,
+    PythonTestsUncachedEnvVarsField,
     InterpreterConstraintsField,
     SkipPythonTestsField,
     EnvironmentField,

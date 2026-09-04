@@ -147,6 +147,17 @@ impl crate::CommandRunner for CommandRunner {
                 );
             }
 
+            // Merged here rather than at construction because every caching layer wraps this
+            // runner: by this point the action digest has been computed and the cache consulted, so
+            // these values reach the process without entering its key. `env` wins a collision,
+            // since an explicitly cache-keyed value is the more specific request.
+            for (name, value) in &process.uncached_env {
+                process
+                    .env
+                    .entry(name.clone())
+                    .or_insert_with(|| value.clone());
+            }
+
             let has_concurrency_template =
                 matches!(process.concurrency, Some(ProcessConcurrency::Range { .. }))
                     || process.concurrency_available > 0;

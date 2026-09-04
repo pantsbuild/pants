@@ -111,6 +111,7 @@ class Process:
     use_nailgun: tuple[str, ...]
     working_directory: str | None
     env: FrozenDict[str, str]
+    uncached_env: FrozenDict[str, str] = dataclasses.field(compare=False)
     append_only_caches: FrozenDict[str, str]
     output_files: tuple[str, ...]
     output_directories: tuple[str, ...]
@@ -134,6 +135,7 @@ class Process:
         use_nailgun: Iterable[str] = (),
         working_directory: str | None = None,
         env: Mapping[str, str] | None = None,
+        uncached_env: Mapping[str, str] | None = None,
         append_only_caches: Mapping[str, str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
@@ -151,6 +153,15 @@ class Process:
         This process will be hermetic, meaning that it cannot access files and environment variables
         that are not explicitly populated. For example, $PATH will not be defined by default, unless
         populated through the `env` parameter.
+
+        `env` values are part of the process's cache key, so a value that varies per run gives the
+        process a key nothing else can match. `uncached_env` is the escape hatch for values that
+        unavoidably vary but cannot change what the process produces — a CI build id used only to
+        label a report, an upload token. Those are excluded from the cache key and merged into the
+        environment after the cache is consulted. You own that invariant: if a value there can
+        change the output, cached results will be wrong. Note also that on a cache hit the process
+        does not run, so `uncached_env` cannot be used to make something happen on every run, and
+        that it is dropped under remote execution.
 
         Usually, you will want to provide input files/directories via the parameter `input_digest`.
         The process will then be able to access these paths through relative paths. If you want to
@@ -187,6 +198,7 @@ class Process:
         object.__setattr__(self, "use_nailgun", tuple(use_nailgun))
         object.__setattr__(self, "working_directory", working_directory)
         object.__setattr__(self, "env", FrozenDict(env or {}))
+        object.__setattr__(self, "uncached_env", FrozenDict(uncached_env or {}))
         object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches or {}))
         object.__setattr__(self, "output_files", tuple(output_files or ()))
         object.__setattr__(self, "output_directories", tuple(output_directories or ()))
@@ -483,7 +495,10 @@ class InteractiveProcess(SideEffecting):
     ) -> InteractiveProcess:
         return InteractiveProcess(
             argv=process.argv,
-            env=process.env,
+            # An interactive process is never cached, so the distinction `uncached_env` draws does
+            # not apply here and the values simply belong in the environment. Folding them in keeps
+            # `--debug` faithful to a normal run; leaving them out silently drops them.
+            env={**process.uncached_env, **process.env},
             description=process.description,
             input_digest=process.input_digest,
             forward_signals_to_process=forward_signals_to_process,
