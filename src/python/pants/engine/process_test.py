@@ -313,6 +313,44 @@ def test_interactive_process_inputs(rule_runner: RuleRunner, run_in_workspace: b
         }
 
 
+def test_interactive_process_starts_new_session(rule_runner: RuleRunner) -> None:
+    # NB: `run_interactive_process()` expects an initialized workunit store, which only certain
+    # other engine operations take steps to initialize. This test otherwise has no engine setup
+    # to perform, so make an empty request with the side-effect of workunit initialization.
+    rule_runner.request(Digest, [CreateDigest([])])
+
+    # NB: Strictly speaking this is testing an implementation detail, because it's much more
+    # difficult to directly test the higher-level behavior we actually want: that interactive
+    # processes are able to read from stdin connected to a terminal without observing SIGTTIN.
+    #
+    # If a process is spawned in a background process group of a session associated with a
+    # controlling terminal, and the process attempts to read stdin from the controlling terminal,
+    # its entire process group will be signalled with SIGTTIN. By default, this stops every
+    # process in the group and appears as a hang.
+    #
+    # If instead the process is spawned in a new session, it still inherits file descriptors as
+    # normal, but as the process is necessarily no longer associated with the session of that
+    # controlling terminal it is also no longer subject to being signalled with SIGTTIN for reads
+    # on that terminal.
+    #
+    # `mock_console` isn't sufficient to recreate these conditions as its stdin is not tied to a
+    # controlling terminal, but we can at least ensure that interactive processes are spawned in
+    # a new session.
+    #
+    # `exec` preserves the spawned process's PID while `ps` reports its PID and session ID. The
+    # leader of a new session has a session ID equal to its PID.
+    process = InteractiveProcess(
+        argv=["/bin/bash", "-c", 'exec /bin/ps -o pid= -o sid= -p "$$"'],
+    )
+
+    with mock_console(rule_runner.options_bootstrapper) as (_, stdio_reader):
+        result = rule_runner.run_interactive_process(process)
+        assert result.exit_code == 0
+
+        pid, sid = map(int, stdio_reader.get_stdout().split())
+        assert pid == sid
+
+
 def test_interactive_process_rejects_invalid_run_in_workspace(rule_runner: RuleRunner) -> None:
     process = object.__new__(InteractiveProcess)
     object.__setattr__(process, "process", Process(["/bin/echo", "hello"], description="echo"))

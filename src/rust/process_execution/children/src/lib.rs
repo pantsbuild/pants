@@ -26,7 +26,37 @@ pub struct ManagedChild {
 }
 
 impl ManagedChild {
+    /// Spawn child as leader of a new process group.
     pub fn spawn(
+        command: &mut Command,
+        graceful_shutdown_timeout: Option<time::Duration>,
+    ) -> std::io::Result<Self> {
+        // Adjust the Command to create its own PGID as it starts, to make it safe to kill the PGID
+        // later.
+        command.process_group(0);
+
+        Self::spawn_inner(command, graceful_shutdown_timeout)
+    }
+
+    /// Spawn child as leader of a new process group in a new session.
+    ///
+    /// NB: Permits an interactive child to read terminal input. May be less efficient than `spawn`.
+    pub fn spawn_in_new_session(
+        command: &mut Command,
+        graceful_shutdown_timeout: Option<time::Duration>,
+    ) -> std::io::Result<Self> {
+        unsafe {
+            command.pre_exec(|| {
+                nix::unistd::setsid()
+                    .map(|_pgid| ())
+                    .map_err(|e| std::io::Error::other(format!("Could not create new session: {e}")))
+            });
+        };
+
+        Self::spawn_inner(command, graceful_shutdown_timeout)
+    }
+
+    fn spawn_inner(
         command: &mut Command,
         graceful_shutdown_timeout: Option<time::Duration>,
     ) -> std::io::Result<Self> {
@@ -34,10 +64,6 @@ impl ManagedChild {
         // mechanism:
         //   see https://docs.rs/tokio/1.14.0/tokio/process/struct.Command.html#method.kill_on_drop
         command.kill_on_drop(true);
-
-        // Adjust the Command to create its own PGID as it starts, to make it safe to kill the PGID
-        // later.
-        command.process_group(0);
 
         // Then spawn.
         let child = command.spawn()?;
