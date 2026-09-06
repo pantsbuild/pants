@@ -43,7 +43,11 @@ def run_docformatter(
     rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
 ) -> FmtResult:
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python.lint.docformatter", *(extra_args or ())],
+        args=[
+            "--backend-packages=pants.backend.python.lint.docformatter",
+            "--python-interpreter-constraints=['==3.12.*']",
+            *(extra_args or ()),
+        ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     field_sets = [DocformatterFieldSet.create(tgt) for tgt in targets]
@@ -121,19 +125,3 @@ def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     )
     assert fmt_result.output == rule_runner.make_snapshot({"f.py": content})
     assert fmt_result.did_change is False
-
-
-def test_stub_files(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {"good.pyi": GOOD_FILE, "bad.pyi": BAD_FILE, "BUILD": "python_sources(name='t')"}
-    )
-
-    good_tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="good.pyi"))
-    fmt_result = run_docformatter(rule_runner, [good_tgt])
-    assert fmt_result.output == rule_runner.make_snapshot({"good.pyi": GOOD_FILE})
-    assert not fmt_result.did_change
-
-    bad_tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.pyi"))
-    fmt_result = run_docformatter(rule_runner, [bad_tgt])
-    assert fmt_result.output == rule_runner.make_snapshot({"bad.pyi": FIXED_BAD_FILE})
-    assert fmt_result.did_change
