@@ -47,9 +47,9 @@ impl ManagedChild {
     ) -> std::io::Result<Self> {
         unsafe {
             command.pre_exec(|| {
-                nix::unistd::setsid()
-                    .map(|_pgid| ())
-                    .map_err(|e| std::io::Error::other(format!("Could not create new session: {e}")))
+                nix::unistd::setsid().map(|_pgid| ()).map_err(|e| {
+                    std::io::Error::other(format!("Could not create new session: {e}"))
+                })
             });
         };
 
