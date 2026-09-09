@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 from pants.backend.url_handlers.s3.subsystem import S3AuthSigning, S3Subsystem
 from pants.core.util_rules.env_vars import environment_vars_subset
@@ -118,11 +118,14 @@ async def download_from_s3(
 ) -> Digest:
     from botocore import auth, compat, exceptions  # pants: no-infer-dep
 
-    virtual_hosted_url = f"https://{request.bucket}.s3.amazonaws.com/{request.key}"
+    # S3 signs the percent-encoded path it receives, so the key must be encoded before signing
+    # rather than left to the signer. Decoding first keeps this idempotent for keys that the URL
+    # already spelled encoded.
+    key = quote(unquote(request.key), safe="/~")
+
+    virtual_hosted_url = f"https://{request.bucket}.s3.amazonaws.com/{key}"
     if request.region:
-        virtual_hosted_url = (
-            f"https://{request.bucket}.s3.{request.region}.amazonaws.com/{request.key}"
-        )
+        virtual_hosted_url = f"https://{request.bucket}.s3.{request.region}.amazonaws.com/{key}"
     if request.query:
         virtual_hosted_url += f"?{request.query}"
 
@@ -158,7 +161,9 @@ async def download_from_s3(
                 "An aws region is required to sign requests with sigv4. Please specify a region in the url or configure the default region in aws config or environment variables."
             )
 
-        signer = auth.SigV4Auth(aws_credentials.creds, "s3", signing_region)
+        # NB: `S3SigV4Auth`, unlike `SigV4Auth`, signs the URL path verbatim. This is what boto3
+        # uses for S3, and it avoids re-encoding or normalizing away `.`/`..` segments in the key.
+        signer = auth.S3SigV4Auth(aws_credentials.creds, "s3", signing_region)
 
     else:
         assert s3_subsystem.auth_signing == S3AuthSigning.HMACV1
@@ -166,7 +171,7 @@ async def download_from_s3(
         path_style_url = "https://s3"
         if request.region:
             path_style_url += f".{request.region}"
-        path_style_url += f".amazonaws.com/{request.bucket}/{request.key}"
+        path_style_url += f".amazonaws.com/{request.bucket}/{key}"
         if request.query:
             path_style_url += f"?{request.query}"
 
