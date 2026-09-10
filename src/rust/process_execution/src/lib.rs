@@ -1089,7 +1089,7 @@ pub async fn get_digest(
     process_cache_namespace: Option<String>,
     store: &Store,
     append_only_caches_base_path: Option<&str>,
-) -> (Digest, Digest) {
+) -> Result<(Digest, Digest), String> {
     let EntireExecuteRequest {
         execute_request,
         action,
@@ -1101,13 +1101,12 @@ pub async fn get_digest(
         store,
         append_only_caches_base_path,
     )
-    .await
-    .unwrap();
+    .await?;
 
-    (
-        execute_request.action_digest.unwrap().try_into().unwrap(),
-        action.command_digest.unwrap().try_into().unwrap(),
-    )
+    Ok((
+        require_digest(execute_request.action_digest.as_ref())?,
+        require_digest(action.command_digest.as_ref())?,
+    ))
 }
 
 pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {
