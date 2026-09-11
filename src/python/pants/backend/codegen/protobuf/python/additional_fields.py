@@ -25,6 +25,9 @@ class PythonSourceRootField(StringField):
         The source root to generate Python sources under.
 
         If unspecified, the source root the `protobuf_sources` is under will be used.
+
+        Ignored when `protobuf_generator='buf'`; in that case the output location
+        is dictated by the `out:` field of the `buf.gen.yaml` template.
         """
     )
 
