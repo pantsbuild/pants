@@ -82,7 +82,7 @@ COURSIER_FETCH_WRAPPER_SCRIPT = textwrap.dedent(  # noqa: PNT20
     shift
 
     working_dir="$(pwd)"
-    "$coursier_exe" fetch {repos_args} \
+    "$coursier_exe" {jvm_options_args} fetch {repos_args} \
         --json-output-file="$json_output_file" \
         "${{@//{coursier_working_directory}/$working_dir}}"
     {mkdir} -p classpath
@@ -176,6 +176,41 @@ class CoursierSubsystem(TemplatedExternalTool):
         ),
     )
 
+    jvm_options = StrListOption(
+        advanced=True,
+        help=softwrap(
+            """
+            Extra JVM options to pass to Coursier.
+
+            Coursier is distributed as a GraalVM native image. It bundles its own trust
+            store from build time and does not read the `HTTP_PROXY`/`HTTPS_PROXY`
+            environment variables, so a custom CA or proxy must be supplied as JVM system
+            properties on Coursier's own command line. Without this option there is no way
+            to do that, and Coursier fails to fetch artifacts and JDKs in environments
+            with a TLS-inspecting proxy or without direct internet access.
+
+            Each value is passed to Coursier prefixed with `-J`; the prefix is added
+            automatically if you omit it. For example, both
+            `-Djavax.net.ssl.trustStore=/etc/pki/java/cacerts` and
+            `-J-Djavax.net.ssl.trustStore=/etc/pki/java/cacerts` are passed to Coursier as
+            `-J-Djavax.net.ssl.trustStore=/etc/pki/java/cacerts`.
+
+            These options apply to every Coursier invocation, including JDK provisioning.
+            They are unrelated to `[jvm].global_options`, which applies to the JVM
+            processes Pants runs, not to Coursier itself.
+
+            See https://get-coursier.io/docs/other-proxy.
+            """
+        ),
+    )
+
+    @property
+    def normalized_jvm_options(self) -> tuple[str, ...]:
+        """`jvm_options` with the `-J` prefix Coursier requires, added where absent."""
+        return tuple(
+            option if option.startswith("-J") else f"-J{option}" for option in self.jvm_options
+        )
+
     def generate_exe(self, plat: Platform) -> str:
         tool_version = self.known_version(plat)
         url = (tool_version and tool_version.url_override) or self.generate_url(plat)
@@ -192,6 +227,7 @@ class Coursier:
     _digest: Digest
     repos: FrozenOrderedSet[str]
     jvm_index: str
+    jvm_options: tuple[str, ...]
     _append_only_caches: FrozenDict[str, str]
 
     bin_dir: ClassVar[str] = "__coursier"
@@ -203,10 +239,18 @@ class Coursier:
     working_directory_placeholder: ClassVar[str] = "___COURSIER_WORKING_DIRECTORY___"
 
     def args(self, args: Iterable[str], *, wrapper: Iterable[str] = ()) -> tuple[str, ...]:
+        # `jvm_options` must precede Coursier's subcommand, so it cannot simply be prepended
+        # to `args`. When a `wrapper` is used, the Coursier exe path is consumed by the
+        # wrapper script as a positional argument rather than being invoked directly here,
+        # so inserting the options at this point would shift the wrapper's own arguments.
+        # In that case the wrapper is responsible for passing them: they are templated into
+        # `COURSIER_FETCH_WRAPPER_SCRIPT` as `jvm_options_args`.
+        jvm_options = () if wrapper else self.jvm_options
         return (
             self.post_process_stderr,
             *wrapper,
             os.path.join(self.bin_dir, self.coursier.exe),
+            *jvm_options,
             *args,
         )
 
@@ -284,7 +328,9 @@ async def setup_coursier(
     repos_args = (
         " ".join(f"-r={shlex.quote(repo)}" for repo in coursier_subsystem.repos) + " --no-default"
     )
+    jvm_options = coursier_subsystem.normalized_jvm_options
     coursier_wrapper_script = COURSIER_FETCH_WRAPPER_SCRIPT.format(
+        jvm_options_args=" ".join(shlex.quote(option) for option in jvm_options),
         repos_args=repos_args,
         coursier_working_directory=Coursier.working_directory_placeholder,
         python_path=shlex.quote(python.path),
@@ -333,6 +379,7 @@ async def setup_coursier(
         ),
         repos=FrozenOrderedSet(coursier_subsystem.repos),
         jvm_index=coursier_subsystem.jvm_index,
+        jvm_options=jvm_options,
         _append_only_caches=python.APPEND_ONLY_CACHES,
     )
 
