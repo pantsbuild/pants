@@ -30,10 +30,12 @@ use crate::python::{Failure, Key, TypeId, Value};
 mod address;
 mod collection;
 pub mod dep_inference;
+pub mod docker;
 pub mod engine_aware;
 mod frozen_ordered_set;
 mod frozendict;
 pub mod fs;
+pub mod hunk;
 mod interface;
 #[cfg(test)]
 mod interface_tests;

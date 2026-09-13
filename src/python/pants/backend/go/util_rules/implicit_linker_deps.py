@@ -8,7 +8,7 @@ from pants.backend.go.util_rules.build_pkg import (
     merge_built_go_package_archives,
     required_built_go_package,
 )
-from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageRequestForStdlibRequest
+from pants.backend.go.util_rules.build_pkg_stdlib import BuildGoPackageRequestForStdlibRequest
 from pants.backend.go.util_rules.link_defs import (
     ImplicitLinkerDependencies,
     ImplicitLinkerDependenciesHook,

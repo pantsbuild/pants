@@ -18,6 +18,7 @@ from pants.bin.pants_env_vars import (
     RECURSION_LIMIT,
 )
 from pants.bin.pants_runner import PantsRunner
+from pants.engine import embedded_binary
 from pants.engine.internals import native_engine
 from pants.util.strutil import softwrap
 
@@ -84,17 +85,7 @@ class PantsLoader:
 
     @staticmethod
     def sandboxer_bin() -> str | None:
-        # In theory as_file could return a temporary file and clean it up, so we'd be returning
-        # an invalid path. But in practice we know that we're running either in a venv with all
-        # resources expanded on disk, or from sources, and either way we will get a persistent
-        # valid path that will not be cleaned up.
-        with importlib.resources.as_file(
-            importlib.resources.files("pants.bin").joinpath("sandboxer")
-        ) as sandboxer_bin:
-            if os.path.isfile(sandboxer_bin):
-                os.chmod(sandboxer_bin, 0o755)
-                return str(sandboxer_bin)
-        return None
+        return embedded_binary.get_embedded_binary("sandboxer")
 
     @staticmethod
     def run_alternate_entrypoint(entrypoint: str) -> None:

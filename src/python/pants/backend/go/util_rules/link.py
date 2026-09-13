@@ -2,13 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import hashlib
 import textwrap
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.util_rules import import_config
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo_binaries import CGoBinaryPathRequest, find_cgo_binary_path
+from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_config import ImportConfigRequest, generate_import_config
 from pants.backend.go.util_rules.link_defs import (
     ImplicitLinkerDependenciesHook,
@@ -84,11 +87,54 @@ async def setup_go_linker(
     return LinkerSetup(digest, extld_wrapper_path)
 
 
+def _compute_link_action_id(
+    request: LinkGoBinaryRequest,
+    goroot: GoRoot,
+    link_tool_id: str,
+    import_paths_to_pkg_a_files: Mapping[str, str],
+) -> str:
+    """Compute the Go toolchain build ID to record in the linked binary.
+
+    This computation is intended to capture similar values to the action ID computed by the `go`
+    tool for its own cache. For details, see `linkActionID` and `printLinkerConfig` in
+    https://github.com/golang/go/blob/master/src/cmd/go/internal/work/exec.go
+    """
+    h = hashlib.sha256()
+
+    # All Go action IDs have the full version (as returned by `runtime.Version()`) in the key.
+    # See https://github.com/golang/go/blob/master/src/cmd/go/internal/cache/hash.go#L32-L46
+    h.update(goroot.full_version.encode())
+
+    h.update(b"link\n")
+    h.update(f"goos {goroot.goos} goarch {goroot.goarch}\n".encode())
+    h.update(f"link {link_tool_id}\n".encode())
+    h.update(
+        f"race {request.build_opts.with_race_detector} msan {request.build_opts.with_msan} "
+        f"asan {request.build_opts.with_asan}\n".encode()
+    )
+    for flag in request.build_opts.linker_flags:
+        h.update(f"linkflag {flag}\n".encode())
+    h.update(f"out {request.output_filename}\n".encode())
+    for import_path, pkg_a_file in sorted(import_paths_to_pkg_a_files.items()):
+        h.update(f"packagefile {import_path}={pkg_a_file}\n".encode())
+    for archive in request.archives:
+        h.update(f"archive {archive}\n".encode())
+    if "GOEXPERIMENT" in goroot._raw_metadata:
+        h.update(f"GOEXPERIMENT={goroot._raw_metadata['GOEXPERIMENT']}\n".encode())
+
+    # Inputs are included in this hash since it feeds the link buildid that is recorded in the
+    # binary as its platform identity record. So it should distinguish different outputs.
+    h.update(f"inputs {request.input_digest.fingerprint}\n".encode())
+
+    return h.hexdigest()
+
+
 @rule
 async def link_go_binary(
     request: LinkGoBinaryRequest,
     linker_setup: LinkerSetup,
     union_membership: UnionMembership,
+    goroot: GoRoot,
 ) -> LinkedGoBinary:
     implict_linker_deps_hooks = union_membership.get(ImplicitLinkerDependenciesHook)
     implicit_linker_deps = await concurrently(
@@ -139,6 +185,13 @@ async def link_go_binary(
     maybe_msan_arg = ["-msan"] if request.build_opts.with_msan else []
     maybe_asan_arg = ["-asan"] if request.build_opts.with_asan else []
 
+    build_id = _compute_link_action_id(
+        request,
+        goroot,
+        link_tool_id.tool_id,
+        import_paths_to_pkg_a_files,
+    )
+
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
             GoSdkProcess(
@@ -162,6 +215,8 @@ async def link_go_binary(
                     "-o",
                     request.output_filename,
                     "-buildmode=exe",  # seen in `go build -x` output
+                    "-buildid",
+                    build_id,
                     *request.build_opts.linker_flags,
                     *request.archives,
                 ),

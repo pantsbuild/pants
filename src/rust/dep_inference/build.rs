@@ -166,13 +166,11 @@ fn gen_impl_hash_file(name: &'static str, source_dir: &Path, impl_dir: &Path, ou
         .flatten()
     {
         if entry.file_type().is_file() && entry.path().file_name().unwrap() != "tests.rs" {
-            let mut reader = std::fs::File::open(entry.path()).expect("Failed to open file");
-            let _ = std::io::copy(&mut reader, &mut hasher).expect("Failed to copy bytes");
+            let bytes = std::fs::read(entry.path()).expect("Failed to read file");
+            hasher.update(&bytes);
         }
     }
-    hasher
-        .write_all(env::var("CARGO_PKG_VERSION").unwrap().as_bytes())
-        .unwrap();
+    hasher.update(env::var("CARGO_PKG_VERSION").unwrap().as_bytes());
     let hash_bytes = &hasher.finalize();
     let hash = hex::encode(hash_bytes);
     let mut file = std::fs::File::create(out_dir.join(format!("{name}_impl_hash.rs"))).unwrap();

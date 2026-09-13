@@ -1,12 +1,16 @@
 // Copyright 2026 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+mod adaptor;
 mod field;
 mod source_fields;
-mod util;
+#[allow(clippy::module_inception)]
+mod target;
+pub(crate) mod util;
 
 use pyo3::prelude::*;
 
+pub use adaptor::{SourceBlock, SourceBlocks, TargetAdaptor};
 pub use field::{
     AsyncFieldMixin, BoolField, Field, ScalarField, SequenceField, StringField,
     StringSequenceField, TriBoolField,
@@ -17,6 +21,10 @@ pub use source_fields::{
 pub use util::NoFieldValue;
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    target::register(m)?;
+    m.add_class::<SourceBlock>()?;
+    m.add_class::<SourceBlocks>()?;
+    m.add_class::<TargetAdaptor>()?;
     m.add_class::<Field>()?;
     m.add_class::<ScalarField>()?;
     m.add_class::<BoolField>()?;
@@ -31,7 +39,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<SingleSourceField>()?;
     m.add_class::<NoFieldValue>()?;
 
-    m.add("NO_VALUE", NoFieldValue)?;
+    NoFieldValue::init_singleton(m.py());
+    m.add("NO_VALUE", NoFieldValue::expect_singleton())?;
 
     Ok(())
 }

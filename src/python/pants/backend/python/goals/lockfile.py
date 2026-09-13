@@ -312,7 +312,7 @@ async def generate_pex_lockfile(
                 [
                     FileContent(
                         PythonLockfileMetadata.metadata_location_for_lockfile(req.lockfile_dest),
-                        metadata.to_json(with_description=descr).encode(),
+                        f"{metadata.to_json(with_description=descr)}\n".encode(),
                     ),
                 ]
             )
@@ -351,6 +351,7 @@ async def generate_uv_lockfile(
     generate_lockfiles_subsystem: GenerateLockfilesSubsystem,
     downloaded_uv: DownloadedUv,
     uv_env: UvEnvironment,
+    level: LogLevel,
 ) -> GenerateLockfileResult:
     if not req.interpreter_constraints:
         raise ValueError(
@@ -368,6 +369,7 @@ async def generate_uv_lockfile(
         req.interpreter_constraints,
         req.requirements,
         indexes=resolve_config.indexes,
+        find_links=(*resolve_config.find_links, *req.find_links),
         sources=resolve_config.sources,
     )
 
@@ -406,7 +408,7 @@ async def generate_uv_lockfile(
             # is generated.
             pass
 
-    uv_config = resolve_config.uv_config(extra_find_links=req.find_links)
+    uv_config = resolve_config.uv_config()
 
     uv_config_digest = await create_digest(
         CreateDigest(
@@ -427,6 +429,7 @@ async def generate_uv_lockfile(
                 argv=(
                     *downloaded_uv.args(),
                     "lock",
+                    *(["--verbose"] if level >= LogLevel.DEBUG else []),  # type: ignore[operator]
                 ),
                 env=uv_env.env,
                 input_digest=input_digest,
@@ -478,7 +481,7 @@ async def generate_uv_lockfile(
             [
                 FileContent(
                     PythonLockfileMetadata.metadata_location_for_lockfile(req.lockfile_dest),
-                    metadata.to_json(with_description=descr).encode(),
+                    f"{metadata.to_json(with_description=descr)}\n".encode(),
                 ),
             ]
         )

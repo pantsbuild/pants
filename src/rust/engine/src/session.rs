@@ -13,7 +13,7 @@ use crate::python::{Failure, Value};
 
 use async_latch::AsyncLatch;
 use futures::future::{self, FutureExt};
-use graph::{Context, LastObserved};
+use graph::{Context, LastObserved, RunGuard};
 use log::warn;
 use parking_lot::Mutex;
 use pyo3::prelude::*;
@@ -87,6 +87,9 @@ struct SessionState {
     // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
     // same Session while still observing new values for uncacheable rules like Goals.
     run_id: AtomicU32,
+    // Keeps the current `run_id` live in the graph. Dropped (and swapped by `new_run_id`) so that
+    // the Run is retired for pruning once no holder remains.
+    run_guard: Mutex<RunGuard>,
     /// Tasks to await at the "tail" of the session.
     tail_tasks: TailTasks,
 }
@@ -157,11 +160,9 @@ impl Session {
         if dynamic_ui {
             max_workunit_level = std::cmp::max(max_workunit_level, log::Level::Debug);
         }
-        // Only queue workunit messages for consumers which will actually poll for them: the
-        // streaming channel is enabled later iff a streaming workunit consumer registers (see
-        // `enable_streaming_workunits`), and the heavy hitters consumer only exists for the
-        // dynamic UI.
-        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level, false, dynamic_ui);
+        // The streaming channel is enabled later iff a streaming workunit consumer registers (see
+        // `enable_streaming_workunits`).
+        let workunit_store = WorkunitStore::new(!dynamic_ui, max_workunit_level, false);
         let display = tokio::sync::Mutex::new(SessionDisplay::new(
             &workunit_store,
             core.local_parallelism,
@@ -177,6 +178,7 @@ impl Session {
         });
         core.sessions.add(&handle)?;
         let run_id = core.graph.generate_run_id();
+        let run_guard = core.graph.register_run(run_id);
         let preceding_graph_size = core.graph.len();
         Ok(Session {
             handle,
@@ -187,6 +189,7 @@ impl Session {
                 workunit_store,
                 session_values: Mutex::new(Value::new(session_values)),
                 run_id: AtomicU32::new(run_id.0),
+                run_guard: Mutex::new(run_guard),
                 tail_tasks: TailTasks::new(),
             }),
         })
@@ -296,10 +299,14 @@ impl Session {
     }
 
     pub fn new_run_id(&self) {
-        self.state.run_id.store(
-            self.state.core.graph.generate_run_id().0,
-            atomic::Ordering::SeqCst,
-        );
+        let new_run_id = self.state.core.graph.generate_run_id();
+        let new_run_guard = self.state.core.graph.register_run(new_run_id);
+        self.state
+            .run_id
+            .store(new_run_id.0, atomic::Ordering::SeqCst);
+        // Dropping the previous guard retires the previous Run only once any in-flight holder
+        // (e.g. Contexts from work that outlives the run switch) has also dropped it.
+        *self.state.run_guard.lock() = new_run_guard;
     }
 
     pub async fn with_console_ui_disabled<T>(&self, f: impl Future<Output = T>) -> T {
@@ -342,6 +349,9 @@ impl Session {
     }
 
     pub fn maybe_display_render(&self) {
+        // Neither display mode consumes the heavy hitters queue on every tick, so drain it here
+        // (outside of the display lock) to keep it from growing between renders.
+        self.state.workunit_store.refresh_heavy_hitters();
         let mut display = if let Ok(display) = self.handle.display.try_lock() {
             display
         } else {

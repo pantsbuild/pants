@@ -17,4 +17,4 @@ services:
 
   execution-image:
     profiles: ["image_refs"]
-    image: ghcr.io/catthehacker/ubuntu:act-22.04@sha256:b3098f231fa07cf5c2423b0f2c2e7dacf85c0c508c7f27687febe30bab8cfd3e
+    image: ubuntu:24.04@sha256:561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea

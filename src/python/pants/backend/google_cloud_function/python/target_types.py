@@ -17,6 +17,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
+    PythonFaaSUvPlatforms,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.environments.target_types import EnvironmentField
@@ -64,30 +65,37 @@ class PythonGoogleCloudFunctionRuntimes(Enum):
 
 
 class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
+    # The manylinux values were confirmed by running `ldd --version` in each of the images.
     DOCKER_RUNTIME_MAPPING = {
         PythonGoogleCloudFunctionRuntimes.PYTHON_37: (
             "us-central1-docker.pkg.dev/serverless-runtimes/google-18-full/runtimes/python37",
             "python37_20240728_3_7_17_RC00",
+            "manylinux_2_17",
         ),
         PythonGoogleCloudFunctionRuntimes.PYTHON_38: (
             "us-central1-docker.pkg.dev/serverless-runtimes/google-18-full/runtimes/python38",
             "python38_20240728_3_8_19_RC00",
+            "manylinux_2_17",
         ),
         PythonGoogleCloudFunctionRuntimes.PYTHON_39: (
             "us-central1-docker.pkg.dev/serverless-runtimes/google-18-full/runtimes/python39",
             "python39_20240728_3_9_19_RC00",
+            "manylinux_2_17",
         ),
         PythonGoogleCloudFunctionRuntimes.PYTHON_310: (
             "us-central1-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/python310",
             "python310_20240728_3_10_14_RC00",
+            "manylinux_2_35",
         ),
         PythonGoogleCloudFunctionRuntimes.PYTHON_311: (
             "us-central1-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/python311",
             "python311_20240728_3_11_9_RC00",
+            "manylinux_2_35",
         ),
         PythonGoogleCloudFunctionRuntimes.PYTHON_312: (
             "us-central1-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/python312",
             "python312_20240728_3_12_4_RC00",
+            "manylinux_2_35",
         ),
     }
 
@@ -108,11 +116,12 @@ class PythonGoogleCloudFunctionRuntime(PythonFaaSRuntimeField):
         PythonFaaSKnownRuntime(
             runtime.value,
             *runtime.to_interpreter_version(),
-            docker_repo,
-            docker_tag,
-            FaaSArchitecture.X86_64,
+            docker_repo=docker_repo,
+            tag=docker_tag,
+            architecture=FaaSArchitecture.X86_64,
+            manylinux=manylinux,
         )
-        for runtime, (docker_repo, docker_tag) in DOCKER_RUNTIME_MAPPING.items()
+        for runtime, (docker_repo, docker_tag, manylinux) in DOCKER_RUNTIME_MAPPING.items()
     )
 
     @classmethod
@@ -166,6 +175,7 @@ class PythonGoogleCloudFunction(Target):
         PythonGoogleCloudFunctionHandlerField,
         PythonGoogleCloudFunctionRuntime,
         PythonFaaSCompletePlatforms,
+        PythonFaaSUvPlatforms,
         PythonGoogleCloudFunctionType,
         PythonFaaSPex3VenvCreateExtraArgsField,
         PythonFaaSPexBuildExtraArgs,

@@ -319,6 +319,7 @@ Created as part of the release process.
 + Raúl Cuza
 + Rhuan Barreto
 + Rhys Madigan
++ Robert Pickering
 + Robert Stapenhurst
 + Roger Jiang
 + Roman Andriadi

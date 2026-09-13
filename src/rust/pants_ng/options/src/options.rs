@@ -250,7 +250,11 @@ impl Options {
         seed_values.extend([
             ("buildroot".to_string(), buildroot.convert_to_string()?),
             ("homedir".to_string(), shellexpand::tilde("~").into_owned()),
-            ("user".to_string(), whoami::username()),
+            (
+                "user".to_string(),
+                // whoami 1.x fell back to "unknown" instead of failing; preserve that.
+                whoami::username().unwrap_or_else(|_| "unknown".to_string()),
+            ),
             // TODO: Support setting custom workdir and distdir? The current
             //   parser supports this, but it seems pretty esoteric.
             ("pants_workdir".to_string(), ".pants.d".to_string()),

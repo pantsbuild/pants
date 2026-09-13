@@ -19,6 +19,8 @@ DEFAULT_DEPENDENTS_RULES = (
     "//tests/**",
     # Allow build-support to use what ever.
     "//build-support/**",
+    # Allow release and CI tooling to use what ever.
+    "//src/python/pants_release/**",
     # Allow testprojects to use any backend.
     "//testprojects/**",
     # Deny all others.

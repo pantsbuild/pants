@@ -659,8 +659,11 @@ def build_fs_util() -> None:
     # include it in our releases because it can be a useful standalone tool.
     banner("Building fs_util")
     command = ["./cargo", "build", "-p", "fs_util"]
-    release_mode = os.environ.get("MODE", "") != "debug"
-    if release_mode:
+    mode = os.environ.get("MODE", "release")
+    if mode == "dist":
+        command.extend(["--profile", "dist"])
+    elif mode != "debug":
+        mode = "release"
         command.append("--release")
     subprocess.run(command, check=True, env={**os.environ, "RUST_BACKTRACE": "1"})
     current_os = (
@@ -673,7 +676,7 @@ def build_fs_util() -> None:
     )
     dest_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(
-        f"src/rust/target/{'release' if release_mode else 'debug'}/fs_util",
+        f"src/rust/target/{mode}/fs_util",
         dest_dir,
     )
     green(f"Built fs_util at {dest_dir / 'fs_util'}.")

@@ -410,31 +410,46 @@ class ResolvePexConstraintsFile:
     constraints: FrozenOrderedSet[PipRequirement]
 
 
-def generate_uv_index_config(indexes: Iterable[str] | None, table_name: str) -> Iterable[str]:
+def generate_uv_index_config(
+    indexes: Iterable[str] | None, find_links: Iterable[str] | None, table_name: str
+) -> Iterable[str]:
     if not indexes:
         return ["no-index = true"]
 
-    parsed_indexes = []
-    for index in indexes:
+    # List of pairs (index string, is_find_links).
+    unparsed_indexes = []
+    for index in indexes or []:
+        unparsed_indexes.append((index, False))
+    for index in find_links or []:
+        unparsed_indexes.append((index, True))
+
+    parsed_indexes: list[dict[str, str]] = []
+    for index, is_find_links in unparsed_indexes:
         part1, _, part2 = index.partition("=")
         (name, url) = (part1, part2) if part2 else ("", part1)
-        parsed_indexes.append((name, url))
+        val = {"url": f'"{url}"'}
+        if name:
+            val["name"] = f'"{name}"'
+            # All named indexes must be referenced explicitly in `sources`, to match the
+            # preexisting pex resolver behavior.
+            val["explicit"] = "true"
+        if is_find_links:
+            val["format"] = '"flat"'
+        parsed_indexes.append(val)
 
-    lines = []
     if parsed_indexes:
         # To turn off uv's fallback to PyPI we must set some other index to be the default.
         # In uv the default index has the lowest priority, regardless of its position in the
         # list of indexes, so we set the last index to be that default, to match user intent.
+        parsed_indexes[-1]["default"] = "true"
         table_header = f"[[{table_name}]]"
-        for i, (name, url) in enumerate(parsed_indexes):
-            is_default = i == len(parsed_indexes) - 1
+        lines = []
+        for parsed_index in parsed_indexes:
             lines.append(table_header)
-            if name:
-                lines.append(f'name = "{name}"')
-            lines.append(f'url = "{url}"')
-            if is_default:
-                lines.append("default = true")
-    lines.append("")
+            for k, v in parsed_index.items():
+                lines.append(f"{k} = {v}")
+
+        lines.append("")
     return lines
 
 
@@ -454,6 +469,9 @@ class ResolveConfig:
     path_mappings: tuple[str, ...]
     lock_style: str
     complete_platforms: tuple[str, ...]
+    uv_platforms: tuple[
+        str, ...
+    ]  # Each entry must be a valid value for the `uv sync` option `--python-platform`.
     uploaded_prior_to: str | None
 
     def pex_args(self) -> Iterator[str]:
@@ -508,21 +526,13 @@ class ResolveConfig:
         if self.uploaded_prior_to:
             yield f"--uploaded-prior-to={self.uploaded_prior_to}"
 
-    def uv_config(self, extra_find_links: Iterable[str] = ()) -> str:
+    def uv_config(self) -> str:
         """Content for uv.toml based on this resolve's configuration.
 
         Only uv-supported fields are used. Call validate_for_uv() first to ensure no
         pex-specific fields are set.
         """
         config_lines: list[str] = []
-
-        all_find_links = (*self.find_links, *extra_find_links)
-        if all_find_links:
-            config_lines.append("find-links = [")
-            for fl in all_find_links:
-                config_lines.append(f'    "{fl}",')
-            config_lines.append("]")
-            config_lines.append("")
 
         if self.no_binary:
             if ":all:" in self.no_binary:
@@ -552,17 +562,17 @@ class ResolveConfig:
         # index config from pyproject.toml for lockfile generation, and we must write it to uv.toml.
         # However we also write it to pyproject.toml so that uv can validate the source names
         # in `sources`.
-        config_lines.extend(generate_uv_index_config(self.indexes, "index"))
+        config_lines.extend(generate_uv_index_config(self.indexes, self.find_links, "index"))
 
         return "\n".join(config_lines) + "\n" if config_lines else ""
 
     def validate_for_uv(self, resolve_name: str) -> None:
         """Raise if any pex-specific resolve options are set that have no uv equivalent."""
         pex_specific: list[str] = []
-        if self.constraints_file:
-            pex_specific.append("`[python].resolves_to_constraints_file`")
         if self.complete_platforms:
             pex_specific.append("`[python].resolves_to_complete_platforms`")
+        if self.constraints_file:
+            pex_specific.append("`[python].resolves_to_constraints_file`")
         if self.excludes:
             pex_specific.append("`[python].resolves_to_excludes`")
         if self.overrides:
@@ -614,7 +624,8 @@ async def determine_resolve_config(
             sources=FrozenOrderedSet(),
             path_mappings=python_repos.path_mappings,
             lock_style="universal",  # Default to universal when no resolve name
-            complete_platforms=(),  # No complete platforms by default
+            complete_platforms=(),
+            uv_platforms=(),
             uploaded_prior_to=None,
         )
 
@@ -627,6 +638,7 @@ async def determine_resolve_config(
     complete_platforms = tuple(
         python_setup.resolves_to_complete_platforms().get(request.resolve_name) or []
     )
+    uv_platforms = tuple(python_setup.resolves_to_uv_platforms().get(request.resolve_name) or [])
     uploaded_prior_to = python_setup.resolves_to_uploaded_prior_to().get(request.resolve_name)
 
     constraints_file: ResolvePexConstraintsFile | None = None
@@ -681,6 +693,7 @@ async def determine_resolve_config(
         path_mappings=python_repos.path_mappings,
         lock_style=lock_style,
         complete_platforms=complete_platforms,
+        uv_platforms=uv_platforms,
         uploaded_prior_to=uploaded_prior_to,
     )
 

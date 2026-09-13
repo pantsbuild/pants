@@ -8,8 +8,6 @@ publish = false
 [dependencies]
 byteorder = { workspace = true }
 deepsize = { workspace = true }
-digest = { workspace = true }
-generic-array = { workspace = true }
 hex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 sha2 = { workspace = true }

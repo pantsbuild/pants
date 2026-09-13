@@ -3,20 +3,21 @@
 
 use std::ops::Deref;
 use std::sync::Arc;
-use std::sync::atomic::{self, AtomicU32, AtomicUsize};
+use std::sync::atomic::AtomicUsize;
 
 use parking_lot::Mutex;
 use workunit_store::RunId;
 
-use crate::Graph;
 use crate::entry::Generation;
 use crate::node::{CompoundNode, EntryId, Node, NodeError};
+use crate::{Graph, RunGuard};
 
 struct InnerContext<N: Node + Send> {
     context: N::Context,
-    run_id: AtomicU32,
+    run_id: RunId,
     stats: Stats,
     graph: Graph<N>,
+    _run_guard: RunGuard,
 }
 
 #[derive(Clone, Default)]
@@ -39,15 +40,21 @@ pub struct Context<N: Node + Send> {
 }
 
 impl<N: Node + Send> Context<N> {
-    pub(crate) fn new(graph: Graph<N>, context: N::Context, run_id: RunId) -> Self {
+    pub(crate) fn new(
+        graph: Graph<N>,
+        context: N::Context,
+        run_id: RunId,
+        run_guard: RunGuard,
+    ) -> Self {
         Self {
             entry_id: None,
             dep_state: Arc::default(),
             inner: Arc::new(InnerContext {
                 context,
-                run_id: AtomicU32::new(run_id.0),
+                run_id,
                 stats: Stats::default(),
                 graph,
+                _run_guard: run_guard,
             }),
         }
     }
@@ -71,14 +78,7 @@ impl<N: Node + Send> Context<N> {
     }
 
     pub fn run_id(&self) -> RunId {
-        RunId(self.inner.run_id.load(atomic::Ordering::SeqCst))
-    }
-
-    pub fn new_run_id(&self) {
-        self.inner.run_id.store(
-            self.inner.graph.generate_run_id().0,
-            atomic::Ordering::SeqCst,
-        );
+        self.inner.run_id
     }
 
     pub fn context(&self) -> &N::Context {

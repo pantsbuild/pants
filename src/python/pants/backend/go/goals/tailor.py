@@ -11,6 +11,7 @@ from pathlib import PurePath
 
 from pants.backend.go.subsystems.golang import GolangSubsystem
 from pants.backend.go.target_types import (
+    GoBinaryMainImportPathField,
     GoBinaryMainPackageField,
     GoBinaryTarget,
     GoModTarget,
@@ -194,6 +195,8 @@ async def _find_go_binary_targets(
         determine_main_pkg_for_go_binary(GoBinaryMainPackageRequest(t[GoBinaryMainPackageField]))
         for t in existing_targets
         if t.has_field(GoBinaryMainPackageField)
+        # `main_import_path` mains are third-party packages, never a local `go_package`.
+        and not t.get(GoBinaryMainImportPathField).value
     )
     unowned_main_package_dirs = set(main_package_dirs) - {
         # NB: We assume the `go_package` lives in the directory it's defined, which we validate

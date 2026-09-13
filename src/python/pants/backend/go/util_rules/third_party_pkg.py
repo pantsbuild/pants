@@ -13,6 +13,7 @@ from typing import Any
 import ijson.backends.python as ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
+from pants.backend.go.subsystems.golang import GolangSubsystem, ThirdPartyTargetGranularity
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
@@ -34,6 +35,7 @@ from pants.engine.fs import (
 )
 from pants.engine.intrinsics import (
     create_digest,
+    digest_subset_to_digest,
     digest_to_snapshot,
     execute_process,
     get_digest_contents,
@@ -57,7 +59,8 @@ class GoThirdPartyPkgError(Exception):
 class ThirdPartyPkgAnalysis:
     """All the info and files needed to build a third-party package.
 
-    The digest only contains the files for the package, with all prefixes stripped.
+    The digest contains the sources of the package's whole module; the package's own files
+    live under `dir_path`.
     """
 
     import_path: str
@@ -65,6 +68,9 @@ class ThirdPartyPkgAnalysis:
 
     digest: Digest
     dir_path: str
+
+    # The import path of the Go module providing this package.
+    module_import_path: str
 
     # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
     # tests directly on a third-party package.
@@ -93,6 +99,33 @@ class ThirdPartyPkgAnalysis:
     xtest_embed_config: EmbedConfig | None = None
 
     error: GoThirdPartyPkgError | None = None
+
+    @property
+    def contains_native_sources(self) -> bool:
+        return bool(
+            self.cgo_files
+            or self.c_files
+            or self.cxx_files
+            or self.m_files
+            or self.f_files
+            or self.s_files
+            or self.h_files
+            or self.syso_files
+        )
+
+
+async def resolve_third_party_pkg_sources_digest(pkg_info: ThirdPartyPkgAnalysis) -> Digest:
+    """Slice the whole-module analysis digest down to the files this package's compilation
+    consumes.
+
+    Native-code packages keep the whole module: their include closure is not knowable from
+    `go list` metadata.
+    """
+    if pkg_info.contains_native_sources:
+        return pkg_info.digest
+
+    glob = f"{pkg_info.dir_path}/**" if pkg_info.embed_config else f"{pkg_info.dir_path}/*"
+    return await digest_subset_to_digest(DigestSubset(pkg_info.digest, PathGlobs([glob])))
 
 
 @dataclass(frozen=True)
@@ -157,7 +190,7 @@ class ModuleDescriptors:
 @dataclass(frozen=True)
 class ModuleDownloadRequest:
     """Download and analyze a Go module, keyed by (name, version, minimum_go_version,
-    build_opts, go_sum_entries).
+    cgo_enabled, go_sum_entries).
 
     This enables cross-go.mod deduplication: if mod-a and mod-b both depend on
     grpc@v1.60.0 with the same go.sum entries, the download and analysis only
@@ -180,7 +213,13 @@ class ModuleDownloadRequest:
     name: str
     version: str
     minimum_go_version: str | None
-    build_opts: GoBuildOptions
+    # NB: Only `cgo_enabled` is carried here, rather than the whole `GoBuildOptions`. Downloading
+    # and analyzing a module is independent of every other build option -- `go mod download` does
+    # not consult them, and the package analyzer only reads `CGO_ENABLED`. Keying on the full
+    # options object meant that callers differing in an irrelevant field (e.g. target generation
+    # using defaults while a compile resolves `race=True`) each paid for their own download of
+    # every module in the graph.
+    cgo_enabled: bool
     go_sum_entries: tuple[str, ...]
 
 
@@ -251,8 +290,9 @@ async def analyze_module_dependencies(request: ModuleDescriptorsRequest) -> Modu
         if "Main" in mod_json and mod_json["Main"]:
             continue
 
-        # Skip first-party modules referenced from other first-party modules.
-        # TODO Issue #22097: These cross-module references could be used for dependency inference
+        # Skip first-party modules referenced from other first-party modules via a local
+        # directory `replace`. These are not third-party packages; `map_import_paths_to_packages`
+        # folds their import paths into the referencing module's inference map (#22097).
         if "Replace" in mod_json and "Version" not in mod_json["Replace"]:
             continue
 
@@ -407,6 +447,7 @@ async def analyze_go_third_party_package(
         import_path=import_path,
         name=request.pkg_json["Name"],
         dir_path=request.package_path,
+        module_import_path=request.module_import_path,
         imports=tuple(request.pkg_json.get("Imports", ())),
         go_files=tuple(request.pkg_json.get("GoFiles", ())),
         c_files=tuple(request.pkg_json.get("CFiles", ())),
@@ -491,9 +532,9 @@ async def download_and_analyze_module(
 ) -> AnalyzedThirdPartyModule:
     """Download and analyze a single Go module via a synthetic go.mod + go.sum.
 
-    Keyed by (name, version, minimum_go_version, build_opts, go_sum_entries),
+    Keyed by (name, version, minimum_go_version, cgo_enabled, go_sum_entries),
     which lets the Pants engine deduplicate identical module downloads across
-    go.mods.
+    go.mods and across callers using different build options.
 
     A synthetic go.mod + go.sum pair is written into the sandbox so that Go's
     normal checksum verification still runs -- the go.sum entries come straight
@@ -588,7 +629,7 @@ async def download_and_analyze_module(
                 },
                 description=f"Analyze metadata for Go third-party module: {request.name}@{request.version}",
                 level=LogLevel.DEBUG,
-                env={"CGO_ENABLED": "1" if request.build_opts.cgo_enabled else "0"},
+                env={"CGO_ENABLED": "1" if request.cgo_enabled else "0"},
             )
         )
     )
@@ -645,7 +686,7 @@ async def download_and_analyze_third_party_packages(
     # Parse the go.sum once into a dict for O(1) lookup per module.
     go_sum_index = _parse_go_sum(go_sum_content)
 
-    # The engine memoizes by (name, version, minimum_go_version, build_opts,
+    # The engine memoizes by (name, version, minimum_go_version, cgo_enabled,
     # go_sum_entries), so identical modules across go.mods are downloaded
     # once -- reducing downloads from O(N*M) to O(M).
     analyzed_modules = await concurrently(
@@ -654,7 +695,7 @@ async def download_and_analyze_third_party_packages(
                 name=mod.name,
                 version=mod.version,
                 minimum_go_version=mod.minimum_go_version,
-                build_opts=request.build_opts,
+                cgo_enabled=request.build_opts.cgo_enabled,
                 go_sum_entries=go_sum_index.get((mod.name, mod.version), ()),
             ),
             **implicitly(),
@@ -672,7 +713,9 @@ async def download_and_analyze_third_party_packages(
 
 
 @rule
-async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPartyPkgAnalysis:
+async def extract_package_info(
+    request: ThirdPartyPkgAnalysisRequest, golang: GolangSubsystem
+) -> ThirdPartyPkgAnalysis:
     all_packages = await download_and_analyze_third_party_packages(
         AllThirdPartyPackagesRequest(
             request.go_mod_address,
@@ -684,6 +727,15 @@ async def extract_package_info(request: ThirdPartyPkgAnalysisRequest) -> ThirdPa
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:
         return pkg_info
+    if golang.third_party_target_granularity == ThirdPartyTargetGranularity.MODULE:
+        raise GoThirdPartyPkgError(
+            f"There is no Go package with the import path `{request.import_path}` in the "
+            f"third-party modules of `{request.go_mod_path}`.\n\n"
+            'Under `[golang].third_party_target_granularity = "module"`, a '
+            "`go_third_party_module` target address refers to its module's root package; "
+            "other packages are compiled automatically when imported. To build a specific "
+            "package as a binary, use the `main_import_path` field of `go_binary`."
+        )
     raise AssertionError(
         f"The package `{request.import_path}` was not downloaded, but Pants tried using it. "
         "This should not happen. Please open an issue at "
@@ -726,6 +778,7 @@ def maybe_raise_or_create_error_or_create_failed_pkg_info(
             import_path=import_path,
             name="",
             dir_path="",
+            module_import_path="",
             digest=EMPTY_DIGEST,
             imports=(),
             go_files=(),

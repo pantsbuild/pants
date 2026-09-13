@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::time::SystemTime;
 use task_executor::Executor;
-use terminal_size::terminal_size_using_fd;
+use terminal_size::terminal_size_of;
 use workunit_store::SpanId;
 
 mod indicatif;
@@ -40,8 +40,8 @@ impl Instance {
         local_parallelism: usize,
         executor: Executor,
     ) -> Result<Instance, String> {
-        let stderr_fd = stdio::get_destination().stderr_as_c_fd()?;
-        let (terminal_width, terminal_height) = terminal_size_using_fd(stderr_fd)
+        let (terminal_width, terminal_height) = stdio::get_destination()
+            .with_stderr_file(|stderr| terminal_size_of(stderr))?
             .map(|terminal_dimensions| (terminal_dimensions.0.0, terminal_dimensions.1.0 - 1))
             .unwrap_or((50, local_parallelism.try_into().unwrap()));
 

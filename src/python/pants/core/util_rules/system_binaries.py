@@ -437,6 +437,10 @@ class FindBinary(BinaryPath):
     pass
 
 
+class FlockBinary(BinaryPath):
+    pass
+
+
 class GetentBinary(BinaryPath):
     pass
 
@@ -1302,13 +1306,33 @@ def rules():
 
 
 # -------------------------------------------------------------------------------------------
-# Rules for fallible binaries
+# Rules for binaries that are allowed not be present
 # -------------------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MaybeFlockBinary:
+    flock_binary: FlockBinary | None = None
 
 
 @dataclass(frozen=True)
 class MaybeGitBinary:
     git_binary: GitBinary | None = None
+
+
+@rule(desc="Finding the `flock` binary", level=LogLevel.DEBUG)
+async def maybe_find_flock(
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
+) -> MaybeFlockBinary:
+    request = BinaryPathRequest(
+        binary_name="flock", search_path=system_binaries.system_binary_paths
+    )
+    paths = await find_binary(request, **implicitly())
+    first_path = paths.first_path
+    if not first_path:
+        return MaybeFlockBinary()
+
+    return MaybeFlockBinary(FlockBinary(first_path.path, first_path.fingerprint))
 
 
 @rule(desc="Finding the `git` binary", level=LogLevel.DEBUG)

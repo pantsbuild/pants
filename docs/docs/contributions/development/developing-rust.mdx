@@ -55,6 +55,8 @@ As described in [Setting up Pants](./setting-up-pants.mdx), we default to compil
 When working on Rust, you typically should set the environment variable `MODE=debug` for substantially faster compiles.
 :::
 
+There is also `MODE=dist`, the profile used to build published artifacts. It enables additional optimizations, like link-time optimization, that are usually too slow to be worthwhile for local development.
+
 ### Run tests
 
 To run tests for all crates, run:

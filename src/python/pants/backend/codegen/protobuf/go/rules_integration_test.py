@@ -298,6 +298,81 @@ def test_generates_go(rule_runner: RuleRunner) -> None:
 
 
 @requires_go
+def test_generates_go_module_granularity(rule_runner: RuleRunner) -> None:
+    # The generated code's imports of the protobuf runtime must resolve by import path under
+    # module granularity; the runtime module has no root package.
+    rule_runner.write_files(
+        {
+            "src/protobuf/dir1/f.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                option go_package = "example.com/dir1";
+
+                package dir1;
+
+                message Person {
+                  string name = 1;
+                }
+                """
+            ),
+            "src/protobuf/dir1/BUILD": "protobuf_sources()",
+            "src/go/people/BUILD": dedent(
+                """\
+                go_mod(name="mod")
+                go_package(name="pkg")
+                """
+            ),
+            "src/go/people/go.mod": dedent(
+                """\
+                module example.com/people
+                require google.golang.org/protobuf v1.27.1
+                """
+            ),
+            "src/go/people/go.sum": dedent(
+                """\
+                github.com/golang/protobuf v1.5.0 h1:LUVKkCeviFUMKqHa4tXIIij/lbhnMbP7Fn5wKdKkRh4=
+                github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
+                github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
+                github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+                golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
+                golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+                google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
+                google.golang.org/protobuf v1.27.1 h1:SnqbnDw1V7RiZcXPx5MEeqPv2s79L9i7BJUlG/+RurQ=
+                google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
+                """
+            ),
+            "src/go/people/proto_test.go": dedent(
+                """\
+                package people
+                import (
+                  "testing"
+                  pb "example.com/dir1"
+                )
+                func TestProtoGen(t *testing.T) {
+                  person := pb.Person{Name: "name"}
+                  if person.Name != "name" {
+                    t.Fail()
+                  }
+                }
+                """
+            ),
+        }
+    )
+
+    rule_runner.set_options(
+        ["--go-test-args=-v", "--golang-third-party-target-granularity=module"],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    tgt = rule_runner.get_target(Address("src/go/people", target_name="pkg"))
+    result = rule_runner.request(
+        TestResult, [GoTestRequest.Batch("", (GoTestFieldSet.create(tgt),), None)]
+    )
+    assert result.exit_code == 0
+    assert b"PASS: TestProtoGen" in result.stdout_bytes
+
+
+@requires_go
 def test_generates_go_grpc(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import logging
 import os
+from enum import Enum
 
 from pants.core.util_rules.asdf import AsdfPathString
-from pants.option.option_types import BoolOption, StrListOption, StrOption
+from pants.option.option_types import BoolOption, EnumOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
@@ -17,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 _DEFAULT_COMPILER_FLAGS = ("-g", "-O2")
+
+
+class ThirdPartyTargetGranularity(Enum):
+    PACKAGE = "package"
+    MODULE = "module"
 
 
 class GolangSubsystem(Subsystem):
@@ -215,6 +221,23 @@ class GolangSubsystem(Subsystem):
             Do not include the patch version.
             """
         ),
+    )
+    third_party_target_granularity = EnumOption(
+        default=ThirdPartyTargetGranularity.PACKAGE,
+        help=softwrap(
+            """
+            The granularity at which third-party targets are generated from a `go_mod` target.
+
+            `package`: one `go_third_party_package` target per third-party Go package (the
+            historical behavior).
+
+            `module`: one `go_third_party_module` target per third-party Go module. First-party
+            targets depend on the modules they import; `go.mod`/`go.sum` owns transitive
+            resolution. Use `go_binary`'s `main_import_path` field to build a specific
+            third-party package.
+            """
+        ),
+        advanced=True,
     )
     tailor_go_mod_targets = BoolOption(
         default=True,

@@ -62,12 +62,13 @@ use crate::{
     TypeId, Types, Value, externs, nodes,
 };
 
-#[pymodule]
+#[pymodule(gil_used = false)]
 fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     intrinsics::register(py, m)?;
     externs::register(py, m)?;
     externs::address::register(py, m)?;
     externs::fs::register(m)?;
+    externs::hunk::register(m)?;
     externs::memo::register(m)?;
     externs::nailgun::register(py, m)?;
     externs::options::register(m)?;
@@ -79,6 +80,7 @@ fn native_engine(py: Python, m: &Bound<'_, PyModule>) -> PyO3Result<()> {
     externs::testutil::register(m)?;
     externs::workunits::register(m)?;
     externs::dep_inference::register(m)?;
+    externs::docker::register(m)?;
     externs::unions::register(py, m)?;
     externs::frozendict::register(py, m)?;
     externs::frozen_ordered_set::register(py, m)?;
@@ -1207,12 +1209,11 @@ fn scheduler_live_items<'py>(
 }
 
 #[pyfunction]
-fn scheduler_shutdown(py: Python, py_scheduler: &Bound<'_, PyScheduler>, timeout_secs: u64) {
+fn scheduler_shutdown(py: Python, py_scheduler: &Bound<'_, PyScheduler>, timeout: Duration) {
     let core = py_scheduler.borrow().0.core.clone();
     core.executor.enter(|| {
         py.detach(|| {
-            core.executor
-                .block_on(core.shutdown(Duration::from_secs(timeout_secs)));
+            core.executor.block_on(core.shutdown(timeout));
         })
     })
 }
@@ -1528,10 +1529,9 @@ fn session_wait_for_tail_tasks(
     py: Python<'_>,
     py_scheduler: &Bound<'_, PyScheduler>,
     py_session: &Bound<'_, PySession>,
-    timeout: f64,
+    timeout: Duration,
 ) -> PyO3Result<()> {
     let core = &py_scheduler.borrow().0.core;
-    let timeout = Duration::from_secs_f64(timeout);
     let session = &py_session.borrow().0;
 
     core.executor.enter(|| {
@@ -2009,12 +2009,13 @@ fn stdio_thread_set_destination(stdio_destination: &Bound<'_, PyStdioDestination
     stdio_destination.borrow().0.set_for_current_thread();
 }
 
-// TODO: Needs to be thread-local / associated with the Console.
 #[pyfunction]
 #[pyo3(signature = (log_path))]
 fn set_per_run_log_path(py: Python, log_path: Option<PathBuf>) {
     py.detach(|| {
-        PANTS_LOGGER.set_per_run_logs(log_path);
+        if let Err(e) = stdio::get_destination().set_per_run_log_path(log_path) {
+            warn!("{e}");
+        }
     })
 }
 

@@ -163,6 +163,19 @@ impl NailgunPool {
     }
 
     ///
+    /// Kills all pooled nailgun servers, waiting for any that are in use to be released first.
+    ///
+    pub async fn shutdown(&self) -> Result<(), String> {
+        let mut processes = self.processes.lock().await;
+        for pool_entry in processes.drain(..) {
+            let mut process = pool_entry.process.lock_arc().await;
+            // Dropping the `NailgunProcess` kills the server: see its `Drop`.
+            drop(process.take());
+        }
+        Ok(())
+    }
+
+    ///
     /// Find a usable process in the pool that matches the given fingerprint.
     ///
     fn find_usable(
@@ -438,7 +451,7 @@ struct NailgunProcessFingerprint {
 impl NailgunProcessFingerprint {
     pub async fn new(name: String, nailgun_req: &Process, store: &Store) -> Result<Self, String> {
         let (nailgun_req_digest, _command_digest) =
-            process_execution::get_digest(nailgun_req, None, None, store, None).await;
+            process_execution::get_digest(nailgun_req, None, None, store, None).await?;
         Ok(NailgunProcessFingerprint {
             name,
             fingerprint: nailgun_req_digest.hash,

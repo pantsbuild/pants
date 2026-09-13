@@ -14,15 +14,16 @@ use std::time::Duration;
 use async_oncecell::OnceCell;
 use async_trait::async_trait;
 use bollard::auth::DockerCredentials;
-use bollard::container::{
-    CreateContainerOptions, ListContainersOptions, LogOutput, RemoveContainerOptions,
-};
+use bollard::container::LogOutput;
 use bollard::exec::StartExecResults;
-use bollard::image::CreateImageOptions;
-use bollard::models::ContainerState;
-use bollard::secret::{ContainerInspectResponse, ContainerStateStatusEnum};
-use bollard::service::CreateImageInfo;
-use bollard::volume::CreateVolumeOptions;
+use bollard::models::{
+    ContainerCreateBody, ContainerInspectResponse, ContainerState, ContainerStateStatusEnum,
+    CreateImageInfo, ExecConfig, HostConfig, VolumeCreateRequest,
+};
+use bollard::query_parameters::{
+    CreateContainerOptionsBuilder, CreateImageOptionsBuilder, ListContainersOptionsBuilder,
+    ListVolumesOptions, RemoveContainerOptions, RemoveContainerOptionsBuilder,
+};
 use bollard::{Docker, errors::Error as DockerError};
 use bytes::{Bytes, BytesMut};
 use fs::RelativePath;
@@ -98,6 +99,10 @@ impl DockerOnceCell {
         let docker = Docker::connect_with_local_defaults()
           .map_err(|err| format!("Failed to connect to local Docker: {err}"))?;
 
+        // Clamp the client API version to the daemon's, as the docker CLI does.
+        let docker = docker.negotiate_version().await
+          .map_err(|err| format!("Failed to negotiate API version with local Docker: {err}"))?;
+
         let version = docker.version().await
           .map_err(|err| format!("Failed to obtain version from local Docker: {err}"))?;
 
@@ -127,10 +132,11 @@ pub(crate) async fn remove_old_images(
 ) -> Result<(), Vec<String>> {
     let build_root_label = format!("{PANTS_CONTAINER_BUILDROOT_LABEL_KEY}={build_root}");
     let removal_tasks = docker
-        .list_containers(Some(ListContainersOptions::<&str> {
-            filters: hashmap!{"label" => vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY, build_root_label.as_str()], "status" => vec!["exited", "dead"]},
-            ..ListContainersOptions::default()
-        }))
+        .list_containers(Some(
+            ListContainersOptionsBuilder::default()
+                .filters(&hashmap!{"label" => vec![PANTS_CONTAINER_ENVIRONMENT_LABEL_KEY, build_root_label.as_str()], "status" => vec!["exited", "dead"]})
+                .build(),
+        ))
         .await
         .map_err(|err| {
             vec![format!(
@@ -147,10 +153,7 @@ pub(crate) async fn remove_old_images(
                         docker
                         .remove_container(
                             container_id.as_str(),
-                            Some(RemoveContainerOptions {
-                                force: true,
-                                ..RemoveContainerOptions::default()
-                            }),
+                            Some(RemoveContainerOptionsBuilder::default().force(true).build()),
                         )
                         .await
                         .map_err(|err| {
@@ -375,11 +378,10 @@ async fn pull_image(
                     .await
                     .map_err(|e| format!("Failed to pull Docker image `{image}`: {e}"))?;
 
-                let create_image_options = CreateImageOptions::<String> {
-                    from_image: image.to_string(),
-                    platform: docker_platform_identifier(platform).to_string(),
-                    ..CreateImageOptions::default()
-                };
+                let create_image_options = CreateImageOptionsBuilder::default()
+                    .from_image(image)
+                    .platform(docker_platform_identifier(platform))
+                    .build();
 
                 let mut result_stream =
                     docker.create_image(Some(create_image_options), None, credentials);
@@ -388,10 +390,12 @@ async fn pull_image(
                     match msg {
                         Ok(msg) => match msg {
                             CreateImageInfo {
-                                error: Some(error), ..
+                                error_detail: Some(error_detail),
+                                ..
                             } => {
                                 return Err(format!(
-                                    "Failed to pull Docker image `{image}`: {error}"
+                                    "Failed to pull Docker image `{image}`: {}",
+                                    error_detail.message.unwrap_or_default()
                                 ));
                             }
                             CreateImageInfo {
@@ -400,7 +404,7 @@ async fn pull_image(
                             } => {
                                 log::debug!("Docker pull status: {status}");
                             }
-                            // Ignore content in other event fields, namely `id`, `progress`, and `progress_detail`.
+                            // Ignore content in other event fields, namely `id` and `progress_detail`.
                             _ => (),
                         },
                         Err(err) => {
@@ -724,7 +728,7 @@ impl CapturedWorkdir for CommandRunner<'_> {
 }
 
 /// A loose clone of `std::process:Command` for Docker `exec`.
-struct Command(bollard::exec::CreateExecOptions<String>);
+struct Command(ExecConfig);
 
 /// A struct to propagate errors that can occur during the `Command.spawn` method.
 struct CommandSpawnError {
@@ -734,11 +738,11 @@ struct CommandSpawnError {
 
 impl Command {
     fn new(argv: Vec<String>) -> Self {
-        Self(bollard::exec::CreateExecOptions {
+        Self(ExecConfig {
             cmd: Some(argv),
             attach_stdout: Some(true),
             attach_stderr: Some(true),
-            ..bollard::exec::CreateExecOptions::default()
+            ..ExecConfig::default()
         })
     }
 
@@ -767,7 +771,7 @@ impl Command {
         log::trace!("creating execution with config: {:?}", self.0);
 
         let exec = docker
-            .create_exec::<String>(&container_id, self.0.clone())
+            .create_exec(&container_id, self.0.clone())
             .await
             .map_err(|err| CommandSpawnError {
                 message: format!("Failed to create Docker execution in container: {err}"),
@@ -937,9 +941,9 @@ impl<'a> ContainerCache<'a> {
             .await
             .map_err(|e| format!("Failed to create named cache volume for {image_name}: {e}"))?;
 
-        let config = bollard::container::Config {
+        let config = ContainerCreateBody {
             entrypoint: Some(vec!["/bin/sh".to_string()]),
-            host_config: Some(bollard::service::HostConfig {
+            host_config: Some(HostConfig {
                 binds: Some(vec![
                     format!("{work_dir_base}:{SANDBOX_BASE_PATH_IN_CONTAINER}"),
                     format!("{named_cache_volume_name}:{NAMED_CACHES_BASE_PATH_IN_CONTAINER}",),
@@ -950,28 +954,27 @@ impl<'a> ContainerCache<'a> {
                 ]),
                 // The init process ensures that child processes are properly reaped.
                 init: Some(true),
-                ..bollard::service::HostConfig::default()
+                ..HostConfig::default()
             }),
             image: Some(image_name.clone()),
             tty: Some(true),
             open_stdin: Some(true),
             labels,
-            ..bollard::container::Config::default()
+            ..ContainerCreateBody::default()
         };
 
         log::trace!("creating cached container with config for image `{image_name}`: {config:?}",);
 
-        let create_options = CreateContainerOptions::<&str> {
-            name: "",
-            platform: Some(docker_platform_identifier(&platform)),
-        };
+        let create_options = CreateContainerOptionsBuilder::default()
+            .platform(docker_platform_identifier(&platform))
+            .build();
         let container = docker
-            .create_container::<&str, String>(Some(create_options), config)
+            .create_container(Some(create_options), config)
             .await
             .map_err(|err| format!("Failed to create Docker container: {err:?}"))?;
 
         docker
-            .start_container::<String>(&container.id, None)
+            .start_container(&container.id, None)
             .await
             .map_err(|err| {
                 format!(
@@ -1005,7 +1008,7 @@ impl<'a> ContainerCache<'a> {
         let named_cache_volume_name = format!("pants-named-caches-{image_hash}");
         // TODO: Use a filter on volume name.
         let volume_exists = docker
-            .list_volumes::<&str>(None)
+            .list_volumes(None::<ListVolumesOptions>)
             .await?
             .volumes
             .map(|volumes| volumes.iter().any(|v| v.name == named_cache_volume_name))
@@ -1015,13 +1018,13 @@ impl<'a> ContainerCache<'a> {
         }
 
         let mut labels = HashMap::new();
-        labels.insert("image_name", image_name);
+        labels.insert("image_name".to_string(), image_name.to_string());
         docker
-            .create_volume::<&str>(CreateVolumeOptions {
-                name: &named_cache_volume_name,
-                driver: "local",
-                labels,
-                ..CreateVolumeOptions::default()
+            .create_volume(VolumeCreateRequest {
+                name: Some(named_cache_volume_name.clone()),
+                driver: Some("local".to_string()),
+                labels: Some(labels),
+                ..VolumeCreateRequest::default()
             })
             .await?;
 
@@ -1214,10 +1217,7 @@ impl<'a> ContainerCache<'a> {
             .collect::<Vec<_>>();
 
         let removal_futures = container_ids.into_iter().map(|(id, _)| async move {
-            let remove_options = RemoveContainerOptions {
-                force: true,
-                ..RemoveContainerOptions::default()
-            };
+            let remove_options = RemoveContainerOptionsBuilder::default().force(true).build();
             Self::remove_container(docker, id.as_str(), Some(remove_options))
                 .await
                 .map_err(|err| {

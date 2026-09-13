@@ -18,9 +18,10 @@ python_distribution(
     dependencies=[
         "./__main__.py",
         ":resources",
-        # Include the native client and sandboxer binaries in the distribution.
+        # Include the native client, sandboxer and pants_lock binaries in the distribution.
         "src/python/pants/bin:native_client",
         "src/python/pants/bin:sandboxer",
+        "src/python/pants/bin:pants_lock",
     ],
     # Because we have native code, this will cause the wheel to use whatever the ABI is for the
     # interpreter used to run setup.py, e.g. `cp39m-macosx_10_15_x86_64`.
@@ -67,6 +68,18 @@ pex_binary(
     scie_bind_resource_path=["PANTS_NATIVE_CLIENT=pants/bin/native_client"],
     scie_exe="{scie.env.PANTS_NATIVE_CLIENT}",
     scie_env=["NO_SCIE_WARNING=true", "_PANTS_SERVER_EXE={scie.env.VIRTUAL_ENV}/bin/pants"],
+    # The scie interpreter must match the wheels: each release lane builds one
+    # parametrization with the corresponding CPython (PY=python3.14t or python3.14).
+    **parametrize(
+        "cp314t",
+        scie_pbs_free_threaded=True,
+        output_path="${spec_path_normalized}/pants-pex-cp314t${file_suffix}",
+    ),
+    **parametrize(
+        "cp314",
+        scie_pbs_free_threaded=False,
+        output_path="${spec_path_normalized}/pants-pex-cp314${file_suffix}",
+    ),
 )
 
 # NB: we use `dummy.c` to avoid clang/gcc complaining `error: no input files` when building

@@ -12,11 +12,13 @@ source "${REPO_ROOT}/build-support/common.sh"
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust"
 
-# N.B. Set $MODE to "debug" for faster builds.
+# N.B. Set $MODE to "debug" for faster builds, or "dist" for the profile used
+# to build published artifacts.
 readonly MODE="${MODE:-release}"
 case "$MODE" in
-  debug) MODE_FLAG="" ;;
-  *) MODE_FLAG="--release" ;;
+  debug) MODE_FLAG=() ;;
+  dist) MODE_FLAG=(--profile dist) ;;
+  *) MODE_FLAG=(--release) ;;
 esac
 
 function calculate_current_hash() {
@@ -30,7 +32,7 @@ function calculate_current_hash() {
   (
     cd "${REPO_ROOT}" || exit 1
     (
-      echo "${MODE_FLAG}"
+      echo "${MODE_FLAG[*]}"
       uname -mps
       # the engine only depends on the implementation and major.minor version, not the patch
       "${PY}" -c 'import sys; print(sys.implementation.name, sys.version_info.major, sys.version_info.minor, sys.abiflags)'

@@ -41,9 +41,9 @@ from pants.util.strutil import softwrap
 logger = logging.getLogger(__name__)
 
 
-_PEX_VERSION = "v2.97.3"
-_PEX_BINARY_HASH = "61bc0afdb879b791c30211a809fddc542e36f6b4533240c85fb56753f6d65c05"
-_PEX_BINARY_SIZE = 5038874
+PEX_VERSION = "v2.100.5"
+PEX_BINARY_HASH = "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1"
+_PEX_BINARY_SIZE = 5312775
 
 
 class PexCli(TemplatedExternalTool):
@@ -51,9 +51,9 @@ class PexCli(TemplatedExternalTool):
     name = "pex"
     help = "The PEX (Python EXecutable) tool (https://github.com/pex-tool/pex)."
 
-    default_version = _PEX_VERSION
+    default_version = PEX_VERSION
     default_url_template = "https://github.com/pex-tool/pex/releases/download/{version}/pex"
-    version_constraints = ">=2.97.1,<3.0"
+    version_constraints = ">=2.100.5,<3.0"
 
     # extra args to be passed to the pex tool; note that they
     # are going to apply to all invocations of the pex tool.
@@ -68,7 +68,7 @@ class PexCli(TemplatedExternalTool):
     )
 
     default_known_versions = [
-        f"{_PEX_VERSION}|{platform}|{_PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}"
+        f"{PEX_VERSION}|{platform}|{PEX_BINARY_HASH}|{_PEX_BINARY_SIZE}"
         for platform in ["macos_x86_64", "macos_arm64", "linux_x86_64", "linux_arm64"]
     ]
 

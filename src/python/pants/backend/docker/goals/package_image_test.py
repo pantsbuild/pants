@@ -2521,6 +2521,10 @@ def test_docker_build_fail_logs(
             show_warnings=False,
         )
 
+    # Setting the deprecated `[docker].suggest_renames` option logs a deprecation warning that is
+    # orthogonal to the build-failure logging under test.
+    caplog.records[:] = [r for r in caplog.records if r.name != "pants.base.deprecated"]
+
     assert_logged(caplog, expect_logged)
     for msg in fail_log_contains:
         if suggest_renames:

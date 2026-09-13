@@ -6,10 +6,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import PurePath
 
+from pants.backend.go.target_type_rules import (
+    GoBinaryMainImportPathRequest,
+    resolve_go_binary_main_import_path,
+)
 from pants.backend.go.target_types import (
+    GoBinaryMainImportPathField,
     GoBinaryMainPackageField,
     GoBinaryTarget,
     GoPackageTarget,
+    GoThirdPartyModuleTarget,
     GoThirdPartyPackageTarget,
 )
 from pants.backend.go.util_rules.binary import (
@@ -21,11 +27,16 @@ from pants.backend.go.util_rules.build_opts import (
     go_extract_build_options_from_target,
 )
 from pants.backend.go.util_rules.build_pkg import (
+    BuildGoPackageRequest,
     MergeBuiltGoPackageArchivesRequest,
     merge_built_go_package_archives,
     required_built_go_package,
 )
 from pants.backend.go.util_rules.build_pkg_target import BuildGoPackageTargetRequest
+from pants.backend.go.util_rules.build_pkg_third_party import (
+    BuildGoPackageRequestForThirdPartyPackageRequest,
+    setup_build_go_package_target_request_for_third_party,
+)
 from pants.backend.go.util_rules.first_party_pkg import (
     FirstPartyPkgAnalysisRequest,
     analyze_first_party_package,
@@ -58,14 +69,22 @@ class GoBinaryFieldSet(PackageFieldSet, RunFieldSet):
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
     main: GoBinaryMainPackageField
+    main_import_path: GoBinaryMainImportPathField
     output_path: OutputPathField
     environment: EnvironmentField
 
 
 @rule(desc="Package Go binary", level=LogLevel.DEBUG)
 async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
+    main_pkg_get = (
+        resolve_go_binary_main_import_path(
+            GoBinaryMainImportPathRequest(field_set.address), **implicitly()
+        )
+        if field_set.main_import_path.value
+        else determine_main_pkg_for_go_binary(GoBinaryMainPackageRequest(field_set.main))
+    )
     main_pkg, build_opts = await concurrently(
-        determine_main_pkg_for_go_binary(GoBinaryMainPackageRequest(field_set.main)),
+        main_pkg_get,
         go_extract_build_options_from_target(
             GoBuildOptionsFromTargetRequest(field_set.address), **implicitly()
         ),
@@ -84,7 +103,8 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
                 go_mod_info.digest,
                 go_mod_info.mod_path,
                 build_opts=build_opts,
-            )
+            ),
+            **implicitly(),
         )
 
         package_name = analysis.name
@@ -100,18 +120,44 @@ async def package_go_binary(field_set: GoBinaryFieldSet) -> BuiltPackage:
         package_name = main_pkg_analysis.analysis.name
 
     if package_name != "main":
+        if main_pkg.is_third_party_module:
+            main_alias = GoThirdPartyModuleTarget.alias
+        elif main_pkg.is_third_party:
+            main_alias = GoThirdPartyPackageTarget.alias
+        else:
+            main_alias = GoPackageTarget.alias
         raise ValueError(
-            f"{GoThirdPartyPackageTarget.alias if main_pkg.is_third_party else GoPackageTarget.alias} "
-            f"target `{main_pkg.address}` is used as the main package for {GoBinaryTarget.alias} target "
-            f"`{field_set.address}` but uses package name `{package_name}` instead of `main`. Go "
-            "requires that main packages actually use `main` as the package name."
+            f"`{main_alias}` target `{main_pkg.address}` is used as the main package for "
+            f"{GoBinaryTarget.alias} target `{field_set.address}` but uses package name "
+            f"`{package_name}` instead of `main`. Go requires that main packages actually use "
+            "`main` as the package name."
         )
 
-    built_package = await required_built_go_package(
-        **implicitly(
-            BuildGoPackageTargetRequest(main_pkg.address, is_main=True, build_opts=build_opts)
-        ),
-    )
+    if main_pkg.is_third_party_module:
+        assert isinstance(main_pkg.import_path, str)
+        fallible_request = await setup_build_go_package_target_request_for_third_party(
+            BuildGoPackageRequestForThirdPartyPackageRequest(
+                import_path=main_pkg.import_path,
+                go_mod_address=go_mod_address,
+                build_opts=build_opts,
+                is_main=True,
+            )
+        )
+        build_request = fallible_request.request
+        if build_request is None:
+            raise ValueError(
+                f"Unable to build main package `{main_pkg.import_path}` for "
+                f"{GoBinaryTarget.alias} target `{field_set.address}`: {fallible_request.stderr}"
+            )
+        built_package = await required_built_go_package(
+            **implicitly({build_request: BuildGoPackageRequest})
+        )
+    else:
+        built_package = await required_built_go_package(
+            **implicitly(
+                BuildGoPackageTargetRequest(main_pkg.address, is_main=True, build_opts=build_opts)
+            ),
+        )
     merged = await merge_built_go_package_archives(
         MergeBuiltGoPackageArchivesRequest((built_package,))
     )

@@ -1,0 +1,16 @@
+[package]
+version = "0.0.1"
+edition = "2024"
+name = "pants_lock"
+authors = ["Pants Build <pantsbuild@gmail.com>"]
+publish = false
+
+[[bin]]
+name = "pants_lock"
+path = "src/main.rs"
+
+[dependencies]
+libc = { workspace = true }
+
+[lints]
+workspace = true

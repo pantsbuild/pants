@@ -311,6 +311,7 @@ def test_pex3_venv_create_extra_args_are_passed_through() -> None:
         handler=Mock(),
         runtime=Mock(),
         complete_platforms=Mock(),
+        uv_platforms=Mock(),
         type=Mock(),
         output_path=Mock(),
         environment=Mock(),

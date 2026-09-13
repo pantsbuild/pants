@@ -6,6 +6,7 @@ from __future__ import annotations
 import functools
 import inspect
 import re
+import threading
 from abc import ABCMeta
 from collections.abc import Callable, Iterable, Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
@@ -30,6 +31,8 @@ if TYPE_CHECKING:
     from pants.engine.rules import Rule
 
 _SubsystemT = TypeVar("_SubsystemT", bound="Subsystem")
+
+_rules_lock = threading.Lock()
 
 
 class _SubsystemMeta(ABCMeta):
@@ -171,7 +174,14 @@ class Subsystem(metaclass=_SubsystemMeta):
                     yield cls._construct_env_aware_rule()
                     yield from (cast(Rule, i) for i in add_option_fields_for(cls.EnvironmentAware))
 
-            cls._rules = tuple(inner())
+            candidate = tuple(inner())
+            # nb. Runs load backends concurrently under pantsd, so the memo must be published
+            # exactly once: a caller that later observed a second tuple would hand the rule graph
+            # two distinct rules per id. No foreign code runs under the lock, so it need not be
+            # re-entrant.
+            with _rules_lock:
+                if cls._rules is None:
+                    cls._rules = candidate
         return cast("Sequence[Rule]", cls._rules)
 
     @distinct_union_type_per_subclass

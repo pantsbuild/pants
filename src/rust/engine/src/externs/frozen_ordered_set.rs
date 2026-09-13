@@ -314,7 +314,7 @@ fn filter_keys<'py>(
 }
 
 impl FrozenOrderedSet {
-    fn from_iterable(iterable: Option<&Bound<PyAny>>) -> PyResult<Self> {
+    pub(crate) fn from_iterable(iterable: Option<&Bound<PyAny>>) -> PyResult<Self> {
         let Some(iterable) = iterable else {
             return Python::attach(|py| Self::from_pydict(PyDict::new(py)));
         };

@@ -19,12 +19,13 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSLayoutField,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
+    PythonFaaSUvPlatforms,
     build_python_faas,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import BuiltPackage, OutputPathField, PackageFieldSet
-from pants.engine.rules import collect_rules, rule
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -38,6 +39,7 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
     handler: PythonGoogleCloudFunctionHandlerField
     runtime: PythonGoogleCloudFunctionRuntime
     complete_platforms: PythonFaaSCompletePlatforms
+    uv_platforms: PythonFaaSUvPlatforms
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
     pex_build_extra_args: PythonFaaSPexBuildExtraArgs
     layout: PythonFaaSLayoutField
@@ -55,6 +57,7 @@ async def package_python_google_cloud_function(
             address=field_set.address,
             target_name=PythonGoogleCloudFunction.alias,
             complete_platforms=field_set.complete_platforms,
+            uv_platforms=field_set.uv_platforms,
             runtime=field_set.runtime,
             # GCF only supports x86_64 architecture for now.
             architecture=FaaSArchitecture.X86_64,
@@ -67,7 +70,8 @@ async def package_python_google_cloud_function(
             include_sources=True,
             reexported_handler_module=PythonGoogleCloudFunctionHandlerField.reexported_handler_module,
             log_only_reexported_handler_func=True,
-        )
+        ),
+        **implicitly(),
     )
 
 

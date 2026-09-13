@@ -189,6 +189,7 @@ def test_validate_lockfiles(
             path_mappings=(),
             lock_style="universal",
             complete_platforms=(),
+            uv_platforms=(),
             uploaded_prior_to=None,
         ),
     )
@@ -373,6 +374,7 @@ class TestResolveConfigPexArgs:
                 path_mappings=[],
                 lock_style="universal",
                 complete_platforms=(),
+                uv_platforms=(),
                 uploaded_prior_to=None,
             ).pex_args()
         )
@@ -448,6 +450,7 @@ class TestResolveConfigPexArgs:
                 path_mappings=[],
                 lock_style="universal",
                 complete_platforms=(),
+                uv_platforms=(),
                 uploaded_prior_to="2023-09-20",
             ).pex_args()
         )
@@ -456,8 +459,6 @@ class TestResolveConfigPexArgs:
 
 def _uv_config(
     indexes=None,
-    find_links=None,
-    extra_find_links=(),
     sources=None,
     only_binary=None,
     no_binary=None,
@@ -465,7 +466,7 @@ def _uv_config(
 ):
     cfg = ResolveConfig(
         indexes=indexes if indexes is not None else ["https://pypi.org/simple"],
-        find_links=find_links or [],
+        find_links=[],
         manylinux=None,
         constraints_file=None,
         no_binary=FrozenOrderedSet(no_binary or []),
@@ -476,9 +477,10 @@ def _uv_config(
         path_mappings=[],
         lock_style="universal",
         complete_platforms=(),
+        uv_platforms=(),
         uploaded_prior_to=uploaded_prior_to,
     )
-    return tomllib.loads(cfg.uv_config(extra_find_links=extra_find_links))
+    return tomllib.loads(cfg.uv_config())
 
 
 def test_uv_config_indexes():
@@ -505,30 +507,30 @@ def test_uv_config_indexes():
                 "https://primary.example.com/simple",
                 "fallback=https://secondary.example.com/simple",
             ],
+            find_links=[
+                "https://findlinks.example.com/index",
+                "other=https://findlinks.other.com/index",
+            ],
         )
     )
     indexes = parsed["tool"]["uv"]["index"]
-    assert len(indexes) == 2
+    assert len(indexes) == 4
     assert indexes[0]["url"] == "https://primary.example.com/simple"
     assert "name" not in indexes[0]
     assert "default" not in indexes[0]
+    assert "explicit" not in indexes[0]
     assert indexes[1]["url"] == "https://secondary.example.com/simple"
     assert indexes[1].get("name") == "fallback"
-    assert indexes[1]["default"] is True
-
-
-def test_uv_config_find_links():
-    parsed = _uv_config(find_links=["https://example.com/wheels"])
-    assert parsed["find-links"] == ["https://example.com/wheels"]
-
-    parsed = _uv_config(
-        find_links=["https://a.example.com/wheels"],
-        extra_find_links=("https://b.example.com/wheels",),
-    )
-    assert parsed["find-links"] == [
-        "https://a.example.com/wheels",
-        "https://b.example.com/wheels",
-    ]
+    assert "default" not in indexes[1]
+    assert indexes[1]["explicit"] is True
+    assert indexes[2]["url"] == "https://findlinks.example.com/index"
+    assert "name" not in indexes[2]
+    assert "default" not in indexes[2]
+    assert "explicit" not in indexes[2]
+    assert indexes[3]["url"] == "https://findlinks.other.com/index"
+    assert indexes[3].get("name") == "other"
+    assert indexes[3]["default"] is True
+    assert indexes[3]["explicit"] is True
 
 
 def test_uv_config_sources():

@@ -20,6 +20,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
+    PythonFaaSUvPlatforms,
 )
 from pants.backend.python.util_rules.faas import rules as faas_rules
 from pants.core.environments.target_types import EnvironmentField
@@ -116,24 +117,74 @@ LAMBDA_DOCKER_REPO = "public.ecr.aws/lambda/python"
 
 
 class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
-    # https://gallery.ecr.aws/lambda/python
+    # See https://docs.aws.amazon.com/powertools/python/latest/build_recipes/cross-platform/#manylinux-compatibility-tags
+    # Note: The 3.9-3.11 runtimes actually support glibc 2.24, but uv doesn't offer *-manylinux_2_24 as allowed
+    # values for the --python-platform option.
     RUNTIME_TAG_MAPPING = {
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_36, FaaSArchitecture.X86_64): "3.6",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_37, FaaSArchitecture.X86_64): "3.7",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_38, FaaSArchitecture.X86_64): "3.8-x86_64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_38, FaaSArchitecture.ARM64): "3.8-arm64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_39, FaaSArchitecture.X86_64): "3.9-x86_64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_39, FaaSArchitecture.ARM64): "3.9-arm64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_310, FaaSArchitecture.X86_64): "3.10-x86_64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_310, FaaSArchitecture.ARM64): "3.10-arm64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_311, FaaSArchitecture.X86_64): "3.11-x86_64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_311, FaaSArchitecture.ARM64): "3.11-arm64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.X86_64): "3.12-x86_64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.ARM64): "3.12-arm64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.X86_64): "3.13-x86_64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.ARM64): "3.13-arm64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_314, FaaSArchitecture.X86_64): "3.14-x86_64",
-        (PythonAwsLambdaFunctionRuntimes.PYTHON_314, FaaSArchitecture.ARM64): "3.14-arm64",
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_36, FaaSArchitecture.X86_64): (
+            "3.6",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_37, FaaSArchitecture.X86_64): (
+            "3.7",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_38, FaaSArchitecture.X86_64): (
+            "3.8-x86_64",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_38, FaaSArchitecture.ARM64): (
+            "3.8-arm64",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_39, FaaSArchitecture.X86_64): (
+            "3.9-x86_64",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_39, FaaSArchitecture.ARM64): (
+            "3.9-arm64",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_310, FaaSArchitecture.X86_64): (
+            "3.10-x86_64",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_310, FaaSArchitecture.ARM64): (
+            "3.10-arm64",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_311, FaaSArchitecture.X86_64): (
+            "3.11-x86_64",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_311, FaaSArchitecture.ARM64): (
+            "3.11-arm64",
+            "manylinux_2_17",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.X86_64): (
+            "3.12-x86_64",
+            "manylinux_2_34",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_312, FaaSArchitecture.ARM64): (
+            "3.12-arm64",
+            "manylinux_2_34",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.X86_64): (
+            "3.13-x86_64",
+            "manylinux_2_34",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_313, FaaSArchitecture.ARM64): (
+            "3.13-arm64",
+            "manylinux_2_34",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_314, FaaSArchitecture.X86_64): (
+            "3.14-x86_64",
+            "manylinux_2_34",
+        ),
+        (PythonAwsLambdaFunctionRuntimes.PYTHON_314, FaaSArchitecture.ARM64): (
+            "3.14-arm64",
+            "manylinux_2_34",
+        ),
     }
 
     help = help_text(
@@ -151,9 +202,14 @@ class PythonAwsLambdaRuntime(PythonFaaSRuntimeField):
     valid_choices = PythonAwsLambdaFunctionRuntimes
     known_runtimes = tuple(
         PythonFaaSKnownRuntime(
-            runtime.value, *runtime.to_interpreter_version(), LAMBDA_DOCKER_REPO, tag, architecture
+            runtime.value,
+            *runtime.to_interpreter_version(),
+            docker_repo=LAMBDA_DOCKER_REPO,
+            tag=tag,
+            architecture=architecture,
+            manylinux=manylinux,
         )
-        for (runtime, architecture), tag in RUNTIME_TAG_MAPPING.items()
+        for (runtime, architecture), (tag, manylinux) in RUNTIME_TAG_MAPPING.items()
     )
 
     @classmethod
@@ -208,6 +264,7 @@ class _AWSLambdaBaseTarget(Target):
         PythonAwsLambdaIncludeRequirements,
         PythonAwsLambdaRuntime,
         PythonFaaSCompletePlatforms,
+        PythonFaaSUvPlatforms,
         PythonFaaSPex3VenvCreateExtraArgsField,
         PythonFaaSPexBuildExtraArgs,
         PythonFaaSLayoutField,

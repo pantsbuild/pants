@@ -1,12 +1,15 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::borrow::Borrow;
 use std::convert::Infallible;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::{fmt, hash};
 
 use deepsize::{DeepSizeOf, known_deep_size};
 use pyo3::FromPyObject;
+use pyo3::basic::CompareOp;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyType};
 use smallvec::SmallVec;
@@ -164,6 +167,57 @@ impl TypeId {
                         .collect()
                 })
         })
+    }
+}
+
+/// A `TypeId` that keeps its type alive, so the underlying pointer can't be reused by a later,
+/// differently-defined class. Use it whenever a `TypeId` is retained past the lifetime of the
+/// `Bound` it came from, such as a cache key.
+pub struct PinnedTypeId {
+    id: TypeId,
+    _cls: Py<PyType>,
+}
+
+impl PinnedTypeId {
+    pub fn new(py_type: &Bound<'_, PyType>) -> Self {
+        Self {
+            id: TypeId::new(py_type),
+            _cls: py_type.clone().unbind(),
+        }
+    }
+}
+
+impl Deref for PinnedTypeId {
+    type Target = TypeId;
+
+    fn deref(&self) -> &TypeId {
+        &self.id
+    }
+}
+
+impl Borrow<TypeId> for PinnedTypeId {
+    fn borrow(&self) -> &TypeId {
+        &self.id
+    }
+}
+
+impl PartialEq for PinnedTypeId {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for PinnedTypeId {}
+
+impl hash::Hash for PinnedTypeId {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
+impl fmt::Debug for PinnedTypeId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.id.fmt(f)
     }
 }
 
@@ -617,6 +671,16 @@ pub fn throw(msg: String) -> Failure {
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 #[repr(transparent)]
 pub struct PyComparedBool(pub Option<bool>);
+
+impl PyComparedBool {
+    pub fn eq_ne(op: CompareOp, is_eq: bool) -> Self {
+        Self(match op {
+            CompareOp::Eq => Some(is_eq),
+            CompareOp::Ne => Some(!is_eq),
+            _ => None,
+        })
+    }
+}
 
 impl From<Option<bool>> for PyComparedBool {
     fn from(value: Option<bool>) -> Self {

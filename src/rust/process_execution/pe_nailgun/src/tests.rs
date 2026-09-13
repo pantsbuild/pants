@@ -61,3 +61,15 @@ async fn acquire() {
     let workdir_three = run(&pool, 200).await;
     assert_ne!(workdir_two, workdir_three);
 }
+
+#[tokio::test]
+async fn shutdown_drains_the_pool() {
+    let pool = pool(1);
+
+    let workdir_one = run(&pool, 100).await;
+    pool.0.shutdown().await.unwrap();
+
+    // The pooled server was dropped, so an identical request starts a new one.
+    let workdir_two = run(&pool, 100).await;
+    assert_ne!(workdir_one, workdir_two);
+}

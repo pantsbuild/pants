@@ -50,9 +50,11 @@ Rust compilation is really slow. Fortunately, this step gets cached, so you will
 :::
 
 :::note Want a faster compile?
-We default to compiling with Rust's `release` mode, instead of its `debug` mode, because this makes Pants substantially faster. However, this results in the compile taking 5-10x longer.
+We default to compiling with Rust's `release` mode, instead of its `debug` mode, because this makes Pants substantially faster. However, this results in the compile taking 5-10x longer. This is generally a good balance in the common case of working on the Pants Python code instead of the Pants Rust engine.
 
 If you are okay with Pants running much slower when iterating, set the environment variable `MODE=debug` and rerun `pants` to compile in debug mode.
+
+(Published Pants releases are built with `MODE=dist`, which enables further optimizations, such as link-time optimization, that take additional time.)
 :::
 
 :::caution Rust compilation can use lots of storage

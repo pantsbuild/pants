@@ -1,11 +1,13 @@
 # Copyright 2024 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import copy
+import pickle
 from itertools import zip_longest
 
 import pytest
 
 from pants.engine.internals.target_adaptor import SourceBlock
-from pants.vcs.hunk import TextBlock
+from pants.vcs.hunk import Hunk, TextBlock
 
 
 @pytest.mark.parametrize(
@@ -41,3 +43,19 @@ from pants.vcs.hunk import TextBlock
 )
 def test_source_block_intersection(inputs: tuple[SourceBlock, TextBlock], expected: bool):
     assert inputs[0].is_touched_by(inputs[1]) == expected
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        SourceBlock(start=4, end=6),
+        TextBlock(start=5, count=2),
+        Hunk(left=TextBlock(start=1, count=2), right=None),
+        Hunk(left=None, right=TextBlock(start=1, count=2)),
+    ],
+)
+@pytest.mark.parametrize(
+    "roundtrip", [lambda v: pickle.loads(pickle.dumps(v)), copy.copy, copy.deepcopy]
+)
+def test_roundtrip(value, roundtrip):
+    assert roundtrip(value) == value

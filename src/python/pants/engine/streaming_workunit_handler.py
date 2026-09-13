@@ -249,6 +249,7 @@ class StreamingWorkunitHandler:
         max_workunit_verbosity: LogLevel,
     ) -> None:
         scheduler = scheduler.isolated_shallow_clone("streaming_workunit_handler_session")
+        self._scheduler = scheduler
         if callbacks:
             # A polling consumer exists: enable queueing of workunit messages. NB: The shallow
             # clone shares its WorkunitStore with the original session.
@@ -279,6 +280,10 @@ class StreamingWorkunitHandler:
         if not self.thread_runner:
             return
         self.thread_runner.start()
+
+    def cancel_session(self) -> None:
+        """Cancels the isolated session, after which `self.context` may no longer be used."""
+        self._scheduler.cancel()
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         if not self.thread_runner:
