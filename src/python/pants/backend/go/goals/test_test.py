@@ -763,6 +763,12 @@ def test_external_test_with_use_coverage(rule_runner: RuleRunner) -> None:
     )
     assert result.exit_code == 0
 
+    # An exit code of 0 is not enough: assert that a coverage profile was actually produced.
+    assert isinstance(result.coverage_data, GoCoverageData)
+    digest_contents = rule_runner.request(DigestContents, (result.coverage_data.coverage_digest,))
+    assert [file_content.path for file_content in digest_contents] == ["cover.out"]
+    assert digest_contents[0].content.decode().startswith("mode: set\n")
+
 
 # A real unsynchronised write, which the race detector reports deterministically.
 # The `race` build constraint is deliberately NOT used as the probe: Pants sets
@@ -844,8 +850,3 @@ def test_race_detector_disabled_by_default(rule_runner: RuleRunner) -> None:
     result = _run_race_probe(rule_runner, "go_mod(name='mod')\ngo_package()", [])
     assert result.exit_code == 0
     assert b"DATA RACE" not in result.stdout_bytes + result.stderr_bytes
-    # An exit code of 0 is not enough: assert that a coverage profile was actually produced.
-    assert isinstance(result.coverage_data, GoCoverageData)
-    digest_contents = rule_runner.request(DigestContents, (result.coverage_data.coverage_digest,))
-    assert [file_content.path for file_content in digest_contents] == ["cover.out"]
-    assert digest_contents[0].content.decode().startswith("mode: set\n")

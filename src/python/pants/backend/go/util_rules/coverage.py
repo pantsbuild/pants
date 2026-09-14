@@ -240,25 +240,6 @@ COVERAGE_SETUP_TESTDEPS_IMPORTS: tuple[str, ...] = ("fmt", "io", "os", "sync/ato
 SYNC_ATOMIC_IMPORT_PATH = "sync/atomic"
 
 
-def requires_sync_atomic_dependency(
-    with_coverage: bool, coverage_config: GoCoverageConfig | None
-) -> bool:
-    """Whether a package instrumented for coverage needs `sync/atomic` in its `importcfg`.
-
-    `go tool cover -mode=atomic` rewrites each covered statement to call
-    `sync/atomic.AddUint32`, adding an import the package's own sources never declared. Pants
-    builds each package's `importcfg` from its direct dependencies, so unless `sync/atomic` is
-    added explicitly the package fails to compile with "could not import sync/atomic". Packages
-    which happen to import `sync/atomic` already are unaffected, which is why this only breaks
-    some of them.
-    """
-    return (
-        with_coverage
-        and coverage_config is not None
-        and coverage_config.cover_mode == GoCoverMode.ATOMIC
-    )
-
-
 def registers_coverage_via_testdeps(goroot: GoRoot) -> bool:
     """Whether the coverage setup code must register coverage through `testing/internal/testdeps`.
 
@@ -379,25 +360,25 @@ func coverWriteProfile(_ string, coverProfile string, coverMode string, coveredP
     }
 
     var active, total int64
+    var count uint32
     for _, fileName := range coverFileNames {
         counters := coverCounters[fileName]
         blocks := coverBlocks[fileName]
         for i := range counters {
             stmts := int64(blocks[i].Stmts)
             total += stmts
-            count := atomic.LoadUint32(&counters[i]) // For -mode=atomic.
+            count = atomic.LoadUint32(&counters[i]) // For -mode=atomic.
             if count > 0 {
                 active += stmts
             }
-            if f == nil {
-                continue
-            }
-            if _, err = fmt.Fprintf(f, "%s:%d.%d,%d.%d %d %d\\n", fileName,
-                blocks[i].Line0, blocks[i].Col0,
-                blocks[i].Line1, blocks[i].Col1,
-                stmts,
-                count); err != nil {
-                return err
+            if f != nil {
+                if _, err = fmt.Fprintf(f, "%s:%d.%d,%d.%d %d %d\\n", fileName,
+                    blocks[i].Line0, blocks[i].Col0,
+                    blocks[i].Line1, blocks[i].Col1,
+                    stmts,
+                    count); err != nil {
+                    return err
+                }
             }
         }
     }

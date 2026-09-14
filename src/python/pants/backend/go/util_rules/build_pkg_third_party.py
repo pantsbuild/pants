@@ -21,11 +21,8 @@ from pants.backend.go.util_rules.build_pkg import (
 )
 from pants.backend.go.util_rules.build_pkg_stdlib import (
     BuildGoPackageRequestForStdlibRequest,
+    maybe_setup_sync_atomic_dependency,
     setup_build_go_package_target_request_for_stdlib,
-)
-from pants.backend.go.util_rules.coverage import (
-    SYNC_ATOMIC_IMPORT_PATH,
-    requires_sync_atomic_dependency,
 )
 from pants.backend.go.util_rules.go_mod import GoModInfoRequest, determine_go_mod_info
 from pants.backend.go.util_rules.import_analysis import (
@@ -147,16 +144,10 @@ async def setup_build_go_package_target_request_for_third_party(
         for pattern in coverage_config.import_path_include_patterns:
             with_coverage = with_coverage or match_simple_pattern(pattern)(request.import_path)
 
-    if requires_sync_atomic_dependency(with_coverage, coverage_config) and not any(
-        dep.import_path == SYNC_ATOMIC_IMPORT_PATH for dep in direct_dependencies
-    ):
-        maybe_sync_atomic_dep = await setup_build_go_package_target_request_for_stdlib(
-            BuildGoPackageRequestForStdlibRequest(
-                import_path=SYNC_ATOMIC_IMPORT_PATH,
-                build_opts=request.build_opts,
-            ),
-            **implicitly(),
-        )
+    maybe_sync_atomic_dep = await maybe_setup_sync_atomic_dependency(
+        with_coverage, request.build_opts, direct_dependencies
+    )
+    if maybe_sync_atomic_dep is not None:
         if maybe_sync_atomic_dep.request is None:
             return dataclasses.replace(maybe_sync_atomic_dep, dependency_failed=True)
         direct_dependencies.append(maybe_sync_atomic_dep.request)
