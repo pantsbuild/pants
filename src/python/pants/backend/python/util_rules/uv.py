@@ -40,7 +40,7 @@ from pants.core.util_rules.system_binaries import (
     DirnameBinary,
     MaybeFlockBinary,
     MkdirBinary,
-    RealpathBinary,
+    MvBinary,
 )
 from pants.engine.composite_process import Subprocess
 from pants.engine.env_vars import EnvironmentVarsRequest
@@ -186,10 +186,10 @@ async def create_venv_repository_from_uv_lockfile(
     request: VenvFromUvLockfileRequest,
     downloaded_uv: DownloadedUv,
     uv_env: UvEnvironment,
-    realpath_binary: RealpathBinary,
     buildroot: BuildRoot,
     dirname_binary: DirnameBinary,
     mkdir_binary: MkdirBinary,
+    mv_binary: MvBinary,
     maybe_flock_binary: MaybeFlockBinary,
     level: LogLevel,
 ) -> VenvRepository:
@@ -293,10 +293,12 @@ async def create_venv_repository_from_uv_lockfile(
     # so that any entry point scripts it creates exec a valid path that doesn't reference
     # the sandbox.
     #
-    # uv claims that you can run sync concurrently on the same venv, but this relies on a
-    # lock on the workspace (not on the target venv), and since each sandbox is its own
-    # uv workspace, these locks don't exclude each other. So instead we use flock (if available)
-    # or pants_lock (otherwise) to provide mutual exclusion on the venv.
+    # We lock around the `uv sync` call for performance: the initial sync is expected to be
+    # expensive, whereas subsequent syncs with the same args and lockfile are very fast no-ops,
+    # so serializing them is possibly preferable to multiple concurrent syncs that may redo a lot
+    # of work (in the optimistic scenario they may use each others' cached work items, but in the
+    # pessimistic scenario they might race on doing the same work items in near lockstep...).
+    #
     # The local platform will always have pants_lock, since we bundle it with Pants.
     # A Linux platform should normally have flock. So the cases where neither binary is available
     # are a remote platform that isn't Linux (unlikely) or a very constrained Linux, that doesn't
@@ -310,23 +312,34 @@ async def create_venv_repository_from_uv_lockfile(
     pants_lock = pants_lock_bin()
     command = dedent(
         f"""\
-        cache_root="$({realpath_binary.path} {shlex.quote(VenvRepository.cache_dir)})"
+        cache_root={shlex.quote(VenvRepository.cache_dir)}
         project_env="${{cache_root}}/{venv_path_suffix}"
-        lock_path="${{project_env}}.lock"
-        {mkdir_binary.path} -p "$({dirname_binary.path} "${{lock_path}}")"
-        (
-          if [ -x "{flock}" ]; then
-            {flock} 200 || exit 1
-          elif [ -x "{pants_lock}" ]; then
-            {pants_lock} 200 || exit 1
-          else
-            echo "ERROR: No flock or pants_lock binary found on system executing a uv process. " \
-                 "Please ensure flock is installed on this host and available on " \
-                 "[system-binaries].system_binary_paths." >&2
-            exit 1
-          fi
-          UV_PROJECT_ENVIRONMENT="${{project_env}}" {uv_cmd}
-        ) 200>"${{lock_path}}" || exit $?
+
+        if [ ! -d "${{project_env}}" ]; then
+            lock_path="${{project_env}}.lock"
+            {mkdir_binary.path} -p "$({dirname_binary.path} "${{lock_path}}")"
+            (
+            if [ -x "{flock}" ]; then
+                {flock} 200 || exit 1
+            elif [ -x "{pants_lock}" ]; then
+                {pants_lock} 200 || exit 1
+            else
+                echo "ERROR: No flock or pants_lock binary found on system executing a uv process. " \
+                    "Please ensure flock is installed on this host and available on " \
+                    "[system-binaries].system_binary_paths." >&2
+                exit 1
+            fi
+            # Now that we hold the lock, create the venv if it doesn't already exist.
+            if [ ! -d "${{project_env}}" ]; then
+                # Since this is run under a lock we could just use a fixed suffix. But then we would
+                # have to nuke the tmp venv directory first, and putting `rm -rf` in a script is scary
+                # So instead we use a random suffix.
+                random_suffix=${{RANDOM}}_${{RANDOM}}
+                project_env_tmp="${{project_env}}.${{random_suffix}}"
+                UV_PROJECT_ENVIRONMENT="${{project_env_tmp}}" {uv_cmd} && {mv_binary.path} ${{project_env_tmp}} ${{project_env}}
+            fi
+            ) 200>"${{lock_path}}" || exit $?
+        fi
         """
     )
 
