@@ -638,6 +638,16 @@ class InvalidPyprojectRequiresPythonError(Exception):
     interpreter constraints."""
 
 
+@dataclass(frozen=True)
+class PyprojectRequiresPythonRequest:
+    directory: str
+
+
+@dataclass(frozen=True)
+class PyprojectRequiresPython:
+    value: str | None
+
+
 def _pyproject_requires_python(file_content: bytes) -> str | None:
     """Extract `[project].requires-python` from the contents of a `pyproject.toml`.
 
@@ -660,45 +670,60 @@ def _pyproject_requires_python(file_content: bytes) -> str | None:
 
 
 @rule
+async def find_pyproject_requires_python(
+    request: PyprojectRequiresPythonRequest,
+) -> PyprojectRequiresPython:
+    pyproject_path = os.path.join(request.directory, "pyproject.toml")
+    digest_contents = await get_digest_contents(
+        **implicitly(
+            PathGlobs([pyproject_path], glob_match_error_behavior=GlobMatchErrorBehavior.ignore)
+        )
+    )
+    if not digest_contents:
+        return PyprojectRequiresPython(None)
+    file_content = next(iter(digest_contents))
+    try:
+        requires_python = _pyproject_requires_python(file_content.content)
+    except (TomlDecodeError, UnicodeDecodeError, ValueError) as e:
+        raise InvalidPyprojectRequiresPythonError(
+            softwrap(
+                f"""
+                Failed to read `[project].requires-python` from {file_content.path}: {e}
+                """
+            )
+        )
+    if requires_python is not None:
+        try:
+            InterpreterConstraints([requires_python])
+        except InvalidRequirement as e:
+            raise InvalidPyprojectRequiresPythonError(
+                softwrap(
+                    f"""
+                    The `[project].requires-python` value in {file_content.path} is not a valid
+                    interpreter constraint: {e}
+                    """
+                )
+            )
+    return PyprojectRequiresPython(requires_python)
+
+
+@rule
 async def resolve_python_distribution_interpreter_constraints(
     field: PythonDistributionInterpreterConstraintsField,
     python_setup: PythonSetup,
 ) -> InterpreterConstraints:
-    if field.value is None:
-        pyproject_path = os.path.join(field.address.spec_path, "pyproject.toml")
-        digest_contents = await get_digest_contents(
-            **implicitly(
-                PathGlobs([pyproject_path], glob_match_error_behavior=GlobMatchErrorBehavior.ignore)
-            )
-        )
-        if digest_contents:
-            file_content = next(iter(digest_contents))
-            try:
-                requires_python = _pyproject_requires_python(file_content.content)
-            except (TomlDecodeError, UnicodeDecodeError, ValueError) as e:
-                raise InvalidPyprojectRequiresPythonError(
-                    softwrap(
-                        f"""
-                        Failed to infer `interpreter_constraints` for the `python_distribution`
-                        target {field.address} from {file_content.path}: {e}
-                        """
-                    )
-                )
-            if requires_python is not None:
-                try:
-                    return InterpreterConstraints([requires_python])
-                except InvalidRequirement as e:
-                    raise InvalidPyprojectRequiresPythonError(
-                        softwrap(
-                            f"""
-                            Failed to infer `interpreter_constraints` for the `python_distribution`
-                            target {field.address} from `[project].requires-python` in
-                            {file_content.path}: {e}
-                            """
-                        )
-                    )
+    if field.value is not None:
+        return InterpreterConstraints(field.value_or_configured_default(python_setup, resolve=None))
 
-    return InterpreterConstraints(field.value_or_configured_default(python_setup, resolve=None))
+    requires_python = await find_pyproject_requires_python(
+        PyprojectRequiresPythonRequest(field.address.spec_path)
+    )
+    return InterpreterConstraints(
+        python_setup.compatibility_or_constraints(
+            [requires_python.value] if requires_python.value is not None else None,
+            resolve=None,
+        )
+    )
 
 
 class PythonValidateDependenciesRequest(ValidateDependenciesRequest):
