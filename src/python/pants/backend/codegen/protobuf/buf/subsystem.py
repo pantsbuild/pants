@@ -77,15 +77,15 @@ class BufSubsystem(TemplatedExternalTool):
         advanced=True,
         help=lambda cls: softwrap(
             f"""
-            Path to a `buf.gen.yaml` template used by `buf generate`
-            (https://buf.build/docs/configuration/v2/buf-gen-yaml).
+            Path to the `buf.gen.yaml` template used by `buf generate`
+            (https://buf.build/docs/configuration/v2/buf-gen-yaml) for targets with
+            `protobuf_generator='buf'`. The template must be `version: v2`.
 
-            Used when a `protobuf_source` target opts into buf-based code generation
-            via the `protobuf_generator` field. May be overridden on a per-target
-            basis via the `buf_gen_template` field.
+            A language's `buf_gen_template` option (e.g.
+            `[python-protobuf].buf_gen_template`) and a target's `buf_gen_template`
+            field take precedence.
 
-            Setting this option will disable `[{cls.options_scope}].gen_template_discovery`. Use
-            this option if the template is located in a non-standard location.
+            Setting this option disables `[{cls.options_scope}].gen_template_discovery`.
             """
         ),
     )
