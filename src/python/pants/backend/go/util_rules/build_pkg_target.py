@@ -477,7 +477,8 @@ async def setup_build_go_package_target_request(
                     owning_go_mod_info.digest,
                     owning_go_mod_info.mod_path,
                     build_opts=request.build_opts,
-                )
+                ),
+                **implicitly(),
             )
             resolvable = [
                 imp

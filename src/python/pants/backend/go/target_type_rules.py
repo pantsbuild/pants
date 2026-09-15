@@ -122,7 +122,8 @@ async def expand_module_import_paths(
             go_mod_info.mod_path,
             # Matches target generation (see `generate_targets_from_go_mod`).
             build_opts=GoBuildOptions(),
-        )
+        ),
+        **implicitly(),
     )
     return ModuleImportPathsExpansion(
         {
@@ -591,7 +592,8 @@ async def generate_targets_from_go_mod(
             # `GoBuildOptions`, so target generation and a compile resolving e.g. `race=True` share
             # one memoized download. Only a caller that actually differs in `cgo_enabled` pays twice.
             build_opts=GoBuildOptions(),
-        )
+        ),
+        **implicitly(),
     )
 
     def gen_file_tgt(fp: str) -> TargetGeneratorSourcesHelperTarget:
