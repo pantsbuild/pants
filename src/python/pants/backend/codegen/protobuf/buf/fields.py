@@ -1,11 +1,7 @@
 # Copyright 2026 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""Language-agnostic per-target buf fields.
-
-`BufGenTemplateField` is shared across language backends (Python, Go, JS, ...) — a
-single `buf.gen.yaml` typically declares plugins for multiple languages.
-"""
+"""Per-target buf fields shared by the language backends."""
 
 from __future__ import annotations
 
@@ -22,12 +18,12 @@ class BufGenTemplateField(StringField):
     default = None
     help = help_text(
         """
-        Path to a `buf.gen.yaml` template for this target, overriding
-        `[buf].gen_template`. The path is interpreted relative to the BUILD file's
-        directory.
+        Path to the `buf.gen.yaml` template for this target, relative to the BUILD
+        file's directory. Only used when `protobuf_generator='buf'`.
 
-        Only consulted when the target opts into buf-based code generation
-        via `protobuf_generator='buf'`.
+        A target's template is the first of: this field, the language's
+        `buf_gen_template` option (e.g. `[python-protobuf].buf_gen_template`),
+        `[buf].gen_template`, and a `buf.gen.yaml` at the repository root.
         """
     )
 

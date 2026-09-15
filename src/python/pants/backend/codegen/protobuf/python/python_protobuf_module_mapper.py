@@ -185,7 +185,11 @@ async def map_protobuf_to_python_modules(
     # ---- buf path: plugins and `out:` come from each target's template. ----
     if buf_targets:
         buf_layout: BufLayout = await fetch_buf_layout(buf)
-        buf_gen_contents: tuple[BufGenContent, ...] = await fetch_buf_gen_contents(buf_targets, buf)
+        buf_gen_contents: tuple[BufGenContent, ...] = await fetch_buf_gen_contents(
+            buf_targets,
+            buf,
+            python_protobuf_subsystem.language_gen_template,
+        )
     else:
         buf_layout = BufLayout("", ())
         buf_gen_contents = ()

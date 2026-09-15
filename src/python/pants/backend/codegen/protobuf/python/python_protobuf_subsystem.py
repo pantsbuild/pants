@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.buf.config import (
+    LanguageGenTemplate,
     gen_template_request_from_fields,
     parse_plugin_outs,
 )
@@ -33,7 +34,7 @@ from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
-from pants.option.option_types import BoolOption, DictOption
+from pants.option.option_types import BoolOption, DictOption, FileOption
 from pants.option.subsystem import Subsystem
 from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.docutil import doc_url
@@ -80,6 +81,25 @@ class PythonProtobufSubsystem(Subsystem):
 
         See {doc_url("docs/python/integrations/protobuf-and-grpc")}.
         """
+    )
+
+    buf_gen_template = FileOption(
+        default=None,
+        advanced=True,
+        help=softwrap(
+            """
+            Path to the `buf.gen.yaml` template used to generate Python, when a
+            `protobuf_source` opts into `protobuf_generator='buf'`.
+
+            Takes precedence over `[buf].gen_template`. Set this when other languages
+            generate from the same protos with plugins that need tooling this language's
+            sandbox does not carry -- one `buf generate` run executes every plugin in its
+            template, so those languages need templates of their own.
+
+            Paths inside the template (`inputs:`, `out:`) are relative to the build root,
+            because Pants runs `buf generate` from the sandbox root.
+            """
+        ),
     )
 
     grpcio_plugin = BoolOption(
@@ -181,6 +201,10 @@ class PythonProtobufSubsystem(Subsystem):
         ),
         advanced=True,
     )
+
+    @property
+    def language_gen_template(self) -> LanguageGenTemplate | None:
+        return LanguageGenTemplate.from_option(self, "buf_gen_template")
 
     @property
     def buf_plugin_suffixes(self) -> dict[str, str]:
@@ -319,6 +343,7 @@ async def infer_dependencies(
             address_str=str(request.field_set.address),
             override=request.field_set.buf_gen_template.value,
             buf=buf,
+            language_template=python_protobuf.language_gen_template,
         )
         template_files = await find_config_file(template_request)
         suffix_outs: dict[str, str] = {}

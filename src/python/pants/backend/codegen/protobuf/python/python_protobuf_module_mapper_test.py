@@ -488,6 +488,42 @@ def test_buf_target_per_target_template_override(rule_runner: RuleRunner) -> Non
     )
 
 
+def test_buf_target_uses_python_template_option(rule_runner: RuleRunner) -> None:
+    """`[python-protobuf].buf_gen_template` takes precedence over `[buf].gen_template`."""
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['/']",
+            "--python-enable-resolves",
+            "--buf-gen-template=buf.gen.yaml",
+            "--python-protobuf-buf-gen-template=buf.gen.python.yaml",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "buf.yaml": "version: v2\nmodules:\n  - path: .\n",
+            "protos/svc.proto": "",
+            "protos/BUILD": "protobuf_sources(protobuf_generator='buf')",
+            # A template for another language, with no Python plugins.
+            "buf.gen.yaml": "version: v2\nplugins:\n  - local: protoc-gen-es\n    out: gen_ts\n",
+            "buf.gen.python.yaml": (
+                "version: v2\nplugins:\n  - protoc_builtin: python\n    out: gen_py\n"
+            ),
+        }
+    )
+    result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
+    assert result == FirstPartyPythonMappingImpl.create(
+        {
+            "python-default": {
+                "gen_py.protos.svc_pb2": (
+                    ModuleProvider(
+                        Address("protos", relative_file_path="svc.proto"), ModuleProviderType.IMPL
+                    ),
+                ),
+            }
+        }
+    )
+
+
 def test_buf_target_grpc_field_is_no_op(rule_runner: RuleRunner) -> None:
     """`grpc=True` on a buf target has no effect on which suffixes are registered;
     plugin presence in `buf.gen.yaml` is the sole determinant."""
