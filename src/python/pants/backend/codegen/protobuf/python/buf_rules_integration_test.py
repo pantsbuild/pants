@@ -26,10 +26,15 @@ from pants.backend.codegen.protobuf.target_types import (
 from pants.backend.codegen.protobuf.target_types import rules as protobuf_target_types_rules
 from pants.backend.python import target_types_rules as python_target_types_rules
 from pants.backend.python.dependency_inference import module_mapper
+from pants.backend.python.goals import package_dists, package_pex_binary, run_pex_binary
+from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
+from pants.backend.python.util_rules import pex_from_targets
+from pants.core.goals import package, run
 from pants.core.target_types import rules as core_target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
+from pants.engine.fs import Digest, DigestContents
 from pants.engine.target import (
     GeneratedSources,
     HydratedSources,
@@ -85,13 +90,20 @@ def rule_runner() -> RuleRunner:
             *stripped_source_files.rules(),
             *module_mapper.rules(),
             *core_target_types_rules(),
+            *package.rules(),
+            *run.rules(),
+            *package_pex_binary.rules(),
+            *run_pex_binary.rules(),
+            *pex_from_targets.rules(),
+            *package_dists.rules(),
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GeneratePythonFromProtobufRequest]),
             QueryRule(InferredDependencies, [InferProtobufDependencies]),
             QueryRule(TransitiveTargets, [TransitiveTargetsRequest]),
             QueryRule(SourceFiles, [SourceFilesRequest]),
+            QueryRule(DigestContents, [Digest]),
         ],
-        target_types=[ProtobufSourcesGeneratorTarget],
+        target_types=[ProtobufSourcesGeneratorTarget, PexBinary, PythonSourcesGeneratorTarget],
     )
 
 
@@ -101,11 +113,13 @@ def _assert_generates(
     *,
     expected_files: set[str],
     source_roots: list[str],
-) -> None:
+    extra_args: list[str] | None = None,
+) -> GeneratedSources:
     rule_runner.set_options(
         [
             f"--source-root-patterns={repr(source_roots)}",
             "--no-python-protobuf-infer-runtime-dependency",
+            *(extra_args or ()),
         ],
         env_inherit={"PATH"},
     )
@@ -118,6 +132,7 @@ def _assert_generates(
         [GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt)],
     )
     assert set(generated.snapshot.files) == expected_files
+    return generated
 
 
 @pytest.mark.platform_specific_behavior
@@ -477,3 +492,55 @@ def test_default_protoc_path_still_works(rule_runner: RuleRunner) -> None:
         expected_files={"src/protobuf/foo/person_pb2.py"},
         source_roots=["src/protobuf"],
     )
+
+
+# A `protoc-gen-*` plugin that ignores its `CodeGeneratorRequest` and answers with a
+# `CodeGeneratorResponse` holding one file. The response is encoded by hand so the plugin needs
+# no protobuf runtime.
+CODEGEN_PLUGIN = dedent(
+    """\
+    import sys
+
+    def field(number, payload):
+        return bytes([number << 3 | 2, len(payload)]) + payload
+
+    sys.stdin.buffer.read()
+    generated = field(1, b"foo/plugin.txt") + field(15, b"from the plugin")
+    sys.stdout.buffer.write(field(15, generated))
+    """
+)
+
+
+@pytest.mark.platform_specific_behavior
+def test_buf_runs_local_codegen_plugin(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "buf.yaml": BUF_YAML,
+            "buf.gen.yaml": dedent(
+                """\
+                version: v2
+                plugins:
+                  - local: protoc-gen-test
+                    out: src/proto
+                """
+            ),
+            "idl/proto/foo/person.proto": SIMPLE_PROTO,
+            "idl/proto/foo/BUILD": "protobuf_sources(protobuf_generator='buf')",
+            "plugins/plugin.py": CODEGEN_PLUGIN,
+            "plugins/BUILD": dedent(
+                """\
+                python_sources()
+                pex_binary(name="protoc-gen-test", entry_point="plugin.py")
+                """
+            ),
+        }
+    )
+    generated = _assert_generates(
+        rule_runner,
+        Address("idl/proto/foo", relative_file_path="person.proto"),
+        expected_files={"src/proto/foo/plugin.txt"},
+        source_roots=["idl/proto", "src/proto", "plugins"],
+        extra_args=["--buf-codegen-plugins=['plugins:protoc-gen-test']"],
+    )
+    (content,) = rule_runner.request(DigestContents, [generated.snapshot.digest])
+    assert content.content == b"from the plugin"
