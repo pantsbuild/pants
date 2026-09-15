@@ -23,6 +23,7 @@ from pants.backend.python.target_types import (
     GenerateSetupField,
     LongDescriptionPathField,
     PythonDistributionEntryPointsField,
+    PythonDistributionInterpreterConstraintsField,
     PythonDistributionOutputPathField,
     PythonGeneratingSourcesBase,
     PythonProvidesField,
@@ -38,6 +39,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types_rules import (
     SetupPyError,
     resolve_python_distribution_entry_points,
+    resolve_python_distribution_interpreter_constraints,
 )
 from pants.backend.python.util_rules.dists import (
     BuildSystemRequest,
@@ -417,9 +419,17 @@ async def create_dist_build_request(
     else:
         extra_build_time_env = EnvironmentVars()
 
-    interpreter_constraints = InterpreterConstraints.create_from_targets(
-        transitive_targets.closure, python_setup
-    ) or InterpreterConstraints(python_setup.interpreter_constraints)
+    dependency_interpreter_constraints = InterpreterConstraints.create_from_targets(
+        (tgt for tgt in transitive_targets.closure if tgt.address != dist_tgt.address), python_setup
+    )
+    dist_interpreter_constraints = await resolve_python_distribution_interpreter_constraints(
+        dist_tgt[PythonDistributionInterpreterConstraintsField],
+        **implicitly(),
+    )
+    interpreter_constraints_to_merge = [dist_interpreter_constraints]
+    if dependency_interpreter_constraints:
+        interpreter_constraints_to_merge.append(dependency_interpreter_constraints)
+    interpreter_constraints = InterpreterConstraints.merge(interpreter_constraints_to_merge)
     chroot = await generate_chroot(
         DistBuildChrootRequest(
             exported_target,
