@@ -86,12 +86,13 @@ async def dump_python_source_analysis_single(
 ) -> PythonSourceAnalysis:
     """Infer the dependencies for a single python fieldset, keeping all the intermediate results."""
 
-    parsed_dependencies = await _exec_parse_deps(fs, python_setup)
+    parsed_dependencies = next(iter((await _exec_parse_deps((fs.source,))).path_to_deps.values()))
 
     resolve = fs.resolve.normalized_value(python_setup)
 
     resolved_dependencies = await resolve_parsed_dependencies(
-        ResolvedParsedPythonDependenciesRequest(fs, parsed_dependencies, resolve), **implicitly()
+        ResolvedParsedPythonDependenciesRequest(fs, parsed_dependencies, resolve),
+        **implicitly(),
     )
 
     import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
