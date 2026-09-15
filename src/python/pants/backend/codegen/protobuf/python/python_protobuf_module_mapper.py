@@ -89,28 +89,17 @@ def _plan_buf_target(
     return _BufStripPlan(tuple(suffix_outs), tuple(_path_for(out) for out in suffix_outs.values()))
 
 
-# Protoc-only subsystem options. Their default values are mirrored here so we can
-# detect when the user explicitly set them while also using buf targets, and warn
-# that they're ignored on the buf path. Keep in sync with the option definitions
-# in `python_protobuf_subsystem.py`.
-_PROTOC_ONLY_OPTION_DEFAULTS: tuple[tuple[str, object], ...] = (
-    ("grpcio_plugin", True),
-    ("grpclib_plugin", False),
-    ("mypy_plugin", False),
-    ("generate_type_stubs", False),
-)
+_PROTOC_ONLY_OPTIONS = ("grpcio_plugin", "grpclib_plugin", "mypy_plugin", "generate_type_stubs")
 
 
 def _emit_subsystem_warnings_for_buf(subsystem: PythonProtobufSubsystem) -> None:
-    """Warn once if subsystem options that are protoc-only are set non-default
-    while at least one buf target exists."""
-    for option_name, default in _PROTOC_ONLY_OPTION_DEFAULTS:
-        if getattr(subsystem, option_name) == default:
+    """Warn about protoc-only options the user set, when no target uses protoc."""
+    for option_name in _PROTOC_ONLY_OPTIONS:
+        if subsystem.options.is_default(option_name):
             continue
         logger.warning(
-            "[%s].%s is set but ignored for `protobuf_generator='buf'` targets. "
-            "Service generation and `.pyi` stubs for buf targets are determined by "
-            "the plugin entries in `buf.gen.yaml`.",
+            "[%s].%s has no effect: every `protobuf_source` uses `protobuf_generator='buf'`, "
+            "whose plugins come from `buf.gen.yaml`.",
             subsystem.options_scope,
             option_name,
         )
@@ -157,7 +146,7 @@ async def map_protobuf_to_python_modules(
         else:
             protoc_targets.append(tgt)
 
-    if buf_targets:
+    if buf_targets and not protoc_targets:
         _emit_subsystem_warnings_for_buf(python_protobuf_subsystem)
 
     # ---- protoc path. ----

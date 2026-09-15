@@ -31,6 +31,7 @@ target(
         "src/python/pants/backend/experimental/codegen/protobuf/go",
         "src/python/pants/backend/experimental/codegen/protobuf/java",
         "src/python/pants/backend/experimental/codegen/protobuf/scala",
+        "src/python/pants/backend/experimental/codegen/protobuf/typescript",
         "src/python/pants/backend/experimental/codegen/python_format_string",
         "src/python/pants/backend/experimental/codegen/python_format_string/k8s",
         "src/python/pants/backend/experimental/codegen/thrift/apache/java",
