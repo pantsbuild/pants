@@ -41,6 +41,11 @@ from pants.engine.unions import UnionMembership, UnionRule
 @dataclass(frozen=True)
 class InstalledNodePackageRequest:
     address: Address
+    enable_codegen: bool = True
+    """Whether to run code generators while hydrating the package's sources.
+
+    Turn this off when a code generator installs a package that depends on the generator's own
+    inputs: generating those while installing the package would re-enter the generator."""
 
 
 @dataclass(frozen=True)
@@ -70,14 +75,14 @@ class InstalledNodePackageWithSource(InstalledNodePackage):
 
 
 async def _get_relevant_source_files(
-    sources: Iterable[SourcesField], with_js: bool = False
+    sources: Iterable[SourcesField], with_js: bool = False, enable_codegen: bool = True
 ) -> SourceFiles:
     return await determine_source_files(
         SourceFilesRequest(
             sources,
             for_sources_types=(PackageJsonSourceField, FileSourceField)
             + ((ResourceSourceField, JSRuntimeSourceField) if with_js else ()),
-            enable_codegen=True,
+            enable_codegen=enable_codegen,
         )
     )
 
@@ -97,6 +102,7 @@ async def install_node_packages_for_address(
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.closure if tgt.has_field(SourcesField)),
         with_js=False,
+        enable_codegen=req.enable_codegen,
     )
     package_digest = source_files.snapshot.digest
 
@@ -138,6 +144,7 @@ async def add_sources_to_installed_node_package(
     source_files = await _get_relevant_source_files(
         (tgt[SourcesField] for tgt in transitive_tgts.dependencies if tgt.has_field(SourcesField)),
         with_js=True,
+        enable_codegen=req.enable_codegen,
     )
     digest = await merge_digests(MergeDigests((installation.digest, source_files.snapshot.digest)))
     return InstalledNodePackageWithSource(installation.project_env, digest=digest)
