@@ -149,7 +149,8 @@ async def go_show_package_analysis(
                 request.go_mod_digest,
                 request.go_mod_path,
                 build_opts=request.build_opts,
-            )
+            ),
+            **implicitly(),
         )
         if request.import_path not in all_packages.import_paths_to_pkg_info:
             console.write_stdout(
