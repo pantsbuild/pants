@@ -17,9 +17,9 @@ class TypeScriptSubsystem(NodeJSToolBase):
     name = "TypeScript"
     help = """TypeScript type checker (tsc)."""
 
-    # TypeScript always uses resolve-based execution because it needs access to project
-    # dependencies for type checking. The resolve is determined dynamically in check.py.
-    # This default version is never used - TypeScript must come from project package.json.
+    # TypeScript always uses resolve-based execution (it needs project dependencies for type
+    # checking), so its transitive deps are pinned by the user's project lockfile and it ships
+    # no bundled lockfile (`default_lockfile_resources` stays `None`).
     default_version = "typescript@FROM_PACKAGE_JSON"
 
     skip = SkipOption("check")

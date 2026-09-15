@@ -55,6 +55,6 @@ async def run_openapi_format(
 def rules():
     return [
         *collect_rules(),
-        *nodejs_tool.rules(),
+        *nodejs_tool.rules_for_tool(OpenApiFormatSubsystem),
         *OpenApiFormatRequest.rules(),
     ]
