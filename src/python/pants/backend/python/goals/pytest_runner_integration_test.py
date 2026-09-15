@@ -588,6 +588,45 @@ def test_extra_env_vars(rule_runner: PythonRuleRunner) -> None:
     assert result.exit_code == 0
 
 
+def test_uncached_env_vars(rule_runner: PythonRuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            f"{PACKAGE}/test_uncached_env_vars.py": dedent(
+                """\
+                import os
+
+                def test_args():
+                    assert os.getenv("ARG_UNCACHED_WITH_VALUE") == "arg_uncached_with_value"
+                    assert os.getenv("ARG_UNCACHED_WITHOUT_VALUE") == "arg_uncached_without_value"
+                    assert os.getenv("TARGET_UNCACHED_VAR") == "target_uncached_var"
+                    # A name in both lists resolves to the cached value: it is the more specific
+                    # request, and honouring it keeps the process's key honest.
+                    assert os.getenv("IN_BOTH_LISTS") == "from_extra_env_vars"
+                """
+            ),
+            f"{PACKAGE}/BUILD": dedent(
+                """\
+                python_tests(
+                    uncached_env_vars=("TARGET_UNCACHED_VAR=target_uncached_var",),
+                    extra_env_vars=("IN_BOTH_LISTS=from_extra_env_vars",),
+                )
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address(PACKAGE, relative_file_path="test_uncached_env_vars.py"))
+    result = run_pytest(
+        rule_runner,
+        [tgt],
+        extra_args=[
+            "--test-uncached-env-vars=['ARG_UNCACHED_WITH_VALUE=arg_uncached_with_value', "
+            "'ARG_UNCACHED_WITHOUT_VALUE', 'IN_BOTH_LISTS=from_uncached_env_vars']"
+        ],
+        env={"ARG_UNCACHED_WITHOUT_VALUE": "arg_uncached_without_value"},
+    )
+    assert result.exit_code == 0
+
+
 def test_pytest_addopts_test_extra_env(rule_runner: PythonRuleRunner) -> None:
     rule_runner.write_files(
         {
@@ -873,6 +912,18 @@ def test_debug_adaptor_request_argv(rule_runner: PythonRuleRunner) -> None:
         [
             "__defaults__(dict(python_tests=dict(batch_compatibility_tag='default', extra_env_vars=['FOO', 'BAR'])))",
             "python_tests(overrides={'test_2.py': {'extra_env_vars': ['BAR', 'FOO']}})",
+            [[f"{PACKAGE}/test_1.py", f"{PACKAGE}/test_2.py", f"{PACKAGE}/test_3.py"]],
+        ],
+        # A batch runs as one process, so targets wanting different uncached env must split too:
+        [
+            "__defaults__(dict(python_tests=dict(batch_compatibility_tag='default', uncached_env_vars=['BUILD_ID'])))",
+            "python_tests(overrides={'test_2.py': {'uncached_env_vars': []}})",
+            [[f"{PACKAGE}/test_1.py", f"{PACKAGE}/test_3.py"], [f"{PACKAGE}/test_2.py"]],
+        ],
+        # Order of uncached_env_vars shouldn't affect partitioning:
+        [
+            "__defaults__(dict(python_tests=dict(batch_compatibility_tag='default', uncached_env_vars=['FOO', 'BAR'])))",
+            "python_tests(overrides={'test_2.py': {'uncached_env_vars': ['BAR', 'FOO']}})",
             [[f"{PACKAGE}/test_1.py", f"{PACKAGE}/test_2.py", f"{PACKAGE}/test_3.py"]],
         ],
         # Partition on different environments:

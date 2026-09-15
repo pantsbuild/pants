@@ -1320,6 +1320,7 @@ class PexProcess:
     input_digest: Digest | None
     working_directory: str | None
     extra_env: FrozenDict[str, str]
+    uncached_env: FrozenDict[str, str]
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
@@ -1337,6 +1338,7 @@ class PexProcess:
         input_digest: Digest | None = None,
         working_directory: str | None = None,
         extra_env: Mapping[str, str] | None = None,
+        uncached_env: Mapping[str, str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | None = None,
@@ -1351,6 +1353,7 @@ class PexProcess:
         object.__setattr__(self, "input_digest", input_digest)
         object.__setattr__(self, "working_directory", working_directory)
         object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(self, "uncached_env", FrozenDict(uncached_env or {}))
         object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
         object.__setattr__(
             self, "output_directories", tuple(output_directories) if output_directories else None
@@ -1385,6 +1388,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         input_digest=input_digest,
         working_directory=request.working_directory,
         env=env,
+        uncached_env=request.uncached_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches={
@@ -1407,6 +1411,7 @@ class VenvPexProcess:
     input_digest: Digest | None
     working_directory: str | None
     extra_env: FrozenDict[str, str]
+    uncached_env: FrozenDict[str, str]
     output_files: tuple[str, ...] | None
     output_directories: tuple[str, ...] | None
     timeout_seconds: int | None
@@ -1425,6 +1430,7 @@ class VenvPexProcess:
         input_digest: Digest | None = None,
         working_directory: str | None = None,
         extra_env: Mapping[str, str] | None = None,
+        uncached_env: Mapping[str, str] | None = None,
         output_files: Iterable[str] | None = None,
         output_directories: Iterable[str] | None = None,
         timeout_seconds: int | None = None,
@@ -1440,6 +1446,7 @@ class VenvPexProcess:
         object.__setattr__(self, "input_digest", input_digest)
         object.__setattr__(self, "working_directory", working_directory)
         object.__setattr__(self, "extra_env", FrozenDict(extra_env or {}))
+        object.__setattr__(self, "uncached_env", FrozenDict(uncached_env or {}))
         object.__setattr__(self, "output_files", tuple(output_files) if output_files else None)
         object.__setattr__(
             self, "output_directories", tuple(output_directories) if output_directories else None
@@ -1481,6 +1488,7 @@ async def setup_venv_pex_process(
         input_digest=input_digest,
         working_directory=request.working_directory,
         env=request.extra_env,
+        uncached_env=request.uncached_env,
         output_files=request.output_files,
         output_directories=request.output_directories,
         append_only_caches=append_only_caches,

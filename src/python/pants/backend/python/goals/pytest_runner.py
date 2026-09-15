@@ -188,6 +188,7 @@ class TestMetadata:
 
     interpreter_constraints: InterpreterConstraints
     extra_env_vars: tuple[str, ...]
+    uncached_env_vars: tuple[str, ...]
     xdist_concurrency: int | None
     resolve: str
     environment: str
@@ -298,12 +299,17 @@ async def setup_pytest_for_target(
         EnvironmentVarsRequest(request.metadata.extra_env_vars), **implicitly()
     )
 
+    field_set_uncached_env_get = environment_vars_subset(
+        EnvironmentVarsRequest(request.metadata.uncached_env_vars), **implicitly()
+    )
+
     (
         pytest_pex,
         requirements_pex,
         prepared_sources,
         field_set_source_files,
         field_set_extra_env,
+        field_set_uncached_env,
         extra_output_directory_digest,
     ) = await concurrently(
         pytest_pex_get,
@@ -311,6 +317,7 @@ async def setup_pytest_for_target(
         prepared_sources_get,
         field_set_source_files_get,
         field_set_extra_env_get,
+        field_set_uncached_env_get,
         extra_output_directory_digest_get,
     )
 
@@ -421,6 +428,12 @@ async def setup_pytest_for_target(
         **field_set_extra_env,
     }
 
+    uncached_env = {
+        **test_extra_env.uncached_env,
+        # Same precedence rule as `extra_env` above: the target's own value wins.
+        **field_set_uncached_env,
+    }
+
     # Cache test runs only if they are successful, or not at all if `--test-force`.
     cache_scope = test_subsystem.default_process_cache_scope
 
@@ -464,6 +477,7 @@ async def setup_pytest_for_target(
                 *field_set_source_files.files,
             ),
             extra_env=extra_env,
+            uncached_env=uncached_env,
             input_digest=input_digest,
             output_directories=(_EXTRA_OUTPUT_DIR,),
             output_files=output_files,
@@ -501,6 +515,7 @@ async def partition_python_tests(
                 [field_set], python_setup
             ),
             extra_env_vars=field_set.extra_env_vars.sorted(),
+            uncached_env_vars=field_set.uncached_env_vars.sorted(),
             xdist_concurrency=field_set.xdist_concurrency.value,
             resolve=field_set.resolve.normalized_value(python_setup),
             environment=field_set.environment.value,

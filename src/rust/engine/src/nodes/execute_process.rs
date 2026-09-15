@@ -77,6 +77,8 @@ impl ExecuteProcess {
     ) -> Result<Process, StoreError> {
         let env = externs::getattr_from_str_frozendict(value, "env");
 
+        let uncached_env = externs::getattr_from_str_frozendict(value, "uncached_env");
+
         let working_directory = externs::getattr_as_optional_string(value, "working_directory")
             .map_err(|e| format!("Failed to get `working_directory` from field: {e}"))?
             .map(RelativePath::new)
@@ -163,6 +165,7 @@ impl ExecuteProcess {
         Ok(Process {
             argv: externs::getattr(value, "argv")?,
             env,
+            uncached_env,
             working_directory,
             input_digests,
             output_files,

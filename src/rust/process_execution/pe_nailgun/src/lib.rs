@@ -65,6 +65,7 @@ fn construct_nailgun_server_request(
         description: format!("nailgun server for {nailgun_name}"),
         level: log::Level::Info,
         execution_slot_variable: None,
+        uncached_env: BTreeMap::new(),
         env: client_request.env,
         append_only_caches: client_request.append_only_caches,
         ..client_request

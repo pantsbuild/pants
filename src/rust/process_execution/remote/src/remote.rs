@@ -905,6 +905,24 @@ impl process_execution::CommandRunner for CommandRunner {
         _workunit: &mut RunningWorkunit,
         request: Process,
     ) -> Result<FallibleProcessResultWithPlatform, ProcessError> {
+        // The `Command` proto is the only channel to the worker, and `uncached_env` is defined as
+        // excluded from it, so there is nowhere to put these values. Warn rather than fail: the
+        // contract is that they cannot affect what the process produces, so a remote execution
+        // without them is still correct, just missing whatever they were labelling.
+        if !request.uncached_env.is_empty() {
+            warn!(
+                "Dropping uncached env var(s) {} for {}: they cannot be delivered under remote \
+                 execution. See the `uncached_env` docs on `Process`.",
+                request
+                    .uncached_env
+                    .keys()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                request.description,
+            );
+        }
+
         // Retrieve capabilities for this server.
         let capabilities = self.get_capabilities().await?;
         trace!("RE capabilities: {:?}", capabilities);
