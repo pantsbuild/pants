@@ -23,6 +23,7 @@ from pants.engine.fs import PathGlobs
 from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
 from pants.engine.rules import concurrently, implicitly
 from pants.engine.target import Target
+from pants.option.subsystem import Subsystem
 
 # ---- Errors ----------------------------------------------------------------
 
@@ -343,19 +344,58 @@ def synthesize_pinned_buf_gen_yaml(
 # ---- Per-target template request resolvers --------------------------------
 
 
+@dataclass(frozen=True)
+class LanguageGenTemplate:
+    """A `buf.gen.yaml` named by a language backend's own option.
+
+    A language needs a template of its own when it cannot share the default one: a single
+    `buf generate` run executes every plugin in its template, and each language's sandbox
+    carries only that language's toolchain.
+    """
+
+    path: str
+    option_name: str
+
+    @classmethod
+    def from_option(cls, subsystem: Subsystem, option_attribute: str) -> LanguageGenTemplate | None:
+        """Pair the option's value with its scoped name so the two cannot disagree.
+
+        Returns None when the option is unset, which leaves the language on the default
+        resolution: `[buf].gen_template`, then discovery.
+        """
+        path = getattr(subsystem, option_attribute)
+        if not path:
+            return None
+        return cls(path=path, option_name=f"{subsystem.options_scope}.{option_attribute}")
+
+
 def gen_template_request_from_fields(
     *,
     spec_path: str,
     address_str: str,
     override: str | None,
     buf: BufSubsystem,
+    language_template: LanguageGenTemplate | None,
 ) -> ConfigFilesRequest:
     """Resolve the `buf.gen.yaml` request from already-extracted field values.
 
-    Precedence: per-target `buf_gen_template` (`override`) → `[buf].gen_template`
-    subsystem option → `[buf].gen_template_discovery`.
+    Precedence:
+    1. The target's `buf_gen_template` field (`override`)
+    2. The language backend's template option (`language_template`)
+    3. `[buf].gen_template`
+    4. `[buf].gen_template_discovery`
+
+    Each language gets its own option because `buf generate` runs every plugin in the
+    template, and a language's sandbox only has that language's toolchain.
     """
     if override is None:
+        if language_template is not None:
+            return ConfigFilesRequest(
+                specified=language_template.path,
+                specified_option_name=language_template.option_name,
+                discovery=False,
+                check_existence=(language_template.path,),
+            )
         return buf.gen_template_request
     path = os.path.normpath(os.path.join(spec_path, override))
     return ConfigFilesRequest(
@@ -366,9 +406,14 @@ def gen_template_request_from_fields(
     )
 
 
-def gen_template_request_for_target(tgt: Target, buf: BufSubsystem) -> ConfigFilesRequest:
+def gen_template_request_for_target(
+    tgt: Target,
+    buf: BufSubsystem,
+    language_template: LanguageGenTemplate | None,
+) -> ConfigFilesRequest:
     """Convenience wrapper around `gen_template_request_from_fields` for a Target."""
     return gen_template_request_from_fields(
+        language_template=language_template,
         spec_path=tgt.address.spec_path,
         address_str=str(tgt.address),
         override=tgt.get(BufGenTemplateField).value,
@@ -376,12 +421,14 @@ def gen_template_request_for_target(tgt: Target, buf: BufSubsystem) -> ConfigFil
     )
 
 
-def resolved_template_path(tgt: Target, buf: BufSubsystem) -> str | None:
+def resolved_template_path(
+    tgt: Target, buf: BufSubsystem, language_template: LanguageGenTemplate | None
+) -> str | None:
     """Path to pass to `buf generate --template`, or None to rely on discovery."""
     override = tgt.get(BufGenTemplateField).value
     if override is not None:
         return os.path.normpath(os.path.join(tgt.address.spec_path, override))
-    return buf.gen_template
+    return (language_template.path if language_template else None) or buf.gen_template
 
 
 # ---- Async fetchers + result types ----------------------------------------
@@ -437,13 +484,16 @@ class BufGenContent:
 
 
 async def fetch_buf_gen_contents(
-    targets: Sequence[Target], buf: BufSubsystem
+    targets: Sequence[Target],
+    buf: BufSubsystem,
+    language_template: LanguageGenTemplate | None,
 ) -> tuple[BufGenContent, ...]:
     """Resolve and read each target's effective `buf.gen.yaml`."""
     if not targets:
         return ()
     template_files_per_target = await concurrently(
-        find_config_file(gen_template_request_for_target(t, buf)) for t in targets
+        find_config_file(gen_template_request_for_target(t, buf, language_template))
+        for t in targets
     )
     contents_per_target = await concurrently(
         get_digest_contents(tf.snapshot.digest) for tf in template_files_per_target
