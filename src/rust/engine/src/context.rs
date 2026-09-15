@@ -158,6 +158,7 @@ pub struct ExecutionStrategyOptions {
     pub child_max_memory: usize,
     pub child_default_memory: usize,
     pub graceful_shutdown_timeout: Duration,
+    pub cache_key_excluded_env_vars: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -432,6 +433,25 @@ impl Core {
         exec_strategy_opts: &ExecutionStrategyOptions,
         remoting_opts: &RemotingOptions,
     ) -> Result<Vec<Arc<dyn CommandRunner>>, String> {
+        // Under remote execution the `Command` proto is the only channel by which env vars
+        // reach the worker, so a name left out of it would not arrive at all.
+        let cache_key_excluded_env_vars = if remoting_opts.execution_enable {
+            if !exec_strategy_opts.cache_key_excluded_env_vars.is_empty() {
+                log::warn!(
+                    "Ignoring `[GLOBAL] cache_key_excluded_env_vars` because remote execution \
+                     is enabled. The named variables are passed to processes and affect their \
+                     cache keys, as they would without the option set."
+                );
+            }
+            Vec::new()
+        } else {
+            exec_strategy_opts.cache_key_excluded_env_vars.clone()
+        };
+
+        // Before any runner exists, so no cache key can be computed with a different list
+        // than the one configured.
+        process_execution::set_cache_key_excluded_env_vars(cache_key_excluded_env_vars);
+
         let leaf_runner = Self::make_leaf_runner(
             full_store,
             local_runner_store,

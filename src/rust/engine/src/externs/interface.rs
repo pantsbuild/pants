@@ -304,6 +304,7 @@ impl PyExecutionStrategyOptions {
         child_default_memory: usize,
         child_max_memory: usize,
         graceful_shutdown_timeout: usize,
+        cache_key_excluded_env_vars: Vec<String>,
     ) -> Self {
         Self(ExecutionStrategyOptions {
             local_parallelism,
@@ -318,6 +319,7 @@ impl PyExecutionStrategyOptions {
             graceful_shutdown_timeout: Duration::from_secs(
                 graceful_shutdown_timeout.try_into().unwrap(),
             ),
+            cache_key_excluded_env_vars,
         })
     }
 }
