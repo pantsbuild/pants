@@ -144,6 +144,24 @@ class BufSubsystem(TemplatedExternalTool):
         advanced=True,
     )
 
+    codegen_plugins = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            Addresses of runnable targets (ones `pants run` can execute) that are `local:`
+            plugins named by a `buf.gen.yaml` template, e.g.
+            `["//src/gen:protoc-gen-example"]`.
+
+            Each one is placed on `PATH` for `buf generate` under its target name, which
+            must match the `local:` entry in the template that uses it.
+
+            A `local:` path to a plugin outside the sandbox also runs, but Pants doesn't
+            track it, so editing the plugin won't regenerate code.
+            """
+        ),
+        advanced=True,
+    )
+
     @property
     def config_request(self) -> ConfigFilesRequest:
         # Refer to https://docs.buf.build/configuration/overview.

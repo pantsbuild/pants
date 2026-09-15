@@ -18,10 +18,22 @@ from pants.backend.codegen.protobuf.buf.subsystem import BufSubsystem
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
+from pants.core.util_rules.adhoc_process_support import (
+    ResolveRunnableDependenciesRequest,
+    resolve_runnable_dependencies,
+)
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.config_files import find_config_file
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
-from pants.engine.fs import CreateDigest, Directory, FileContent, MergeDigests, RemovePrefix
+from pants.engine.addresses import UnparsedAddressInputs
+from pants.engine.fs import (
+    CreateDigest,
+    Directory,
+    FileContent,
+    MergeDigests,
+    RemovePrefix,
+)
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.intrinsics import (
     create_digest,
@@ -84,6 +96,18 @@ async def generate_python_from_protobuf_via_buf(
         SourceFilesRequest([target[ProtobufSourceField]])
     )
 
+    codegen_plugins_request = resolve_runnable_dependencies(
+        ResolveRunnableDependenciesRequest(
+            UnparsedAddressInputs(
+                buf.codegen_plugins,
+                owning_address=None,
+                description_of_origin=(
+                    f"the `[{BufSubsystem.options_scope}].codegen_plugins` option"
+                ),
+            )
+        ),
+        **implicitly(),
+    )
     download_buf_request = download_external_tool(buf.get_request(platform))
     download_protoc_request = download_external_tool(protoc.get_request(platform))
     config_files_request = find_config_file(buf.config_request)
@@ -95,6 +119,7 @@ async def generate_python_from_protobuf_via_buf(
         empty_output_dir,
         all_sources,
         target_sources,
+        codegen_plugins,
         config_files,
         gen_template_files,
     ) = await concurrently(
@@ -103,6 +128,7 @@ async def generate_python_from_protobuf_via_buf(
         create_output_dir_request,
         all_sources_request,
         target_sources_request,
+        codegen_plugins_request,
         config_files_request,
         gen_template_files_request,
     )
@@ -166,6 +192,7 @@ async def generate_python_from_protobuf_via_buf(
         MergeDigests(
             (
                 all_sources.snapshot.digest,
+                codegen_plugins.digest,
                 empty_output_dir,
                 downloaded_buf.digest,
                 config_files.snapshot.digest,
@@ -201,17 +228,29 @@ async def generate_python_from_protobuf_via_buf(
 
     # Expose `protoc` (and any plugin binaries co-located with it) on PATH so
     # `buf generate` can resolve `protoc_builtin:` and `local: [protoc]` plugin
-    # entries.
+    # entries, and `[buf].codegen_plugins` so it can resolve `local: <name>`.
     protoc_relpath = "__protoc"
     protoc_bin_dir = os.path.join(protoc_relpath, os.path.dirname(downloaded_protoc.exe))
+    env = {"PATH": protoc_bin_dir}
+    immutable_input_digests = {protoc_relpath: downloaded_protoc.digest}
+    append_only_caches: dict[str, str] = {}
+    plugins = codegen_plugins.runnable_dependencies
+    if plugins:
+        env = {
+            "PATH": f"{protoc_bin_dir}:{{chroot}}/{plugins.path_component}",
+            **plugins.extra_env,
+        }
+        immutable_input_digests.update(plugins.immutable_input_digests)
+        append_only_caches.update(plugins.append_only_caches)
 
     result = await execute_process_or_raise(
         **implicitly(
             Process(
                 argv=argv,
                 input_digest=input_digest,
-                immutable_input_digests={protoc_relpath: downloaded_protoc.digest},
-                env={"PATH": protoc_bin_dir},
+                immutable_input_digests=immutable_input_digests,
+                env=env,
+                append_only_caches=append_only_caches,
                 description=f"Generating Python from Protobuf via buf for {target.address}.",
                 level=LogLevel.DEBUG,
                 output_directories=(output_dir,),
@@ -227,4 +266,4 @@ async def generate_python_from_protobuf_via_buf(
 
 
 def rules():
-    return collect_rules()
+    return [*collect_rules(), *adhoc_process_support_rules()]
