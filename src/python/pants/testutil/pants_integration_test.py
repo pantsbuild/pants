@@ -192,6 +192,9 @@ def run_pants_with_workdir_without_waiting(
         "--python-interpreter-constraints" in arg for arg in command
     ):
         args.append("--python-interpreter-constraints=['>=3.10,<3.15']")
+    # Launching a sandboxer per test is overkill, so we disable it by default.
+    # It is sufficiently tested separately.
+    args.append("--no-sandboxer")
 
     pants_script = [sys.executable, "-m", "pants"]
 
