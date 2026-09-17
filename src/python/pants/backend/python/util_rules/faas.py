@@ -99,6 +99,20 @@ class PythonFaaSLayoutField(StringField):
     )
 
 
+class PythonFaaSLinkPythonField(StringField):
+    alias = "link_python"
+    help = help_text(
+        """
+        The path the `venv` layout's Python should link to, instead of the interpreter that laid the
+        venv out. The interpreter only has to exist by the time the artifact runs, which is what
+        allows building a `venv` layout artifact for a cloud vendor's runtime: for example,
+        `link_python="/var/lang/bin/python3.13"` for AWS Lambda.
+
+        Has no effect on the `flat` and `flat-zipped` layouts.
+        """
+    )
+
+
 class PythonFaaSPex3VenvCreateExtraArgsField(StringSequenceField):
     alias = "pex3_venv_create_extra_args"
     default = ()
@@ -558,6 +572,7 @@ class BuildPythonFaaSRequest:
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
     pex_build_extra_args: PythonFaaSPexBuildExtraArgs
     layout: PythonFaaSLayoutField
+    link_python: PythonFaaSLinkPythonField
 
     include_requirements: bool
     include_sources: bool
@@ -668,6 +683,7 @@ async def build_python_faas(
             complete_platforms=platforms.complete_platforms,
             extra_args=request.pex3_venv_create_extra_args.value or (),
             prefix=request.prefix_in_artifact,
+            link_python=request.link_python.value,
             output_path=Path(output_filename),
             description=f"Build {request.target_name} artifact for {request.address}",
         ),
