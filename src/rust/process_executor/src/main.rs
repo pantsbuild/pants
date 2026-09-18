@@ -14,8 +14,8 @@ use clap::Parser;
 use fs::{DirectoryDigest, Permissions, RelativePath};
 use hashing::{Digest, Fingerprint};
 use process_execution::{
-    CacheContentBehavior, Context, InputDigests, NamedCaches, Platform, ProcessCacheScope,
-    ProcessConcurrency, ProcessExecutionEnvironment, ProcessExecutionStrategy,
+    CacheContentBehavior, CacheKeyExcludedEnvVars, Context, InputDigests, NamedCaches, Platform,
+    ProcessCacheScope, ProcessConcurrency, ProcessExecutionEnvironment, ProcessExecutionStrategy,
     local::KeepSandboxes,
 };
 use prost::Message;
@@ -231,6 +231,7 @@ async fn main() -> Result<(), String> {
                             append_only_caches_base_path: args
                                 .named_cache_path
                                 .map(|p| p.to_string_lossy().to_string()),
+                            cache_key_excluded_env_vars: CacheKeyExcludedEnvVars::default(),
                         },
                         RemoteStoreOptions {
                             provider: RemoteProvider::Reapi,

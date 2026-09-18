@@ -18,9 +18,9 @@ use workunit_store::{
 };
 
 use crate::{
-    CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Platform, Process,
-    ProcessCacheScope, ProcessError, ProcessExecutionEnvironment, ProcessResultSource,
-    check_cache_content,
+    CacheContentBehavior, CacheKeyExcludedEnvVars, Context, FallibleProcessResultWithPlatform,
+    Platform, Process, ProcessCacheScope, ProcessError, ProcessExecutionEnvironment,
+    ProcessResultSource, check_cache_content,
 };
 
 // TODO: Consider moving into protobuf as a CacheValue type.
@@ -38,6 +38,7 @@ pub struct CommandRunner {
     cache_read: bool,
     cache_content_behavior: CacheContentBehavior,
     process_cache_namespace: Option<String>,
+    cache_key_excluded_env_vars: CacheKeyExcludedEnvVars,
 }
 
 impl CommandRunner {
@@ -48,6 +49,7 @@ impl CommandRunner {
         cache_read: bool,
         cache_content_behavior: CacheContentBehavior,
         process_cache_namespace: Option<String>,
+        cache_key_excluded_env_vars: CacheKeyExcludedEnvVars,
     ) -> CommandRunner {
         CommandRunner {
             inner,
@@ -56,6 +58,7 @@ impl CommandRunner {
             cache_read,
             cache_content_behavior,
             process_cache_namespace,
+            cache_key_excluded_env_vars,
         }
     }
 }
@@ -80,7 +83,7 @@ impl crate::CommandRunner for CommandRunner {
             || req.cache_scope == ProcessCacheScope::LocalAlways;
 
         let (action_digest, command_digest) = crate::get_digest(
-            &req,
+            &self.cache_key_excluded_env_vars.process_to_key_on(&req),
             None,
             self.process_cache_namespace.clone(),
             &self.file_store,

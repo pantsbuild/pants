@@ -28,9 +28,9 @@ use workunit_store::{RunId, RunningWorkunit, WorkunitStore};
 use crate::remote::ensure_action_stored_locally;
 use crate::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
 use process_execution::{
-    CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context, EntireExecuteRequest,
-    FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope, ProcessError,
-    ProcessExecutionEnvironment, ProcessExecutionStrategy, ProcessResultMetadata,
+    CacheContentBehavior, CacheKeyExcludedEnvVars, CommandRunner as CommandRunnerTrait, Context,
+    EntireExecuteRequest, FallibleProcessResultWithPlatform, Platform, Process, ProcessCacheScope,
+    ProcessError, ProcessExecutionEnvironment, ProcessExecutionStrategy, ProcessResultMetadata,
     ProcessResultSource, local::KeepSandboxes, make_execute_request,
 };
 use remote_provider::choose_action_cache_provider;
@@ -73,6 +73,7 @@ async fn make_action_result_runner(
             warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
             cache_content_behavior: CacheContentBehavior::Defer,
             append_only_caches_base_path: None,
+            cache_key_excluded_env_vars: CacheKeyExcludedEnvVars::default(),
         },
         RemoteStoreOptions {
             provider: RemoteProvider::Reapi,
@@ -302,6 +303,7 @@ async fn create_cached_runner_with_cache_write(
                 warnings_behavior: RemoteCacheWarningsBehavior::FirstOnly,
                 cache_content_behavior,
                 append_only_caches_base_path: None,
+                cache_key_excluded_env_vars: CacheKeyExcludedEnvVars::default(),
             },
             RemoteStoreOptions {
                 provider: RemoteProvider::Reapi,

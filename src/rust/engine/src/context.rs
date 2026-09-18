@@ -21,8 +21,8 @@ use log::{Level, debug, log};
 use parking_lot::Mutex;
 use process_execution::switched::SwitchedCommandRunner;
 use process_execution::{
-    self, CacheContentBehavior, CommandRunner, NamedCaches, ProcessExecutionStrategy, bounded,
-    local,
+    self, CacheContentBehavior, CacheKeyExcludedEnvVars, CommandRunner, NamedCaches,
+    ProcessExecutionStrategy, bounded, local,
 };
 use regex::Regex;
 use remote::remote_cache::{RemoteCacheRunnerOptions, RemoteCacheWarningsBehavior};
@@ -376,6 +376,7 @@ impl Core {
         remote_cache_write: bool,
         local_cache_read: bool,
         local_cache_write: bool,
+        cache_key_excluded_env_vars: &CacheKeyExcludedEnvVars,
     ) -> Result<Arc<dyn CommandRunner>, String> {
         if remote_cache_read || remote_cache_write {
             runner = Arc::new(
@@ -393,6 +394,7 @@ impl Core {
                         append_only_caches_base_path: remoting_opts
                             .append_only_caches_base_path
                             .clone(),
+                        cache_key_excluded_env_vars: cache_key_excluded_env_vars.clone(),
                     },
                     remoting_opts.to_remote_store_options(tls_config)?,
                 )
@@ -408,6 +410,7 @@ impl Core {
                 local_cache_read,
                 remoting_opts.cache_content_behavior,
                 process_cache_namespace,
+                cache_key_excluded_env_vars.clone(),
             ));
         }
 
@@ -433,8 +436,11 @@ impl Core {
         exec_strategy_opts: &ExecutionStrategyOptions,
         remoting_opts: &RemotingOptions,
     ) -> Result<Vec<Arc<dyn CommandRunner>>, String> {
-        // Under remote execution the `Command` proto is the only channel by which env vars
-        // reach the worker, so a name left out of it would not arrive at all.
+        // Under remote execution the `Command` proto is the only channel by which env vars reach
+        // the worker, so the remote execution runner must key on all of them. Rather than let
+        // caching differ by where a process happened to run -- which under speculation is a race
+        // between the local and the remote runner, and so unpredictable -- the option is off
+        // entirely whenever remote execution is enabled.
         let cache_key_excluded_env_vars = if remoting_opts.execution_enable {
             if !exec_strategy_opts.cache_key_excluded_env_vars.is_empty() {
                 log::warn!(
@@ -443,14 +449,10 @@ impl Core {
                      cache keys, as they would without the option set."
                 );
             }
-            Vec::new()
+            CacheKeyExcludedEnvVars::default()
         } else {
-            exec_strategy_opts.cache_key_excluded_env_vars.clone()
+            CacheKeyExcludedEnvVars::new(exec_strategy_opts.cache_key_excluded_env_vars.clone())
         };
-
-        // Before any runner exists, so no cache key can be computed with a different list
-        // than the one configured.
-        process_execution::set_cache_key_excluded_env_vars(cache_key_excluded_env_vars);
 
         let leaf_runner = Self::make_leaf_runner(
             full_store,
@@ -488,6 +490,7 @@ impl Core {
                 remote_cache_write,
                 local_cache_read_write,
                 local_cache_read_write,
+                &cache_key_excluded_env_vars,
             )
             .await?;
 
@@ -509,6 +512,7 @@ impl Core {
                 remote_cache_write,
                 false,
                 local_cache_read_write,
+                &cache_key_excluded_env_vars,
             )
             .await?;
 

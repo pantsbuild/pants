@@ -9,7 +9,6 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use fs::RelativePath;
-use hashing::Digest;
 use prost_types::Timestamp;
 use protos::pb::build::bazel::remote::execution::v2 as remexec;
 use remexec::ExecutedActionMetadata;
@@ -18,9 +17,9 @@ use tokio::io::AsyncWriteExt;
 use workunit_store::RunId;
 
 use crate::{
-    CacheName, Platform, Process, ProcessExecutionEnvironment, ProcessExecutionStrategy,
-    ProcessResultMetadata, ProcessResultSource, env_var_name_matches, extract_output_files,
-    get_digest, local::KeepSandboxes, maybe_make_wrapper_script, set_cache_key_excluded_env_vars,
+    CacheKeyExcludedEnvVars, CacheName, Platform, Process, ProcessExecutionEnvironment,
+    ProcessExecutionStrategy, ProcessResultMetadata, ProcessResultSource, extract_output_files,
+    get_digest, local::KeepSandboxes, maybe_make_wrapper_script,
 };
 
 #[test]
@@ -395,60 +394,48 @@ async fn get_digest_propagates_errors_instead_of_panicking() {
     );
 }
 
-#[test]
-fn cache_key_excluded_env_var_patterns_match_a_name_exactly_or_by_prefix() {
-    let patterns = vec!["DOCKER_CONFIG".to_owned(), "BUILDKITE*".to_owned()];
+/// The env var names `patterns` leaves in the cache key, given a process whose env is `names`.
+fn env_names_kept_in_cache_key(patterns: &[&str], names: &[&str]) -> Vec<String> {
+    let mut process = Process::new(vec!["/bin/echo".to_owned()]);
+    process.env = names
+        .iter()
+        .map(|name| ((*name).to_owned(), "value".to_owned()))
+        .collect();
 
-    assert!(env_var_name_matches(&patterns, "DOCKER_CONFIG"));
-    assert!(env_var_name_matches(&patterns, "BUILDKITE"));
-    assert!(env_var_name_matches(&patterns, "BUILDKITE_BUILD_ID"));
-
-    // An exact pattern is not also a prefix, and `*` is only special as the last character.
-    assert!(!env_var_name_matches(&patterns, "DOCKER_CONFIG_DIR"));
-    assert!(!env_var_name_matches(&patterns, "MY_BUILDKITE_TOKEN"));
-    assert!(!env_var_name_matches(&["FOO*BAR".to_owned()], "FOO_BAR"));
+    CacheKeyExcludedEnvVars::new(patterns.iter().map(|p| (*p).to_owned()).collect())
+        .process_to_key_on(&process)
+        .env
+        .keys()
+        .cloned()
+        .collect()
 }
 
-#[tokio::test]
-async fn excluded_env_vars_are_absent_from_the_action_digest() {
-    async fn digests_for_env(store: &store::Store, env: &[(&str, &str)]) -> (Digest, Digest) {
-        let mut process = Process::new(vec!["/bin/echo".to_owned()]);
-        process.env = env
-            .iter()
-            .map(|(name, value)| (name.to_string(), value.to_string()))
-            .collect();
-        get_digest(&process, None, None, store, None).await.unwrap()
-    }
+#[test]
+fn cache_key_excluded_env_vars_match_a_name_exactly_or_by_prefix() {
+    // An exact pattern is not also a prefix.
+    assert_eq!(
+        vec!["DOCKER_CONFIG_DIR", "MY_BUILDKITE_TOKEN"],
+        env_names_kept_in_cache_key(
+            &["DOCKER_CONFIG", "BUILDKITE*"],
+            &[
+                "BUILDKITE",
+                "BUILDKITE_BUILD_ID",
+                "DOCKER_CONFIG",
+                "DOCKER_CONFIG_DIR",
+                "MY_BUILDKITE_TOKEN",
+            ],
+        )
+    );
 
-    let store_dir = TempDir::new().unwrap();
-    let store = store::Store::local_only(task_executor::Executor::new(), store_dir.path()).unwrap();
+    // `*` is only special as the last character of a pattern.
+    assert_eq!(
+        vec!["FOO_BAR"],
+        env_names_kept_in_cache_key(&["FOO*BAR"], &["FOO_BAR"])
+    );
 
-    // The list is process-global and set once, so these names are unique to this test: a name
-    // another test passes in `env` would have its cache key changed here too.
-    set_cache_key_excluded_env_vars(vec![
-        "PANTS_TEST_EXCLUDED".to_owned(),
-        "PANTS_TEST_EXCLUDED_PREFIX_*".to_owned(),
-    ]);
-
-    let baseline = digests_for_env(&store, &[("PANTS_TEST_KEYED", "1")]).await;
-
-    for excluded in [
-        ("PANTS_TEST_EXCLUDED", "a"),
-        ("PANTS_TEST_EXCLUDED", "b"),
-        ("PANTS_TEST_EXCLUDED_PREFIX_BUILD_ID", "a"),
-    ] {
-        assert_eq!(
-            baseline,
-            digests_for_env(&store, &[("PANTS_TEST_KEYED", "1"), excluded]).await,
-            "{} changed the action or command digest",
-            excluded.0
-        );
-    }
-
-    // A name that is not excluded still keys the cache, so the assertions above cannot pass
-    // vacuously if a future change stops `env` reaching the `Command` at all.
-    assert_ne!(
-        baseline,
-        digests_for_env(&store, &[("PANTS_TEST_KEYED", "2")]).await
+    // With no patterns configured, every name keys the cache.
+    assert_eq!(
+        vec!["DOCKER_CONFIG"],
+        env_names_kept_in_cache_key(&[], &["DOCKER_CONFIG"])
     );
 }

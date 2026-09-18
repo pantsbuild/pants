@@ -1349,27 +1349,18 @@ class BootstrapOptions:
         default=list(DEFAULT_EXECUTION_OPTIONS.cache_key_excluded_env_vars),
         help=softwrap(
             """
-            Environment variable names whose values must not affect process cache keys.
+            Environment variable names whose values will not affect process cache keys.
 
-            A process still receives these variables; they are simply left out of the key
-            its cached result is stored under. Use this for a variable that a process needs
-            but that cannot change its output — a credential-helper config path that is a
-            fresh temporary directory on every CI job, or build metadata such as
-            `BUILDKITE_BUILD_ID` that a test process reads only to report itself.
-
-            Without this, such a variable makes every process that receives it uncacheable
-            across runs, however deterministic the process is.
+            Processes still receive these variables, but one whose value changes between runs,
+            such as a per-job `DOCKER_CONFIG` path or `BUILDKITE_BUILD_ID`, no longer makes
+            every process that receives it a cache miss.
 
             Each entry is an exact name or a single trailing `*` for a prefix match, e.g.
-            `BUILDKITE*`.
+            `BUILDKITE*`. Ignored when remote execution is enabled, since there the cache key
+            is also the only means of delivering environment variables to the worker.
 
-            Ignored when remote execution is enabled: there the cache key is also the only
-            means of delivering environment variables to the worker, so the named variables
-            are passed to processes and affect their cache keys as usual.
-
-            This is a deliberate hole in the hermeticity Pants otherwise gives you: name a
-            variable that *does* change output and you will be served a stale result with
-            nothing to indicate it. Keep the list short and obviously safe.
+            Naming a variable that does change a process's output will serve you a stale
+            result, with nothing to indicate it. Use with caution!
             """
         ),
     )

@@ -21,9 +21,9 @@ use workunit_store::{
 };
 
 use process_execution::{
-    CacheContentBehavior, Context, FallibleProcessResultWithPlatform, Process, ProcessCacheScope,
-    ProcessError, ProcessExecutionEnvironment, ProcessResultSource, check_cache_content,
-    populate_fallible_execution_result,
+    CacheContentBehavior, CacheKeyExcludedEnvVars, Context, FallibleProcessResultWithPlatform,
+    Process, ProcessCacheScope, ProcessError, ProcessExecutionEnvironment, ProcessResultSource,
+    check_cache_content, populate_fallible_execution_result,
 };
 use process_execution::{EntireExecuteRequest, make_execute_request};
 
@@ -51,6 +51,7 @@ pub struct RemoteCacheRunnerOptions {
     pub warnings_behavior: RemoteCacheWarningsBehavior,
     pub cache_content_behavior: CacheContentBehavior,
     pub append_only_caches_base_path: Option<String>,
+    pub cache_key_excluded_env_vars: CacheKeyExcludedEnvVars,
 }
 
 /// This `CommandRunner` implementation caches results remotely using the Action Cache service
@@ -74,6 +75,7 @@ pub struct CommandRunner {
     cache_write: bool,
     cache_content_behavior: CacheContentBehavior,
     warnings_behavior: RemoteCacheWarningsBehavior,
+    cache_key_excluded_env_vars: CacheKeyExcludedEnvVars,
     read_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
     write_errors_counter: Arc<Mutex<BTreeMap<String, usize>>>,
 }
@@ -91,6 +93,7 @@ impl CommandRunner {
             warnings_behavior,
             cache_content_behavior,
             append_only_caches_base_path,
+            cache_key_excluded_env_vars,
         }: RemoteCacheRunnerOptions,
         provider: Arc<dyn ActionCacheProvider + 'static>,
     ) -> Self {
@@ -106,6 +109,7 @@ impl CommandRunner {
             cache_write,
             cache_content_behavior,
             warnings_behavior,
+            cache_key_excluded_env_vars,
             read_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
             write_errors_counter: Arc::new(Mutex::new(BTreeMap::new())),
         }
@@ -569,7 +573,7 @@ impl process_execution::CommandRunner for CommandRunner {
         let EntireExecuteRequest {
             action, command, ..
         } = make_execute_request(
-            &request,
+            &self.cache_key_excluded_env_vars.process_to_key_on(&request),
             self.instance_name.clone(),
             self.process_cache_namespace.clone(),
             &self.store,

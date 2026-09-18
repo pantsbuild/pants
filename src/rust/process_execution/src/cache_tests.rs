@@ -15,7 +15,7 @@ use tokio::sync::RwLock;
 use workunit_store::{RunningWorkunit, WorkunitStore};
 
 use crate::{
-    CacheContentBehavior, CommandRunner as CommandRunnerTrait, Context,
+    CacheContentBehavior, CacheKeyExcludedEnvVars, CommandRunner as CommandRunnerTrait, Context,
     FallibleProcessResultWithPlatform, NamedCaches, Process, ProcessError,
 };
 
@@ -45,6 +45,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
 fn create_cached_runner(
     local: Box<dyn CommandRunnerTrait>,
     store: Store,
+    cache_key_excluded_env_vars: CacheKeyExcludedEnvVars,
 ) -> (Box<dyn CommandRunnerTrait>, TempDir) {
     let runtime = task_executor::Executor::new();
     let cache_dir = TempDir::new().unwrap();
@@ -66,6 +67,7 @@ fn create_cached_runner(
         true,
         CacheContentBehavior::Fetch,
         None,
+        cache_key_excluded_env_vars,
     ));
 
     (runner, cache_dir)
@@ -102,7 +104,8 @@ async fn run_roundtrip(script_exit_code: i8, workunit: &mut RunningWorkunit) -> 
         .run(Context::default(), workunit, process.clone())
         .await;
 
-    let (caching, _cache_dir) = create_cached_runner(local, store.clone());
+    let (caching, _cache_dir) =
+        create_cached_runner(local, store.clone(), CacheKeyExcludedEnvVars::default());
 
     let uncached_result = caching
         .run(Context::default(), workunit, process.clone())
@@ -138,12 +141,72 @@ async fn failures_not_cached() {
     assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found
 }
 
+/// Runs `process` with `env_var` set to two different values, hitting the cache on the second
+/// run only if the value is not part of the cache key. The script is removed in between, so a
+/// miss cannot succeed: it exits 127.
+async fn exit_code_of_second_run_with_changed_env_var(
+    cache_key_excluded_env_vars: CacheKeyExcludedEnvVars,
+    env_var: &str,
+    workunit: &mut RunningWorkunit,
+) -> i32 {
+    let (local, store, _local_runner_dir) = create_local_runner();
+    let (caching, _cache_dir) = create_cached_runner(local, store, cache_key_excluded_env_vars);
+    let (process, script_path, _script_dir) = create_script(0);
+
+    let with_value = |value: &str| {
+        process
+            .clone()
+            .env([(env_var.to_owned(), value.to_owned())].into())
+    };
+
+    caching
+        .run(Context::default(), workunit, with_value("first"))
+        .await
+        .unwrap();
+
+    std::fs::remove_file(&script_path).unwrap();
+
+    caching
+        .run(Context::default(), workunit, with_value("second"))
+        .await
+        .unwrap()
+        .exit_code
+}
+
+#[tokio::test]
+async fn excluded_env_var_value_does_not_key_the_cache() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+
+    assert_eq!(
+        0,
+        exit_code_of_second_run_with_changed_env_var(
+            CacheKeyExcludedEnvVars::new(vec!["BUILD_ID".to_owned()]),
+            "BUILD_ID",
+            &mut workunit,
+        )
+        .await
+    );
+
+    // A name the option does not match still keys the cache, so the assertion above cannot pass
+    // vacuously if a future change stops `env` reaching the cache key at all.
+    assert_eq!(
+        127,
+        exit_code_of_second_run_with_changed_env_var(
+            CacheKeyExcludedEnvVars::new(vec!["BUILD_ID".to_owned()]),
+            "OTHER_VAR",
+            &mut workunit,
+        )
+        .await
+    );
+}
+
 #[tokio::test]
 async fn recover_from_missing_store_contents() {
     let (_, mut workunit) = WorkunitStore::setup_for_tests();
 
     let (local, store, _local_runner_dir) = create_local_runner();
-    let (caching, _cache_dir) = create_cached_runner(local, store.clone());
+    let (caching, _cache_dir) =
+        create_cached_runner(local, store.clone(), CacheKeyExcludedEnvVars::default());
     let (process, _script_path, _script_dir) = create_script(0);
 
     // Run once to cache the process.

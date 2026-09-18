@@ -4,12 +4,13 @@
 #[macro_use]
 extern crate derivative;
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::convert::TryFrom;
 use std::fmt::{self, Debug, Display};
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -1109,37 +1110,47 @@ pub async fn get_digest(
     ))
 }
 
-/// Env var names whose *values* are kept out of the cache key.
+/// Env var names from `[GLOBAL] cache_key_excluded_env_vars`, whose *values* are kept out of
+/// process cache keys.
 ///
-/// Set once from `[GLOBAL] cache_key_excluded_env_vars` when the scheduler is built. A
-/// global rather than a `Process` field because the variables this exists for -- a
-/// per-job `DOCKER_CONFIG` path, `BUILDKITE_*` build metadata -- are noise for every
-/// process that receives them, not for one rule's process.
-static CACHE_KEY_EXCLUDED_ENV_VARS: OnceLock<Vec<String>> = OnceLock::new();
+/// Held by the caching `CommandRunner`s, which key on `process_to_key_on` rather than on the
+/// `Process` they pass down the stack. Only those runners take it: the remote *execution*
+/// runner must keep every variable in its `Command`, because that proto is the only channel
+/// by which env vars reach the worker.
+#[derive(Clone, Debug, Default)]
+pub struct CacheKeyExcludedEnvVars(Vec<String>);
 
-/// Called once during scheduler construction. Later calls are ignored, which keeps a
-/// second scheduler in the same process (pantsd tests do this) from changing cache keys
-/// underneath the first.
-pub fn set_cache_key_excluded_env_vars(patterns: Vec<String>) {
-    let _ = CACHE_KEY_EXCLUDED_ENV_VARS.set(patterns);
-}
+impl CacheKeyExcludedEnvVars {
+    pub fn new(patterns: Vec<String>) -> Self {
+        Self(patterns)
+    }
 
-/// Exact name, or a single trailing `*` as a prefix match -- the same two shapes
-/// `[test] extra_env_vars` accepts, so a name can be excluded in the spelling it was
-/// declared in.
-fn env_var_name_matches(patterns: &[String], name: &str) -> bool {
-    patterns
-        .iter()
-        .any(|pattern| match pattern.strip_suffix('*') {
-            Some(prefix) => name.starts_with(prefix),
-            None => name == pattern,
-        })
-}
+    /// `process` with the excluded names dropped from its env, for use as a cache key.
+    ///
+    /// The process itself keeps them, and so still receives them. Deliberately a hole in the
+    /// hermeticity contract: an excluded variable that does change output will now be served
+    /// a stale result.
+    pub fn process_to_key_on<'a>(&self, process: &'a Process) -> Cow<'a, Process> {
+        if self.0.is_empty() {
+            return Cow::Borrowed(process);
+        }
 
-pub fn is_cache_key_excluded_env_var(name: &str) -> bool {
-    CACHE_KEY_EXCLUDED_ENV_VARS
-        .get()
-        .is_some_and(|patterns| env_var_name_matches(patterns, name))
+        let mut keyed = process.clone();
+        keyed.env.retain(|name, _| !self.excludes(name));
+        Cow::Owned(keyed)
+    }
+
+    /// Exact name, or a single trailing `*` as a prefix match -- the same two shapes
+    /// `[test] extra_env_vars` accepts, so a name can be excluded in the spelling it was
+    /// declared in.
+    fn excludes(&self, name: &str) -> bool {
+        self.0
+            .iter()
+            .any(|pattern| match pattern.strip_suffix('*') {
+                Some(prefix) => name.starts_with(prefix),
+                None => name == pattern,
+            })
+    }
 }
 
 pub fn digest<T: prost::Message>(message: &T) -> Result<Digest, String> {
@@ -1375,14 +1386,6 @@ pub async fn make_execute_request(
             return Err(format!(
                 "Cannot set env var with name {name} as that is reserved for internal use by pants"
             ));
-        }
-
-        // Excluded names stay in `req.env`, so the process still receives them; they are
-        // only absent from the `Command` the action digest is taken over. Deliberately a
-        // hole in the hermeticity contract: an excluded variable that does change output
-        // will now be served a stale result.
-        if is_cache_key_excluded_env_var(name) {
-            continue;
         }
 
         command
