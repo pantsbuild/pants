@@ -153,8 +153,7 @@ def test_parse_java_version() -> None:
 @maybe_skip_jdk_test
 def test_include_default_heap_size_in_jvm_options(rule_runner: RuleRunner) -> None:
     proc = javac_version_proc(rule_runner)
-    assert proc.argv[-1] == "@__jvm_args.txt"
-    assert '"-Xmx512m"' in get_jvm_argfile(rule_runner, proc)
+    assert "-Xmx512m" in proc.argv
 
 
 @maybe_skip_jdk_test
@@ -164,7 +163,7 @@ def test_include_child_mem_constraint_in_jvm_options(rule_runner: RuleRunner) ->
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
     proc = javac_version_proc(rule_runner)
-    assert '"-Xmx1g"' in get_jvm_argfile(rule_runner, proc)
+    assert "-Xmx1g" in proc.argv
 
 
 @maybe_skip_jdk_test
@@ -178,14 +177,51 @@ def test_uses_nailgun_instead_of_jvm_argfile_for_java_9_plus(rule_runner: RuleRu
 
 
 @maybe_skip_jdk_test
-def test_uses_jvm_argfile_for_java_arguments(rule_runner: RuleRunner) -> None:
+def test_short_argv_stays_inline_below_threshold(rule_runner: RuleRunner) -> None:
+    # Under the argfile length threshold a `use_nailgun=False` process must stay on the command
+    # line exactly as it did before argfiles were introduced, and must not materialize an argfile.
     jdk = rule_runner.request(InternalJdk, [])
     proc = rule_runner.request(
         Process,
         [
             JvmProcess(
                 jdk=jdk,
-                classpath_entries=("tool.jar", "another tool.jar"),
+                classpath_entries=("tool.jar",),
+                argv=["com.example.Main", "hello world"],
+                input_digest=EMPTY_DIGEST,
+                description="",
+                use_nailgun=False,
+            )
+        ],
+    )
+
+    assert proc.argv == (
+        rule_runner.request(BashBinary, []).path,
+        "__jdk/jdk.sh",
+        "__java_home/bin/java",
+        "-cp",
+        f"{jdk.nailgun_jar}:tool.jar",
+        "-Xmx512m",
+        "com.example.Main",
+        "hello world",
+    )
+    digest_contents = rule_runner.request(DigestContents, [proc.input_digest])
+    assert not any(fc.path == "__jvm_args.txt" for fc in digest_contents)
+
+
+@maybe_skip_jdk_test
+def test_uses_jvm_argfile_for_java_arguments(rule_runner: RuleRunner) -> None:
+    jdk = rule_runner.request(InternalJdk, [])
+    # A classpath entry long enough to push the total command line past the argfile length
+    # threshold, so this exercises the actual trigger (over `_JVM_ARGUMENT_FILE_MAX_CMD_LEN`) as
+    # well as the escaping of the shorter arguments.
+    long_entry = "x" * 70_000
+    proc = rule_runner.request(
+        Process,
+        [
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=("tool.jar", "another tool.jar", long_entry),
                 argv=["com.example.Main", "hello world", "a#b", r"a\b", 'a"b', "@literal"],
                 input_digest=EMPTY_DIGEST,
                 description="",
@@ -202,7 +238,7 @@ def test_uses_jvm_argfile_for_java_arguments(rule_runner: RuleRunner) -> None:
     )
     assert get_jvm_argfile(rule_runner, proc).splitlines() == [
         '"-cp"',
-        f'"{jdk.nailgun_jar}:tool.jar:another tool.jar"',
+        f'"{jdk.nailgun_jar}:tool.jar:another tool.jar:{long_entry}"',
         '"-Xmx512m"',
         '"com.example.Main"',
         '"hello world"',
