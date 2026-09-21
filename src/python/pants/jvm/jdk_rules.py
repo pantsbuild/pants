@@ -38,6 +38,13 @@ logger = logging.getLogger(__name__)
 
 
 _JVM_ARGUMENT_FILE = "__jvm_args.txt"
+# Only route Java 9+ (non-nailgun) `java` invocations through an `@argfile` once their command
+# line grows large enough to threaten an OS-level "Argument list too long" error. Linux caps a
+# single argv element at 128 KiB (`MAX_ARG_STRLEN`); macOS caps the entire argv+envp area at
+# 256 KiB (`ARG_MAX`). A 64 KiB argument list stays below both even after the process
+# environment is counted, while keeping short/medium invocations on the command line exactly as
+# they were before this PR.
+_JVM_ARGUMENT_FILE_MAX_CMD_LEN = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -460,12 +467,22 @@ async def jvm_process(
     contains_chroot_placeholder = any(
         "{chroot}" in value for value in (*request.classpath_entries, *request.argv)
     )
+    classpath = ":".join([jdk.nailgun_jar, *request.classpath_entries])
+
     # Nailgun sends the classpath and program arguments to the already-running server over a
     # socket rather than via argv, so it isn't subject to the OS argument-length limit the argfile
     # works around, and doesn't benefit from one. Route through the argfile only when nailgun
     # won't be used, rather than disabling nailgun to make room for it.
+    #
+    # Only start using the argfile once the serialized command line actually risks the OS limit
+    # (see `_JVM_ARGUMENT_FILE_MAX_CMD_LEN`); otherwise short/medium invocations stay inline
+    # exactly as they did before this PR.
+    argument_length = len(" ".join(["-cp", classpath, *jvm_options, *request.argv]))
     use_argfile = (
-        jdk.jre_major_version >= 9 and not request.use_nailgun and not contains_chroot_placeholder
+        jdk.jre_major_version >= 9
+        and not request.use_nailgun
+        and not contains_chroot_placeholder
+        and argument_length > _JVM_ARGUMENT_FILE_MAX_CMD_LEN
     )
     use_nailgun = []
     if request.use_nailgun and not use_argfile:
@@ -482,7 +499,7 @@ async def jvm_process(
 
     java_args = [
         "-cp",
-        ":".join([jdk.nailgun_jar, *request.classpath_entries]),
+        classpath,
         *jvm_options,
         *request.argv,
     ]
