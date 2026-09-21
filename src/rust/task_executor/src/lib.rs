@@ -15,6 +15,11 @@ use tokio::task::{Id, JoinError, JoinHandle, JoinSet};
 /// Tokio's own default. A conservative cap would stall clients rather than bound anything useful.
 const MAX_REQUEST_THREADS: usize = 512;
 
+/// Keeps the blocking pool under LMDB's 126-reader default so a run can't hit
+/// `MDB_READERS_FULL`, no matter how large `--rule-threads-core`/`--rule-threads-max` or the
+/// core count get. See https://github.com/pantsbuild/pants/issues/23652.
+const MAX_BLOCKING_THREADS_LMDB_SAFE: usize = 120;
+
 /// Copy our (thread-local or task-local) stdio destination and current workunit parent into
 /// the task. The former ensures that when a pantsd thread kicks off a future, any stdio done
 /// by it ends up in the pantsd log as we expect. The latter ensures that when a new workunit
@@ -52,6 +57,8 @@ pub struct Executor {
     handle: Handle,
     request_pool: Arc<Mutex<Option<Runtime>>>,
     request_pool_handle: Option<Handle>,
+    /// Set by `new_owned`; `None` for `new()`, which borrows an ambient Runtime we don't size.
+    max_blocking_threads: Option<usize>,
 }
 
 impl Executor {
@@ -70,6 +77,7 @@ impl Executor {
             handle: Handle::current(),
             request_pool: Arc::new(Mutex::new(None)),
             request_pool_handle: None,
+            max_blocking_threads: None,
         }
     }
 
@@ -94,11 +102,21 @@ impl Executor {
         let on_thread_start = Arc::new(on_thread_start);
         let on_thread_stop = Arc::new(on_thread_stop);
 
+        let requested_blocking_threads = match max_threads.checked_sub(num_worker_threads) {
+            Some(n) if n > 0 => n,
+            _ => {
+                return Err(format!(
+                    "Invalid thread configuration: max_threads ({max_threads}) must be greater than num_worker_threads ({num_worker_threads})."
+                ));
+            }
+        };
+        let max_blocking_threads = requested_blocking_threads.min(MAX_BLOCKING_THREADS_LMDB_SAFE);
+
         let mut runtime_builder = Builder::new_multi_thread();
 
         runtime_builder
             .worker_threads(num_worker_threads)
-            .max_blocking_threads(max_threads - num_worker_threads)
+            .max_blocking_threads(max_blocking_threads)
             .enable_all();
 
         // NB: These run on every runtime-managed thread, including blocking-pool threads, which
@@ -144,6 +162,7 @@ impl Executor {
             handle,
             request_pool: Arc::new(Mutex::new(Some(request_pool))),
             request_pool_handle: Some(request_pool_handle),
+            max_blocking_threads: Some(max_blocking_threads),
         })
     }
 
@@ -157,7 +176,15 @@ impl Executor {
             handle: self.handle.clone(),
             request_pool: Arc::new(Mutex::new(None)),
             request_pool_handle: self.request_pool_handle.clone(),
+            max_blocking_threads: self.max_blocking_threads,
         }
+    }
+
+    /// The actual blocking-pool thread count, possibly capped below what was requested (see
+    /// `MAX_BLOCKING_THREADS_LMDB_SAFE`). `None` if this Executor wraps an ambient Runtime we
+    /// didn't size ourselves (see `new()`).
+    pub fn max_blocking_threads(&self) -> Option<usize> {
+        self.max_blocking_threads
     }
 
     ///
@@ -401,5 +428,39 @@ impl TailTasks {
             );
             inner.task_set.abort_all();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Executor, MAX_BLOCKING_THREADS_LMDB_SAFE};
+
+    #[test]
+    fn new_owned_caps_blocking_threads_at_lmdb_safe_limit() {
+        // `rule_threads_max` can exceed this on large-core machines (#23652).
+        let executor =
+            Executor::new_owned(4, 4 + 10 * MAX_BLOCKING_THREADS_LMDB_SAFE, || {}, || {}).unwrap();
+        assert_eq!(
+            executor.max_blocking_threads(),
+            Some(MAX_BLOCKING_THREADS_LMDB_SAFE)
+        );
+    }
+
+    #[test]
+    fn new_owned_does_not_cap_small_requests() {
+        let requested_blocking_threads = MAX_BLOCKING_THREADS_LMDB_SAFE - 1;
+        let executor =
+            Executor::new_owned(2, 2 + requested_blocking_threads, || {}, || {}).unwrap();
+        assert_eq!(
+            executor.max_blocking_threads(),
+            Some(requested_blocking_threads)
+        );
+    }
+
+    #[test]
+    fn new_owned_errors_rather_than_underflows() {
+        // Regression: this subtraction used to underflow instead of returning an error.
+        assert!(Executor::new_owned(4, 4, || {}, || {}).is_err());
+        assert!(Executor::new_owned(4, 3, || {}, || {}).is_err());
     }
 }
