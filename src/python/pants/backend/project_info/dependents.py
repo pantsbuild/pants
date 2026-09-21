@@ -40,7 +40,7 @@ class DependentsOutputFormat(Enum):
     json = "json"
 
 
-@rule(desc="Map all targets to their dependents", level=LogLevel.DEBUG)
+@rule(desc="Map all targets to their dependents", level=LogLevel.INFO)
 async def map_addresses_to_dependents(all_targets: AllUnexpandedTargets) -> AddressToDependents:
     dependencies_per_target = await concurrently(
         resolve_dependencies(
