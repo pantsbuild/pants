@@ -343,7 +343,8 @@ def test_create_py_executor_respects_small_thread_counts() -> None:
 
 
 def test_create_py_executor_clamps_and_warns_for_large_thread_counts(caplog) -> None:
-    # rule_threads_core=64 means rule_threads_max defaults to 256, well past the 120 cap (#23652).
+    # rule_threads_core=64 means rule_threads_max defaults to 256, so the requested blocking pool
+    # (max - core = 192) is past the 120 cap (#23652).
     ob = create_options_bootstrapper(
         args=["--rule-threads-core=64"],
     )
