@@ -318,6 +318,7 @@ def test_pex3_venv_create_extra_args_are_passed_through() -> None:
         pex3_venv_create_extra_args=extra_args_field,
         pex_build_extra_args=Mock(),
         layout=Mock(),
+        link_python=Mock(),
     )
 
     observed_calls = []

@@ -32,6 +32,7 @@ class PexVenvRequest:
     platforms: PexPlatforms = PexPlatforms()
     complete_platforms: CompletePlatforms = CompletePlatforms()
     prefix: None | str = None
+    link_python: None | str = None
     extra_args: tuple[str, ...] = ()
 
 
@@ -72,6 +73,11 @@ async def pex_venv(request: PexVenvRequest) -> PexVenv:
                     f"--pex-repository={request.pex.name}",
                     f"--layout={request.layout.value}",
                     *((f"--prefix={request.prefix}",) if request.prefix is not None else ()),
+                    *(
+                        (f"--link-python={request.link_python}",)
+                        if request.link_python is not None
+                        else ()
+                    ),
                     # NB. Specifying more than one of these args doesn't make sense for `venv
                     # create`. Incorrect usage will be surfaced as a subprocess failure.
                     *request.platforms.generate_pex_arg_list(),
