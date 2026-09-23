@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import override
 
 from pants.backend.python.subsystems.setuptools import PythonDistributionFieldSet
 from pants.backend.python.subsystems.twine import TwineSubsystem
@@ -76,7 +77,8 @@ class PublishPythonPackageFieldSet(PublishFieldSet):
     repositories: PythonRepositoriesField
     skip_twine: SkipTwineUploadField
 
-    def make_skip_request(self, package_fs: PackageFieldSet) -> PythonDistCheckSkipRequest | None:
+    @override
+    def check_skip_request(self, package_fs: PackageFieldSet) -> PythonDistCheckSkipRequest | None:
         return PythonDistCheckSkipRequest(publish_fs=self, package_fs=package_fs)
 
     def get_output_data(self) -> PublishOutputData:
