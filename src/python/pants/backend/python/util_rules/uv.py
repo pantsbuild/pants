@@ -310,7 +310,8 @@ async def create_venv_repository_from_uv_lockfile(
     pants_lock = pants_lock_bin()
     command = dedent(
         f"""\
-        cache_root="$({realpath_binary.path} {shlex.quote(VenvRepository.cache_dir)})"
+        #cache_root="$({realpath_binary.path} {shlex.quote(VenvRepository.cache_dir)})"
+        cache_root={shlex.quote(VenvRepository.cache_dir)}
         project_env="${{cache_root}}/{venv_path_suffix}"
         lock_path="${{project_env}}.lock"
         {mkdir_binary.path} -p "$({dirname_binary.path} "${{lock_path}}")"

@@ -43,7 +43,11 @@ def run_docformatter(
     rule_runner: RuleRunner, targets: list[Target], *, extra_args: list[str] | None = None
 ) -> FmtResult:
     rule_runner.set_options(
-        ["--backend-packages=pants.backend.python.lint.docformatter", *(extra_args or ())],
+        args=[
+            "--backend-packages=pants.backend.python.lint.docformatter",
+            "--python-interpreter-constraints=['==3.12.*']",
+            *(extra_args or ()),
+        ],
         env_inherit={"PATH", "PYENV_ROOT", "HOME"},
     )
     field_sets = [DocformatterFieldSet.create(tgt) for tgt in targets]
