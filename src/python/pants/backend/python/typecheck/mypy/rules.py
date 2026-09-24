@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterable
+import os
+from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
 from textwrap import dedent  # noqa: PNT20
@@ -13,11 +15,14 @@ import packaging
 
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.typecheck.mypy.subsystem import (
+    CONFIG_DISCOVERY_CONTENT_CHECKS,
+    CONFIG_DISCOVERY_FILENAMES,
     MyPy,
     MyPyCacheMode,
     MyPyConfigFile,
     MyPyFieldSet,
     MyPyFirstPartyPlugins,
+    setup_mypy_config,
 )
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
@@ -46,6 +51,11 @@ from pants.core.goals.check import (
     CheckResults,
     CheckSubsystem,
 )
+from pants.core.util_rules.config_files import (
+    GatherPrioritizedConfigFilesByDirectoriesRequest,
+    OrphanFilepathConfigBehavior,
+    gather_prioritized_config_files_by_workspace_dir,
+)
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import (
     CpBinary,
@@ -56,9 +66,25 @@ from pants.core.util_rules.system_binaries import (
     ShBinary,
 )
 from pants.engine.collection import Collection
-from pants.engine.fs import CreateDigest, FileContent, MergeDigests, RemovePrefix
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    DigestSubset,
+    FileContent,
+    MergeDigests,
+    PathGlobs,
+    RemovePrefix,
+)
 from pants.engine.internals.graph import resolve_coarsened_targets as coarsened_targets_get
-from pants.engine.intrinsics import create_digest, execute_process, merge_digests, remove_prefix
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_subset_to_digest,
+    execute_process,
+    get_digest_contents,
+    merge_digests,
+    remove_prefix,
+)
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import CoarsenedTargets, CoarsenedTargetsRequest
 from pants.engine.unions import UnionRule
@@ -74,10 +100,12 @@ class MyPyPartition:
     root_targets: CoarsenedTargets
     resolve_description: str | None
     interpreter_constraints: InterpreterConstraints
+    config_file: MyPyConfigFile
 
     def description(self) -> str:
         ics = str(sorted(str(c) for c in self.interpreter_constraints))
-        return f"{self.resolve_description}, {ics}" if self.resolve_description else ics
+        base = f"{self.resolve_description}, {ics}" if self.resolve_description else ics
+        return f"{base} ({self.config_file.path})" if self.config_file.path else base
 
 
 class MyPyPartitions(Collection[MyPyPartition]):
@@ -121,10 +149,11 @@ async def _generate_argv(
     venv_python: str,
     file_list_path: str,
     python_version: str | None,
+    config_path: str | None,
 ) -> tuple[str, ...]:
     args = [pex.pex.argv0, f"--python-executable={venv_python}", *mypy.args]
-    if mypy.config:
-        args.append(f"--config-file={mypy.config}")
+    if config_path:
+        args.append(f"--config-file={config_path}")
     if python_version:
         args.append(f"--python-version={python_version}")
 
@@ -161,7 +190,6 @@ def determine_python_files(files: Iterable[str]) -> tuple[str, ...]:
 @rule
 async def mypy_typecheck_partition(
     partition: MyPyPartition,
-    config_file: MyPyConfigFile,
     first_party_plugins: MyPyFirstPartyPlugins,
     build_root: BuildRoot,
     mypy: MyPy,
@@ -255,13 +283,15 @@ async def mypy_typecheck_partition(
         closure_sources_get, requirements_venv_pex_request, file_list_digest_request
     )
 
-    py_version = config_file.python_version_to_autoset(
+    py_version = partition.config_file.python_version_to_autoset(
         partition.interpreter_constraints, python_setup.interpreter_versions_universe
     )
     named_cache_dir = ".cache/mypy_cache"
     mypy_cache_dir = f"{named_cache_dir}/{sha256(build_root.path.encode()).hexdigest()}"
     if partition.resolve_description:
         mypy_cache_dir += f"/{partition.resolve_description}"
+    if partition.config_file.path:
+        mypy_cache_dir += f"/{sha256(partition.config_file.path.encode()).hexdigest()}"
     run_cache_dir = ".tmp_cache/mypy_cache"
     argv = await _generate_argv(
         mypy,
@@ -270,6 +300,7 @@ async def mypy_typecheck_partition(
         cache_dir=run_cache_dir,
         file_list_path=file_list_path,
         python_version=py_version,
+        config_path=partition.config_file.path,
     )
 
     mypy_command = " ".join(shell_quote(arg) for arg in argv)
@@ -371,7 +402,7 @@ async def mypy_typecheck_partition(
                 first_party_plugins.sources_digest,
                 closure_sources.source_files.snapshot.digest,
                 requirements_venv_pex.digest,
-                config_file.digest,
+                partition.config_file.digest,
                 script_runner_digest,
             ]
         )
@@ -424,6 +455,68 @@ async def mypy_typecheck_partition(
     )
 
 
+async def _mypy_config_file_for_path(
+    config_path: str | None, all_configs: Digest, mypy: MyPy
+) -> MyPyConfigFile:
+    if config_path is None:
+        return MyPyConfigFile(
+            EMPTY_DIGEST, None, mypy.check_and_warn_if_python_version_configured(None)
+        )
+    config_digest = await digest_subset_to_digest(
+        DigestSubset(all_configs, PathGlobs([config_path]))
+    )
+    digest_contents = await get_digest_contents(config_digest)
+    config_content = digest_contents[0] if digest_contents else None
+    python_version_configured = mypy.check_and_warn_if_python_version_configured(config_content)
+    return MyPyConfigFile(config_digest, config_path, python_version_configured)
+
+
+async def _mypy_field_set_to_config_file(
+    field_sets: Sequence[MyPyFieldSet], mypy: MyPy
+) -> dict[MyPyFieldSet, MyPyConfigFile]:
+    """Map each field set to the MyPyConfigFile that applies to it.
+
+    If an explicit config is set, or config discovery is disabled, every field set shares the
+    single repo-wide config (mirroring the pre-existing, non-hierarchical behavior). Otherwise,
+    Pants looks for the nearest ancestor mypy config file for each field set's source file, so
+    different parts of the repo can use different MyPy configs.
+    """
+    if mypy.config or not mypy.config_discovery:
+        config_file = await setup_mypy_config(**implicitly())
+        return dict.fromkeys(field_sets, config_file)
+
+    gathered = await gather_prioritized_config_files_by_workspace_dir(
+        GatherPrioritizedConfigFilesByDirectoriesRequest(
+            tool_name=mypy.options_scope,
+            candidate_conf_filenames=CONFIG_DISCOVERY_FILENAMES,
+            filepaths=tuple(field_set.sources.file_path for field_set in field_sets),
+            content_marker_by_filename=CONFIG_DISCOVERY_CONTENT_CHECKS,
+            orphan_filepath_behavior=OrphanFilepathConfigBehavior.IGNORE,
+        )
+    )
+
+    config_path_by_field_set = {
+        field_set: gathered.source_dir_to_config_file.get(
+            os.path.dirname(field_set.sources.file_path)
+        )
+        for field_set in field_sets
+    }
+    unique_config_paths = sorted(set(config_path_by_field_set.values()), key=lambda p: p or "")
+    config_file_by_path = dict(
+        zip(
+            unique_config_paths,
+            await concurrently(
+                _mypy_config_file_for_path(config_path, gathered.snapshot.digest, mypy)
+                for config_path in unique_config_paths
+            ),
+        )
+    )
+    return {
+        field_set: config_file_by_path[config_path]
+        for field_set, config_path in config_path_by_field_set.items()
+    }
+
+
 @rule(desc="Determine if necessary to partition MyPy input", level=LogLevel.DEBUG)
 async def mypy_determine_partitions(
     request: MyPyRequest, mypy: MyPy, python_setup: PythonSetup
@@ -431,27 +524,41 @@ async def mypy_determine_partitions(
     resolve_and_interpreter_constraints_to_field_sets = (
         _partition_by_interpreter_constraints_and_resolve(request.field_sets, python_setup)
     )
-    coarsened_targets = await coarsened_targets_get(
-        CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
-        **implicitly(),
+    coarsened_targets, field_set_to_config_file = await concurrently(
+        coarsened_targets_get(
+            CoarsenedTargetsRequest(field_set.address for field_set in request.field_sets),
+            **implicitly(),
+        ),
+        _mypy_field_set_to_config_file(request.field_sets, mypy),
     )
     coarsened_targets_by_address = coarsened_targets.by_address()
 
-    return MyPyPartitions(
-        MyPyPartition(
-            FrozenOrderedSet(field_sets),
-            CoarsenedTargets(
-                OrderedSet(
-                    coarsened_targets_by_address[field_set.address] for field_set in field_sets
+    partitions = []
+    for (resolve, interpreter_constraints), field_sets in sorted(
+        resolve_and_interpreter_constraints_to_field_sets.items()
+    ):
+        field_sets_by_config_file: dict[MyPyConfigFile, list[MyPyFieldSet]] = defaultdict(list)
+        for field_set in field_sets:
+            field_sets_by_config_file[field_set_to_config_file[field_set]].append(field_set)
+
+        for config_file, config_field_sets in sorted(
+            field_sets_by_config_file.items(), key=lambda item: item[0].path or ""
+        ):
+            partitions.append(
+                MyPyPartition(
+                    FrozenOrderedSet(config_field_sets),
+                    CoarsenedTargets(
+                        OrderedSet(
+                            coarsened_targets_by_address[field_set.address]
+                            for field_set in config_field_sets
+                        )
+                    ),
+                    resolve if len(python_setup.resolves) > 1 else None,
+                    interpreter_constraints or mypy.interpreter_constraints,
+                    config_file,
                 )
-            ),
-            resolve if len(python_setup.resolves) > 1 else None,
-            interpreter_constraints or mypy.interpreter_constraints,
-        )
-        for (resolve, interpreter_constraints), field_sets in sorted(
-            resolve_and_interpreter_constraints_to_field_sets.items()
-        )
-    )
+            )
+    return MyPyPartitions(partitions)
 
 
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)

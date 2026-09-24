@@ -19,6 +19,7 @@ from pants.util.dirutil import (
     absolute_symlink,
     fast_relpath,
     find_nearest_ancestor_file,
+    find_nearest_ancestor_file_by_priority_order,
     group_by_dir,
     longest_dir_prefix,
     read_file,
@@ -496,3 +497,29 @@ def test_find_nearest_ancestor_file() -> None:
     assert find_nearest_ancestor_file(files2, "foo", "grok.conf") is None
     assert find_nearest_ancestor_file(files2, "foo/", "grok.conf") is None
     assert find_nearest_ancestor_file(files2, "", "grok.conf") is None
+
+
+def test_find_nearest_ancestor_file_by_priority_order() -> None:
+    candidates = ("mypy.ini", ".mypy.ini", "pyproject.toml", "setup.cfg")
+
+    # Within a single directory, the first candidate in priority order wins.
+    files = {"foo/bar/setup.cfg", "foo/bar/pyproject.toml", "foo/bar/.mypy.ini"}
+    assert (
+        find_nearest_ancestor_file_by_priority_order(files, "foo/bar", candidates)
+        == "foo/bar/.mypy.ini"
+    )
+
+    # A closer ancestor directory wins even if it only has a lower-priority filename than a
+    # farther ancestor.
+    files2 = {"mypy.ini", "foo/bar/setup.cfg"}
+    assert (
+        find_nearest_ancestor_file_by_priority_order(files2, "foo/bar", candidates)
+        == "foo/bar/setup.cfg"
+    )
+    assert find_nearest_ancestor_file_by_priority_order(files2, "foo", candidates) == "mypy.ini"
+    assert find_nearest_ancestor_file_by_priority_order(files2, "", candidates) == "mypy.ini"
+
+    # No candidate found anywhere in the ancestry.
+    files3 = {"hello/world/mypy.ini"}
+    assert find_nearest_ancestor_file_by_priority_order(files3, "foo/bar", candidates) is None
+    assert find_nearest_ancestor_file_by_priority_order(files3, "", candidates) is None
