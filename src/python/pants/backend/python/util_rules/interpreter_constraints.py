@@ -615,21 +615,24 @@ def _major_minor_version_when_single_and_entire(ics: InterpreterConstraints) -> 
 
 
 @memoized
-def _warn_on_python2_usage_in_interpreter_constraints(
+def _includes_python2(interpreter_constraints: tuple[str, ...]) -> bool:
+    return InterpreterConstraints(interpreter_constraints).includes_python2()
+
+
+@memoized
+def _log_python2_usage_warning(
     interpreter_constraints: tuple[str, ...], *, description_of_origin: str
 ) -> None:
-    ics = InterpreterConstraints(interpreter_constraints)
-    if ics.includes_python2():
-        logger.warning(
-            f"The Python interpreter constraints from {description_of_origin} includes Python 2.x as a selected Python version. "
-            "Please note that Pants will no longer be proactively tested with Python 2.x starting with Pants v2.24.x because "
-            "Python 2 support ended on 1 January 2020. Please consider upgrading to Python 3.x for your code."
-        )
+    logger.warning(
+        f"The Python interpreter constraints from {description_of_origin} includes Python 2.x as a selected Python version. "
+        "Please note that Pants will no longer be proactively tested with Python 2.x starting with Pants v2.24.x because "
+        "Python 2 support ended on 1 January 2020. Please consider upgrading to Python 3.x for your code."
+    )
 
 
 def warn_on_python2_usage_in_interpreter_constraints(
     interpreter_constraints: Iterable[str], *, description_of_origin: str
 ) -> None:
-    _warn_on_python2_usage_in_interpreter_constraints(
-        tuple(interpreter_constraints), description_of_origin=description_of_origin
-    )
+    ics = tuple(interpreter_constraints)
+    if _includes_python2(ics):
+        _log_python2_usage_warning(ics, description_of_origin=description_of_origin)
