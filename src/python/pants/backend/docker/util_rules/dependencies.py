@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 
@@ -18,11 +19,12 @@ from pants.backend.docker.util_rules.docker_build_args import (
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.base.specs import FileLiteralSpec, RawSpecs
 from pants.core.goals.package import AllPackageableTargets, OutputPathField
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.internals.graph import resolve_targets, resolve_unparsed_address_inputs
-from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import softwrap
 
 
@@ -31,6 +33,46 @@ class DockerInferenceFieldSet(FieldSet):
     required_fields = (DockerImageDependenciesField,)
 
     dependencies: DockerImageDependenciesField
+
+
+@dataclass(frozen=True)
+class PackageableOutputPathsRequest:
+    file_ending: str | None
+
+
+@dataclass(frozen=True)
+class PackageableOutputPaths:
+    """Maps each default output path (for one file ending) to the positions in
+    `AllPackageableTargets` of the targets which produce it."""
+
+    positions_by_path: FrozenDict[str, tuple[int, ...]]
+
+
+@dataclass(frozen=True)
+class PackageableTargetPositions:
+    positions: FrozenDict[Address, int]
+
+
+@rule
+async def packageable_target_positions(
+    all_packageable_targets: AllPackageableTargets,
+) -> PackageableTargetPositions:
+    return PackageableTargetPositions(
+        FrozenDict({target.address: i for i, target in enumerate(all_packageable_targets)})
+    )
+
+
+@rule
+async def packageable_output_paths(
+    request: PackageableOutputPathsRequest, all_packageable_targets: AllPackageableTargets
+) -> PackageableOutputPaths:
+    positions_by_path: dict[str, list[int]] = defaultdict(list)
+    for i, target in enumerate(all_packageable_targets):
+        output_path = target.get(OutputPathField).value_or_default(file_ending=request.file_ending)
+        positions_by_path[output_path].append(i)
+    return PackageableOutputPaths(
+        FrozenDict({path: tuple(positions) for path, positions in positions_by_path.items()})
+    )
 
 
 class InferDockerDependencies(InferDependenciesRequest):
@@ -95,27 +137,34 @@ async def infer_docker_dependencies(
     # NB: The suffix gets an `or None` `pathlib` includes the ".", but `OutputPathField` doesn't
     # expect it (if you give it "", it'll leave a trailing ".").
     possible_file_endings = {PurePath(path).suffix[1:] or None for path in maybe_output_paths}
+    output_paths_per_ending = await concurrently(
+        packageable_output_paths(PackageableOutputPathsRequest(file_ending), **implicitly())
+        for file_ending in sorted(possible_file_endings, key=lambda e: e or "")
+    )
+    positions = (await packageable_target_positions(**implicitly())).positions
+
+    # Targets which are images we depend on.
+    image_positions = {positions[a] for a in putative_image_addresses if a in positions}
+    # Targets which look like they could generate a file we're trying to COPY.
+    output_path_positions = {
+        position
+        for output_paths in output_paths_per_ending
+        for path in maybe_output_paths
+        for position in output_paths.positions_by_path.get(path, ())
+    }
+    # Targets with the same address as an ARG that will eventually be copied.
+    copy_positions = {positions[a] for a in putative_copy_target_addresses if a in positions}
+
     inferred_addresses = []
-    for target in all_packageable_targets:
-        # If the target is an image we depend on, add it
-        if target.address in putative_image_addresses:
-            inferred_addresses.append(target.address)
+    for position in sorted(image_positions | output_path_positions | copy_positions):
+        address = all_packageable_targets[position].address
+        if position in image_positions:
+            inferred_addresses.append(address)
             continue
-
-        # If the target looks like it could generate the file we're trying to COPY
-        output_path_field = target.get(OutputPathField)
-        possible_output_paths = {
-            output_path_field.value_or_default(file_ending=file_ending)
-            for file_ending in possible_file_endings
-        }
-        for output_path in possible_output_paths:
-            if output_path in maybe_output_paths:
-                inferred_addresses.append(target.address)
-                break
-
-        # If the target has the same address as an ARG that will eventually be copied
-        if target.address in putative_copy_target_addresses:
-            inferred_addresses.append(target.address)
+        if position in output_path_positions:
+            inferred_addresses.append(address)
+        if position in copy_positions:
+            inferred_addresses.append(address)
 
     # add addresses from source paths if they are files directly
     addresses_from_source_paths = await resolve_targets(
