@@ -9,7 +9,10 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.dependency_inference.module_mapper import PythonModuleOwners
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModuleOwners,
+    find_all_python_targets,
+)
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonImportInfo,
     ParsedPythonImports,
@@ -27,6 +30,7 @@ from pants.backend.python.dependency_inference.rules import (
     UnownedImportsPossibleOwnersRequest,
     _find_other_owners_for_unowned_imports,
     _get_imports_info,
+    get_python_source_owners_by_file,
     import_rules,
     infer_python_conftest_dependencies,
     infer_python_init_dependencies,
@@ -372,6 +376,8 @@ def test_infer_python_inits(behavior: InitFilesInference) -> None:
             *target_types_rules.rules(),
             *core_target_types_rules(),
             infer_python_init_dependencies,
+            get_python_source_owners_by_file,
+            find_all_python_targets,
             *PythonInferSubsystem.rules(),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
         ],
@@ -440,6 +446,8 @@ def test_infer_python_conftests() -> None:
             *target_types_rules.rules(),
             *core_target_types_rules(),
             infer_python_conftest_dependencies,
+            get_python_source_owners_by_file,
+            find_all_python_targets,
             *PythonInferSubsystem.rules(),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
