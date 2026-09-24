@@ -15,6 +15,7 @@ from pants.backend.python.util_rules.interpreter_constraints import (
     _PATCH_VERSION_UPPER_BOUND,
     InterpreterConstraints,
     parse_constraint,
+    warn_on_python2_usage_in_interpreter_constraints,
 )
 from pants.build_graph.address import Address
 from pants.engine.target import FieldSet
@@ -218,6 +219,25 @@ def test_interpreter_constraints_includes_python2(constraints) -> None:
 )
 def test_interpreter_constraints_do_not_include_python2(constraints):
     assert InterpreterConstraints(constraints).includes_python2() is False
+
+
+@pytest.mark.parametrize(
+    "constraints,warns",
+    [
+        (["CPython>=2.7,<3"], True),
+        (["CPython>=3.8"], False),
+    ],
+    ids=["python2-warns", "python3-does-not-warn"],
+)
+def test_warn_on_python2_usage_in_interpreter_constraints(
+    caplog: pytest.LogCaptureFixture, constraints: list[str], warns: bool
+) -> None:
+    # The warning is memoized per origin for the life of the process, so use an origin no other
+    # test uses.
+    warn_on_python2_usage_in_interpreter_constraints(
+        constraints, description_of_origin=f"test_warn_on_python2_usage {constraints}"
+    )
+    assert ("includes Python 2.x" in caplog.text) is warns
 
 
 @pytest.mark.parametrize(
