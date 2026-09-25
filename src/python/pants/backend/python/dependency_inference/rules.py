@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
 
-from pants.backend.python.dependency_inference import module_mapper, parse_python_dependencies
+from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.default_unowned_dependencies import (
     DEFAULT_UNOWNED_DEPENDENCIES,
 )
@@ -26,9 +26,11 @@ from pants.backend.python.dependency_inference.parse_python_dependencies import 
     ParsedPythonImports,
     ParsePythonDependenciesRequest,
     PythonFileDependencies,
+    PythonFilesDependencies,
+    parse_python_dependencies,
 )
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
-    parse_python_dependencies as parse_python_dependencies_get,
+    rules as parse_python_dependencies_rules,
 )
 from pants.backend.python.dependency_inference.subsystem import (
     AmbiguityResolution,
@@ -67,6 +69,8 @@ from pants.engine.target import (
     DependenciesRequest,
     ExplicitlyProvidedDependencies,
     FieldSet,
+    InferDependenciesMultiRequest,
+    InferDependenciesMultiResult,
     InferDependenciesRequest,
     InferredDependencies,
 )
@@ -76,7 +80,9 @@ from pants.source.source_root import (
     SourceRootsRequest,
     get_optional_source_roots,
     get_source_root,
+    get_source_roots,
 )
+from pants.util.dirutil import fast_relpath
 from pants.util.docutil import doc_url
 from pants.util.strutil import bullet_list, softwrap
 from pants.vcs.changed import DeletedFiles, get_deleted_files
@@ -99,7 +105,12 @@ class PythonImportDependenciesInferenceFieldSet(FieldSet):
     interpreter_constraints: InterpreterConstraintsField
 
 
+class InferPythonImportDependenciesMulti(InferDependenciesMultiRequest):
+    pass
+
+
 class InferPythonImportDependencies(InferDependenciesRequest):
+    multi_request = InferPythonImportDependenciesMulti
     infer_from = PythonImportDependenciesInferenceFieldSet
 
 
@@ -374,18 +385,16 @@ async def _handle_unowned_imports(
 
 
 async def _exec_parse_deps(
-    field_set: PythonImportDependenciesInferenceFieldSet,
-    python_setup: PythonSetup,
-) -> PythonFileDependencies:
-    source = await determine_source_files(SourceFilesRequest([field_set.source]))
-    resp = await parse_python_dependencies_get(
+    sources: tuple[PythonSourceField, ...],
+) -> PythonFilesDependencies:
+    source = await determine_source_files(SourceFilesRequest(sources))
+    ret = await parse_python_dependencies(
         ParsePythonDependenciesRequest(
             source,
         ),
         **implicitly(),
     )
-    assert len(resp.path_to_deps) == 1
-    return next(iter(resp.path_to_deps.values()))
+    return ret
 
 
 @dataclass(frozen=True)
@@ -473,7 +482,9 @@ async def infer_python_dependencies_via_source(
     if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
         return InferredDependencies([])
 
-    parsed_dependencies = await _exec_parse_deps(request.field_set, python_setup)
+    files_deps = await _exec_parse_deps((request.field_set.source,))
+    assert len(files_deps.path_to_deps) == 1
+    parsed_dependencies = next(iter(files_deps.path_to_deps.values()))
 
     resolve = request.field_set.resolve.normalized_value(python_setup)
 
@@ -525,6 +536,102 @@ async def infer_python_dependencies_via_source(
                         break
 
     return InferredDependencies(sorted(inferred_deps))
+
+
+@rule(desc="Inferring Python dependencies by analyzing source (multi)")
+async def infer_python_dependencies_via_source_multi(
+    request: InferPythonImportDependenciesMulti,
+    python_infer_subsystem: PythonInferSubsystem,
+    python_setup: PythonSetup,
+) -> InferDependenciesMultiResult:
+    field_sets = request.field_sets
+    if not python_infer_subsystem.imports and not python_infer_subsystem.assets:
+        return InferDependenciesMultiResult(tuple(InferredDependencies([]) for _ in field_sets))
+
+    files_deps = await _exec_parse_deps(tuple(fs.source for fs in field_sets))
+    assert len(files_deps.path_to_deps) == len(field_sets)
+
+    # `files_deps.path_to_deps` is keyed by source-root-stripped path (e.g. `pants/util/foo.py`,
+    # not `src/python/pants/util/foo.py`), so we must strip each field set's file path the same
+    # way to look up its parsed dependencies.
+    file_paths = [fs.source.file_path for fs in field_sets]
+    source_roots_result = await get_source_roots(SourceRootsRequest.for_files(file_paths))
+    stripped_file_paths = [
+        fp
+        if (root := source_roots_result.path_to_root[PurePath(fp)].path) == "."
+        else fast_relpath(fp, root)
+        for fp in file_paths
+    ]
+    parsed_dependencies_per_fs = [files_deps.path_to_deps[fp] for fp in stripped_file_paths]
+    resolves = [fs.resolve.normalized_value(python_setup) for fs in field_sets]
+
+    resolved_dependencies_per_fs = await concurrently(
+        resolve_parsed_dependencies(
+            ResolvedParsedPythonDependenciesRequest(fs, parsed_dependencies, resolve),
+            **implicitly(),
+        )
+        for fs, parsed_dependencies, resolve in zip(
+            field_sets, parsed_dependencies_per_fs, resolves
+        )
+    )
+
+    inferred_deps_per_fs: list[frozenset[Address]] = []
+    unowned_imports_per_fs: list[frozenset[str]] = []
+    for resolved_dependencies in resolved_dependencies_per_fs:
+        import_deps, unowned_imports = _collect_imports_info(resolved_dependencies.resolve_results)
+        unowned_imports = _remove_ignored_imports(
+            unowned_imports, python_infer_subsystem.ignored_unowned_imports
+        )
+        asset_deps, _ = _collect_imports_info(resolved_dependencies.assets)
+        inferred_deps_per_fs.append(import_deps | asset_deps)
+        unowned_imports_per_fs.append(unowned_imports)
+
+    await concurrently(
+        _handle_unowned_imports(
+            fs.address,
+            python_infer_subsystem.unowned_dependency_behavior,
+            python_setup,
+            unowned_imports,
+            parsed_dependencies.imports,
+            resolve=resolve,
+        )
+        for fs, unowned_imports, parsed_dependencies, resolve in zip(
+            field_sets, unowned_imports_per_fs, parsed_dependencies_per_fs, resolves
+        )
+    )
+
+    if any(unowned_imports_per_fs):
+        # Let's see if any of the unowned imports were provided by a deleted file. This is
+        # per-request (not per-field-set) global repo state, so we only compute it once.
+        deleted_files: DeletedFiles = await get_deleted_files(**implicitly())
+        deleted_python_files = tuple(f for f in deleted_files.paths if f.endswith((".py", ".pyi")))
+        if deleted_python_files:
+            optional_source_roots_result = await get_optional_source_roots(
+                SourceRootsRequest.for_files(deleted_python_files)
+            )
+            # We drop files not under a source root, since they can't be used for import anyway.
+            stripped_deleted_python_files = tuple(
+                f.relative_to(opt_root.source_root.path)
+                for f, opt_root in optional_source_roots_result.path_to_optional_root.items()
+                if opt_root.source_root
+            )
+            deleted_modules = tuple(
+                module_from_stripped_path(f) for f in stripped_deleted_python_files
+            )
+            for i, unowned_imports in enumerate(unowned_imports_per_fs):
+                for impt in unowned_imports:
+                    for mod in deleted_modules:
+                        if impt == mod or (impt.startswith(mod) and impt[len(mod)] == "."):
+                            # At least one unowned import was provided by a deleted file, so we
+                            # inject a dep on the DeletedTarget pseudo-target.
+                            inferred_deps_per_fs[i] = frozenset(
+                                inferred_deps_per_fs[i] | {DELETED_ADDRESS}
+                            )
+                            break
+
+    return InferDependenciesMultiResult(
+        tuple(InferredDependencies(sorted(inferred_deps)) for inferred_deps in inferred_deps_per_fs)
+    )
 
 
 @dataclass(frozen=True)
@@ -634,14 +741,16 @@ def import_rules():
         resolve_parsed_dependencies,
         find_other_owners_for_unowned_import,
         infer_python_dependencies_via_source,
+        infer_python_dependencies_via_source_multi,
         *pex.rules(),
-        *parse_python_dependencies.rules(),
+        *parse_python_dependencies_rules(),
         *module_mapper.rules(),
         *stripped_source_files.rules(),
         *target_types.rules(),
         *PythonInferSubsystem.rules(),
         *PythonSetup.rules(),
         UnionRule(InferDependenciesRequest, InferPythonImportDependencies),
+        UnionRule(InferDependenciesMultiRequest, InferPythonImportDependenciesMulti),
     ]
 
 
