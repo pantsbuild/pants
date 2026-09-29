@@ -86,7 +86,7 @@ impl crate::CommandRunner for CommandRunner {
             &self.file_store,
             None,
         )
-        .await;
+        .await?;
 
         let key = CacheKey {
             digest: Some(action_digest.into()),

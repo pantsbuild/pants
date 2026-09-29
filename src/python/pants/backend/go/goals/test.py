@@ -270,7 +270,8 @@ async def prepare_go_test_binary(
             GoImportPathMappingRequest(go_mod_addr.address), **implicitly()
         ),
         go_extract_build_options_from_target(
-            GoBuildOptionsFromTargetRequest(request.field_set.address), **implicitly()
+            GoBuildOptionsFromTargetRequest(request.field_set.address, for_tests=True),
+            **implicitly(),
         ),
     )
 
