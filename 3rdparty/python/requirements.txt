@@ -49,6 +49,11 @@ pydevd-pycharm==261.20362.36
 fastapi==0.120.1
 starlette==0.49.1
 strawberry-graphql[fastapi]==0.284.1
+# Pinned to 3.2.x because strawberry sets its requirement to < 3.4.0 but in practice does not
+# work with 3.3.0 (it fails with "cannot import name 'ExecutionContext' from 'graphql.execution'"
+# because ExecutionContext was renamed to Execution in 3.3.0).
+# We can remove this when we upgrade strawberry-graphql to some unaffected version.
+graphql-core<3.3.0
 uvicorn[standard]==0.38.0
 
 beautifulsoup4==4.11.1 # Util for webcrawling for pulling in tool versions
