@@ -28,8 +28,13 @@ from pants.backend.helm.subsystems.k8s_parser import HelmKubeParserSubsystem
 from pants.backend.helm.subsystems.post_renderer import HelmPostRendererSubsystem
 from pants.backend.java.lint.google_java_format.subsystem import GoogleJavaFormatSubsystem
 from pants.backend.java.subsystems.junit import JUnit
+from pants.backend.javascript.lint.prettier.subsystem import Prettier
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
 from pants.backend.kotlin.lint.ktlint.subsystem import KtlintSubsystem
 from pants.backend.nfpm.native_libs.elfdeps.subsystem import Elfdeps
+from pants.backend.openapi.lint.openapi_format.subsystem import OpenApiFormatSubsystem
+from pants.backend.openapi.lint.spectral.subsystem import SpectralSubsystem
+from pants.backend.openapi.subsystems.redocly import Redocly
 from pants.backend.python.goals.coverage_py import CoverageSubsystem
 from pants.backend.python.lint.add_trailing_comma.subsystem import AddTrailingComma
 from pants.backend.python.lint.autoflake.subsystem import Autoflake
@@ -52,6 +57,7 @@ from pants.backend.python.subsystems.setuptools import Setuptools
 from pants.backend.python.subsystems.setuptools_scm import SetuptoolsSCM
 from pants.backend.python.subsystems.twine import TwineSubsystem
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
+from pants.backend.python.typecheck.pyright.subsystem import Pyright
 from pants.backend.python.typecheck.pytype.subsystem import Pytype
 from pants.backend.python.util_rules.lockfile_metadata import PythonLockfileMetadata
 from pants.backend.scala.lint.scalafmt.subsystem import ScalafmtSubsystem
@@ -71,6 +77,11 @@ logger = logging.getLogger(__name__)
 
 
 default_python_interpreter_constraints = "CPython>=3.10,<3.15"
+
+
+def _lockfile_dest_for_resource(resource_pkg: str, filename: str) -> str:
+    """In-repo path for a bundled lockfile resource, relative to the Pants repo root."""
+    return os.path.join("src", "python", resource_pkg.replace(".", os.path.sep), filename)
 
 
 ToolBaseT = TypeVar("ToolBaseT")
@@ -100,6 +111,10 @@ class PythonTool(Tool[PythonToolRequirementsBase]): ...
 
 @dataclass
 class JvmTool(Tool[JvmToolBase]): ...
+
+
+@dataclass
+class NodeJSTool(Tool[NodeJSToolBase]): ...
 
 
 all_python_tools = tuple(
@@ -165,7 +180,23 @@ all_jvm_tools = tuple(
 )
 
 
-name_to_tool = {tool.name: tool for tool in (all_python_tools + all_jvm_tools)}
+all_nodejs_tools = tuple(
+    sorted(
+        [
+            NodeJSTool(Prettier, "pants.backend.experimental.javascript.lint.prettier"),
+            NodeJSTool(Pyright, "pants.backend.experimental.python.typecheck.pyright"),
+            NodeJSTool(SpectralSubsystem, "pants.backend.experimental.openapi.lint.spectral"),
+            NodeJSTool(
+                OpenApiFormatSubsystem, "pants.backend.experimental.openapi.lint.openapi_format"
+            ),
+            NodeJSTool(Redocly, "pants.backend.experimental.openapi"),
+        ],
+        key=lambda tool: tool.name,
+    )
+)
+
+
+name_to_tool = {tool.name: tool for tool in (all_python_tools + all_jvm_tools + all_nodejs_tools)}
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -186,6 +217,9 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--all-jvm", action="store_true", help="Regenerate all builtin JVM tool lockfiles."
+    )
+    parser.add_argument(
+        "--all-nodejs", action="store_true", help="Regenerate all builtin NodeJS tool lockfiles."
     )
     parser.add_argument(
         "--resolver",
@@ -296,6 +330,73 @@ def generate_jvm_tool_lockfiles(
         generate(tmp_buildroot, tools, jvm_args, dry_run, keep_sandboxes)
 
 
+def generate_nodejs_tool_lockfiles(
+    tools: Sequence[NodeJSTool], dry_run: bool, keep_sandboxes: KeepSandboxes
+) -> None:
+    cleanup_tmp = keep_sandboxes == KeepSandboxes.never
+    pants_repo_root = get_buildroot()
+    # The tool-lockfile generation rules live in the core javascript backend; each tool's own
+    # backend only contributes its `ExportableTool` union rule.
+    backends = sorted({tool.backend for tool in tools} | {"pants.backend.experimental.javascript"})
+    custom_cmd = "./pants run build-support/bin/generate_builtin_lockfiles.py"
+
+    # `generate-lockfiles` only emits a lockfile for the configured package manager, so run it
+    # once per manager to produce all three bundled lockfiles.
+    pkg_manager_names = ("npm", "yarn", "pnpm")
+
+    # Generate in an isolated tmp buildroot so the Pants repo's own config and lockfiles can't
+    # influence the result.
+    with temporary_dir(cleanup=cleanup_tmp) as tmp_buildroot:
+        if not cleanup_tmp:
+            logger.info(f"Preserving temp buildroot: {tmp_buildroot}")
+        touch(os.path.join(tmp_buildroot, "pants.toml"))
+
+        for pm_name in pkg_manager_names:
+            tool_dests: dict[str, str] = {}
+            for tool in tools:
+                resources = tool.cls.default_lockfile_resources
+                if not resources or pm_name not in resources:
+                    logger.warning(
+                        f"Skipping {tool.name} for {pm_name}: no bundled lockfile resource configured."
+                    )
+                    continue
+                resource_pkg, resource_filename = resources[pm_name]
+                tool_dests[tool.name] = _lockfile_dest_for_resource(resource_pkg, resource_filename)
+            if not tool_dests:
+                continue
+
+            args = [
+                os.path.join(pants_repo_root, "pants"),
+                "--concurrent",
+                f"--keep-sandboxes={keep_sandboxes.value}",
+                "--anonymous-telemetry-enabled=false",
+                f"--backend-packages={backends}",
+                f"--nodejs-package-manager={pm_name}",
+                # Point `[<tool>].lockfile` at a real path so the goal regenerates each file
+                # instead of skipping the tool (whose default is the bundled-lockfile sentinel).
+                *[f"--{name}-lockfile={dest}" for name, dest in sorted(tool_dests.items())],
+                f"--generate-lockfiles-custom-command={custom_cmd}",
+                "generate-lockfiles",
+                *[f"--resolve={name}" for name in sorted(tool_dests)],
+            ]
+
+            if dry_run:
+                logger.info("Would run: " + " ".join(repr(arg) for arg in args))
+                continue
+
+            logger.info(f"Generating {pm_name} lockfiles for: {', '.join(sorted(tool_dests))}")
+            logger.debug("Running: " + " ".join(repr(arg) for arg in args))
+            subprocess.run(args, cwd=tmp_buildroot, check=True)
+
+            # The goal wrote each lockfile to its repo-relative path inside `tmp_buildroot`; copy
+            # each out to the real repo.
+            for name, rel in sorted(tool_dests.items()):
+                src = os.path.join(tmp_buildroot, rel)
+                dst = os.path.join(pants_repo_root, rel)
+                shutil.copy(src, dst)
+                logger.debug(f"Copied {rel}")
+
+
 def generate(
     buildroot: str,
     tools: Sequence[Tool],
@@ -304,12 +405,7 @@ def generate(
     keep_sandboxes: KeepSandboxes,
 ) -> None:
     def lockfile_inrepo_dest(lockfile_pkg, lockfile_filename):
-        return os.path.join(
-            "src",
-            "python",
-            lockfile_pkg.replace(".", os.path.sep),
-            lockfile_filename,
-        )
+        return _lockfile_dest_for_resource(lockfile_pkg, lockfile_filename)
 
     def lockfile_buildroot_filename(lockfile_name):
         return os.path.join(buildroot, lockfile_name)
@@ -378,22 +474,27 @@ def main() -> None:
 
     python_tools = []
     jvm_tools = []
+    nodejs_tools = []
     for name in args.tool:
         tool = name_to_tool[name]
         if isinstance(tool, PythonTool):
             python_tools.append(tool)
         elif isinstance(tool, JvmTool):
             jvm_tools.append(tool)
+        elif isinstance(tool, NodeJSTool):
+            nodejs_tools.append(tool)
         else:
             raise ValueError(f"Tool {name} has unknown type.")
     if args.all_python:
         python_tools.extend(all_python_tools)
     if args.all_jvm:
         jvm_tools.extend(all_jvm_tools)
-    if not python_tools and not jvm_tools:
+    if args.all_nodejs:
+        nodejs_tools.extend(all_nodejs_tools)
+    if not python_tools and not jvm_tools and not nodejs_tools:
         raise ValueError(
             "Must specify at least one tool, either via positional args, "
-            "or via the --all-python/--all-jvm flags."
+            "or via the --all-python/--all-jvm/--all-nodejs flags."
         )
     if python_tools:
         generate_python_tool_lockfiles(
@@ -401,6 +502,8 @@ def main() -> None:
         )
     if jvm_tools:
         generate_jvm_tool_lockfiles(jvm_tools, args.dry_run, args.keep_sandboxes)
+    if nodejs_tools:
+        generate_nodejs_tool_lockfiles(nodejs_tools, args.dry_run, args.keep_sandboxes)
 
 
 if __name__ == "__main__":

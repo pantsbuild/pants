@@ -11,7 +11,13 @@ import pytest
 
 from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.subsystems import nodejs_tool
-from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase, NodeJSToolRequest
+from pants.backend.javascript.subsystems.nodejs_tool import (
+    NodeJSToolBase,
+    NodeJSToolRequest,
+    _parse_package_name_and_version,
+    bundled_lockfiles,
+)
+from pants.core.goals.generate_lockfiles import DEFAULT_TOOL_LOCKFILE
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.process import Process, ProcessResult
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -24,6 +30,14 @@ class CowsayTool(NodeJSToolBase):
     # Intentionally older version.
     default_version = "cowsay@1.4.0"
     help = "The Cowsay utility for printing cowsay messages"
+
+
+class CowsayToolWithLockfile(NodeJSToolBase):
+    options_scope = "cowsay-locked"
+    name = "CowsayLocked"
+    default_version = "cowsay@1.6.0"
+    help = "Cowsay with bundled lockfile"
+    default_lockfile_resources = bundled_lockfiles(__package__, "cowsay")
 
 
 class TypescriptTool(NodeJSToolBase):
@@ -39,8 +53,10 @@ def rule_runner() -> RuleRunner:
         rules=[
             *nodejs_tool.rules(),
             *CowsayTool.rules(),
+            *CowsayToolWithLockfile.rules(),
             *TypescriptTool.rules(),
             QueryRule(CowsayTool, []),
+            QueryRule(CowsayToolWithLockfile, []),
             QueryRule(TypescriptTool, []),
             QueryRule(ProcessResult, [NodeJSToolRequest]),
             QueryRule(Process, [NodeJSToolRequest]),
@@ -314,6 +330,117 @@ def test_invalid_npm_package_specification():
             self.version = version
             self._binary_name = None
 
-    tool_invalid = TestTool("")
-    with pytest.raises(ValueError, match="Invalid npm package specification: "):
-        _ = tool_invalid.binary_name
+    # An empty spec, and degenerate scoped specs missing the scope or the name, must raise rather
+    # than yield an empty/bogus binary name (which would then break the tool exec).
+    for invalid in ("", "@", "@foo", "@foo@1.0.0", "@scope/", "@/name"):
+        with pytest.raises(ValueError, match="Invalid npm package specification: "):
+            _ = TestTool(invalid).binary_name
+
+
+def test_parse_package_name_and_version():
+    assert _parse_package_name_and_version("prettier@3.6.2") == ("prettier", "3.6.2")
+    assert _parse_package_name_and_version("@redocly/cli@1.10.5") == ("@redocly/cli", "1.10.5")
+    assert _parse_package_name_and_version("@stoplight/spectral-cli@6.5.1") == (
+        "@stoplight/spectral-cli",
+        "6.5.1",
+    )
+    assert _parse_package_name_and_version("pyright@1.1.396") == ("pyright", "1.1.396")
+
+
+def test_bundled_lockfiles_helper():
+    resources = nodejs_tool.bundled_lockfiles("pants.backend.javascript.subsystems", "some-tool")
+    assert resources == {
+        "npm": ("pants.backend.javascript.subsystems", "some-tool.package-lock.json"),
+        "yarn": ("pants.backend.javascript.subsystems", "some-tool.yarn.lock"),
+        "pnpm": ("pants.backend.javascript.subsystems", "some-tool.pnpm-lock.yaml"),
+    }
+
+
+def test_no_bundled_lockfile_by_default():
+    # Tools opt in to bundled lockfiles explicitly; without `default_lockfile_resources` a tool
+    # ships no bundled lockfile (so it won't break custom subclasses).
+    class ToolOptedOut(NodeJSToolBase):
+        options_scope = "opted_out_tool"
+        name = "OptedOutTool"
+        default_version = "some-tool@1.0.0"
+        help = "A tool that ships no bundled lockfile"
+
+    assert ToolOptedOut.default_lockfile_resources is None
+
+
+def test_default_lockfile_option_when_resources_set():
+    class ToolWithResources(NodeJSToolBase):
+        options_scope = "tool_with_resources"
+        name = "ToolWithResources"
+        default_version = "some-tool@1.0.0"
+        help = "A tool with lockfile resources"
+        default_lockfile_resources = {
+            "npm": ("some.package", "tool.package-lock.json"),
+            "yarn": ("some.package", "tool.yarn.lock"),
+            "pnpm": ("some.package", "tool.pnpm-lock.yaml"),
+        }
+
+    assert ToolWithResources.lockfile.kwargs["default"] == DEFAULT_TOOL_LOCKFILE
+
+
+def test_default_lockfile_option_when_no_resources():
+    assert CowsayTool.lockfile.kwargs["default"] is None
+
+
+@pytest.mark.parametrize("package_manager", ["npm", "yarn", "pnpm"])
+def test_bundled_lockfile_execution(rule_runner: RuleRunner, package_manager: str):
+    # Exercise the install-from-bundled-lockfile -> `node_modules/.bin/<tool>` path for every
+    # package manager. The immutable install (`npm ci` / yarn `--immutable` / pnpm
+    # `--frozen-lockfile`) fails unless the bundled lockfile is present and consistent with the
+    # generated package.json, so a passing run also proves the lockfile was actually consumed.
+    rule_runner.set_options(
+        [
+            f"--nodejs-package-manager={package_manager}",
+        ],
+        env_inherit={"PATH"},
+    )
+    tool = rule_runner.request(CowsayToolWithLockfile, [])
+    result = rule_runner.request(
+        ProcessResult,
+        [tool.request(("--version",), EMPTY_DIGEST, "Cowsay version", LogLevel.DEBUG)],
+    )
+    assert result.stdout == b"1.6.0\n"
+
+
+def test_parse_package_name_and_version_error():
+    with pytest.raises(ValueError, match="Invalid npm package specification"):
+        _parse_package_name_and_version("prettier")
+    # A trailing `@` must not silently become an unpinned `""` dependency.
+    with pytest.raises(ValueError, match="Invalid npm package specification"):
+        _parse_package_name_and_version("prettier@")
+
+
+def test_version_override_ignores_bundled_lockfile(rule_runner: RuleRunner):
+    # The bundled lockfile pins the default version's dependency tree; overriding the version
+    # must fall back to unpinned execution instead of a doomed immutable install.
+    rule_runner.set_options(
+        [
+            "--cowsay-locked-version=cowsay@1.5.0",
+            "--nodejs-package-manager=npm",
+        ],
+        env_inherit={"PATH"},
+    )
+    tool = rule_runner.request(CowsayToolWithLockfile, [])
+    request = tool.request(("--version",), EMPTY_DIGEST, "Cowsay version", LogLevel.DEBUG)
+    assert request.lockfile is None
+
+
+def test_non_default_package_manager_version_still_uses_bundled_lockfile(rule_runner: RuleRunner):
+    # A non-default package-manager version no longer disables the bundled lockfile (we removed
+    # that special-case): the request keeps the default-lockfile sentinel. A genuinely
+    # incompatible package manager instead fails the immutable install loudly.
+    rule_runner.set_options(
+        [
+            "--nodejs-package-manager=npm",
+            "--nodejs-package-managers={'npm': '10.9.2'}",
+        ],
+        env_inherit={"PATH"},
+    )
+    tool = rule_runner.request(CowsayToolWithLockfile, [])
+    request = tool.request(("--version",), EMPTY_DIGEST, "Cowsay version", LogLevel.DEBUG)
+    assert request.lockfile == DEFAULT_TOOL_LOCKFILE
