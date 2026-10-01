@@ -21,6 +21,7 @@ from pants.backend.python.util_rules.faas import (
     FaaSArchitecture,
     PythonFaaSCompletePlatforms,
     PythonFaaSLayoutField,
+    PythonFaaSLinkPythonField,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
     PythonFaaSUvPlatforms,
@@ -46,6 +47,7 @@ class _BaseFieldSet(PackageFieldSet):
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
     pex_build_extra_args: PythonFaaSPexBuildExtraArgs
     layout: PythonFaaSLayoutField
+    link_python: PythonFaaSLinkPythonField
     output_path: OutputPathField
     environment: EnvironmentField
 
@@ -85,6 +87,7 @@ async def package_python_aws_lambda_function(
             pex3_venv_create_extra_args=field_set.pex3_venv_create_extra_args,
             pex_build_extra_args=field_set.pex_build_extra_args,
             layout=field_set.layout,
+            link_python=field_set.link_python,
             reexported_handler_module=PythonAwsLambdaHandlerField.reexported_handler_module,
         ),
         **implicitly(),
@@ -110,6 +113,7 @@ async def package_python_aws_lambda_layer(
             pex3_venv_create_extra_args=field_set.pex3_venv_create_extra_args,
             pex_build_extra_args=field_set.pex_build_extra_args,
             layout=field_set.layout,
+            link_python=field_set.link_python,
             # See
             # https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-path
             #
