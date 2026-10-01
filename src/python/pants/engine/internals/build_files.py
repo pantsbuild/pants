@@ -358,7 +358,7 @@ async def parse_address_family(
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
         maybe_parents = await concurrently(
-            parse_address_family(AddressFamilyDir(str(parent_dir)), **implicitly())
+            parse_address_family(**implicitly(AddressFamilyDir(str(parent_dir))))
             for parent_dir in parent_dirs
         )
         for maybe_parent in maybe_parents:
@@ -613,7 +613,7 @@ async def _get_target_family_and_adaptor_for_dep_rules(
         )
     )
     maybe_address_families = await concurrently(
-        parse_address_family(AddressFamilyDir(rules_path), **implicitly())
+        parse_address_family(**implicitly(AddressFamilyDir(rules_path)))
         for rules_path in rules_paths
     )
     maybe_families = {maybe.path: maybe for maybe in maybe_address_families}
