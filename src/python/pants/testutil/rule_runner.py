@@ -275,6 +275,9 @@ class RuleRunner:
             self.build_root = str(build_root)
         else:
             self.build_root = os.path.realpath(safe_mkdtemp(prefix="_BUILD_ROOT"))
+        # Launching a sandboxer per test is overkill, so we disable it by default.
+        # It is sufficiently tested separately.
+        bootstrap_args.append("--no-sandboxer")
 
         safe_mkdir(self.pants_workdir)
         BuildRoot().path = self.build_root
