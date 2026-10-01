@@ -155,16 +155,10 @@ async def infer_docker_dependencies(
     # Targets with the same address as an ARG that will eventually be copied.
     copy_positions = {positions[a] for a in putative_copy_target_addresses if a in positions}
 
-    inferred_addresses = []
-    for position in sorted(image_positions | output_path_positions | copy_positions):
-        address = all_packageable_targets[position].address
-        if position in image_positions:
-            inferred_addresses.append(address)
-            continue
-        if position in output_path_positions:
-            inferred_addresses.append(address)
-        if position in copy_positions:
-            inferred_addresses.append(address)
+    inferred_addresses = {
+        all_packageable_targets[position].address
+        for position in image_positions | output_path_positions | copy_positions
+    }
 
     # add addresses from source paths if they are files directly
     addresses_from_source_paths = await resolve_targets(
@@ -183,7 +177,7 @@ async def infer_docker_dependencies(
         )
     )
 
-    inferred_addresses.extend(e.address for e in addresses_from_source_paths)
+    inferred_addresses.update(e.address for e in addresses_from_source_paths)
 
     return InferredDependencies(Addresses(inferred_addresses))
 
