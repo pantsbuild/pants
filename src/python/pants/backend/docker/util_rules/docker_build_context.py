@@ -41,14 +41,14 @@ from pants.core.goals.package import (
 from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address, UnparsedAddressInputs
-from pants.engine.fs import Digest, MergeDigests, Snapshot
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.internals.graph import (
     find_valid_field_sets,
     resolve_targets,
     resolve_unparsed_address_inputs,
 )
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
-from pants.engine.intrinsics import digest_to_snapshot
+from pants.engine.intrinsics import create_digest, digest_to_snapshot
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     Dependencies,
@@ -362,7 +362,30 @@ async def create_docker_build_context(
     else:
         logger.debug("Did not build any packages for Docker image")
 
-    embedded_pkgs_digest = [built_package.digest for built_package in embedded_pkgs]
+    # A built Docker image's package digest holds its `docker-info.json` metadata file, which
+    # records the image's tags. Tags may embed timestamps or other values that change on every
+    # build, so including that file would make the build context of every downstream image
+    # unstable. Substitute a file holding only the image ID, which is stable for stable inputs.
+    embedded_pkgs_digest: list[Digest] = []
+    stable_docker_info: list[FileContent] = []
+    for built_package in embedded_pkgs:
+        for artifact in built_package.artifacts:
+            if isinstance(artifact, BuiltDockerImage) and artifact.relpath:
+                # `stable` in the file name emphasizes that it contains only metadata that is
+                # stable for given inputs, and not fields, such as tags, that may contain
+                # timestamps or otherwise change on each rebuild.
+                stable_docker_info.append(
+                    FileContent(
+                        f"{artifact.relpath.removesuffix('.json')}.stable.json",
+                        artifact.image_id.encode(),
+                    )
+                )
+                break
+        else:
+            embedded_pkgs_digest.append(built_package.digest)
+    if stable_docker_info:
+        embedded_pkgs_digest.append(await create_digest(CreateDigest(stable_docker_info)))
+
     all_digests = (dockerfile_info.digest, sources.snapshot.digest, *embedded_pkgs_digest)
 
     # Merge all digests to get the final docker build context digest.
