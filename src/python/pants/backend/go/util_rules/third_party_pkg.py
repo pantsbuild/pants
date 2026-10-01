@@ -13,11 +13,25 @@ from typing import Any
 import ijson.backends.python as ijson
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
-from pants.backend.go.subsystems.golang import GolangSubsystem, ThirdPartyTargetGranularity
+from pants.backend.go.subsystems.golang import (
+    GolangSubsystem,
+    GoThirdPartyTargetGeneration,
+    ThirdPartyTargetGranularity,
+)
 from pants.backend.go.util_rules import pkg_analyzer
 from pants.backend.go.util_rules.build_opts import GoBuildOptions
 from pants.backend.go.util_rules.cgo import CGoCompilerFlags
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
+from pants.backend.go.util_rules.import_analysis import (
+    GoStdLibPackagesRequest,
+    analyze_go_stdlib_packages,
+)
+from pants.backend.go.util_rules.import_roots import (
+    FirstPartyImportRootsRequest,
+    GoCodegenImportRootsRequest,
+    determine_codegen_import_roots,
+    determine_first_party_import_roots,
+)
 from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.backend.go.util_rules.sdk import GoSdkProcess
 from pants.build_graph.address import Address
@@ -43,6 +57,7 @@ from pants.engine.intrinsics import (
 )
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.unions import UnionMembership
 from pants.util.dirutil import group_by_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -74,7 +89,9 @@ class ThirdPartyPkgAnalysis:
 
     # Note that we don't care about test-related metadata like `TestImports`, as we'll never run
     # tests directly on a third-party package.
+    # NB: filtered by the host's build constraints. See `all_imports` below.
     imports: tuple[str, ...]
+
     go_files: tuple[str, ...]
     cgo_files: tuple[str, ...]
     cgo_flags: CGoCompilerFlags
@@ -93,6 +110,13 @@ class ThirdPartyPkgAnalysis:
     embed_patterns: tuple[str, ...]
     test_embed_patterns: tuple[str, ...]
     xtest_embed_patterns: tuple[str, ...]
+
+    # `imports` without the host's build constraints applied. Import-scoped target generation must
+    # walk this set, or the closure it computes would depend on the machine running Pants: a
+    # first-party `//go:build windows` file contributes its direct import as a root, but that
+    # module's own Windows-only dependencies would not be followed. Defaulted because a failed
+    # analysis has no imports to report at all.
+    all_imports: tuple[str, ...] = ()
 
     embed_config: EmbedConfig | None = None
     test_embed_config: EmbedConfig | None = None
@@ -449,6 +473,7 @@ async def analyze_go_third_party_package(
         dir_path=request.package_path,
         module_import_path=request.module_import_path,
         imports=tuple(request.pkg_json.get("Imports", ())),
+        all_imports=tuple(request.pkg_json.get("AllImports", ())),
         go_files=tuple(request.pkg_json.get("GoFiles", ())),
         c_files=tuple(request.pkg_json.get("CFiles", ())),
         cxx_files=tuple(request.pkg_json.get("CXXFiles", ())),
@@ -660,9 +685,192 @@ async def download_and_analyze_module(
     return AnalyzedThirdPartyModule(FrozenOrderedSet(analyzed_packages))
 
 
+class ModuleImportPathResolver:
+    """Resolves an import path to the build-list module that provides it.
+
+    Matches `cmd/go`: a module provides an import path when the module path is the import path or
+    a path-segment prefix of it, and where several qualify (e.g. `example.com/a` and
+    `example.com/a/b` are both on the build list) the longest match wins. The longest-first
+    ordering is established in the constructor so `resolve` can rely on it rather than the caller
+    having to uphold it.
+
+    Modules are indexed under both their name and their `import_path`: a versioned `replace` that
+    changes the path (`replace example.com/orig => example.com/fork v1.1.0`) has a `name` of
+    `example.com/fork` while first-party code still imports `example.com/orig/...`.
+    """
+
+    def __init__(self, module_analysis: ModuleDescriptors) -> None:
+        self._modules_by_path: dict[str, ModuleDescriptor] = {}
+        for mod in module_analysis.modules:
+            self._modules_by_path.setdefault(mod.name, mod)
+            self._modules_by_path.setdefault(mod.import_path, mod)
+        self._paths_longest_first = tuple(sorted(self._modules_by_path, key=len, reverse=True))
+
+    def resolve(self, import_path: str) -> ModuleDescriptor | None:
+        for path in self._paths_longest_first:
+            if import_path == path or import_path.startswith(f"{path}/"):
+                return self._modules_by_path[path]
+        return None
+
+
+async def _analyze_imported_packages(
+    request: AllThirdPartyPackagesRequest,
+    module_analysis: ModuleDescriptors,
+    go_sum_index: dict[tuple[str, str], tuple[str, ...]],
+    union_membership: UnionMembership,
+) -> dict[str, ThirdPartyPkgAnalysis]:
+    """Resolve only the third-party packages reachable from first-party code.
+
+    Walks the import graph outward from the `go_mod`'s own imports, downloading a module only when
+    something actually reaches into it, and iterating until no new import paths appear. Contrast
+    with the build-list path, which downloads and analyzes every module `go list -m all` reports
+    regardless of what the repo imports.
+    """
+    resolver = ModuleImportPathResolver(module_analysis)
+    modules_by_name = {mod.name: mod for mod in module_analysis.modules}
+
+    roots, stdlib_packages = await concurrently(
+        determine_first_party_import_roots(
+            FirstPartyImportRootsRequest(
+                go_mod_address=request.go_mod_address,
+                go_mod_path=request.go_mod_path,
+            ),
+            **implicitly(),
+        ),
+        analyze_go_stdlib_packages(
+            GoStdLibPackagesRequest(
+                with_race_detector=request.build_opts.with_race_detector,
+                cgo_enabled=request.build_opts.cgo_enabled,
+            )
+        ),
+    )
+
+    def is_third_party(import_path: str) -> bool:
+        # `C` is the cgo pseudo-package, and a relative import can never name a module.
+        if import_path in stdlib_packages or import_path == "C":
+            return False
+        if import_path.startswith(".") or import_path.startswith("/"):
+            return False
+        return True
+
+    # Sources that do not exist yet -- generated `.pb.go` and friends -- cannot be scanned, so
+    # codegen backends name the runtime modules their output imports. These are pulled in whole:
+    # see `GoCodegenImportRootsRequest` for why package-level precision would buy nothing.
+    codegen_roots = await concurrently(
+        determine_codegen_import_roots(
+            **implicitly(
+                {
+                    hook(
+                        go_mod_address=request.go_mod_address,
+                        go_mod_path=request.go_mod_path,
+                    ): GoCodegenImportRootsRequest
+                }
+            )
+        )
+        for hook in union_membership.get(GoCodegenImportRootsRequest)
+    )
+    codegen_module_names = {
+        module_path
+        for codegen_root in codegen_roots
+        for module_path in codegen_root.module_paths
+        if module_path in modules_by_name
+    }
+
+    known_packages: dict[str, ThirdPartyPkgAnalysis] = {}
+    reachable: dict[str, ThirdPartyPkgAnalysis] = {}
+    analyzed_module_names: set[str] = set()
+    seen_import_paths: set[str] = set()
+
+    if codegen_module_names:
+        codegen_analyzed = await concurrently(
+            download_and_analyze_module(
+                ModuleDownloadRequest(
+                    name=modules_by_name[module_name].name,
+                    version=modules_by_name[module_name].version,
+                    minimum_go_version=modules_by_name[module_name].minimum_go_version,
+                    cgo_enabled=request.build_opts.cgo_enabled,
+                    go_sum_entries=go_sum_index.get(
+                        (
+                            modules_by_name[module_name].name,
+                            modules_by_name[module_name].version,
+                        ),
+                        (),
+                    ),
+                ),
+                **implicitly(),
+            )
+            for module_name in sorted(codegen_module_names)
+        )
+        for module_name, analyzed_module in zip(sorted(codegen_module_names), codegen_analyzed):
+            analyzed_module_names.add(module_name)
+            for pkg in analyzed_module.packages:
+                known_packages[pkg.import_path] = pkg
+                reachable[pkg.import_path] = pkg
+
+    frontier = {ip for ip in roots.import_paths if is_third_party(ip)}
+    # Whatever the codegen modules themselves import has to resolve too.
+    for pkg in reachable.values():
+        frontier.update(ip for ip in (pkg.all_imports or pkg.imports) if is_third_party(ip))
+    seen_import_paths |= set(reachable)
+
+    while frontier:
+        seen_import_paths |= frontier
+
+        # Pull in any module a frontier import path lands in that we have not analyzed yet. The
+        # per-module download is memoized by the engine, so modules shared with another `go_mod`
+        # cost nothing here.
+        pending_modules = {}
+        for import_path in frontier:
+            owning_module = resolver.resolve(import_path)
+            if owning_module is not None and owning_module.name not in analyzed_module_names:
+                pending_modules[owning_module.name] = owning_module
+
+        if pending_modules:
+            newly_analyzed = await concurrently(
+                download_and_analyze_module(
+                    ModuleDownloadRequest(
+                        name=mod.name,
+                        version=mod.version,
+                        minimum_go_version=mod.minimum_go_version,
+                        cgo_enabled=request.build_opts.cgo_enabled,
+                        go_sum_entries=go_sum_index.get((mod.name, mod.version), ()),
+                    ),
+                    **implicitly(),
+                )
+                for mod in pending_modules.values()
+            )
+            for module_name, analyzed_module in zip(pending_modules, newly_analyzed):
+                analyzed_module_names.add(module_name)
+                for pkg in analyzed_module.packages:
+                    known_packages[pkg.import_path] = pkg
+
+        next_frontier: set[str] = set()
+        for import_path in frontier:
+            reached_pkg = known_packages.get(import_path)
+            if reached_pkg is None:
+                # The import path resolved to no package we downloaded. That is normal: an import
+                # only reachable under a build tag we do not satisfy may name a package that does
+                # not exist for this platform, or name no module on the build list at all. The
+                # build-list path would not have produced a target for it either.
+                continue
+            reachable[import_path] = reached_pkg
+            # NB: `all_imports`, not `imports` -- see the field's comment. Falls back to the
+            # filtered set for analyses produced before the field existed.
+            for dep_import_path in reached_pkg.all_imports or reached_pkg.imports:
+                if dep_import_path in seen_import_paths or not is_third_party(dep_import_path):
+                    continue
+                next_frontier.add(dep_import_path)
+
+        frontier = next_frontier
+
+    return reachable
+
+
 @rule(desc="Download and analyze all third-party Go packages", level=LogLevel.DEBUG)
 async def download_and_analyze_third_party_packages(
     request: AllThirdPartyPackagesRequest,
+    golang_subsystem: GolangSubsystem,
+    union_membership: UnionMembership,
 ) -> AllThirdPartyPackages:
     module_analysis = await analyze_module_dependencies(
         ModuleDescriptorsRequest(
@@ -685,6 +893,16 @@ async def download_and_analyze_third_party_packages(
 
     # Parse the go.sum once into a dict for O(1) lookup per module.
     go_sum_index = _parse_go_sum(go_sum_content)
+
+    if golang_subsystem.third_party_target_generation is GoThirdPartyTargetGeneration.IMPORTED:
+        return AllThirdPartyPackages(
+            EMPTY_DIGEST,
+            FrozenDict(
+                await _analyze_imported_packages(
+                    request, module_analysis, go_sum_index, union_membership
+                )
+            ),
+        )
 
     # The engine memoizes by (name, version, minimum_go_version, cgo_enabled,
     # go_sum_entries), so identical modules across go.mods are downloaded
@@ -722,7 +940,8 @@ async def extract_package_info(
             request.go_mod_digest,
             request.go_mod_path,
             build_opts=request.build_opts,
-        )
+        ),
+        **implicitly(),
     )
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info:
