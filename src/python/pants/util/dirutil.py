@@ -444,10 +444,22 @@ def group_by_dir(paths: Iterable[str]) -> dict[str, set[str]]:
 
 def find_nearest_ancestor_file(files: set[str], dir: str, filename: str) -> str | None:
     """Given a filename return the nearest ancestor file of that name in the directory hierarchy."""
+    return find_nearest_ancestor_file_by_priority_order(files, dir, (filename,))
+
+
+def find_nearest_ancestor_file_by_priority_order(
+    files: set[str], dir: str, candidate_filenames: Sequence[str]
+) -> str | None:
+    """Like `find_nearest_ancestor_file`, but with multiple candidate filenames.
+
+    A nearer ancestor directory always wins; within a single directory, the earliest of
+    `candidate_filenames` wins.
+    """
     while True:
-        candidate_config_file_path = os.path.join(dir, filename)
-        if candidate_config_file_path in files:
-            return candidate_config_file_path
+        for filename in candidate_filenames:
+            candidate_config_file_path = os.path.join(dir, filename)
+            if candidate_config_file_path in files:
+                return candidate_config_file_path
 
         if dir == "":
             return None
