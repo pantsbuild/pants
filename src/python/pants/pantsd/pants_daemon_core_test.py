@@ -21,11 +21,11 @@ def test_prepare_scheduler() -> None:
     )
 
     first_scheduler, first_options_initializer = core.prepare(
-        create_options_bootstrapper(["-ldebug"]),
+        create_options_bootstrapper(["-ldebug", "--no-sandboxer"]),
         env,
     )
     second_scheduler, second_options_initializer = core.prepare(
-        create_options_bootstrapper(["-lwarn"]),
+        create_options_bootstrapper(["-lwarn", "--no-sandboxer"]),
         env,
     )
     assert first_scheduler is not second_scheduler
