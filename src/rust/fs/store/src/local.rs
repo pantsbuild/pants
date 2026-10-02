@@ -279,9 +279,9 @@ impl ShardedFSDB {
             let dest_path = self.get_path(fingerprint);
             tokio::fs::create_dir_all(dest_path.parent().unwrap())
                 .await
-                .map_err(
-                    |e| format! {"Failed to create local store subdirectory {dest_path:?}: {e}"},
-                )?;
+                .map_err(|e| {
+                    format!("Failed to create local store subdirectory {dest_path:?}: {e}")
+                })?;
 
             let dest_path2 = dest_path.clone();
             // Make the tempfile in the same dir as the final file so that materializing the final file doesn't
