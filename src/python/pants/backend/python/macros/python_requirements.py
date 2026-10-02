@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Iterator
-from itertools import chain
 from typing import Any
 
 import toml
@@ -15,7 +14,10 @@ from pants.backend.python.macros.common_fields import (
     RequirementsOverrideField,
     TypeStubsModuleMappingField,
 )
-from pants.backend.python.macros.common_requirements_rule import _generate_requirements
+from pants.backend.python.macros.common_requirements_rule import (
+    ParsedRequirement,
+    _generate_requirements,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementTarget
 from pants.engine.rules import collect_rules, rule
@@ -33,7 +35,15 @@ from pants.util.requirements import parse_requirements_file
 from pants.util.strutil import help_text, softwrap
 
 
-def parse_pyproject_toml(pyproject_toml: str, *, rel_path: str) -> Iterator[PipRequirement]:
+def _parse_requirement(dep: str, *, rel_path: str) -> PipRequirement | None:
+    dep, _, _ = dep.partition("--")
+    dep = dep.strip().rstrip("\\")
+    if not dep or dep.startswith(("#", "-")):
+        return None
+    return PipRequirement.parse(dep, description_of_origin=rel_path)
+
+
+def parse_pyproject_toml(pyproject_toml: str, *, rel_path: str) -> Iterator[ParsedRequirement]:
     parsed: dict[str, Any] = toml.loads(pyproject_toml)
     deps_vals: list[str] = parsed.get("project", {}).get("dependencies", [])
     optional_dependencies: dict[str, list[str]] = parsed.get("project", {}).get(
@@ -47,18 +57,12 @@ def parse_pyproject_toml(pyproject_toml: str, *, rel_path: str) -> Iterator[PipR
             )
         )
     for dep in deps_vals:
-        dep, _, _ = dep.partition("--")
-        dep = dep.strip().rstrip("\\")
-        if not dep or dep.startswith(("#", "-")):
-            continue
-        yield PipRequirement.parse(dep, description_of_origin=rel_path)
-    for dep in chain.from_iterable(optional_dependencies.values()):
-        dep, _, _ = dep.partition("--")
-        dep = dep.strip().rstrip("\\")
-        if not dep or dep.startswith(("#", "-")):
-            continue
-        req = PipRequirement.parse(dep, description_of_origin=rel_path)
-        yield req
+        if requirement := _parse_requirement(dep, rel_path=rel_path):
+            yield ParsedRequirement(requirement)
+    for tag, dependencies in optional_dependencies.items():
+        for dependency in dependencies:
+            if requirement := _parse_requirement(dependency, rel_path=rel_path):
+                yield ParsedRequirement(requirement, tags=(tag,))
 
 
 class PythonRequirementsSourceField(SingleSourceField):
@@ -120,7 +124,7 @@ async def generate_from_python_requirement(
 ) -> GeneratedTargets:
     generator = request.generator
     requirements_rel_path = generator[PythonRequirementsSourceField].value
-    callback: Callable[[bytes, str], Iterator[PipRequirement]]
+    callback: Callable[[bytes, str], Iterator[ParsedRequirement]]
     if os.path.basename(requirements_rel_path) == "pyproject.toml":
         callback = parse_pyproject_callback
     else:
@@ -134,11 +138,16 @@ async def generate_from_python_requirement(
     return GeneratedTargets(request.generator, result)
 
 
-def parse_requirements_callback(file_contents: bytes, file_path: str) -> Iterator[PipRequirement]:
-    return parse_requirements_file(file_contents.decode(), rel_path=file_path)
+def parse_requirements_callback(
+    file_contents: bytes, file_path: str
+) -> Iterator[ParsedRequirement]:
+    return (
+        ParsedRequirement(requirement)
+        for requirement in parse_requirements_file(file_contents.decode(), rel_path=file_path)
+    )
 
 
-def parse_pyproject_callback(file_contents: bytes, file_path: str) -> Iterator[PipRequirement]:
+def parse_pyproject_callback(file_contents: bytes, file_path: str) -> Iterator[ParsedRequirement]:
     return parse_pyproject_toml(file_contents.decode(), rel_path=file_path)
 
 
