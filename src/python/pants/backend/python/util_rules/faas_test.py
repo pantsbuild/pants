@@ -26,6 +26,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSHandlerInferenceFieldSet,
     PythonFaaSKnownRuntime,
     PythonFaaSLayoutField,
+    PythonFaaSLinkPythonField,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
@@ -507,6 +508,7 @@ def test_venv_create_extra_args_are_passed_through() -> None:
         pex3_venv_create_extra_args=extra_args_field,
         pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
         layout=PythonFaaSLayoutField(PexVenvLayout.FLAT_ZIPPED.value, addr),
+        link_python=PythonFaaSLinkPythonField(None, addr),
         include_requirements=False,
         include_sources=False,
         reexported_handler_module=None,
@@ -566,6 +568,7 @@ def test_layout_should_be_passed_through_and_adjust_filename(input_layout, expec
         pex3_venv_create_extra_args=Mock(),
         pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
         layout=input_layout,
+        link_python=PythonFaaSLinkPythonField(None, addr),
         include_requirements=False,
         include_sources=False,
         reexported_handler_module=None,
@@ -615,6 +618,7 @@ def test_pex_build_extra_args_passed_through() -> None:
         pex3_venv_create_extra_args=Mock(),
         pex_build_extra_args=extra_pex_args_field,
         layout=PythonFaaSLayoutField(PexVenvLayout.FLAT_ZIPPED.value, addr),
+        link_python=PythonFaaSLinkPythonField(None, addr),
         include_requirements=False,
         include_sources=False,
         reexported_handler_module=None,
@@ -642,3 +646,49 @@ def test_pex_build_extra_args_passed_through() -> None:
     )
 
     assert extra_args[0] in mock_build.mock_calls[0].args[0].additional_args
+
+
+def test_link_python_passed_through() -> None:
+    addr = Address("addr")
+    link_python = "/var/lang/bin/python3.13"
+
+    request = BuildPythonFaaSRequest(
+        address=addr,
+        target_name="test",
+        complete_platforms=Mock(),
+        uv_platforms=Mock(),
+        handler=None,
+        output_path=OutputPathField(None, addr),
+        runtime=Mock(),
+        architecture=FaaSArchitecture.X86_64,
+        pex3_venv_create_extra_args=Mock(),
+        pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
+        layout=PythonFaaSLayoutField(PexVenvLayout.VENV.value, addr),
+        link_python=PythonFaaSLinkPythonField(link_python, addr),
+        include_requirements=False,
+        include_sources=False,
+        reexported_handler_module=None,
+    )
+
+    mock_build = Mock(return_value=Mock(digest=EMPTY_DIGEST))
+
+    # Exercise
+    run_rule_with_mocks(
+        build_python_faas,
+        rule_args=[request, create_subsystem(PythonSetup, resolver=Resolver.pex)],
+        mock_calls={
+            "pants.backend.python.util_rules.faas.infer_runtime_platforms": lambda _: RuntimePlatforms(
+                interpreter_version=None,
+                complete_platforms=CompletePlatforms(),
+                uv_platforms=("aarch64-manylinux_2_17",),
+            ),
+            "pants.backend.python.util_rules.pex.create_pex": lambda _: Pex(
+                digest=EMPTY_DIGEST, name="pex", python=None
+            ),
+            "pants.backend.python.util_rules.pex_venv.pex_venv": mock_build,
+            "pants.engine.intrinsics.create_digest": lambda _: EMPTY_DIGEST,
+            "pants.engine.intrinsics.merge_digests": lambda _: EMPTY_DIGEST,
+        },
+    )
+
+    assert mock_build.mock_calls[0].args[0].link_python == link_python

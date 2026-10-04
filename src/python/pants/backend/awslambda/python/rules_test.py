@@ -436,6 +436,7 @@ def test_pex3_venv_create_extra_args_are_passed_through(
         output_path=Mock(),
         environment=Mock(),
         layout=Mock(),
+        link_python=Mock(),
         **{arg: Mock() for arg in extra_field_set_args},
         pex3_venv_create_extra_args=extra_args_field,
         pex_build_extra_args=PythonFaaSPexBuildExtraArgs(None, addr),
