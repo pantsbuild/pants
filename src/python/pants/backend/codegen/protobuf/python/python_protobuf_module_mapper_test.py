@@ -380,6 +380,26 @@ def test_buf_target_pyi_plugin_does_not_set_module_location(rule_runner: RuleRun
     )
 
 
+@pytest.mark.parametrize("with_protoc_target", [False, True])
+def test_protoc_only_option_warns_only_without_protoc_targets(
+    rule_runner: RuleRunner, caplog: pytest.LogCaptureFixture, with_protoc_target: bool
+) -> None:
+    rule_runner.set_options(["--source-root-patterns=['/']", "--python-protobuf-mypy-plugin"])
+    rule_runner.write_files(
+        {
+            "buf/svc.proto": "",
+            "buf/BUILD": "protobuf_sources(protobuf_generator='buf')",
+            **(
+                {"protoc/svc.proto": "", "protoc/BUILD": "protobuf_sources()"}
+                if with_protoc_target
+                else {}
+            ),
+        }
+    )
+    rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
+    assert ("[python-protobuf].mypy_plugin has no effect" in caplog.text) != with_protoc_target
+
+
 def test_buf_target_grpc_plugin_registers_pb2_grpc(rule_runner: RuleRunner) -> None:
     """A grpc-python plugin entry in `buf.gen.yaml` registers `_pb2_grpc` modules."""
     rule_runner.set_options(
