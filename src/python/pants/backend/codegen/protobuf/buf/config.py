@@ -439,13 +439,29 @@ def resolved_template_path(
 
 @dataclass(frozen=True)
 class BufLayout:
-    """Module layout derived from `buf.yaml`."""
+    """What `buf.yaml` declares, and whether the `buf.lock` beside it exists."""
 
-    buf_yaml_dir: str
-    module_paths: tuple[str, ...]
+    buf_yaml_path: str | None = None
+    module_paths: tuple[str, ...] = ()
+    deps: tuple[str, ...] = ()
+    has_lock: bool = False
+
+    @property
+    def buf_yaml_dir(self) -> str:
+        return os.path.dirname(self.buf_yaml_path) if self.buf_yaml_path else ""
 
     def root_for_proto(self, proto_path: str) -> str:
         return resolve_buf_module_root(proto_path, self.buf_yaml_dir, self.module_paths)
+
+
+def buf_yaml_path(config_files: ConfigFiles) -> str | None:
+    """The `buf.yaml` among the config files, which may also hold its `buf.lock`."""
+    return next((p for p in config_files.snapshot.files if os.path.basename(p) == "buf.yaml"), None)
+
+
+def buf_resolve_name(buf_yaml_path: str) -> str:
+    """The `generate-lockfiles` resolve for a `buf.yaml`: its directory, or `buf` at the root."""
+    return os.path.dirname(buf_yaml_path) or "buf"
 
 
 async def find_buf_config_files(buf: BufSubsystem) -> ConfigFiles:
@@ -459,19 +475,19 @@ async def find_buf_config_files(buf: BufSubsystem) -> ConfigFiles:
 
 
 async def fetch_buf_layout(buf: BufSubsystem) -> BufLayout:
-    """Read `buf.yaml` and return the parsed module layout. Empty if not found.
-
-    `config_request` may also surface `buf.lock` (it's listed in `check_existence`
-    so codegen invalidates on lock changes), so we filter to `buf.yaml` here.
-    """
+    """Read `buf.yaml`. Empty if there isn't one."""
     files = await find_buf_config_files(buf)
-    yaml_paths = [p for p in files.snapshot.files if os.path.basename(p) == "buf.yaml"]
-    if not yaml_paths:
-        return BufLayout("", ())
-    path = yaml_paths[0]
+    path = buf_yaml_path(files)
+    if path is None:
+        return BufLayout()
     contents = await get_digest_contents(files.snapshot.digest)
     content = next((dc.content for dc in contents if dc.path == path), b"")
-    return BufLayout(os.path.dirname(path), parse_buf_yaml_module_paths(content))
+    return BufLayout(
+        buf_yaml_path=path,
+        module_paths=parse_buf_yaml_module_paths(content),
+        deps=parse_buf_yaml_deps(content),
+        has_lock=os.path.join(os.path.dirname(path), "buf.lock") in files.snapshot.files,
+    )
 
 
 @dataclass(frozen=True)
