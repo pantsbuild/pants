@@ -7,12 +7,11 @@ from dataclasses import dataclass
 
 import pytest
 
-from pants.backend.codegen.protobuf.buf.config import find_buf_config_files
+from pants.backend.codegen.protobuf.buf.config import buf_resolve_name, find_buf_config_files
 from pants.backend.codegen.protobuf.buf.lockfile import (
     GenerateBufLockfile,
     KnownBufResolveNamesRequest,
     RequestedBufResolveNames,
-    _resolve_name,
 )
 from pants.backend.codegen.protobuf.buf.lockfile import (
     rules as lockfile_rules,
@@ -31,6 +30,11 @@ class BufConfigFilePaths:
 @rule
 async def buf_config_file_paths_for_test(buf: BufSubsystem) -> BufConfigFilePaths:
     return BufConfigFilePaths((await find_buf_config_files(buf)).snapshot.files)
+
+
+BUF_YAML_WITH_DEPS = (
+    "version: v2\nmodules:\n  - path: .\ndeps:\n  - buf.build/bufbuild/protovalidate\n"
+)
 
 
 @pytest.fixture
@@ -64,16 +68,22 @@ def test_config_option_keeps_sibling_lock(rule_runner: RuleRunner, with_lock: bo
 
 
 def test_resolve_name_uses_parent_directory_or_buf_for_root() -> None:
-    assert _resolve_name("buf.yaml") == "buf"
-    assert _resolve_name("idl/buf.yaml") == "idl"
-    assert _resolve_name("a/b/c/buf.yaml") == "a/b/c"
+    assert buf_resolve_name("buf.yaml") == "buf"
+    assert buf_resolve_name("idl/buf.yaml") == "idl"
+    assert buf_resolve_name("a/b/c/buf.yaml") == "a/b/c"
 
 
 def test_known_resolve_names_finds_repo_root_buf_yaml(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"buf.yaml": "version: v2\nmodules:\n  - path: .\n"})
+    rule_runner.write_files({"buf.yaml": BUF_YAML_WITH_DEPS})
     result = rule_runner.request(KnownUserResolveNames, [KnownBufResolveNamesRequest()])
     assert result.names == ("buf",)
     assert result.requested_resolve_names_cls is RequestedBufResolveNames
+
+
+def test_known_resolve_names_skips_buf_yaml_without_deps(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({"buf.yaml": "version: v2\nmodules:\n  - path: .\n"})
+    result = rule_runner.request(KnownUserResolveNames, [KnownBufResolveNamesRequest()])
+    assert result.names == ()
 
 
 def test_known_resolve_names_returns_empty_when_no_buf_yaml(rule_runner: RuleRunner) -> None:
@@ -82,7 +92,7 @@ def test_known_resolve_names_returns_empty_when_no_buf_yaml(rule_runner: RuleRun
 
 
 def test_setup_lockfile_requests_maps_resolve_name_to_buf_yaml(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"buf.yaml": "version: v2\nmodules:\n  - path: .\n"})
+    rule_runner.write_files({"buf.yaml": BUF_YAML_WITH_DEPS})
     result = rule_runner.request(UserGenerateLockfiles, [RequestedBufResolveNames(["buf"])])
     [req] = result
     assert isinstance(req, GenerateBufLockfile)
@@ -92,6 +102,6 @@ def test_setup_lockfile_requests_maps_resolve_name_to_buf_yaml(rule_runner: Rule
 
 
 def test_setup_lockfile_requests_skips_unknown_resolve_names(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"buf.yaml": "version: v2\nmodules:\n  - path: .\n"})
+    rule_runner.write_files({"buf.yaml": BUF_YAML_WITH_DEPS})
     result = rule_runner.request(UserGenerateLockfiles, [RequestedBufResolveNames(["nonexistent"])])
     assert list(result) == []
