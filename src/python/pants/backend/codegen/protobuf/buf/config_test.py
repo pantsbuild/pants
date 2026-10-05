@@ -11,6 +11,7 @@ import yaml
 from pants.backend.codegen.protobuf.buf.config import (
     InvalidBufPluginPinError,
     UnpinnedBufPluginError,
+    UnsupportedBufGenYamlVersionError,
     parse_buf_yaml_deps,
     parse_plugin_outs,
     suffix_plugin_includes_imports,
@@ -157,6 +158,15 @@ def test_synthesize_rejects_malformed_extra_pin_string(pin: str) -> None:
             "buf.gen.yaml",
             extra_pins={"example.com/some/custom-plugin": pin},
         )
+
+
+@pytest.mark.parametrize("version_line", ["version: v1\n", "version: v1beta1\n", ""])
+def test_synthesize_rejects_non_v2_template(version_line: str) -> None:
+    content = (
+        f"{version_line}plugins:\n  - plugin: buf.build/protocolbuffers/python\n    out: gen\n"
+    ).encode()
+    with pytest.raises(UnsupportedBufGenYamlVersionError, match="buf config migrate"):
+        synthesize_pinned_buf_gen_yaml(content, "buf.gen.yaml")
 
 
 def test_synthesize_ignores_protoc_builtin_and_local() -> None:
