@@ -344,6 +344,42 @@ def test_buf_target_connectrpc_plugin_registers_connect_modules(
     )
 
 
+def test_buf_target_pyi_plugin_does_not_set_module_location(rule_runner: RuleRunner) -> None:
+    """A `pyi` plugin listed before the `python` one doesn't decide where `_pb2` lives."""
+    rule_runner.set_options(
+        ["--source-root-patterns=['gen_py', 'gen_stubs']", "--python-enable-resolves"]
+    )
+    rule_runner.write_files(
+        {
+            "buf.yaml": "version: v2\nmodules:\n  - path: protos\n",
+            "buf.gen.yaml": dedent(
+                """\
+                version: v2
+                plugins:
+                  - protoc_builtin: pyi
+                    out: gen_stubs/nested
+                  - protoc_builtin: python
+                    out: gen_py
+                """
+            ),
+            "protos/svc.proto": "",
+            "protos/BUILD": "protobuf_sources(protobuf_generator='buf')",
+        }
+    )
+    result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
+    assert result == FirstPartyPythonMappingImpl.create(
+        {
+            "python-default": {
+                "svc_pb2": (
+                    ModuleProvider(
+                        Address("protos", relative_file_path="svc.proto"), ModuleProviderType.IMPL
+                    ),
+                ),
+            }
+        }
+    )
+
+
 def test_buf_target_grpc_plugin_registers_pb2_grpc(rule_runner: RuleRunner) -> None:
     """A grpc-python plugin entry in `buf.gen.yaml` registers `_pb2_grpc` modules."""
     rule_runner.set_options(
