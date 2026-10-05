@@ -14,6 +14,8 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
+    uses_generator,
+    validate_protobuf_generator,
 )
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.backend.scala.util_rules.versions import (
@@ -29,6 +31,7 @@ from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.fs import (
+    EMPTY_SNAPSHOT,
     AddPrefix,
     CreateDigest,
     Digest,
@@ -50,7 +53,14 @@ from pants.engine.intrinsics import (
 from pants.engine.platform import Platform
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import GeneratedSources, GenerateSourcesRequest, TransitiveTargetsRequest
+from pants.engine.target import (
+    FieldSet,
+    GeneratedSources,
+    GenerateSourcesRequest,
+    TransitiveTargetsRequest,
+    ValidatedDependencies,
+    ValidateDependenciesRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.compile import ClasspathEntry
 from pants.jvm.dependency_inference import artifact_mapper
@@ -148,6 +158,8 @@ async def generate_scala_from_protobuf(
     jdk: InternalJdk,
     platform: Platform,
 ) -> GeneratedSources:
+    if not uses_generator(request.protocol_target, "protoc"):
+        return GeneratedSources(EMPTY_SNAPSHOT)
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
     shimcp_relpath = "__shimcp"
@@ -335,6 +347,24 @@ async def setup_scalapb_shim_classfiles(
     return ScalaPBShimCompiledClassfiles(digest=stripped_classfiles_digest)
 
 
+@dataclass(frozen=True)
+class ScalaProtobufDependenciesFieldSet(FieldSet):
+    required_fields = (ScalaSourceField,)
+
+    sources: ScalaSourceField
+
+
+class ValidateScalaProtobufDependenciesRequest(ValidateDependenciesRequest):
+    field_set_type = ScalaProtobufDependenciesFieldSet
+
+
+@rule
+async def validate_scala_protobuf_dependencies(
+    request: ValidateScalaProtobufDependenciesRequest,
+) -> ValidatedDependencies:
+    return await validate_protobuf_generator(request, "Scala", "protoc")
+
+
 def rules():
     return [
         *collect_rules(),
@@ -342,6 +372,7 @@ def rules():
         *dependency_inference.rules(),
         *symbol_mapper.rules(),
         UnionRule(GenerateSourcesRequest, GenerateScalaFromProtobufRequest),
+        UnionRule(ValidateDependenciesRequest, ValidateScalaProtobufDependenciesRequest),
         UnionRule(ExportableTool, ScalaPBSubsystem),
         *protoc.rules(),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
