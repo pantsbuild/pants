@@ -35,6 +35,10 @@ class InvalidBufPluginPinError(Exception):
     """Raised when a `[buf].extra_plugin_pins` value isn't `<version>:<revision>`."""
 
 
+class UnsupportedBufGenYamlVersionError(Exception):
+    """Raised when a `buf.gen.yaml` isn't `version: v2`."""
+
+
 class MissingBufLockError(Exception):
     """Raised when `buf.yaml` declares `deps:` but no sibling `buf.lock` exists."""
 
@@ -292,6 +296,14 @@ def synthesize_pinned_buf_gen_yaml(
         return content
     if not isinstance(data, dict):
         return content
+    # Pants reads the v2 plugin keys (`remote:`, `local:`, `protoc_builtin:`) for pinning and
+    # inference. buf still accepts older templates, so without this they'd run unpinned.
+    if data.get("version") != "v2":
+        raise UnsupportedBufGenYamlVersionError(
+            f"`{source_path}` is `version: {data.get('version')}`, but Pants requires "
+            f"`version: v2` for `buf.gen.yaml`. Convert it with "
+            f"`buf config migrate --buf-gen-yaml {source_path}`."
+        )
     plugins = data.get("plugins")
     if not isinstance(plugins, list):
         return content
