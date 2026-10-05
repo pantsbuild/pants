@@ -222,6 +222,87 @@ protobuf_sources(
 )
 ```
 
+## Generating code with Buf
+
+Instead of running `protoc` itself, Pants can generate code with [`buf generate`](https://buf.build/docs/generate/overview/). Which plugins run, and where their output goes, comes from a [`buf.gen.yaml`](https://buf.build/docs/configuration/v2/buf-gen-yaml/) template rather than from Pants.
+
+To use Buf for a target, set `protobuf_generator="buf"`:
+
+```python title="src/protos/BUILD"
+protobuf_sources(protobuf_generator="buf")
+```
+
+Then add a template, which must be `version: v2`, and a [`buf.yaml`](https://buf.build/docs/configuration/v2/buf-yaml/) saying where your Protobuf module is:
+
+```yaml title="buf.gen.yaml"
+version: v2
+plugins:
+  - protoc_builtin: python
+    out: src/python
+  - remote: buf.build/grpc/python
+    out: src/python
+```
+
+```yaml title="buf.yaml"
+version: v2
+modules:
+  - path: src/protos
+```
+
+If `src/python` is a [source root](../../using-pants/key-concepts/source-roots.mdx), you can then `import example.f_pb2` for `src/protos/example/f.proto`.
+
+As with `protoc`, add the runtime libraries to your requirements (Step 2); Pants infers the dependencies.
+
+### Choosing the template
+
+A target's template is the first of:
+
+1. Its `buf_gen_template` field, relative to the BUILD file's directory;
+2. `[python-protobuf].buf_gen_template`;
+3. `[buf].gen_template`;
+4. A `buf.gen.yaml` at the repository root.
+
+`buf generate` runs every plugin in its template, so if another language also generates with Buf, give Python its own template with `[python-protobuf].buf_gen_template`.
+
+### Plugins
+
+A template's plugins can come from:
+
+- **The [Buf Schema Registry](https://buf.build/plugins)**, as `remote:` entries. So that generated code is reproducible, each must be pinned to a version and a `revision:`. Pants fills in the pin for common plugins, as in the example above; pin others yourself, or add them to `[buf].extra_plugin_pins`.
+- **`protoc`'s built-in generators**, as `protoc_builtin:` entries. Pants provides `protoc`.
+- **Targets in your repository**, as `local:` entries. List them in `[buf].codegen_plugins`; any target `pants run` can run works, and each is put on `PATH` under its target name:
+
+  ```python title="plugins/BUILD"
+  python_sources()
+  pex_binary(name="protoc-gen-myorg", entry_point="plugin.py")
+  ```
+
+  ```toml title="pants.toml"
+  [buf]
+  codegen_plugins = ["plugins:protoc-gen-myorg"]
+  ```
+
+Pants knows the common Python plugins: what modules they generate, and which runtime libraries those import. Describe others with `[python-protobuf].extra_buf_plugins`, so Pants can infer dependencies for them.
+
+### Dependencies from the Buf Schema Registry
+
+If `buf.yaml` declares [`deps:`](https://buf.build/docs/configuration/v2/buf-yaml/#deps), Pants requires a `buf.lock`, so that generated code is reproducible. Create or update it with `pants generate-lockfiles`.
+
+Pants doesn't infer dependencies on code generated from these. To import it from your own Python code, install it as a package instead, such as one of [Buf's generated SDKs](https://buf.build/docs/bsr/generated-sdks/python/), and use `modules` to tell Pants what it provides. For example, for `buf.build/bufbuild/protovalidate`:
+
+```toml title="pants.toml"
+[python-repos]
+indexes.add = ["https://buf.build/gen/python"]
+```
+
+```python title="BUILD"
+python_requirement(
+    name="protovalidate-protos",
+    requirements=["bufbuild-protovalidate-protocolbuffers-python"],
+    modules=["buf.validate"],
+)
+```
+
 ## Buf: format and lint Protobuf
 
 Pants integrates with the [`Buf`](https://buf.build/blog/introducing-buf-format) formatter and linter for Protobuf files.
@@ -240,6 +321,8 @@ Now you can run `pants fmt` and `pants lint`:
 ```
 ❯ pants lint src/protos/user.proto
 ```
+
+If `buf.yaml` names [check plugins](https://buf.build/docs/cli/buf-plugins/) built in your repository, list their targets in `[buf].plugins` so `buf lint` can find them. Any target `pants run` can run works, and each is put on `PATH` under its target name.
 
 Use `pants fmt lint dir:` to run on all files in the directory, and `pants fmt lint dir::` to run on all files in the directory and subdirectories.
 
