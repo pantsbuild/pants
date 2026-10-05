@@ -428,8 +428,7 @@ async def fetch_buf_layout(buf: BufSubsystem) -> BufLayout:
 class BufGenContent:
     """Per-target `buf.gen.yaml` resolution.
 
-    `template_path` is `None` when no template was found (callers should fall back
-    to source-root path arithmetic). When set, `content` is the raw yaml.
+    `template_path` is `None` when no template was found. When set, `content` is the raw yaml.
     """
 
     target: Target

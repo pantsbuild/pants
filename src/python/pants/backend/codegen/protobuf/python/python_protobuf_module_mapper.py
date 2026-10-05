@@ -105,14 +105,6 @@ def _plan_buf_target(
     return _BufStripPlan(tuple(suffixes), tuple(paths))
 
 
-def _fallback_plan(target: Target) -> _BufStripPlan:
-    """Plan when no `buf.gen.yaml` was found: assume the proto's source root also
-    covers the generated `.py`. Service suffixes can't be inferred without the
-    template, so we register only `_pb2`."""
-    proto_path = target[ProtobufSourceField].file_path
-    return _BufStripPlan((_PB2_SUFFIX,), (proto_path,))
-
-
 # Protoc-only subsystem options. Their default values are mirrored here so we can
 # detect when the user explicitly set them while also using buf targets, and warn
 # that they're ignored on the buf path. Keep in sync with the option definitions
@@ -203,13 +195,8 @@ async def map_protobuf_to_python_modules(
     for gen in buf_gen_contents:
         _emit_per_target_warnings_for_buf(gen.target)
         if gen.template_path is None:
-            logger.debug(
-                "No `buf.gen.yaml` resolved for %s; falling back to source-root path "
-                "arithmetic for `_pb2` only. Service suffixes can't be inferred without "
-                "the template.",
-                gen.target.address,
-            )
-            plans.append(_fallback_plan(gen.target))
+            # Without a template, codegen fails and generates nothing.
+            plans.append(_BufStripPlan((), ()))
             continue
         # Unpinned plugins are fine here: only their ids are needed, and codegen enforces pins.
         suffix_outs = parse_plugin_outs(gen.content, plugin_suffixes)
