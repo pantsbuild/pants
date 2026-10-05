@@ -12,6 +12,7 @@ from pants.option.option_types import (
     DictOption,
     FileOption,
     SkipOption,
+    StrListOption,
 )
 from pants.util.strutil import softwrap
 
@@ -123,6 +124,21 @@ class BufSubsystem(TemplatedExternalTool):
                 extra_plugin_pins = {
                   "myorg.example.com/internal/python-fork": "v2.0.0:3",
                 }
+            """
+        ),
+        advanced=True,
+    )
+
+    plugins = StrListOption(
+        default=[],
+        help=softwrap(
+            """
+            Addresses of runnable targets (ones `pants run` can execute) that are Buf
+            check plugins (https://buf.build/docs/cli/buf-plugins/), e.g.
+            `["//src/checks:buf-plugin-example"]`.
+
+            Each one is placed on `PATH` for `buf lint` under its target name, which must
+            match the `plugins:` entry in `buf.yaml` that uses it.
             """
         ),
         advanced=True,

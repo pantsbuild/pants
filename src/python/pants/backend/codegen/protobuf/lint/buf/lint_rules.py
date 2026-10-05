@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from pants.backend.codegen.protobuf.buf.config import find_buf_config_files
 from pants.backend.codegen.protobuf.buf.skip_field import SkipBufLintField
 from pants.backend.codegen.protobuf.buf.subsystem import BufSubsystem
 from pants.backend.codegen.protobuf.target_types import (
@@ -10,10 +11,16 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
 )
 from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
-from pants.core.util_rules.config_files import find_config_file
+from pants.core.util_rules import config_files
+from pants.core.util_rules.adhoc_process_support import (
+    ResolveRunnableDependenciesRequest,
+    resolve_runnable_dependencies,
+)
+from pants.core.util_rules.adhoc_process_support import rules as adhoc_process_support_rules
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import strip_source_roots
+from pants.engine.addresses import UnparsedAddressInputs
 from pants.engine.fs import MergeDigests
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.intrinsics import execute_process, merge_digests
@@ -88,18 +95,31 @@ async def run_buf(
 
     download_buf_get = download_external_tool(buf.get_request(platform))
 
-    config_files_get = find_config_file(buf.config_request)
+    config_files_get = find_buf_config_files(buf)
+
+    plugins_get = resolve_runnable_dependencies(
+        ResolveRunnableDependenciesRequest(
+            UnparsedAddressInputs(
+                buf.plugins,
+                owning_address=None,
+                description_of_origin=f"the `[{BufSubsystem.options_scope}].plugins` option",
+            )
+        ),
+        **implicitly(),
+    )
 
     (
         target_sources_stripped,
         all_sources_stripped,
         downloaded_buf,
         config_files,
+        resolved_plugins,
     ) = await concurrently(
         target_stripped_sources_request,
         all_stripped_sources_request,
         download_buf_get,
         config_files_get,
+        plugins_get,
     )
 
     input_digest = await merge_digests(
@@ -109,11 +129,17 @@ async def run_buf(
                 all_sources_stripped.snapshot.digest,
                 downloaded_buf.digest,
                 config_files.snapshot.digest,
+                resolved_plugins.digest,
             )
         )
     )
 
     config_arg = ["--config", buf.config] if buf.config else []
+
+    # Buf resolves a bare `plugins: - plugin: <name>` entry off PATH, and refuses to exec a binary
+    # found via a relative PATH entry.
+    plugins = resolved_plugins.runnable_dependencies
+    env = {"PATH": f"{{chroot}}/{plugins.path_component}", **plugins.extra_env} if plugins else {}
 
     process_result = await execute_process(
         Process(
@@ -126,6 +152,9 @@ async def run_buf(
                 ",".join(target_sources_stripped.snapshot.files),
             ],
             input_digest=input_digest,
+            immutable_input_digests=plugins.immutable_input_digests if plugins else None,
+            append_only_caches=plugins.append_only_caches if plugins else None,
+            env=env,
             description=f"Run buf lint on {pluralize(len(request.elements), 'file')}.",
             level=LogLevel.DEBUG,
         ),
@@ -137,5 +166,7 @@ async def run_buf(
 def rules():
     return [
         *collect_rules(),
+        *adhoc_process_support_rules(),
+        *config_files.rules(),
         *BufLintRequest.rules(),
     ]
