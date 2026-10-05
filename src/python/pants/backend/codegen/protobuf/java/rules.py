@@ -14,6 +14,8 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
+    uses_generator,
+    validate_protobuf_generator,
 )
 from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.target_types import JavaSourceField
@@ -22,6 +24,7 @@ from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.fs import (
+    EMPTY_SNAPSHOT,
     AddPrefix,
     CreateDigest,
     Digest,
@@ -41,7 +44,14 @@ from pants.engine.intrinsics import (
 from pants.engine.platform import Platform
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
-from pants.engine.target import GeneratedSources, GenerateSourcesRequest, TransitiveTargetsRequest
+from pants.engine.target import (
+    FieldSet,
+    GeneratedSources,
+    GenerateSourcesRequest,
+    TransitiveTargetsRequest,
+    ValidatedDependencies,
+    ValidateDependenciesRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.jvm.resolve.coursier_fetch import ToolClasspathRequest, materialize_classpath_for_tool
 from pants.jvm.resolve.jvm_tool import GenerateJvmLockfileFromTool
@@ -113,6 +123,8 @@ async def generate_java_from_protobuf(
     grpc_plugin: ProtobufJavaGrpcPlugin,  # TODO: Don't access grpc plugin unless gRPC codegen is enabled.
     platform: Platform,
 ) -> GeneratedSources:
+    if not uses_generator(request.protocol_target, "protoc"):
+        return GeneratedSources(EMPTY_SNAPSHOT)
     download_protoc_request = download_external_tool(protoc.get_request(platform))
 
     output_dir = "_generated_files"
@@ -199,6 +211,24 @@ async def generate_java_from_protobuf(
     return GeneratedSources(source_root_restored)
 
 
+@dataclass(frozen=True)
+class JavaProtobufDependenciesFieldSet(FieldSet):
+    required_fields = (JavaSourceField,)
+
+    sources: JavaSourceField
+
+
+class ValidateJavaProtobufDependenciesRequest(ValidateDependenciesRequest):
+    field_set_type = JavaProtobufDependenciesFieldSet
+
+
+@rule
+async def validate_java_protobuf_dependencies(
+    request: ValidateJavaProtobufDependenciesRequest,
+) -> ValidatedDependencies:
+    return await validate_protobuf_generator(request, "Java", "protoc")
+
+
 def rules():
     return [
         *collect_rules(),
@@ -206,6 +236,7 @@ def rules():
         *symbol_mapper.rules(),
         *protoc.rules(),
         UnionRule(GenerateSourcesRequest, GenerateJavaFromProtobufRequest),
+        UnionRule(ValidateDependenciesRequest, ValidateJavaProtobufDependenciesRequest),
         UnionRule(ExportableTool, JavaProtobufGrpcSubsystem),
         ProtobufSourceTarget.register_plugin_field(PrefixedJvmJdkField),
         ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmJdkField),

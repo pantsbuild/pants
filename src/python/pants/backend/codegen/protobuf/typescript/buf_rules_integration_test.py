@@ -24,11 +24,19 @@ from pants.backend.python import target_types_rules as python_target_types_rules
 from pants.backend.python.goals import package_dists, package_pex_binary, run_pex_binary
 from pants.backend.python.target_types import PexBinary, PythonSourcesGeneratorTarget
 from pants.backend.python.util_rules import pex_from_targets
+from pants.backend.typescript.target_types import TypeScriptSourcesGeneratorTarget
 from pants.core.target_types import FileTarget
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.target import GeneratedSources, HydratedSources, HydrateSourcesRequest
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    GeneratedSources,
+    HydratedSources,
+    HydrateSourcesRequest,
+    InvalidFieldException,
+)
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 
 # A `protoc-gen-*` plugin that ignores its `CodeGeneratorRequest` and answers with a
 # `CodeGeneratorResponse` holding one file. The response is encoded by hand so the plugin needs
@@ -64,8 +72,10 @@ def rule_runner() -> RuleRunner:
             QueryRule(HydratedSources, [HydrateSourcesRequest]),
             QueryRule(GeneratedSources, [GenerateTypeScriptFromProtobufRequest]),
             QueryRule(DigestContents, [Digest]),
+            QueryRule(Addresses, [DependenciesRequest]),
         ],
         target_types=[
+            TypeScriptSourcesGeneratorTarget,
             ProtobufSourcesGeneratorTarget,
             package_json.PackageJsonTarget,
             FileTarget,
@@ -240,3 +250,22 @@ def test_template_option_is_optional(rule_runner: RuleRunner) -> None:
         ["--typescript-protobuf-buf-node-package-address=plugins"], env_inherit={"PATH"}
     )
     assert _generate(rule_runner).snapshot.files == ("src/ts/foo/person.ts",)
+
+
+def test_skips_targets_not_using_buf(rule_runner: RuleRunner) -> None:
+    """`export-codegen` asks every language to generate every target; protoc ones get nothing."""
+    _write_project(rule_runner, proto_build="protobuf_sources()")
+    assert _generate(rule_runner).snapshot.files == ()
+
+
+def test_typescript_depending_on_protoc_target_fails(rule_runner: RuleRunner) -> None:
+    _write_project(rule_runner, proto_build="protobuf_sources()")
+    rule_runner.write_files(
+        {
+            "src/app/app.ts": "",
+            "src/app/BUILD": "typescript_sources(dependencies=['idl/proto/foo'])",
+        }
+    )
+    tgt = rule_runner.get_target(Address("src/app", relative_file_path="app.ts"))
+    with engine_error(InvalidFieldException, contains="TypeScript can only be generated with buf"):
+        rule_runner.request(Addresses, [DependenciesRequest(tgt[Dependencies])])
