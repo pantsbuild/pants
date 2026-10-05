@@ -57,9 +57,8 @@ DEFAULT_PLUGIN_SUFFIXES: Mapping[str, str] = {
     "remote:buf.build/protocolbuffers/python": "_pb2",
     "protoc_builtin:python": "_pb2",
     "local:protoc-gen-python": "_pb2",
-    # `.pyi` stubs share the same module name as `_pb2.py`, so map to the same suffix.
-    "remote:buf.build/protocolbuffers/pyi": "_pb2",
-    "protoc_builtin:pyi": "_pb2",
+    # No `pyi` plugins: the same target generates the stubs and the `_pb2.py`, so mapping
+    # the `.py` is enough.
     # ConnectRPC.
     "remote:buf.build/connectrpc/python": "_connect",
     "local:protoc-gen-connect-python": "_connect",
