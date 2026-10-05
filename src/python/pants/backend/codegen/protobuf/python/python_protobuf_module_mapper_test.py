@@ -188,14 +188,8 @@ def test_grpc_modules_with_multiple_resolves(rule_runner: RuleRunner) -> None:
     )
 
 
-def test_buf_target_falls_back_to_source_root_math_without_gen_yaml(
-    rule_runner: RuleRunner,
-) -> None:
-    """When `buf.gen.yaml` is absent, the buf path falls back to protoc-style path math.
-
-    This is correct as long as the convention (buf module root and `out:` aligning with
-    Pants source roots) holds. The test does not write a `buf.gen.yaml`.
-    """
+def test_buf_target_registers_nothing_without_gen_yaml(rule_runner: RuleRunner) -> None:
+    """Without a `buf.gen.yaml`, codegen fails and generates nothing, so nothing is registered."""
     rule_runner.set_options(["--source-root-patterns=['src/protobuf']", "--python-enable-resolves"])
     rule_runner.write_files(
         {
@@ -204,18 +198,7 @@ def test_buf_target_falls_back_to_source_root_math_without_gen_yaml(
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
-    assert result == FirstPartyPythonMappingImpl.create(
-        {
-            "python-default": {
-                "foo.f_pb2": (
-                    ModuleProvider(
-                        Address("src/protobuf/foo", relative_file_path="f.proto"),
-                        ModuleProviderType.IMPL,
-                    ),
-                )
-            }
-        }
-    )
+    assert result == FirstPartyPythonMappingImpl.create({})
 
 
 def test_buf_target_uses_gen_yaml_out_directory(rule_runner: RuleRunner) -> None:
