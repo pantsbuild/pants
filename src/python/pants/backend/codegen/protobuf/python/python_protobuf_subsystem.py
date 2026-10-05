@@ -73,42 +73,6 @@ DEFAULT_PLUGIN_SUFFIXES: Mapping[str, str] = {
 }
 
 
-# Built-in registry mapping known BSR module ids (declared in `buf.yaml`'s
-# `deps:`) to the Python module names their generated `*_pb2.py` files produce
-# when buf runs with `include_imports: true` on the `_pb2`-emitting plugin.
-# The buf module mapper uses this to register dep-inference owners for imports
-# of BSR-provided modules from hand-written user code. To refresh:
-# `pants export-codegen ::` against a buf.yaml that lists the dep, then list
-# the resulting `<out>/<…>_pb2.py` paths.
-DEFAULT_BSR_DEP_MODULES: Mapping[str, tuple[str, ...]] = {
-    "buf.build/bufbuild/protovalidate": (
-        "buf.validate.expression_pb2",
-        "buf.validate.validate_pb2",
-    ),
-    "buf.build/protocolbuffers/wellknowntypes": (
-        "google.protobuf.any_pb2",
-        "google.protobuf.api_pb2",
-        "google.protobuf.descriptor_pb2",
-        "google.protobuf.duration_pb2",
-        "google.protobuf.empty_pb2",
-        "google.protobuf.field_mask_pb2",
-        "google.protobuf.source_context_pb2",
-        "google.protobuf.struct_pb2",
-        "google.protobuf.timestamp_pb2",
-        "google.protobuf.type_pb2",
-        "google.protobuf.wrappers_pb2",
-    ),
-    "buf.build/googleapis/googleapis": (
-        "google.api.annotations_pb2",
-        "google.api.field_behavior_pb2",
-        "google.api.http_pb2",
-        "google.rpc.code_pb2",
-        "google.rpc.error_details_pb2",
-        "google.rpc.status_pb2",
-    ),
-}
-
-
 class PythonProtobufSubsystem(Subsystem):
     options_scope = "python-protobuf"
     help = help_text(
@@ -192,35 +156,6 @@ class PythonProtobufSubsystem(Subsystem):
                   "remote:myorg.example.com/internal/python-fork": "_pb2",
                   "remote:buf.build/example/some-grpc-fork": "_pb2_grpc",
                   "local:protoc-gen-myorg-python": "_pb2",
-                }
-            """
-        ),
-        advanced=True,
-    )
-
-    extra_buf_bsr_modules = DictOption[list[str]](
-        default={},
-        help=softwrap(
-            """
-            Map of BSR module ids (declared in `buf.yaml`'s `deps:`) to the
-            Python module names their generated `*_pb2.py` files produce when
-            buf runs with `include_imports: true`. Layered on top of Pants's
-            built-in registry of common modules (e.g.
-            `buf.build/bufbuild/protovalidate`,
-            `buf.build/protocolbuffers/wellknowntypes`).
-
-            Use this to teach Pants about BSR deps not in the built-in
-            registry — typically internal company modules — so that
-            hand-written code importing them doesn't trip "cannot infer
-            owners" warnings.
-
-            Example:
-
-                extra_buf_bsr_modules = {
-                  "buf.build/myorg/internal-types": [
-                    "myorg.internal.types.foo_pb2",
-                    "myorg.internal.types.bar_pb2",
-                  ],
                 }
             """
         ),

@@ -14,7 +14,6 @@ from pants.backend.codegen.protobuf.buf.config import (
     UnsupportedBufGenYamlVersionError,
     parse_buf_yaml_deps,
     parse_plugin_outs,
-    suffix_plugin_includes_imports,
     synthesize_pinned_buf_gen_yaml,
 )
 
@@ -231,81 +230,3 @@ def test_parse_buf_yaml_deps_returns_empty_for_missing_or_invalid() -> None:
     assert parse_buf_yaml_deps(no_deps) == ()
     assert parse_buf_yaml_deps(b"not: valid: yaml: ::\nx") == ()
     assert parse_buf_yaml_deps(b"") == ()
-
-
-def test_suffix_plugin_includes_imports_true_for_remote() -> None:
-    content = dedent(
-        """\
-        version: v2
-        plugins:
-          - remote: buf.build/protocolbuffers/python
-            out: gen
-            include_imports: true
-        """
-    ).encode("utf-8")
-    suffixes = {"remote:buf.build/protocolbuffers/python": "_pb2"}
-    assert suffix_plugin_includes_imports(content, "_pb2", suffixes) is True
-
-
-def test_suffix_plugin_includes_imports_false_when_unset() -> None:
-    content = dedent(
-        """\
-        version: v2
-        plugins:
-          - remote: buf.build/protocolbuffers/python
-            out: gen
-        """
-    ).encode("utf-8")
-    suffixes = {"remote:buf.build/protocolbuffers/python": "_pb2"}
-    assert suffix_plugin_includes_imports(content, "_pb2", suffixes) is False
-
-
-def test_suffix_plugin_includes_imports_only_checks_matching_suffix() -> None:
-    """`include_imports` on a different-suffix plugin doesn't bleed over."""
-    content = dedent(
-        """\
-        version: v2
-        plugins:
-          - remote: buf.build/protocolbuffers/pyi
-            out: gen
-            include_imports: true
-          - remote: buf.build/protocolbuffers/python
-            out: gen
-        """
-    ).encode("utf-8")
-    suffixes = {
-        "remote:buf.build/protocolbuffers/pyi": "_pb2.pyi",
-        "remote:buf.build/protocolbuffers/python": "_pb2",
-    }
-    assert suffix_plugin_includes_imports(content, "_pb2", suffixes) is False
-
-
-def test_suffix_plugin_includes_imports_tolerates_pinned_remote() -> None:
-    content = dedent(
-        """\
-        version: v2
-        plugins:
-          - remote: buf.build/protocolbuffers/python:v34.1
-            revision: 1
-            out: gen
-            include_imports: true
-        """
-    ).encode("utf-8")
-    suffixes = {"remote:buf.build/protocolbuffers/python": "_pb2"}
-    assert suffix_plugin_includes_imports(content, "_pb2", suffixes) is True
-
-
-def test_suffix_plugin_includes_imports_works_for_protoc_builtin() -> None:
-    """`include_imports` is a buf-level switch, applicable to `protoc_builtin:`
-    plugins identically — not just `remote:` ones."""
-    content = dedent(
-        """\
-        version: v2
-        plugins:
-          - protoc_builtin: python
-            out: gen
-            include_imports: true
-        """
-    ).encode("utf-8")
-    suffixes = {"protoc_builtin:python": "_pb2"}
-    assert suffix_plugin_includes_imports(content, "_pb2", suffixes) is True

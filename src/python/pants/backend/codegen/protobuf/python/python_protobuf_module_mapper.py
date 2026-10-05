@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import os
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import DefaultDict
 
@@ -16,12 +16,10 @@ from pants.backend.codegen.protobuf.buf.config import (
     fetch_buf_gen_contents,
     fetch_buf_layout,
     parse_plugin_outs,
-    suffix_plugin_includes_imports,
 )
 from pants.backend.codegen.protobuf.buf.subsystem import BufSubsystem
 from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
-    DEFAULT_BSR_DEP_MODULES,
     PythonProtobufSubsystem,
 )
 from pants.backend.codegen.protobuf.target_types import (
@@ -197,7 +195,7 @@ async def map_protobuf_to_python_modules(
         buf_layout: BufLayout = await fetch_buf_layout(buf)
         buf_gen_contents: tuple[BufGenContent, ...] = await fetch_buf_gen_contents(buf_targets, buf)
     else:
-        buf_layout = BufLayout("", (), ())
+        buf_layout = BufLayout("", ())
         buf_gen_contents = ()
 
     plugin_suffixes = python_protobuf_subsystem.buf_plugin_suffixes
@@ -267,30 +265,6 @@ async def map_protobuf_to_python_modules(
             resolves_to_modules_to_providers[resolve][module].append(
                 ModuleProvider(tgt.address, ModuleProviderType.IMPL)
             )
-
-    # Register BSR-dep Python modules as owned by buf targets that actually
-    # generate them. A target only generates BSR-dep `*_pb2.py` files if its
-    # `buf.gen.yaml` has `include_imports: true` on whichever plugin emits
-    # `_pb2` (the BSR remote, `protoc_builtin: python`, etc.) — otherwise the
-    # file isn't in the `GeneratedSources` digest and registering ownership
-    # would lie. Targets without `include_imports` are skipped; users either set
-    # it or accept the dep-inference warning.
-    if buf_layout.deps and buf_targets:
-        bsr_to_modules: Mapping[str, Sequence[str]] = {
-            **{k: tuple(v) for k, v in DEFAULT_BSR_DEP_MODULES.items()},
-            **{k: tuple(v) for k, v in python_protobuf_subsystem.extra_buf_bsr_modules.items()},
-        }
-        bsr_modules_for_layout: list[str] = []
-        for dep in buf_layout.deps:
-            bsr_modules_for_layout.extend(bsr_to_modules.get(dep, ()))
-        for tgt, gen in zip(buf_targets, buf_gen_contents):
-            if not suffix_plugin_includes_imports(gen.content, "_pb2", plugin_suffixes):
-                continue
-            resolve = tgt[PythonResolveField].normalized_value(python_setup)
-            for module in bsr_modules_for_layout:
-                resolves_to_modules_to_providers[resolve][module].append(
-                    ModuleProvider(tgt.address, ModuleProviderType.IMPL)
-                )
 
     return FirstPartyPythonMappingImpl.create(resolves_to_modules_to_providers)
 

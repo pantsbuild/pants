@@ -196,41 +196,6 @@ def parse_plugin_outs(content: bytes, suffixes: Mapping[str, str]) -> dict[str, 
     return result
 
 
-def suffix_plugin_includes_imports(
-    content: bytes, suffix: str, suffixes: Mapping[str, str]
-) -> bool:
-    """True if the `buf.gen.yaml` plugin emitting `suffix` has `include_imports:
-    true` set — meaning buf will materialize generated artifacts for
-    transitively-imported BSR-dep protos into the digest.
-
-    `suffixes` is the same `<kind>:<ident> -> suffix` mapping passed to
-    `parse_plugin_outs`; the first plugin entry whose registry key maps to
-    `suffix` wins.
-    """
-    try:
-        data = yaml.safe_load(content)
-    except yaml.YAMLError:
-        return False
-    if not isinstance(data, dict):
-        return False
-    plugins = data.get("plugins")
-    if not isinstance(plugins, list):
-        return False
-    for plugin in plugins:
-        if not isinstance(plugin, dict):
-            continue
-        out = plugin.get("out")
-        if not isinstance(out, str) or not out:
-            continue
-        key = _plugin_identifier(plugin)
-        if key is None:
-            continue
-        if suffixes.get(key) != suffix:
-            continue
-        return plugin.get("include_imports") is True
-    return False
-
-
 # ---- buf.gen.yaml pin synthesis --------------------------------------------
 
 
@@ -428,7 +393,6 @@ class BufLayout:
 
     buf_yaml_dir: str
     module_paths: tuple[str, ...]
-    deps: tuple[str, ...]  # BSR module ids (e.g. `buf.build/bufbuild/protovalidate`)
 
     def root_for_proto(self, proto_path: str) -> str:
         return resolve_buf_module_root(proto_path, self.buf_yaml_dir, self.module_paths)
@@ -453,15 +417,11 @@ async def fetch_buf_layout(buf: BufSubsystem) -> BufLayout:
     files = await find_buf_config_files(buf)
     yaml_paths = [p for p in files.snapshot.files if os.path.basename(p) == "buf.yaml"]
     if not yaml_paths:
-        return BufLayout("", (), ())
+        return BufLayout("", ())
     path = yaml_paths[0]
     contents = await get_digest_contents(files.snapshot.digest)
     content = next((dc.content for dc in contents if dc.path == path), b"")
-    return BufLayout(
-        os.path.dirname(path),
-        parse_buf_yaml_module_paths(content),
-        parse_buf_yaml_deps(content),
-    )
+    return BufLayout(os.path.dirname(path), parse_buf_yaml_module_paths(content))
 
 
 @dataclass(frozen=True)
