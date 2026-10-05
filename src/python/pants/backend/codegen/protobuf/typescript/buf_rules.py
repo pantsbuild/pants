@@ -5,10 +5,15 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from pants.backend.codegen.protobuf.buf.generate import BufGenerateRequest, run_buf_generate
 from pants.backend.codegen.protobuf.buf.generate import rules as buf_generate_rules
-from pants.backend.codegen.protobuf.target_types import ProtobufSourceField
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufSourceField,
+    uses_generator,
+    validate_protobuf_generator,
+)
 from pants.backend.codegen.protobuf.typescript.subsystem import TypeScriptProtobufSubsystem
 from pants.backend.javascript.install_node_package import (
     InstalledNodePackageRequest,
@@ -18,9 +23,16 @@ from pants.backend.javascript.subsystems.nodejs import NodeJSProcessEnvironment
 from pants.backend.typescript.target_types import TypeScriptSourceField
 from pants.core.util_rules.adhoc_process_support import ExtraSandboxContents
 from pants.engine.addresses import AddressInput
+from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.build_files import resolve_address
 from pants.engine.rules import Rule, collect_rules, implicitly, rule
-from pants.engine.target import GeneratedSources, GenerateSourcesRequest
+from pants.engine.target import (
+    FieldSet,
+    GeneratedSources,
+    GenerateSourcesRequest,
+    ValidatedDependencies,
+    ValidateDependenciesRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
@@ -76,6 +88,9 @@ async def generate_typescript_from_protobuf(
     node_environment: NodeJSProcessEnvironment,
 ) -> GeneratedSources:
     target = request.protocol_target
+    if not uses_generator(target, "buf"):
+        return GeneratedSources(EMPTY_SNAPSHOT)
+
     package_address = typescript_protobuf.buf_node_package_address
     toolchain = (
         await _node_plugin_toolchain(
@@ -96,9 +111,28 @@ async def generate_typescript_from_protobuf(
     return GeneratedSources(result.snapshot)
 
 
+@dataclass(frozen=True)
+class TypeScriptProtobufDependenciesFieldSet(FieldSet):
+    required_fields = (TypeScriptSourceField,)
+
+    sources: TypeScriptSourceField
+
+
+class ValidateTypeScriptProtobufDependenciesRequest(ValidateDependenciesRequest):
+    field_set_type = TypeScriptProtobufDependenciesFieldSet
+
+
+@rule
+async def validate_typescript_protobuf_dependencies(
+    request: ValidateTypeScriptProtobufDependenciesRequest,
+) -> ValidatedDependencies:
+    return await validate_protobuf_generator(request, "TypeScript", "buf")
+
+
 def rules() -> Iterable[Rule | UnionRule]:
     return (
         *collect_rules(),
         *buf_generate_rules(),
         UnionRule(GenerateSourcesRequest, GenerateTypeScriptFromProtobufRequest),
+        UnionRule(ValidateDependenciesRequest, ValidateTypeScriptProtobufDependenciesRequest),
     )
