@@ -107,9 +107,10 @@ class BufSubsystem(TemplatedExternalTool):
         default={},
         help=softwrap(
             """
-            Map of `buf.gen.yaml` plugin ids to default `vX.Y:revN` pins that
-            Pants will fill in for unpinned `remote:` entries, layered on top of
-            Pants's built-in registry.
+            Map of `buf.gen.yaml` plugin ids to default `<version>:<revision>` pins
+            that Pants will fill in for unpinned `remote:` entries, layered on top of
+            Pants's built-in registry. The version is the plugin's own, `v` included,
+            and the revision is the BSR's integer build number for that version.
 
             Pants requires every `remote:` plugin to be pinned to an exact
             version+revision so codegen output is reproducible. For plugins in
@@ -120,7 +121,7 @@ class BufSubsystem(TemplatedExternalTool):
             Example:
 
                 extra_plugin_pins = {
-                  "myorg.example.com/internal/python-fork": "v2.0:3",
+                  "myorg.example.com/internal/python-fork": "v2.0.0:3",
                 }
             """
         ),
