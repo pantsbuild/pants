@@ -175,7 +175,7 @@ async def map_protobuf_to_python_modules(
             python_protobuf_subsystem.language_gen_template,
         )
     else:
-        buf_layout = BufLayout("", ())
+        buf_layout = BufLayout()
         buf_gen_contents = ()
 
     plugin_suffixes = {

@@ -13,7 +13,11 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from pants.backend.codegen.protobuf.buf.config import find_buf_config_files
+from pants.backend.codegen.protobuf.buf.config import (
+    buf_resolve_name,
+    fetch_buf_layout,
+    find_buf_config_files,
+)
 from pants.backend.codegen.protobuf.buf.subsystem import BufSubsystem
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
@@ -49,19 +53,19 @@ class GenerateBufLockfile(GenerateLockfile):
     buf_yaml_path: str
 
 
-def _resolve_name(buf_yaml_path: str) -> str:
-    parent = os.path.dirname(buf_yaml_path)
-    return parent if parent else "buf"
+async def _lockable_buf_yaml(buf: BufSubsystem) -> str | None:
+    """The `buf.yaml` to lock: only one with BSR `deps:` has anything to put in a `buf.lock`."""
+    layout = await fetch_buf_layout(buf)
+    return layout.buf_yaml_path if layout.deps else None
 
 
 @rule
 async def known_buf_user_resolve_names(
     _: KnownBufResolveNamesRequest, buf: BufSubsystem
 ) -> KnownUserResolveNames:
-    files = await find_buf_config_files(buf)
-    yaml_paths = sorted(p for p in files.snapshot.files if os.path.basename(p) == "buf.yaml")
+    path = await _lockable_buf_yaml(buf)
     return KnownUserResolveNames(
-        names=tuple(_resolve_name(p) for p in yaml_paths),
+        names=(buf_resolve_name(path),) if path else (),
         option_name="`buf.yaml` discovery",
         requested_resolve_names_cls=RequestedBufResolveNames,
     )
@@ -71,21 +75,19 @@ async def known_buf_user_resolve_names(
 async def setup_user_buf_lockfile_requests(
     requested: RequestedBufResolveNames, buf: BufSubsystem
 ) -> UserGenerateLockfiles:
-    files = await find_buf_config_files(buf)
-    name_to_yaml = {
-        _resolve_name(p): p for p in files.snapshot.files if os.path.basename(p) == "buf.yaml"
-    }
+    path = await _lockable_buf_yaml(buf)
+    name_to_yaml = {buf_resolve_name(path): path} if path else {}
     requests = []
     for name in requested:
-        path = name_to_yaml.get(name)
-        if path is None:
+        yaml_path = name_to_yaml.get(name)
+        if yaml_path is None:
             continue
         requests.append(
             GenerateBufLockfile(
                 resolve_name=name,
-                lockfile_dest=os.path.join(os.path.dirname(path), "buf.lock"),
+                lockfile_dest=os.path.join(os.path.dirname(yaml_path), "buf.lock"),
                 diff=False,
-                buf_yaml_path=path,
+                buf_yaml_path=yaml_path,
             )
         )
     return UserGenerateLockfiles(requests)
