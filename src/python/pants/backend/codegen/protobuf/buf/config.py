@@ -31,6 +31,10 @@ class UnpinnedBufPluginError(Exception):
     """Raised when a `remote:` plugin entry isn't fully pinned and Pants can't fill in the pin."""
 
 
+class InvalidBufPluginPinError(Exception):
+    """Raised when a `[buf].extra_plugin_pins` value isn't `<version>:<revision>`."""
+
+
 class MissingBufLockError(Exception):
     """Raised when `buf.yaml` declares `deps:` but no sibling `buf.lock` exists."""
 
@@ -238,8 +242,11 @@ def _split_remote_ident(ident: str) -> tuple[str, str | None]:
 
 
 def _parse_pin_string(pin: str) -> tuple[str, int] | None:
-    """Parse `"vX.Y:N"` (Pants-internal pin format) into `(version, revision)`.
-    Returns `None` if the format is invalid."""
+    """Parse `"<version>:<revision>"`, e.g. `"v0.10.0:1"`, into `(version, revision)`.
+
+    Returns `None` if the format is invalid. A BSR plugin version is `v` plus semver, so it
+    never contains a `:`.
+    """
     parts = pin.split(":")
     if len(parts) != 2 or not parts[0]:
         return None
@@ -265,9 +272,20 @@ def synthesize_pinned_buf_gen_yaml(
 
     Pants requires both fields. If a plugin entry is missing either, it must be
     in `DEFAULT_PLUGIN_PINS` (or the user's `extra_pins`) for Pants to fill in
-    defaults. `extra_pins` values are `"vX.Y:N"` strings, parsed here.
+    defaults. `extra_pins` values are `"<version>:<revision>"` strings, parsed here.
     `protoc_builtin:` and `local:` plugins are not subject to pin enforcement.
     """
+    parsed_extra: dict[str, tuple[str, int]] = {}
+    for plugin_id, pin in (extra_pins or {}).items():
+        parsed = _parse_pin_string(pin)
+        if parsed is None:
+            raise InvalidBufPluginPinError(
+                f"`[{BufSubsystem.options_scope}].extra_plugin_pins` has {pin!r} for "
+                f'`{plugin_id}`. Expected `<version>:<revision>`, e.g. `"v0.10.0:1"`.'
+            )
+        parsed_extra[plugin_id] = parsed
+    pins: Mapping[str, tuple[str, int]] = {**DEFAULT_PLUGIN_PINS, **parsed_extra}
+
     try:
         data = yaml.safe_load(content)
     except yaml.YAMLError:
@@ -277,13 +295,6 @@ def synthesize_pinned_buf_gen_yaml(
     plugins = data.get("plugins")
     if not isinstance(plugins, list):
         return content
-
-    parsed_extra: dict[str, tuple[str, int]] = {}
-    for k, v in (extra_pins or {}).items():
-        parsed = _parse_pin_string(v)
-        if parsed is not None:
-            parsed_extra[k] = parsed
-    pins: Mapping[str, tuple[str, int]] = {**DEFAULT_PLUGIN_PINS, **parsed_extra}
 
     unresolvable: list[str] = []
     rewrote = False
