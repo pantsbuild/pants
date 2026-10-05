@@ -54,7 +54,7 @@ class PackageableTargetPositions:
 
 
 @rule
-async def packageable_target_positions(
+async def get_packageable_target_positions(
     all_packageable_targets: AllPackageableTargets,
 ) -> PackageableTargetPositions:
     return PackageableTargetPositions(
@@ -63,7 +63,7 @@ async def packageable_target_positions(
 
 
 @rule
-async def packageable_output_paths(
+async def get_packageable_output_paths(
     request: PackageableOutputPathsRequest, all_packageable_targets: AllPackageableTargets
 ) -> PackageableOutputPaths:
     positions_by_path: dict[str, list[int]] = defaultdict(list)
@@ -138,10 +138,10 @@ async def infer_docker_dependencies(
     # expect it (if you give it "", it'll leave a trailing ".").
     possible_file_endings = {PurePath(path).suffix[1:] or None for path in maybe_output_paths}
     output_paths_per_ending = await concurrently(
-        packageable_output_paths(PackageableOutputPathsRequest(file_ending), **implicitly())
+        get_packageable_output_paths(PackageableOutputPathsRequest(file_ending), **implicitly())
         for file_ending in sorted(possible_file_endings, key=lambda e: e or "")
     )
-    positions = (await packageable_target_positions(**implicitly())).positions
+    positions = (await get_packageable_target_positions(**implicitly())).positions
 
     # Targets which are images we depend on.
     image_positions = {positions[a] for a in putative_image_addresses if a in positions}
