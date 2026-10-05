@@ -9,6 +9,7 @@ import pytest
 import yaml
 
 from pants.backend.codegen.protobuf.buf.config import (
+    InvalidBufPluginPinError,
     UnpinnedBufPluginError,
     parse_buf_yaml_deps,
     parse_plugin_outs,
@@ -128,9 +129,8 @@ def test_synthesize_extra_pins_override_registry_default() -> None:
     assert plugin["revision"] == 7
 
 
-def test_synthesize_ignores_malformed_extra_pin_string() -> None:
-    """Malformed `extra_pins` values (missing `:revN`) are silently dropped, so the
-    plugin is treated as unknown-and-unpinned and raises."""
+@pytest.mark.parametrize("pin", ["no-colon", "v2.0:rev3", ":3", "v2.0:3:4"])
+def test_synthesize_rejects_malformed_extra_pin_string(pin: str) -> None:
     content = dedent(
         """\
         version: v2
@@ -139,11 +139,11 @@ def test_synthesize_ignores_malformed_extra_pin_string() -> None:
             out: gen
         """
     ).encode("utf-8")
-    with pytest.raises(UnpinnedBufPluginError):
+    with pytest.raises(InvalidBufPluginPinError, match="example.com/some/custom-plugin"):
         synthesize_pinned_buf_gen_yaml(
             content,
             "buf.gen.yaml",
-            extra_pins={"example.com/some/custom-plugin": "no-colon"},
+            extra_pins={"example.com/some/custom-plugin": pin},
         )
 
 
