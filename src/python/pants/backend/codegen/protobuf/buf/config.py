@@ -297,6 +297,8 @@ def synthesize_pinned_buf_gen_yaml(
         return content
 
     unresolvable: list[str] = []
+    # Entries the user pinned in part, which Pants won't override.
+    partial: list[str] = []
     rewrote = False
     for plugin in plugins:
         if not isinstance(plugin, dict):
@@ -307,16 +309,38 @@ def synthesize_pinned_buf_gen_yaml(
         ident = " ".join(str(x) for x in val) if isinstance(val, list) else str(val)
         base, version = _split_remote_ident(ident)
         revision = plugin.get("revision")
-        if version is not None and isinstance(revision, int):
-            continue  # already fully pinned
         default = pins.get(base)
-        if default is None:
+        # Buf itself rejects malformed or nonexistent pins, but it accepts partial ones and
+        # silently uses the newest version or revision.
+        if version is not None and revision is not None:
+            continue  # already fully pinned
+        elif revision is not None:
+            partial.append(f"{ident}: has `revision: {revision}` but no version")
+        elif version is not None:
+            # Fill in the revision only for the version the registry pins; any other
+            # version's revision is unknown to Pants.
+            if default is not None and default[0] == version:
+                plugin["revision"] = default[1]
+                rewrote = True
+            else:
+                known = f"; Pants knows the revision for {default[0]}" if default else ""
+                partial.append(f"{ident}: needs a `revision:`{known}")
+        elif default is None:
             unresolvable.append(ident)
-            continue
-        default_version, default_revision = default
-        plugin["remote"] = f"{base}:{default_version}"
-        plugin["revision"] = default_revision
-        rewrote = True
+        else:
+            default_version, default_revision = default
+            plugin["remote"] = f"{base}:{default_version}"
+            plugin["revision"] = default_revision
+            rewrote = True
+
+    if partial:
+        bullets = "\n".join(f"  - {entry}" for entry in partial)
+        raise UnpinnedBufPluginError(
+            f"`{source_path}` has `remote:` plugin entries that are only partly pinned:\n"
+            f"{bullets}\n\n"
+            "Pin both the version and `revision:`, or, for a plugin in Pants's built-in "
+            "registry or `[buf].extra_plugin_pins`, leave both unset to use the default."
+        )
 
     if unresolvable:
         bullets = "\n".join(f"  - remote: {ident}" for ident in unresolvable)

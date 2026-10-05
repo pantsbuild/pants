@@ -57,22 +57,34 @@ def test_synthesize_fills_in_pin_for_known_unpinned_plugin() -> None:
     assert isinstance(plugin["revision"], int) and plugin["revision"] >= 1
 
 
-def test_synthesize_overrides_partial_pin_with_registry_default() -> None:
-    """A version-only pin (no `revision:`) gets overridden with the registry's full
-    pin so the entry is unambiguous."""
+def test_synthesize_fills_in_revision_for_registry_version() -> None:
+    """A version-only pin gets the registry's revision when the versions match."""
     content = dedent(
         """\
         version: v2
         plugins:
-          - remote: buf.build/protocolbuffers/python:v33.0
+          - remote: buf.build/protocolbuffers/python:v34.1
             out: gen
         """
     ).encode("utf-8")
-    out = synthesize_pinned_buf_gen_yaml(content, "buf.gen.yaml")
-    [plugin] = _plugins(out)
-    assert "revision" in plugin
-    # Registry default version replaces the user's version-only pin.
-    assert plugin["remote"] != "buf.build/protocolbuffers/python:v33.0"
+    [plugin] = _plugins(synthesize_pinned_buf_gen_yaml(content, "buf.gen.yaml"))
+    assert plugin["remote"] == "buf.build/protocolbuffers/python:v34.1"
+    assert plugin["revision"] == 1
+
+
+@pytest.mark.parametrize(
+    "entry, reason",
+    [
+        # A version the registry doesn't pin: the user's choice is kept, not replaced.
+        ("remote: buf.build/protocolbuffers/python:v33.0", "needs a `revision:`"),
+        ("remote: buf.build/protocolbuffers/python\n    revision: 1", "but no version"),
+    ],
+    ids=["unknown-version", "revision-only"],
+)
+def test_synthesize_rejects_partial_pin(entry: str, reason: str) -> None:
+    content = f"version: v2\nplugins:\n  - {entry}\n    out: gen\n".encode()
+    with pytest.raises(UnpinnedBufPluginError, match=reason):
+        synthesize_pinned_buf_gen_yaml(content, "buf.gen.yaml")
 
 
 def test_synthesize_raises_for_unknown_unpinned_plugin() -> None:
