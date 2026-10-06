@@ -3,11 +3,12 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.codegen.protobuf.buf.config import (
     LanguageGenTemplate,
     gen_template_request_from_fields,
-    parse_plugin_outs,
+    parse_plugin_ids,
 )
 from pants.backend.codegen.protobuf.buf.fields import BufGenTemplateField
 from pants.backend.codegen.protobuf.buf.subsystem import BufSubsystem
@@ -44,32 +45,37 @@ from pants.util.strutil import help_text, softwrap
 # pants: infer-dep(mypy_protobuf.lock*)
 
 
-# Built-in registry mapping known buf plugin ids to the Python module-name suffix
-# their output uses (e.g. `buf.build/grpc/python` produces `*_pb2_grpc.py`, so
-# `_pb2_grpc` is the suffix). The Python `python_protobuf_module_mapper` consumes
-# this to know which generated modules to register per proto file. Keys are
-# `<kind>:<ident>`, where `<kind>` is `remote`, `protoc_builtin`, or `local` —
-# matching the field name in `buf.gen.yaml` — so that identical names across
-# kinds (e.g. a `local:` plugin named `python`) cannot collide. Users with
-# custom plugin ids should layer additional entries via
-# `[python-protobuf].extra_buf_plugin_suffixes`.
-DEFAULT_PLUGIN_SUFFIXES: Mapping[str, str] = {
-    # Core message codegen.
-    "remote:buf.build/protocolbuffers/python": "_pb2",
-    "protoc_builtin:python": "_pb2",
-    "local:protoc-gen-python": "_pb2",
-    # No `pyi` plugins: the same target generates the stubs and the `_pb2.py`, so mapping
-    # the `.py` is enough.
-    # ConnectRPC.
-    "remote:buf.build/connectrpc/python": "_connect",
-    "local:protoc-gen-connect-python": "_connect",
-    # gRPC (grpcio).
-    "remote:buf.build/grpc/python": "_pb2_grpc",
-    "local:protoc-gen-grpc-python": "_pb2_grpc",
-    "local:protoc-gen-grpc_python": "_pb2_grpc",
-    # gRPC (grpclib).
-    "local:protoc-gen-grpclib_python": "_grpc",
-    "local:protoc-gen-python_grpc": "_grpc",
+@dataclass(frozen=True)
+class BufPythonPlugin:
+    """What Pants needs to know about a buf plugin that generates Python."""
+
+    # Appended to each `.proto` file's name to name its module, e.g. `_pb2` for `foo_pb2.py`.
+    # `None` for a plugin whose modules aren't named that way; Pants doesn't map them.
+    suffix: str | None
+    # `(module, requirement)` for each module the generated code imports; the requirement is
+    # suggested when no `python_requirement` provides the module.
+    runtime: tuple[tuple[str, str], ...] = ()
+
+
+_PB2 = BufPythonPlugin("_pb2", (("google.protobuf", "protobuf"),))
+_GRPCIO = BufPythonPlugin("_pb2_grpc", (("grpc", "grpcio"),))
+_GRPCLIB = BufPythonPlugin("_grpc", (("grpclib", "grpclib[protobuf]"),))
+_CONNECT = BufPythonPlugin("_connect", (("connectrpc", "connectrpc"),))
+
+# Keyed by `<kind>:<ident>`, where `<kind>` is the field in the `buf.gen.yaml` plugin entry
+# (`remote`, `protoc_builtin` or `local`). No `pyi` plugins: the same target generates the
+# stubs and the `_pb2.py`, so mapping the `.py` is enough.
+DEFAULT_BUF_PYTHON_PLUGINS: Mapping[str, BufPythonPlugin] = {
+    "remote:buf.build/protocolbuffers/python": _PB2,
+    "protoc_builtin:python": _PB2,
+    "local:protoc-gen-python": _PB2,
+    "remote:buf.build/connectrpc/python": _CONNECT,
+    "local:protoc-gen-connect-python": _CONNECT,
+    "remote:buf.build/grpc/python": _GRPCIO,
+    "local:protoc-gen-grpc-python": _GRPCIO,
+    "local:protoc-gen-grpc_python": _GRPCIO,
+    "local:protoc-gen-grpclib_python": _GRPCLIB,
+    "local:protoc-gen-python_grpc": _GRPCLIB,
 }
 
 
@@ -148,33 +154,30 @@ class PythonProtobufSubsystem(Subsystem):
         ),
     )
 
-    extra_buf_plugin_suffixes = DictOption[str](
+    extra_buf_plugins = DictOption[Any](
         default={},
         help=softwrap(
             """
-            Map of additional `buf.gen.yaml` plugin ids to the Python module-name
-            suffix their output uses, layered on top of Pants's built-in registry
-            of common plugins (e.g. `buf.build/protocolbuffers/python`,
-            `buf.build/connectrpc/python`).
+            Additional buf plugins that generate Python, layered on top of Pants's built-in
+            entries for common plugins (e.g. `buf.build/protocolbuffers/python`,
+            `buf.build/grpc/python`).
 
-            Use this to teach Pants about custom or forked plugins. Keys are
-            `<kind>:<id>`, where `<kind>` is `remote`, `protoc_builtin`, or
-            `local` — matching the field name in the `buf.gen.yaml` plugin entry —
-            and `<id>` is the plugin id exactly as it appears in that field
-            (without any `:vX.Y` version suffix on `remote:` entries). Values are
-            module-name suffixes from the set:
+            Keys are `<kind>:<id>`, where `<kind>` is the field in the `buf.gen.yaml` plugin
+            entry (`remote`, `protoc_builtin` or `local`) and `<id>` is its value, without any
+            `:<version>`. Each value has:
 
-            - `_pb2` — produces message modules (`*_pb2.py`).
-            - `_pb2_grpc` — produces grpcio service stubs (`*_pb2_grpc.py`).
-            - `_grpc` — produces grpclib service stubs (`*_grpc.py`).
-            - `_connect` — produces ConnectRPC service stubs (`*_connect.py`).
+            - `suffix` (optional): what the plugin appends to each `.proto` file's name to name
+              its module, e.g. `_pb2_grpc` for `foo_pb2_grpc.py`, so Pants can infer
+              dependencies on the generated modules. Leave it out for a plugin whose modules
+              are named some other way.
+            - `runtime` (optional): modules the generated code imports, so Pants can add
+              dependencies on the requirements that provide them.
 
             Example:
 
-                extra_buf_plugin_suffixes = {
-                  "remote:myorg.example.com/internal/python-fork": "_pb2",
-                  "remote:buf.build/example/some-grpc-fork": "_pb2_grpc",
-                  "local:protoc-gen-myorg-python": "_pb2",
+                extra_buf_plugins = {
+                  "local:protoc-gen-myorg-python": {"suffix": "_pb2", "runtime": ["google.protobuf"]},
+                  "remote:buf.build/example/grpc-fork": {"suffix": "_pb2_grpc", "runtime": ["grpc"]},
                 }
             """
         ),
@@ -207,16 +210,26 @@ class PythonProtobufSubsystem(Subsystem):
         return LanguageGenTemplate.from_option(self, "buf_gen_template")
 
     @property
-    def buf_plugin_suffixes(self) -> dict[str, str]:
-        """The built-in plugin suffixes, plus `extra_buf_plugin_suffixes`."""
-        valid = sorted(set(DEFAULT_PLUGIN_SUFFIXES.values()))
-        for plugin_id, suffix in self.extra_buf_plugin_suffixes.items():
-            if suffix not in valid:
+    def buf_plugins(self) -> dict[str, BufPythonPlugin]:
+        """The built-in buf plugins, plus `extra_buf_plugins`."""
+        plugins = dict(DEFAULT_BUF_PYTHON_PLUGINS)
+        for plugin_id, entry in self.extra_buf_plugins.items():
+            suffix = entry.get("suffix") if isinstance(entry, dict) else None
+            runtime = entry.get("runtime", []) if isinstance(entry, dict) else None
+            if (
+                not isinstance(entry, dict)
+                or (suffix is not None and (not isinstance(suffix, str) or not suffix))
+                or not isinstance(runtime, list)
+                or not all(isinstance(m, str) for m in runtime)
+                or set(entry) - {"suffix", "runtime"}
+            ):
                 raise ValueError(
-                    f"`[{self.options_scope}].extra_buf_plugin_suffixes` has {suffix!r} for "
-                    f"`{plugin_id}`. Expected one of: {', '.join(valid)}."
+                    f"`[{self.options_scope}].extra_buf_plugins` has {entry!r} for "
+                    f'`{plugin_id}`. Expected `{{"suffix": <str>, "runtime": [<module>, ...]}}`, '
+                    "with both optional."
                 )
-        return {**DEFAULT_PLUGIN_SUFFIXES, **self.extra_buf_plugin_suffixes}
+            plugins[plugin_id] = BufPythonPlugin(suffix, tuple((m, m) for m in runtime))
+        return plugins
 
 
 class PythonProtobufMypyPlugin(PythonToolRequirementsBase):
@@ -266,11 +279,6 @@ class InferPythonProtobufDependencies(InferDependenciesRequest):
 # name, requirement URL). Used by the buf branch of runtime-dep inference to add
 # a runtime requirement on the right Python package when a plugin producing that
 # suffix appears in `buf.gen.yaml`.
-_BUF_RUNTIME_DEPS: tuple[tuple[str, str, str, str], ...] = (
-    ("_pb2_grpc", "grpc", "grpcio", "https://pypi.org/project/grpcio/"),
-    ("_grpc", "grpclib", "grpclib[protobuf]", "https://pypi.org/project/grpclib/"),
-    ("_connect", "connectrpc", "connectrpc", "https://pypi.org/project/connectrpc/"),
-)
 
 
 async def _runtime_dep_for_module(
@@ -322,6 +330,50 @@ async def infer_dependencies(
 
     disable_option = f"[{python_protobuf.options_scope}].infer_runtime_dependency"
     result = []
+
+    if request.field_set.generator.value == "buf":
+        # Buf path: each runtime comes from a plugin in the template. Subsystem booleans and
+        # `grpc=True` are not consulted.
+        template_request = gen_template_request_from_fields(
+            spec_path=request.field_set.address.spec_path,
+            address_str=str(request.field_set.address),
+            override=request.field_set.buf_gen_template.value,
+            buf=buf,
+            language_template=python_protobuf.language_gen_template,
+        )
+        template_files = await find_config_file(template_request)
+        runtime: dict[str, str] = {}
+        if template_files.snapshot.files:
+            template_path = template_files.snapshot.files[0]
+            template_dcs = await get_digest_contents(template_files.snapshot.digest)
+            content = next(
+                (dc.content for dc in template_dcs if dc.path == template_path),
+                b"",
+            )
+            plugins = python_protobuf.buf_plugins
+            # Unpinned plugins are fine here: only their ids are needed, and codegen enforces pins.
+            for plugin_id in parse_plugin_ids(content):
+                if plugin_id in plugins:
+                    runtime.update(plugins[plugin_id].runtime)
+        for module, requirement in runtime.items():
+            result.append(
+                await _runtime_dep_for_module(
+                    module=module,
+                    field_set=request.field_set,
+                    python_setup=python_setup,
+                    locality=locality,
+                    resolve=resolve,
+                    recommended_requirement_name=requirement,
+                    recommended_requirement_url=(
+                        f"https://pypi.org/project/{requirement.split('[')[0]}/"
+                    ),
+                    disable_inference_option=disable_option,
+                )
+            )
+        return InferredDependencies(result)
+
+    # Protoc path: gated on `grpc=True` and the subsystem booleans, since Pants
+    # drives the protoc invocation directly.
     result.append(
         await _runtime_dep_for_module(
             module="google.protobuf",
@@ -334,49 +386,6 @@ async def infer_dependencies(
             disable_inference_option=disable_option,
         )
     )
-
-    if request.field_set.generator.value == "buf":
-        # Buf path: generated-module suffixes come from `buf.gen.yaml`. Subsystem
-        # booleans and `grpc=True` are not consulted.
-        template_request = gen_template_request_from_fields(
-            spec_path=request.field_set.address.spec_path,
-            address_str=str(request.field_set.address),
-            override=request.field_set.buf_gen_template.value,
-            buf=buf,
-            language_template=python_protobuf.language_gen_template,
-        )
-        template_files = await find_config_file(template_request)
-        suffix_outs: dict[str, str] = {}
-        if template_files.snapshot.files:
-            template_path = template_files.snapshot.files[0]
-            template_dcs = await get_digest_contents(template_files.snapshot.digest)
-            content = next(
-                (dc.content for dc in template_dcs if dc.path == template_path),
-                b"",
-            )
-            # Unpinned plugins are fine here: only their ids are needed, and codegen enforces pins.
-            suffix_outs = parse_plugin_outs(
-                content,
-                python_protobuf.buf_plugin_suffixes,
-            )
-        for suffix, module, req_name, req_url in _BUF_RUNTIME_DEPS:
-            if suffix in suffix_outs:
-                result.append(
-                    await _runtime_dep_for_module(
-                        module=module,
-                        field_set=request.field_set,
-                        python_setup=python_setup,
-                        locality=locality,
-                        resolve=resolve,
-                        recommended_requirement_name=req_name,
-                        recommended_requirement_url=req_url,
-                        disable_inference_option=disable_option,
-                    )
-                )
-        return InferredDependencies(result)
-
-    # Protoc path: gated on `grpc=True` and the subsystem booleans, since Pants
-    # drives the protoc invocation directly.
     if request.field_set.grpc_toggle.value:
         if python_protobuf.grpcio_plugin:
             result.append(

@@ -163,6 +163,21 @@ def _plugin_identifier(plugin: dict) -> str | None:
     return None
 
 
+def _template_plugins(content: bytes) -> list[dict]:
+    """The plugin entries of a `buf.gen.yaml`, or none if it doesn't parse."""
+    try:
+        data = yaml.safe_load(content)
+    except yaml.YAMLError:
+        return []
+    plugins = data.get("plugins") if isinstance(data, dict) else None
+    return [p for p in plugins if isinstance(p, dict)] if isinstance(plugins, list) else []
+
+
+def parse_plugin_ids(content: bytes) -> tuple[str, ...]:
+    """The `<kind>:<ident>` of each plugin in a `buf.gen.yaml`."""
+    return tuple(key for key in (_plugin_identifier(p) for p in _template_plugins(content)) if key)
+
+
 def parse_plugin_outs(content: bytes, suffixes: Mapping[str, str]) -> dict[str, str]:
     """Walk `buf.gen.yaml` plugins and return `suffix -> out:` for matching entries.
 
@@ -171,20 +186,8 @@ def parse_plugin_outs(content: bytes, suffixes: Mapping[str, str]) -> dict[str, 
     and `suffix` is the language's module/file-naming suffix. The first matching
     plugin per suffix wins.
     """
-    try:
-        data = yaml.safe_load(content)
-    except yaml.YAMLError:
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    plugins = data.get("plugins")
-    if not isinstance(plugins, list):
-        return {}
-
     result: dict[str, str] = {}
-    for plugin in plugins:
-        if not isinstance(plugin, dict):
-            continue
+    for plugin in _template_plugins(content):
         out = plugin.get("out")
         if not isinstance(out, str) or not out:
             continue
