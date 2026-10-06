@@ -475,9 +475,9 @@ async def find_buf_config_files(buf: BufSubsystem) -> ConfigFiles:
 
 
 async def fetch_buf_layout(buf: BufSubsystem) -> BufLayout:
-    """Read `buf.yaml`. Empty if there isn't one."""
+    """Read `buf.yaml`, or the file `[buf].config` names. Empty if there isn't one."""
     files = await find_buf_config_files(buf)
-    path = buf_yaml_path(files)
+    path = buf.config or buf_yaml_path(files)
     if path is None:
         return BufLayout()
     contents = await get_digest_contents(files.snapshot.digest)
