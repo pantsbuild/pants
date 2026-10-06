@@ -105,10 +105,12 @@ impl<N: Node> EntryResult<N> {
         }
     }
 
-    fn has_uncacheable_deps(&self) -> bool {
+    /// The Run which may consume this result, if it is confined to one.
+    fn uncacheable_run_id(&self) -> Option<RunId> {
         match self {
-            EntryResult::Uncacheable(_, _) | EntryResult::UncacheableDependencies(_, _) => true,
-            EntryResult::Clean(..) | EntryResult::Dirty(..) => false,
+            EntryResult::Uncacheable(_, run_id)
+            | EntryResult::UncacheableDependencies(_, run_id) => Some(*run_id),
+            EntryResult::Clean(..) | EntryResult::Dirty(..) => None,
         }
     }
 
@@ -165,10 +167,11 @@ impl<N: Node> AsRef<N::Item> for EntryResult<N> {
     }
 }
 
+/// A Node result, its Generation, and the Run it is confined to, if any.
 pub type NodeResult<N> = (
     Result<<N as Node>::Item, <N as Node>::Error>,
     Generation,
-    bool,
+    Option<RunId>,
 );
 
 #[derive(Debug)]
@@ -550,10 +553,19 @@ impl<N: Node> Entry<N> {
                 ..
             } => {
                 if let Some(receiver) = pending_value.receiver() {
+                    let entry = self.clone();
+                    let context = context.clone();
                     return async move {
-                        receiver.recv().await.unwrap_or_else(|| {
-                            (Err(N::Error::invalidated()), generation.next(), true)
-                        })
+                        let result = receiver.recv().await.unwrap_or_else(|| {
+                            (Err(N::Error::invalidated()), generation.next(), None)
+                        });
+                        match result {
+                            (Ok(_), _, Some(run_id)) if run_id != context.run_id() => {
+                                // We attached to another Run's attempt: re-enter for our own value.
+                                entry.get_node_result(&context, entry_id).await
+                            }
+                            result => result,
+                        }
                     }
                     .boxed();
                 }
@@ -567,7 +579,7 @@ impl<N: Node> Entry<N> {
                 return future::ready((
                     Ok(result.as_ref().clone()),
                     generation,
-                    result.has_uncacheable_deps(),
+                    result.uncacheable_run_id(),
                 ))
                 .boxed();
             }
@@ -644,7 +656,7 @@ impl<N: Node> Entry<N> {
             receiver
                 .recv()
                 .await
-                .unwrap_or_else(|| (Err(N::Error::invalidated()), generation.next(), true))
+                .unwrap_or_else(|| (Err(N::Error::invalidated()), generation.next(), None))
         }
         .boxed()
     }
@@ -732,7 +744,7 @@ impl<N: Node> Entry<N> {
                     previous_result.dirty();
                 }
                 generation = generation.next();
-                sender.send((Err(e), generation, true));
+                sender.send((Err(e), generation, Some(context.run_id())));
                 EntryState::NotStarted {
                     run_token,
                     generation,
@@ -751,7 +763,7 @@ impl<N: Node> Entry<N> {
                 sender.send((
                     Ok(next_result.as_ref().clone()),
                     generation,
-                    next_result.has_uncacheable_deps(),
+                    next_result.uncacheable_run_id(),
                 ));
                 EntryState::Completed {
                     result: next_result,
@@ -774,7 +786,7 @@ impl<N: Node> Entry<N> {
                 sender.send((
                     Ok(result.as_ref().clone()),
                     generation,
-                    result.has_uncacheable_deps(),
+                    result.uncacheable_run_id(),
                 ));
                 EntryState::Completed {
                     result,
@@ -937,7 +949,7 @@ impl<N: Node> Entry<N> {
                 let _ = pending_value.try_interrupt(NodeInterrupt::Aborted((
                     Err(err.clone()),
                     generation.next(),
-                    true,
+                    None,
                 )));
             };
         }
