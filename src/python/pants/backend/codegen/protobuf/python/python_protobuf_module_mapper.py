@@ -56,12 +56,6 @@ class PythonProtobufMappingMarker(FirstPartyPythonMappingImplMarker):
     pass
 
 
-# Suffixes relevant to Python codegen. Each is registered iff its plugin appears
-# in `buf.gen.yaml`.
-_PB2_SUFFIX = "_pb2"
-_SERVICE_SUFFIXES: tuple[str, ...] = ("_pb2_grpc", "_grpc", "_connect")
-
-
 @dataclass(frozen=True)
 class _BufStripPlan:
     """Plan for one buf target: paths to feed to `strip_file_name`, paired with the
@@ -92,17 +86,7 @@ def _plan_buf_target(
     def _path_for(out_dir: str) -> str:
         return os.path.normpath(os.path.join(out_dir, rel_proto))
 
-    suffixes: list[str] = []
-    paths: list[str] = []
-    if _PB2_SUFFIX in suffix_outs:
-        suffixes.append(_PB2_SUFFIX)
-        paths.append(_path_for(suffix_outs[_PB2_SUFFIX]))
-    for suffix in _SERVICE_SUFFIXES:
-        if suffix in suffix_outs:
-            suffixes.append(suffix)
-            paths.append(_path_for(suffix_outs[suffix]))
-
-    return _BufStripPlan(tuple(suffixes), tuple(paths))
+    return _BufStripPlan(tuple(suffix_outs), tuple(_path_for(out) for out in suffix_outs.values()))
 
 
 # Protoc-only subsystem options. Their default values are mirrored here so we can
