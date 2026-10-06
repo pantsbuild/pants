@@ -576,16 +576,16 @@ def test_buf_target_unpinned_remote_plugin_succeeds_via_registry(
     )
 
 
-def test_buf_target_extra_plugin_suffixes_override(rule_runner: RuleRunner) -> None:
-    """`[python-protobuf].extra_buf_plugin_suffixes` lets users teach Pants about
-    custom or forked plugins without modifying the registry."""
+def test_buf_target_extra_plugins(rule_runner: RuleRunner) -> None:
+    """`[python-protobuf].extra_buf_plugins` describes plugins Pants doesn't know, with any
+    module suffix."""
     rule_runner.set_options(
         [
             "--source-root-patterns=['/']",
             "--python-enable-resolves",
             (
-                "--python-protobuf-extra-buf-plugin-suffixes="
-                '{"remote:myorg.example.com/internal/python-fork": "_pb2"}'
+                "--python-protobuf-extra-buf-plugins="
+                '{"remote:myorg.example.com/internal/python-fork": {"suffix": "_pb"}}'
             ),
         ]
     )
@@ -606,7 +606,7 @@ def test_buf_target_extra_plugin_suffixes_override(rule_runner: RuleRunner) -> N
     address = Address("protos", relative_file_path="svc.proto")
     provider = (ModuleProvider(address, ModuleProviderType.IMPL),)
     assert result == FirstPartyPythonMappingImpl.create(
-        {"python-default": {"gen.protos.svc_pb2": provider}}
+        {"python-default": {"gen.protos.svc_pb": provider}}
     )
 
 
@@ -631,11 +631,11 @@ def test_buf_target_grpclib_plugin_names(rule_runner: RuleRunner, plugin: str) -
     )
 
 
-def test_buf_target_extra_plugin_suffixes_rejects_unknown_suffix(rule_runner: RuleRunner) -> None:
+def test_buf_target_extra_plugins_rejects_malformed_entry(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
             "--source-root-patterns=['/']",
-            '--python-protobuf-extra-buf-plugin-suffixes={"local:protoc-gen-mine": "pb2"}',
+            '--python-protobuf-extra-buf-plugins={"local:protoc-gen-mine": "_pb2"}',
         ]
     )
     rule_runner.write_files(
@@ -645,7 +645,7 @@ def test_buf_target_extra_plugin_suffixes_rejects_unknown_suffix(rule_runner: Ru
             "protos/BUILD": "protobuf_sources(protobuf_generator='buf')",
         }
     )
-    with engine_error(ValueError, contains="has 'pb2' for `local:protoc-gen-mine`"):
+    with engine_error(ValueError, contains="has '_pb2' for `local:protoc-gen-mine`"):
         rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
 
 

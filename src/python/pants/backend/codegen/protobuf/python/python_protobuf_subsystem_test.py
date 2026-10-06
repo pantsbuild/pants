@@ -174,11 +174,76 @@ def test_buf_target_infers_runtime_deps_from_gen_yaml_plugins() -> None:
         PythonProtobufDependenciesInferenceFieldSet.create(proto_tgt)
     )
     inferred = rule_runner.request(InferredDependencies, [request])
-    # protobuf is always inferred; grpcio + connectrpc come from the plugins.
+    # Each runtime comes from the plugins in the template.
     assert set(inferred.include) == {
         Address("thirdparty", target_name="protobuf"),
         Address("thirdparty", target_name="grpcio"),
         Address("thirdparty", target_name="connectrpc"),
+    }
+
+
+def test_buf_target_without_known_plugins_infers_no_runtime() -> None:
+    """A template whose plugins Pants doesn't recognize, e.g. betterproto, needs no `protobuf`."""
+    rule_runner = RuleRunner(
+        rules=[
+            *python_protobuf_subsystem.rules(),
+            *target_types.rules(),
+            *module_mapper.rules(),
+            *stripped_source_files.rules(),
+            *additional_fields.rules(),
+            *buf_fields.rules(),
+            QueryRule(InferredDependencies, (InferPythonProtobufDependencies,)),
+        ],
+        target_types=[ProtobufSourcesGeneratorTarget, PythonRequirementTarget],
+    )
+    rule_runner.write_files(
+        {
+            "buf.gen.yaml": "version: v2\nplugins:\n  - local: protoc-gen-python_betterproto\n    out: gen\n",
+            "codegen/dir/f.proto": "",
+            "codegen/dir/BUILD": "protobuf_sources(protobuf_generator='buf')",
+        }
+    )
+    proto_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.proto"))
+    request = InferPythonProtobufDependencies(
+        PythonProtobufDependenciesInferenceFieldSet.create(proto_tgt)
+    )
+    assert not rule_runner.request(InferredDependencies, [request]).include
+
+
+def test_buf_target_extra_plugin_runtime() -> None:
+    """A plugin from `[python-protobuf].extra_buf_plugins` brings its declared runtime."""
+    rule_runner = RuleRunner(
+        rules=[
+            *python_protobuf_subsystem.rules(),
+            *target_types.rules(),
+            *module_mapper.rules(),
+            *stripped_source_files.rules(),
+            *additional_fields.rules(),
+            *buf_fields.rules(),
+            QueryRule(InferredDependencies, (InferPythonProtobufDependencies,)),
+        ],
+        target_types=[ProtobufSourcesGeneratorTarget, PythonRequirementTarget],
+    )
+    rule_runner.write_files(
+        {
+            "buf.gen.yaml": "version: v2\nplugins:\n  - local: protoc-gen-python_betterproto\n    out: gen\n",
+            "codegen/dir/f.proto": "",
+            "codegen/dir/BUILD": "protobuf_sources(protobuf_generator='buf')",
+            "thirdparty/BUILD": "python_requirement(name='betterproto', requirements=['betterproto'])",
+        }
+    )
+    rule_runner.set_options(
+        [
+            '--python-protobuf-extra-buf-plugins={"local:protoc-gen-python_betterproto": '
+            '{"runtime": ["betterproto"]}}'
+        ]
+    )
+    proto_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.proto"))
+    request = InferPythonProtobufDependencies(
+        PythonProtobufDependenciesInferenceFieldSet.create(proto_tgt)
+    )
+    assert set(rule_runner.request(InferredDependencies, [request]).include) == {
+        Address("thirdparty", target_name="betterproto")
     }
 
 
