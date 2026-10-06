@@ -124,6 +124,23 @@ def test_buf_generates_python_at_out_directory(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_buf_target_without_python_template_generates_nothing(rule_runner: RuleRunner) -> None:
+    """E.g. a target only generated for TypeScript, which `export-codegen` still asks about."""
+    rule_runner.write_files(
+        {
+            "buf.yaml": BUF_YAML,
+            "idl/proto/foo/person.proto": SIMPLE_PROTO,
+            "idl/proto/foo/BUILD": "protobuf_sources(protobuf_generator='buf')",
+        }
+    )
+    _assert_generates(
+        rule_runner,
+        Address("idl/proto/foo", relative_file_path="person.proto"),
+        expected_files=set(),
+        source_roots=["idl/proto"],
+    )
+
+
 @pytest.mark.platform_specific_behavior
 def test_default_protoc_path_still_works(rule_runner: RuleRunner) -> None:
     """Regression: `protobuf_generator` unset (default `protoc`) is unchanged."""
