@@ -38,15 +38,18 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
+    DigestSubset,
     Directory,
     FileContent,
     MergeDigests,
+    PathGlobs,
     RemovePrefix,
     Snapshot,
 )
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.intrinsics import (
     create_digest,
+    digest_subset_to_digest,
     digest_to_snapshot,
     get_digest_contents,
     merge_digests,
@@ -177,13 +180,18 @@ async def run_buf_generate(
 
     # Put `protoc` (and any plugin binaries co-located with it) on PATH so buf can resolve
     # `protoc_builtin:` and `local: [protoc]` entries, and `[buf].codegen_plugins` so it can
-    # resolve `local: <name>`.
+    # resolve `local: <name>`. Only protoc's binary directory is mounted: its bundled `.proto`
+    # files would otherwise be part of a module rooted at the sandbox root.
     protoc_relpath = "__protoc"
+    protoc_bin_dir = os.path.dirname(downloaded_protoc.exe)
+    protoc_binaries = await digest_subset_to_digest(
+        DigestSubset(downloaded_protoc.digest, PathGlobs([os.path.join(protoc_bin_dir, "*")]))
+    )
     sandbox_additions = [
         ExtraSandboxContents(
             digest=EMPTY_DIGEST,
-            paths=(os.path.join(protoc_relpath, os.path.dirname(downloaded_protoc.exe)),),
-            immutable_input_digests=FrozenDict({protoc_relpath: downloaded_protoc.digest}),
+            paths=(os.path.join(protoc_relpath, protoc_bin_dir),),
+            immutable_input_digests=FrozenDict({protoc_relpath: protoc_binaries}),
             append_only_caches=FrozenDict(),
             extra_env=FrozenDict(),
         )

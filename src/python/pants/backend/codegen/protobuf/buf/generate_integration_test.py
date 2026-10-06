@@ -361,6 +361,31 @@ def test_generates_full_tree_when_dependency_inference_off(rule_runner: RuleRunn
 
 
 @pytest.mark.platform_specific_behavior
+def test_root_module_without_path_ignores_protocs_own_protos(rule_runner: RuleRunner) -> None:
+    """protoc ships the well-known types' `.proto` files; none may join a module at the root."""
+    rule_runner.write_files(
+        {
+            "buf.yaml": "version: v2\nmodules:\n  - path: .\n",
+            "buf.gen.yaml": BUF_GEN_YAML,
+            "foo/person.proto": dedent(
+                """\
+                syntax = "proto3";
+                package foo;
+                import "google/protobuf/timestamp.proto";
+                message Person {
+                  google.protobuf.Timestamp born = 1;
+                }
+                """
+            ),
+            "foo/BUILD": "protobuf_sources()",
+        }
+    )
+    _set_options(rule_runner, "--no-protoc-dependency-inference", "--source-root-patterns=['/']")
+    generated = _generate(rule_runner, Address("foo", relative_file_path="person.proto"))
+    assert set(generated.files) == {"src/proto/foo/person_pb2.py"}
+
+
+@pytest.mark.platform_specific_behavior
 def test_fails_without_buf_lock_when_deps_declared(rule_runner: RuleRunner) -> None:
     """`buf.yaml` declaring `deps:` without a sibling `buf.lock` is rejected at
     codegen time with a friendly error pointing at `pants generate-lockfiles
