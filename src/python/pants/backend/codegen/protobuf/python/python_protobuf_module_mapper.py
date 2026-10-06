@@ -178,7 +178,11 @@ async def map_protobuf_to_python_modules(
         buf_layout = BufLayout("", ())
         buf_gen_contents = ()
 
-    plugin_suffixes = python_protobuf_subsystem.buf_plugin_suffixes
+    plugin_suffixes = {
+        plugin_id: plugin.suffix
+        for plugin_id, plugin in python_protobuf_subsystem.buf_plugins.items()
+        if plugin.suffix
+    }
     plans: list[_BufStripPlan] = []
     for gen in buf_gen_contents:
         _emit_per_target_warnings_for_buf(gen.target)
