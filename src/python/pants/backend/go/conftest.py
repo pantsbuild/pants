@@ -80,58 +80,48 @@ def _discover_go_binaries() -> list[tuple[str, tuple[int, int]]]:
     return go_binaries
 
 
+# The Go version from which Pants registers coverage counters through
+# `testing/internal/testdeps` rather than `testing.RegisterCover`. Keep in sync with
+# `pants.backend.go.util_rules.coverage.registers_coverage_via_testdeps`.
+_TESTDEPS_COVERAGE_MIN_GO_VERSION = (1, 25)
+
+
+@lru_cache(None)
+def _go_binaries_per_coverage_mechanism() -> list[tuple[str, tuple[int, int]]]:
+    """The newest Go binary on `PATH` for each coverage registration mechanism Pants implements.
+
+    CI installs both a Go v1.25+ and a Go v1.24 toolchain precisely so that both mechanisms get
+    exercised. Where only one of the two is installed, only that one is returned.
+    """
+    selected = []
+    for uses_testdeps in (True, False):
+        for path, version in _discover_go_binaries():  # Newest first.
+            if (version >= _TESTDEPS_COVERAGE_MIN_GO_VERSION) is uses_testdeps:
+                selected.append((path, version))
+                break
+    return selected
+
+
 def pytest_generate_tests(metafunc):
-    """Parametrize tests that require specific Go versions."""
-    # Check if the test has the require_go_version_max marker.
-    marker = metafunc.definition.get_closest_marker("require_go_version_max")
-    if not marker:
+    """Run tests which pin a Go toolchain once per Go coverage registration mechanism."""
+    if "go_binary_path" not in metafunc.fixturenames:
         return
 
-    # Extract the maximum version from the marker.
-    if len(marker.args) < 2:
-        pytest.fail(
-            f"require_go_version_max marker requires 2 args (major, minor), got {marker.args}"
+    go_binaries = _go_binaries_per_coverage_mechanism()
+    if not go_binaries:
+        # Parametrize with None and mark to skip, so the test shows as skipped rather than
+        # uncollected. `pytest_runtest_setup` would skip it in any case.
+        metafunc.parametrize(
+            "go_binary_path",
+            [pytest.param(None, marks=pytest.mark.skip(reason="`go` not present on PATH"))],
+            ids=["no-go"],
         )
         return
 
-    max_major, max_minor = marker.args[0], marker.args[1]
-    max_version = (max_major, max_minor)
-
-    # Discover available Go binaries
-    available_go = _discover_go_binaries()
-
-    # Filter for compatible versions (<= max_version)
-    compatible_go = [(path, version) for path, version in available_go if version <= max_version]
-
-    # Parametrize the test if it accepts a `go_binary_path` fixture.
-    if "go_binary_path" in metafunc.fixturenames:
-        if compatible_go:
-            # Use the newest compatible version.
-            best_go_path, best_version = compatible_go[0]
-            metafunc.parametrize(
-                "go_binary_path",
-                [best_go_path],
-                ids=[f"go{best_version[0]}.{best_version[1]}"],
-            )
-        else:
-            # Parametrize with None and mark to skip, so the test shows as skipped rather than uncollected.
-            available_versions = [f"{v[0]}.{v[1]}" for _, v in available_go]
-            skip_msg = (
-                f"Test requires Go <= {max_major}.{max_minor}, but only found: "
-                f"{', '.join(available_versions) if available_versions else 'none'}"
-            )
-            metafunc.parametrize(
-                "go_binary_path",
-                [pytest.param(None, marks=pytest.mark.skip(reason=skip_msg))],
-                ids=["no-compatible-go"],
-            )
-
-
-def pytest_configure(config):
-    """Register custom markers."""
-    config.addinivalue_line(
-        "markers",
-        "require_go_version_max(major, minor): mark test to require Go version <= specified",
+    metafunc.parametrize(
+        "go_binary_path",
+        [path for path, _ in go_binaries],
+        ids=[f"go{major}.{minor}" for _, (major, minor) in go_binaries],
     )
 
 
