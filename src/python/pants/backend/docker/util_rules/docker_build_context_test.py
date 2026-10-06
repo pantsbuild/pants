@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import os
 import zipfile
-from platform import machine
 from textwrap import dedent
 from typing import Any, ContextManager
 
@@ -38,11 +37,11 @@ from pants.backend.python.target_types import PexBinary, PythonRequirementTarget
 from pants.backend.python.util_rules import pex_from_targets
 from pants.backend.shell.target_types import ShellSourcesGeneratorTarget, ShellSourceTarget
 from pants.backend.shell.target_types import rules as shell_target_types_rules
-from pants.core.environments.target_types import DockerEnvironmentTarget
 from pants.core.goals import package
 from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_types_rules
+from pants.core.util_rules.environments import DockerEnvironmentTarget
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -305,6 +304,101 @@ def test_from_image_build_arg_dependency_overwritten(rule_runner: RuleRunner) ->
         },
         expected_num_upstream_images=0,
         pants_args=["--docker-build-args=BASE_IMAGE=python:3.10-slim"],
+    )
+
+
+def test_from_image_build_arg_with_extra_build_args(rule_runner: RuleRunner) -> None:
+    """Test that extra_build_args can override FROM image build args with default values.
+    
+    This ensures that when a Dockerfile has "ARG BASE_IMAGE=default_value" and 
+    "FROM ${BASE_IMAGE}", the extra_build_args parameter from the BUILD file can 
+    successfully override the default value and resolve the new image reference 
+    correctly during the build context creation phase.
+    """
+    rule_runner.write_files(
+        {
+            "src/base1/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image",
+                  repository="base1/{name}",
+                  image_tags=["1.0"],
+                  instructions=["FROM ubuntu:22.04"],
+                )
+                """
+            ),
+            "src/base2/BUILD": dedent(
+                """\
+                docker_image(
+                  name="image", 
+                  repository="base2/{name}",
+                  image_tags=["2.0"],
+                  instructions=["FROM alpine:3.16"],
+                )
+                """
+            ),
+            "src/downstream/BUILD": dedent(
+                """\
+                docker_image(
+                  name="default",
+                  extra_build_args=["BASE_IMAGE=src/base1:image"],
+                )
+                docker_image(
+                  name="override",
+                  extra_build_args=["BASE_IMAGE=src/base2:image"],
+                )
+                """
+            ),
+            "src/downstream/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=src/base1:image
+                FROM $BASE_IMAGE
+                RUN echo "test"
+                """
+            ),
+        }
+    )
+
+    # Test default case - should use base1 via extra_build_args
+    assert_build_context(
+        rule_runner,
+        Address("src/downstream", target_name="default"),
+        expected_files=[
+            "src/downstream/Dockerfile", 
+            "src.base1/image.docker-info.json"
+        ],
+        build_upstream_images=True,
+        expected_interpolation_context={
+            "tags": {
+                "baseimage": "1.0",
+                "stage0": "1.0",
+            },
+            "build_args": {
+                "BASE_IMAGE": "base1/image:1.0",
+            },
+        },
+        expected_num_upstream_images=1,
+    )
+
+    # Test override case - should use base2 via extra_build_args override
+    assert_build_context(
+        rule_runner,
+        Address("src/downstream", target_name="override"),
+        expected_files=[
+            "src/downstream/Dockerfile", 
+            "src.base2/image.docker-info.json"
+        ],
+        build_upstream_images=True,
+        expected_interpolation_context={
+            "tags": {
+                "baseimage": "2.0",
+                "stage0": "2.0",
+            },
+            "build_args": {
+                "BASE_IMAGE": "base2/image:2.0",
+            },
+        },
+        expected_num_upstream_images=1,
     )
 
 
