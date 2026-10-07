@@ -204,7 +204,14 @@ class BuildGoPackageRequest(EngineAwareParameter):
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return NotImplemented
-        return (
+        return self._eq_helper(other, set())
+
+    def _eq_helper(self, other: BuildGoPackageRequest, equal_items: set[tuple[int, int]]) -> bool:
+        key = (id(self), id(other))
+        if key[0] == key[1] or key in equal_items:
+            return True
+
+        is_eq = (
             self._hashcode == other._hashcode
             and self.import_path == other.import_path
             and self.pkg_name == other.pkg_name
@@ -229,9 +236,18 @@ class BuildGoPackageRequest(EngineAwareParameter):
             and self.pkg_specific_compiler_flags == other.pkg_specific_compiler_flags
             and self.pkg_specific_assembler_flags == other.pkg_specific_assembler_flags
             and self.is_stdlib == other.is_stdlib
-            # TODO: Use a recursive memoized __eq__ if this ever shows up in profiles.
-            and self.direct_dependencies == other.direct_dependencies
+            and len(self.direct_dependencies) == len(other.direct_dependencies)
+            and all(
+                l._eq_helper(r, equal_items)
+                for l, r in zip(self.direct_dependencies, other.direct_dependencies)
+            )
         )
+
+        # NB: We only track equal items because any non-equal item will cause the entire
+        # operation to shortcircuit.
+        if is_eq:
+            equal_items.add(key)
+        return is_eq
 
     def debug_hint(self) -> str | None:
         return self.import_path

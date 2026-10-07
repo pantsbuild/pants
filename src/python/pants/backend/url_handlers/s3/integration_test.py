@@ -116,7 +116,9 @@ def monkeypatch_botocore(monkeypatch):
 
             return SimpleNamespace(add_auth=add_auth)
 
-        botocore.auth = SimpleNamespace(SigV4Auth=fake_auth_ctor, HmacV1Auth=fake_hmac_v1_auth_ctor)
+        botocore.auth = SimpleNamespace(
+            S3SigV4Auth=fake_auth_ctor, HmacV1Auth=fake_hmac_v1_auth_ctor
+        )
 
         monkeypatch.setitem(sys.modules, "botocore", botocore)
 
@@ -280,6 +282,36 @@ def replace_url(monkeypatch):
             "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
             "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
             "https://bucket.s3.us-west-2.amazonaws.com/keypart1/keypart2/file.txt",
+            DownloadS3AuthorityVirtualHostedStyleURL,
+            S3AuthSigning.SIGV4,
+        ),
+        # Keys containing characters that must be percent-encoded: the signed URL and the
+        # downloaded URL must agree, whether or not the request URL spelled the key encoded.
+        (
+            "s3://bucket/keypart1/2.33.0+local.1/file.txt",
+            "https://s3.amazonaws.com/bucket/keypart1/2.33.0%2Blocal.1/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/2.33.0%2Blocal.1/file.txt",
+            DownloadS3SchemeURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "s3://bucket/keypart1/2.33.0+local.1/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/2.33.0%2Blocal.1/file.txt",
+            "https://bucket.s3.amazonaws.com/keypart1/2.33.0%2Blocal.1/file.txt",
+            DownloadS3SchemeURL,
+            S3AuthSigning.SIGV4,
+        ),
+        (
+            "https://s3.us-west-2.amazonaws.com/bucket/keypart1/2.33.0%2Blocal.1/file.txt",
+            "https://s3.us-west-2.amazonaws.com/bucket/keypart1/2.33.0%2Blocal.1/file.txt",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/2.33.0%2Blocal.1/file.txt",
+            DownloadS3AuthorityPathStyleURL,
+            S3AuthSigning.HMACV1,
+        ),
+        (
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/2.33.0%2Blocal.1/file.txt",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/2.33.0%2Blocal.1/file.txt",
+            "https://bucket.s3.us-west-2.amazonaws.com/keypart1/2.33.0%2Blocal.1/file.txt",
             DownloadS3AuthorityVirtualHostedStyleURL,
             S3AuthSigning.SIGV4,
         ),

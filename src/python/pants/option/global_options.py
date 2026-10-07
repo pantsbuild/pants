@@ -276,14 +276,33 @@ class GlobalOptions(BootstrapOptions, Subsystem):
 
     @staticmethod
     def create_py_executor(bootstrap_options: OptionValueContainer) -> PyExecutor:
+        rule_threads_core = bootstrap_options.rule_threads_core
         rule_threads_max = (
             bootstrap_options.rule_threads_max
             if bootstrap_options.rule_threads_max
-            else 4 * bootstrap_options.rule_threads_core
+            else 4 * rule_threads_core
         )
-        return PyExecutor(
-            core_threads=bootstrap_options.rule_threads_core, max_threads=rule_threads_max
-        )
+        executor = PyExecutor(core_threads=rule_threads_core, max_threads=rule_threads_max)
+
+        requested_blocking_threads = rule_threads_max - rule_threads_core
+        effective_blocking_threads = executor.max_blocking_threads()
+        if (
+            effective_blocking_threads is not None
+            and effective_blocking_threads < requested_blocking_threads
+        ):
+            logger.warning(
+                softwrap(
+                    f"""
+                    The configured `--rule-threads-core`/`--rule-threads-max` would have used
+                    {requested_blocking_threads} blocking threads, but Pants capped this run to
+                    {effective_blocking_threads} to stay under LMDB's reader limit and avoid
+                    `MDB_READERS_FULL` errors (see
+                    https://github.com/pantsbuild/pants/issues/23652). Lower `--rule-threads-max`
+                    to silence this warning.
+                    """
+                )
+            )
+        return executor
 
     @staticmethod
     def resolve_keep_sandboxes(

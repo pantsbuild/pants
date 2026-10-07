@@ -31,6 +31,7 @@ from pants.backend.go.util_rules.build_pkg import (
     _gather_transitive_prebuilt_object_files,
 )
 from pants.engine.fs import Snapshot
+from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.rules import QueryRule, rule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
@@ -570,3 +571,88 @@ def test_gather_transitive_prebuilt_object_files_depth2(syso_rule_runner: RuleRu
         f"grandchild/helper.syso missing from collected object_files={result.object_files!r}; "
         "BFS bug: _gather_transitive_prebuilt_object_files never visited the grandchild node"
     )
+
+
+def test_eq_is_linear_in_nodes_not_paths() -> None:
+    """`BuildGoPackageRequest`s form a structure-shared DAG, so comparing two equal-but-distinct
+    graphs must visit each pair of nodes once rather than once per path reaching it.
+
+    Real Go graphs make the difference enormous: `k8s.io/client-go/informers` aggregates 76
+    generated per-API-group informer packages, giving 5.5e9 paths over 61k nodes.
+    """
+
+    def req(import_path: str, deps: tuple[BuildGoPackageRequest, ...]) -> BuildGoPackageRequest:
+        return BuildGoPackageRequest(
+            import_path=import_path,
+            pkg_name=import_path,
+            digest=EMPTY_DIGEST,
+            dir_path=import_path,
+            build_opts=GoBuildOptions(),
+            go_files=("f.go",),
+            s_files=(),
+            direct_dependencies=deps,
+            minimum_go_version=None,
+        )
+
+    def fan_out(width: int, depth: int) -> BuildGoPackageRequest:
+        """Every node depends on every node of the level below."""
+        level = tuple(req(f"leaf{i}", ()) for i in range(width))
+        for d in range(depth):
+            level = tuple(req(f"n{d}_{i}", level) for i in range(width))
+        return req("root", level)
+
+    calls = 0
+
+    def counting(fn):
+        def wrapper(self, *args):
+            nonlocal calls
+            calls += 1
+            return fn(self, *args)
+
+        return wrapper
+
+    def graph_size(root: BuildGoPackageRequest) -> tuple[int, int]:
+        nodes, edges, stack = set(), 0, [root]
+        while stack:
+            node = stack.pop()
+            if id(node) in nodes:
+                continue
+            nodes.add(id(node))
+            edges += len(node.direct_dependencies)
+            stack.extend(node.direct_dependencies)
+        return len(nodes), edges
+
+    original_eq = BuildGoPackageRequest.__eq__
+    original_helper = getattr(BuildGoPackageRequest, "_eq_helper", None)
+    BuildGoPackageRequest.__eq__ = counting(original_eq)  # type: ignore[method-assign]
+    if original_helper is not None:
+        BuildGoPackageRequest._eq_helper = counting(original_helper)  # type: ignore[method-assign]
+    try:
+        a = fan_out(6, 6)
+        b = fan_out(6, 6)
+        assert a == b
+        # Each node entered once and each edge traversed once. Unmemoized recursion instead
+        # visits once per path reaching a node, which on this shape is 335,923 comparisons.
+        nodes, edges = graph_size(a)
+        assert calls <= nodes + edges, (
+            f"visited {calls} node pairs for a {nodes}-node, {edges}-edge graph"
+        )
+
+        # A difference anywhere must still be found, including when every hashcode collides so
+        # the `_hashcode` gate cannot short-circuit.
+        c = fan_out(6, 6)
+        for node in (a, c):
+            stack, seen = [node], set()
+            while stack:
+                n = stack.pop()
+                if id(n) in seen:
+                    continue
+                seen.add(id(n))
+                n._hashcode = 0
+                stack.extend(n.direct_dependencies)
+        c.direct_dependencies[0].direct_dependencies[0].pkg_name = "different"
+        assert a != c
+    finally:
+        BuildGoPackageRequest.__eq__ = original_eq  # type: ignore[method-assign]
+        if original_helper is not None:
+            BuildGoPackageRequest._eq_helper = original_helper  # type: ignore[method-assign]
