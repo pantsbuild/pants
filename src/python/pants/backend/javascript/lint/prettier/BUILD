@@ -1,7 +1,20 @@
 # Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_sources()
+python_sources(
+    overrides={
+        "subsystem.py": {"dependencies": [":lockfiles"]},
+    },
+)
+
+# Bundled lockfiles shipped for the `prettier` NodeJSToolBase subsystem (one per package manager).
+# To regenerate after a version bump (or initial creation):
+#   ./pants run build-support/bin/generate_builtin_lockfiles.py -- prettier
+# Or for all NodeJS tools at once: `... -- --all-nodejs`.
+resources(
+    name="lockfiles",
+    sources=["*.package-lock.json", "*.yarn.lock", "*.pnpm-lock.yaml"],
+)
 
 python_tests(
     name="tests",

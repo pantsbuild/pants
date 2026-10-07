@@ -127,6 +127,6 @@ async def generate_openapi_bundle_sources(
 def rules():
     return (
         *collect_rules(),
-        *nodejs_tool.rules(),
+        *nodejs_tool.rules_for_tool(Redocly),
         UnionRule(GenerateSourcesRequest, GenerateOpenApiBundleRequest),
     )
