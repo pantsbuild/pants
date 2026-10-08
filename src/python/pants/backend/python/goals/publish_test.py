@@ -185,10 +185,10 @@ def test_check_if_skip_upload(
     rule_runner.set_options(["--twine-skip" if skip_twine_config else "--no-twine-skip"])
     rule_runner.write_files(project_files(skip_twine=skip_twine, repositories=repositories))
     tgt = rule_runner.get_target(Address("src", target_name="dist"))
-    request = PythonDistCheckSkipRequest(
-        publish_fs=PublishPythonPackageFieldSet.create(tgt),
-        package_fs=PythonDistributionFieldSet.create(tgt),
+    request = PublishPythonPackageFieldSet.create(tgt).check_skip_request(
+        PythonDistributionFieldSet.create(tgt)
     )
+    assert isinstance(request, PythonDistCheckSkipRequest)
     result = rule_runner.request(CheckSkipResult, [request])
     if expected:
         assert not result.skipped_packages
