@@ -64,7 +64,8 @@ async def setup_build_go_package_target_request_for_third_party(
             go_mod_info.digest,
             go_mod_info.mod_path,
             build_opts=request.build_opts,
-        )
+        ),
+        **implicitly(),
     )
     pkg_info = all_packages.import_paths_to_pkg_info.get(request.import_path)
     if pkg_info is None:
