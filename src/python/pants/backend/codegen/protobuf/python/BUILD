@@ -21,3 +21,11 @@ python_tests(
     # We want to make sure the default lockfile for MyPy Protobuf works for both macOS and Linux.
     tags=["platform_specific_behavior"],
 )
+python_tests(
+    name="buf_rules_integration_test",
+    sources=["buf_rules_integration_test.py"],
+    # On a cold cache this downloads buf and protoc.
+    timeout=330,
+    # Runs the platform-specific buf and protoc binaries.
+    tags=["platform_specific_behavior"],
+)

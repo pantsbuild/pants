@@ -2,20 +2,26 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.engine.rules import collect_rules, rule
+from pants.engine.addresses import Addresses
+from pants.engine.internals.graph import resolve_targets
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
     BoolField,
     Dependencies,
+    InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
+    StringField,
     Target,
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
     Targets,
+    ValidatedDependencies,
+    ValidateDependenciesRequest,
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
@@ -33,6 +39,51 @@ class ProtobufGrpcToggleField(BoolField):
     alias = "grpc"
     default = False
     help = "Whether to generate gRPC code or not."
+
+
+class ProtobufGeneratorField(StringField):
+    alias = "protobuf_generator"
+    valid_choices = ("protoc", "buf")
+    default = "protoc"
+    help = help_text(
+        """
+        Which tool generates code from this `.proto`.
+
+        - `protoc` (default): Pants runs `protoc`. Output paths follow source roots and
+          per-language options such as `python_source_root`.
+        - `buf`: Pants runs `buf generate` with a `buf.gen.yaml` template, which decides
+          the plugins and output paths. See the `buf_gen_template` field for how the
+          template is found.
+
+        Python supports both. TypeScript requires `buf`; Go, Java and Scala require
+        `protoc`.
+        """
+    )
+
+
+# A language's codegen rule skips targets whose generator it can't use, returning no files,
+# because `export-codegen` asks every language to generate every Protobuf target. Code that
+# depends on such a target fails dependency validation instead.
+
+
+def uses_generator(target: Target, generator: str) -> bool:
+    return target[ProtobufGeneratorField].value == generator
+
+
+async def validate_protobuf_generator(
+    request: ValidateDependenciesRequest, language: str, generator: str
+) -> ValidatedDependencies:
+    """Raise if `request`'s target depends on Protobuf that `language` can't generate."""
+    dependencies = await resolve_targets(**implicitly({request.dependencies: Addresses}))
+    for dep in dependencies:
+        if dep.has_field(ProtobufGeneratorField) and not uses_generator(dep, generator):
+            raise InvalidFieldException(
+                f"{request.field_set.address} depends on {dep.address}, which has "
+                f"`{ProtobufGeneratorField.alias}='{dep[ProtobufGeneratorField].value}'`, but "
+                f"{language} can only be generated with {generator}. Set "
+                f"`{ProtobufGeneratorField.alias}='{generator}'` on it."
+            )
+    return ValidatedDependencies()
 
 
 class AllProtobufTargets(Targets):
@@ -60,6 +111,7 @@ class ProtobufSourceTarget(Target):
         ProtobufDependenciesField,
         ProtobufSourceField,
         ProtobufGrpcToggleField,
+        ProtobufGeneratorField,
     )
     help = help_text(
         f"""
@@ -123,6 +175,7 @@ class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         ProtobufGrpcToggleField,
+        ProtobufGeneratorField,
         ProtobufDependenciesField,
     )
     settings_request_cls = GeneratorSettingsRequest
