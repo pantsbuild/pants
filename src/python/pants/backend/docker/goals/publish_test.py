@@ -331,12 +331,11 @@ def test_check_if_skip_push(
         if image_refs
         else None
     )
+    skip_request = publish_fs.check_skip_request(package_fs)
+    assert isinstance(skip_request, PublishDockerImageSkipRequest)
     result = run_rule_with_mocks(
         check_if_skip_push,
-        rule_args=[
-            PublishDockerImageSkipRequest(publish_fs=publish_fs, package_fs=package_fs),
-            docker_options,
-        ],
+        rule_args=[skip_request, docker_options],
         mock_calls=mock_calls,
     )
     assert result == expected
