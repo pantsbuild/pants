@@ -821,3 +821,64 @@ def test_race_detector_does_not_duplicate_module_downloads(rule_runner: RuleRunn
     with_race = analyze(GoBuildOptions(with_race_detector=True))
 
     assert default.digest == with_race.digest
+
+
+def test_imported_mode_generates_only_reachable_packages(rule_runner: RuleRunner) -> None:
+    """`imported` resolves the import closure; `build-list` resolves everything on the build list.
+
+    The go.mod requires both `rsc.io/quote` and `github.com/google/uuid`, but the first-party code
+    imports only `quote`. Under `imported`, `uuid` must not appear -- while `quote`'s own
+    transitive dependency `rsc.io/sampler` must, which is what proves the walk iterates rather
+    than stopping at the direct imports.
+    """
+    files = {
+        "BUILD": "go_mod(name='mod')\n",
+        "go.mod": GO_MOD,
+        "go.sum": GO_SUM,
+        "main.go": dedent(
+            """\
+            package main
+
+            import "rsc.io/quote"
+
+            func main() { println(quote.Hello()) }
+            """
+        ),
+    }
+    rule_runner.write_files(files)
+    digest = rule_runner.make_snapshot({"go.mod": GO_MOD, "go.sum": GO_SUM}).digest
+
+    def resolve() -> set[str]:
+        result = rule_runner.request(
+            AllThirdPartyPackages,
+            [
+                AllThirdPartyPackagesRequest(
+                    Address("", target_name="mod"),
+                    digest,
+                    "go.mod",
+                    build_opts=GoBuildOptions(),
+                )
+            ],
+        )
+        return set(result.import_paths_to_pkg_info)
+
+    rule_runner.set_options(
+        ["--golang-cgo-enabled", "--golang-third-party-target-generation=build-list"],
+        env_inherit={"PATH"},
+    )
+    build_list_packages = resolve()
+    assert "rsc.io/quote" in build_list_packages
+    assert "github.com/google/uuid" in build_list_packages
+
+    rule_runner.set_options(
+        ["--golang-cgo-enabled", "--golang-third-party-target-generation=imported"],
+        env_inherit={"PATH"},
+    )
+    imported_packages = resolve()
+
+    assert "rsc.io/quote" in imported_packages
+    # Reached only through `rsc.io/quote`, so its presence shows the walk followed edges.
+    assert "rsc.io/sampler" in imported_packages
+    # On the build list, but nothing imports it.
+    assert "github.com/google/uuid" not in imported_packages
+    assert imported_packages < build_list_packages
