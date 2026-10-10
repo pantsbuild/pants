@@ -14,7 +14,7 @@ from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.intrinsics import digest_to_snapshot, get_digest_contents
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.collections import ensure_str_list
-from pants.util.dirutil import find_nearest_ancestor_file_by_priority_order
+from pants.util.dirutil import find_nearest_ancestor_file
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.strutil import softwrap
@@ -98,35 +98,40 @@ class OrphanFilepathConfigBehavior(Enum):
 
 
 @dataclass(frozen=True)
-class GatheredPrioritizedConfigFilesByDirectories:
-    config_filenames: tuple[str, ...]
+class GatheredConfigFilesByDirectories:
+    config_filename: str | tuple[str, ...]
     snapshot: Snapshot
     source_dir_to_config_file: FrozenDict[str, str]
 
 
 @dataclass(frozen=True)
-class GatherPrioritizedConfigFilesByDirectoriesRequest:
-    """Like `GatherConfigFilesByDirectoriesRequest`, but with multiple valid config filename
-    candidates, and a priority ordering of those filenames if multiple appear in a given directory.
+class GatherConfigFilesByDirectoriesRequest:
+    """`config_filename` is either a single config filename, or candidate config filenames in
+    priority order. When a directory holds more than one candidate, the earliest wins.
 
     `content_marker_by_filename` maps from config filename to a byte-string marker required for the
     file to be considered a valid config (e.g. `pyproject.toml` might not have `[tool.mypy]`).
     """
 
     tool_name: str
-    candidate_conf_filenames: tuple[str, ...]
+    config_filename: str | tuple[str, ...]
     filepaths: tuple[str, ...]
-    content_marker_by_filename: FrozenDict[str, bytes] = FrozenDict()
     orphan_filepath_behavior: OrphanFilepathConfigBehavior = OrphanFilepathConfigBehavior.ERROR
+    content_marker_by_filename: FrozenDict[str, bytes] = FrozenDict()
 
 
 @rule
-async def gather_prioritized_config_files_by_workspace_dir(
-    request: GatherPrioritizedConfigFilesByDirectoriesRequest,
-) -> GatheredPrioritizedConfigFilesByDirectories:
+async def gather_config_files_by_workspace_dir(
+    request: GatherConfigFilesByDirectoriesRequest,
+) -> GatheredConfigFilesByDirectories:
     """Gathers config files from the workspace and indexes them by the directories relative to
-    them, preferring the nearest ancestor directory and then `candidate_conf_filenames` order."""
+    them, preferring the nearest ancestor directory and then `config_filename` order."""
 
+    config_filenames = (
+        (request.config_filename,)
+        if isinstance(request.config_filename, str)
+        else request.config_filename
+    )
     source_dirs = frozenset(os.path.dirname(path) for path in request.filepaths)
     source_dirs_with_ancestors = {"", *source_dirs}
     for source_dir in source_dirs:
@@ -138,7 +143,7 @@ async def gather_prioritized_config_files_by_workspace_dir(
     candidate_globs = [
         os.path.join(dir, filename)
         for dir in source_dirs_with_ancestors
-        for filename in request.candidate_conf_filenames
+        for filename in config_filenames
     ]
     candidate_digest_contents = await get_digest_contents(**implicitly(PathGlobs(candidate_globs)))
     valid_files = tuple(
@@ -152,13 +157,11 @@ async def gather_prioritized_config_files_by_workspace_dir(
     config_files_set = set(config_files_snapshot.files)
     source_dir_to_config_file: dict[str, str] = {}
     for source_dir in source_dirs:
-        config_file = find_nearest_ancestor_file_by_priority_order(
-            config_files_set, source_dir, request.candidate_conf_filenames
-        )
+        config_file = find_nearest_ancestor_file(config_files_set, source_dir, *config_filenames)
         if config_file:
             source_dir_to_config_file[source_dir] = config_file
         else:
-            filenames = " or ".join(f"`{name}`" for name in request.candidate_conf_filenames)
+            filenames = " or ".join(f"`{name}`" for name in config_filenames)
             msg = softwrap(
                 f"""
                 No {request.tool_name} file ({filenames}) found for
@@ -170,45 +173,8 @@ async def gather_prioritized_config_files_by_workspace_dir(
             elif request.orphan_filepath_behavior == OrphanFilepathConfigBehavior.WARN:
                 logger.warning(msg)
 
-    return GatheredPrioritizedConfigFilesByDirectories(
-        request.candidate_conf_filenames,
-        config_files_snapshot,
-        FrozenDict(source_dir_to_config_file),
-    )
-
-
-@dataclass(frozen=True)
-class GatheredConfigFilesByDirectories:
-    config_filename: str
-    snapshot: Snapshot
-    source_dir_to_config_file: FrozenDict[str, str]
-
-
-@dataclass(frozen=True)
-class GatherConfigFilesByDirectoriesRequest:
-    tool_name: str
-    config_filename: str
-    filepaths: tuple[str, ...]
-    orphan_filepath_behavior: OrphanFilepathConfigBehavior = OrphanFilepathConfigBehavior.ERROR
-
-
-@rule
-async def gather_config_files_by_workspace_dir(
-    request: GatherConfigFilesByDirectoriesRequest,
-) -> GatheredConfigFilesByDirectories:
-    """Gathers config files from the workspace and indexes them by the directories relative to
-    them."""
-
-    gathered = await gather_prioritized_config_files_by_workspace_dir(
-        GatherPrioritizedConfigFilesByDirectoriesRequest(
-            tool_name=request.tool_name,
-            candidate_conf_filenames=(request.config_filename,),
-            filepaths=request.filepaths,
-            orphan_filepath_behavior=request.orphan_filepath_behavior,
-        )
-    )
     return GatheredConfigFilesByDirectories(
-        request.config_filename, gathered.snapshot, gathered.source_dir_to_config_file
+        request.config_filename, config_files_snapshot, FrozenDict(source_dir_to_config_file)
     )
 
 

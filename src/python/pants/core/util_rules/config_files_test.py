@@ -11,8 +11,6 @@ from pants.core.util_rules.config_files import (
     ConfigFilesRequest,
     GatherConfigFilesByDirectoriesRequest,
     GatheredConfigFilesByDirectories,
-    GatheredPrioritizedConfigFilesByDirectories,
-    GatherPrioritizedConfigFilesByDirectoriesRequest,
     OrphanFilepathConfigBehavior,
 )
 from pants.engine.fs import PathGlobs, Snapshot
@@ -28,10 +26,6 @@ def rule_runner() -> RuleRunner:
             *config_files.rules(),
             QueryRule(ConfigFiles, [ConfigFilesRequest]),
             QueryRule(GatheredConfigFilesByDirectories, [GatherConfigFilesByDirectoriesRequest]),
-            QueryRule(
-                GatheredPrioritizedConfigFilesByDirectories,
-                [GatherPrioritizedConfigFilesByDirectoriesRequest],
-            ),
         ]
     )
 
@@ -118,7 +112,7 @@ CANDIDATE_CONF_FILENAMES = ("mypy.ini", ".mypy.ini", "pyproject.toml", "setup.cf
 CONTENT_MARKER_BY_FILENAME = FrozenDict({"pyproject.toml": b"[tool.mypy", "setup.cfg": b"[mypy"})
 
 
-def test_gather_prioritized_config_files(rule_runner: RuleRunner) -> None:
+def test_gather_config_files_multiple_filenames(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {
             "mypy.ini": "[mypy]",
@@ -135,11 +129,11 @@ def test_gather_prioritized_config_files(rule_runner: RuleRunner) -> None:
 
     snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.x"])])
     request = rule_runner.request(
-        GatheredPrioritizedConfigFilesByDirectories,
+        GatheredConfigFilesByDirectories,
         [
-            GatherPrioritizedConfigFilesByDirectoriesRequest(
+            GatherConfigFilesByDirectoriesRequest(
                 tool_name="test",
-                candidate_conf_filenames=CANDIDATE_CONF_FILENAMES,
+                config_filename=CANDIDATE_CONF_FILENAMES,
                 filepaths=snapshot.files,
                 content_marker_by_filename=CONTENT_MARKER_BY_FILENAME,
             )
@@ -157,19 +151,19 @@ def test_gather_prioritized_config_files(rule_runner: RuleRunner) -> None:
     ]
 
 
-def test_gather_prioritized_config_files_orphan_behavior(rule_runner: RuleRunner) -> None:
+def test_gather_config_files_orphan_behavior(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"foo/Foo.x": ""})
     snapshot = rule_runner.request(Snapshot, [PathGlobs(["**/*.x"])])
 
     def gather(
         orphan_filepath_behavior: OrphanFilepathConfigBehavior,
-    ) -> GatheredPrioritizedConfigFilesByDirectories:
+    ) -> GatheredConfigFilesByDirectories:
         return rule_runner.request(
-            GatheredPrioritizedConfigFilesByDirectories,
+            GatheredConfigFilesByDirectories,
             [
-                GatherPrioritizedConfigFilesByDirectoriesRequest(
+                GatherConfigFilesByDirectoriesRequest(
                     tool_name="test",
-                    candidate_conf_filenames=CANDIDATE_CONF_FILENAMES,
+                    config_filename=CANDIDATE_CONF_FILENAMES,
                     filepaths=snapshot.files,
                     content_marker_by_filename=CONTENT_MARKER_BY_FILENAME,
                     orphan_filepath_behavior=orphan_filepath_behavior,

@@ -52,9 +52,9 @@ from pants.core.goals.check import (
     CheckSubsystem,
 )
 from pants.core.util_rules.config_files import (
-    GatherPrioritizedConfigFilesByDirectoriesRequest,
+    GatherConfigFilesByDirectoriesRequest,
     OrphanFilepathConfigBehavior,
-    gather_prioritized_config_files_by_workspace_dir,
+    gather_config_files_by_workspace_dir,
 )
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import (
@@ -477,18 +477,17 @@ async def _mypy_field_set_to_config_file(
     """Map each field set to the MyPyConfigFile that applies to it.
 
     If an explicit config is set, or config discovery is disabled, every field set shares the
-    single repo-wide config (mirroring the pre-existing, non-hierarchical behavior). Otherwise,
-    Pants looks for the nearest ancestor mypy config file for each field set's source file, so
-    different parts of the repo can use different MyPy configs.
+    single repo-wide config. Otherwise, Pants looks for the nearest ancestor mypy config file for
+    each field set's source file, so different parts of the repo can use different MyPy configs.
     """
     if mypy.config or not mypy.config_discovery:
         config_file = await setup_mypy_config(**implicitly())
         return dict.fromkeys(field_sets, config_file)
 
-    gathered = await gather_prioritized_config_files_by_workspace_dir(
-        GatherPrioritizedConfigFilesByDirectoriesRequest(
+    gathered = await gather_config_files_by_workspace_dir(
+        GatherConfigFilesByDirectoriesRequest(
             tool_name=mypy.options_scope,
-            candidate_conf_filenames=CONFIG_DISCOVERY_FILENAMES,
+            config_filename=CONFIG_DISCOVERY_FILENAMES,
             filepaths=tuple(field_set.sources.file_path for field_set in field_sets),
             content_marker_by_filename=CONFIG_DISCOVERY_CONTENT_CHECKS,
             orphan_filepath_behavior=OrphanFilepathConfigBehavior.IGNORE,
