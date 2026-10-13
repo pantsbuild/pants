@@ -487,7 +487,7 @@ async def _mypy_field_set_to_config_file(
     gathered = await gather_config_files_by_workspace_dir(
         GatherConfigFilesByDirectoriesRequest(
             tool_name=mypy.options_scope,
-            config_filename=CONFIG_DISCOVERY_FILENAMES,
+            config_filenames=CONFIG_DISCOVERY_FILENAMES,
             filepaths=tuple(field_set.sources.file_path for field_set in field_sets),
             content_marker_by_filename=CONFIG_DISCOVERY_CONTENT_CHECKS,
             orphan_filepath_behavior=OrphanFilepathConfigBehavior.IGNORE,

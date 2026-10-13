@@ -95,10 +95,11 @@ def test_gather_config_files(rule_runner: RuleRunner) -> None:
         GatheredConfigFilesByDirectories,
         [
             GatherConfigFilesByDirectoriesRequest(
-                tool_name="test", config_filename=TEST_CONFIG_FILENAME, filepaths=snapshot.files
+                tool_name="test", config_filenames=(TEST_CONFIG_FILENAME,), filepaths=snapshot.files
             )
         ],
     )
+    assert request.config_filenames == (TEST_CONFIG_FILENAME,)
     assert sorted(request.source_dir_to_config_file.items()) == [
         ("foo/bar", f"foo/bar/{TEST_CONFIG_FILENAME}"),
         ("foo/bar/xyyzzy", f"foo/bar/{TEST_CONFIG_FILENAME}"),
@@ -133,12 +134,13 @@ def test_gather_config_files_multiple_filenames(rule_runner: RuleRunner) -> None
         [
             GatherConfigFilesByDirectoriesRequest(
                 tool_name="test",
-                config_filename=CANDIDATE_CONF_FILENAMES,
+                config_filenames=CANDIDATE_CONF_FILENAMES,
                 filepaths=snapshot.files,
                 content_marker_by_filename=CONTENT_MARKER_BY_FILENAME,
             )
         ],
     )
+    assert request.config_filenames == CANDIDATE_CONF_FILENAMES
     assert sorted(request.source_dir_to_config_file.items()) == [
         # Nearer ancestor config wins, even though `mypy.ini` outranks `setup.cfg` in priority.
         ("foo/bar", "foo/bar/setup.cfg"),
@@ -163,7 +165,7 @@ def test_gather_config_files_orphan_behavior(rule_runner: RuleRunner) -> None:
             [
                 GatherConfigFilesByDirectoriesRequest(
                     tool_name="test",
-                    config_filename=CANDIDATE_CONF_FILENAMES,
+                    config_filenames=CANDIDATE_CONF_FILENAMES,
                     filepaths=snapshot.files,
                     content_marker_by_filename=CONTENT_MARKER_BY_FILENAME,
                     orphan_filepath_behavior=orphan_filepath_behavior,

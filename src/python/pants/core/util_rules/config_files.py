@@ -99,22 +99,22 @@ class OrphanFilepathConfigBehavior(Enum):
 
 @dataclass(frozen=True)
 class GatheredConfigFilesByDirectories:
-    config_filename: str | tuple[str, ...]
+    config_filenames: tuple[str, ...]
     snapshot: Snapshot
     source_dir_to_config_file: FrozenDict[str, str]
 
 
 @dataclass(frozen=True)
 class GatherConfigFilesByDirectoriesRequest:
-    """`config_filename` is either a single config filename, or candidate config filenames in
-    priority order. When a directory holds more than one candidate, the earliest wins.
+    """`config_filenames` are candidate config filenames in priority order. When a directory holds
+    more than one, the earliest wins.
 
     `content_marker_by_filename` maps from config filename to a byte-string marker required for the
     file to be considered a valid config (e.g. `pyproject.toml` might not have `[tool.mypy]`).
     """
 
     tool_name: str
-    config_filename: str | tuple[str, ...]
+    config_filenames: tuple[str, ...]
     filepaths: tuple[str, ...]
     orphan_filepath_behavior: OrphanFilepathConfigBehavior = OrphanFilepathConfigBehavior.ERROR
     content_marker_by_filename: FrozenDict[str, bytes] = FrozenDict()
@@ -125,13 +125,8 @@ async def gather_config_files_by_workspace_dir(
     request: GatherConfigFilesByDirectoriesRequest,
 ) -> GatheredConfigFilesByDirectories:
     """Gathers config files from the workspace and indexes them by the directories relative to
-    them, preferring the nearest ancestor directory and then `config_filename` order."""
+    them, preferring the nearest ancestor directory and then `config_filenames` order."""
 
-    config_filenames = (
-        (request.config_filename,)
-        if isinstance(request.config_filename, str)
-        else request.config_filename
-    )
     source_dirs = frozenset(os.path.dirname(path) for path in request.filepaths)
     source_dirs_with_ancestors = {"", *source_dirs}
     for source_dir in source_dirs:
@@ -143,7 +138,7 @@ async def gather_config_files_by_workspace_dir(
     candidate_globs = [
         os.path.join(dir, filename)
         for dir in source_dirs_with_ancestors
-        for filename in config_filenames
+        for filename in request.config_filenames
     ]
     candidate_digest_contents = await get_digest_contents(**implicitly(PathGlobs(candidate_globs)))
     valid_files = tuple(
@@ -157,11 +152,13 @@ async def gather_config_files_by_workspace_dir(
     config_files_set = set(config_files_snapshot.files)
     source_dir_to_config_file: dict[str, str] = {}
     for source_dir in source_dirs:
-        config_file = find_nearest_ancestor_file(config_files_set, source_dir, *config_filenames)
+        config_file = find_nearest_ancestor_file(
+            config_files_set, source_dir, *request.config_filenames
+        )
         if config_file:
             source_dir_to_config_file[source_dir] = config_file
         else:
-            filenames = " or ".join(f"`{name}`" for name in config_filenames)
+            filenames = " or ".join(f"`{name}`" for name in request.config_filenames)
             msg = softwrap(
                 f"""
                 No {request.tool_name} file ({filenames}) found for
@@ -174,7 +171,7 @@ async def gather_config_files_by_workspace_dir(
                 logger.warning(msg)
 
     return GatheredConfigFilesByDirectories(
-        request.config_filename, config_files_snapshot, FrozenDict(source_dir_to_config_file)
+        request.config_filenames, config_files_snapshot, FrozenDict(source_dir_to_config_file)
     )
 
 
