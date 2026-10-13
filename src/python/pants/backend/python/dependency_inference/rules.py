@@ -629,8 +629,13 @@ async def infer_python_conftest_dependencies(
         return InferredDependencies([])
     owners_by_file = await get_python_source_owners_by_file(**implicitly())
     resolve = request.field_set.resolve.normalized_value(python_setup)
-    indexed = [f for f in conftest_files.snapshot.files if f in owners_by_file.owners]
-    unindexed = [f for f in conftest_files.snapshot.files if f not in owners_by_file.owners]
+    indexed: list[str] = []
+    unindexed: list[str] = []
+    for f in conftest_files.snapshot.files:
+        if f in owners_by_file.owners:
+            indexed.append(f)
+        else:
+            unindexed.append(f)
     indexed_owners = [
         address
         for f in indexed
