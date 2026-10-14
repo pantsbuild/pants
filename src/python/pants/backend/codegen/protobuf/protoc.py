@@ -51,8 +51,7 @@ class Protoc(TemplatedExternalTool):
             Infer Protobuf dependencies on other Protobuf files by analyzing import
             statements.
 
-            For buf-based code generation (`codegen_tool='buf'`), this also
-            scopes `buf generate` to each target's own files when enabled, or runs
+            For code generated with buf, this also scopes `buf generate` to each target's own files when enabled, or runs
             it against the full proto tree when disabled.
             """
         ),

@@ -190,11 +190,17 @@ def test_grpc_modules_with_multiple_resolves(rule_runner: RuleRunner) -> None:
 
 def test_buf_target_registers_nothing_without_gen_yaml(rule_runner: RuleRunner) -> None:
     """Without a `buf.gen.yaml`, codegen fails and generates nothing, so nothing is registered."""
-    rule_runner.set_options(["--source-root-patterns=['src/protobuf']", "--python-enable-resolves"])
+    rule_runner.set_options(
+        [
+            "--python-protobuf-codegen-tool=buf",
+            "--source-root-patterns=['src/protobuf']",
+            "--python-enable-resolves",
+        ]
+    )
     rule_runner.write_files(
         {
             "src/protobuf/foo/f.proto": "",
-            "src/protobuf/foo/BUILD": ("protobuf_sources(codegen_tool='buf')"),
+            "src/protobuf/foo/BUILD": ("protobuf_sources()"),
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -209,6 +215,7 @@ def test_buf_target_uses_gen_yaml_out_directory(rule_runner: RuleRunner) -> None
     """
     rule_runner.set_options(
         [
+            "--python-protobuf-codegen-tool=buf",
             "--source-root-patterns=['idl/proto', 'src/proto']",
             "--python-enable-resolves",
         ]
@@ -220,7 +227,7 @@ def test_buf_target_uses_gen_yaml_out_directory(rule_runner: RuleRunner) -> None
                 "version: v2\nplugins:\n  - protoc_builtin: python\n    out: src/proto\n"
             ),
             "idl/proto/foo/bar.proto": "",
-            "idl/proto/foo/BUILD": ("protobuf_sources(codegen_tool='buf')"),
+            "idl/proto/foo/BUILD": ("protobuf_sources()"),
         }
     )
     # The discovery glob for `buf.gen.yaml` only checks the repo root, so we stage one
@@ -252,7 +259,13 @@ def test_buf_target_default_remote_plugin_matches_with_version_pin(
 ) -> None:
     """The default `python_buf_plugin = buf.build/protocolbuffers/python` matches a
     `remote:` plugin entry even when the entry includes a `:vXX.X` version suffix."""
-    rule_runner.set_options(["--source-root-patterns=['/']", "--python-enable-resolves"])
+    rule_runner.set_options(
+        [
+            "--python-protobuf-codegen-tool=buf",
+            "--source-root-patterns=['/']",
+            "--python-enable-resolves",
+        ]
+    )
     rule_runner.write_files(
         {
             "buf.yaml": "version: v2\nmodules:\n  - path: .\n",
@@ -263,7 +276,7 @@ def test_buf_target_default_remote_plugin_matches_with_version_pin(
                 "    out: gen\n"
             ),
             "protos/svc.proto": "",
-            "protos/BUILD": "protobuf_sources(codegen_tool='buf')",
+            "protos/BUILD": "protobuf_sources()",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -299,6 +312,7 @@ def test_buf_target_connectrpc_plugin_registers_connect_modules(
     """
     rule_runner.set_options(
         [
+            "--python-protobuf-codegen-tool=buf",
             "--source-root-patterns=['company/proto/gen', 'company/protogen']",
             "--python-enable-resolves",
         ]
@@ -327,7 +341,7 @@ def test_buf_target_connectrpc_plugin_registers_connect_modules(
                 """
             ),
             "company/proto/services/test/v1/service.proto": "",
-            "company/proto/services/test/v1/BUILD": ("protobuf_sources(codegen_tool='buf')"),
+            "company/proto/services/test/v1/BUILD": ("protobuf_sources()"),
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -347,7 +361,11 @@ def test_buf_target_connectrpc_plugin_registers_connect_modules(
 def test_buf_target_pyi_plugin_does_not_set_module_location(rule_runner: RuleRunner) -> None:
     """A `pyi` plugin listed before the `python` one doesn't decide where `_pb2` lives."""
     rule_runner.set_options(
-        ["--source-root-patterns=['gen_py', 'gen_stubs']", "--python-enable-resolves"]
+        [
+            "--python-protobuf-codegen-tool=buf",
+            "--source-root-patterns=['gen_py', 'gen_stubs']",
+            "--python-enable-resolves",
+        ]
     )
     rule_runner.write_files(
         {
@@ -363,7 +381,7 @@ def test_buf_target_pyi_plugin_does_not_set_module_location(rule_runner: RuleRun
                 """
             ),
             "protos/svc.proto": "",
-            "protos/BUILD": "protobuf_sources(codegen_tool='buf')",
+            "protos/BUILD": "protobuf_sources()",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -380,30 +398,27 @@ def test_buf_target_pyi_plugin_does_not_set_module_location(rule_runner: RuleRun
     )
 
 
-@pytest.mark.parametrize("with_protoc_target", [False, True])
-def test_protoc_only_option_warns_only_without_protoc_targets(
-    rule_runner: RuleRunner, caplog: pytest.LogCaptureFixture, with_protoc_target: bool
+@pytest.mark.parametrize("codegen_tool", ["protoc", "buf"])
+def test_protoc_only_option_warns_with_buf(
+    rule_runner: RuleRunner, caplog: pytest.LogCaptureFixture, codegen_tool: str
 ) -> None:
-    rule_runner.set_options(["--source-root-patterns=['/']", "--python-protobuf-mypy-plugin"])
-    rule_runner.write_files(
-        {
-            "buf/svc.proto": "",
-            "buf/BUILD": "protobuf_sources(codegen_tool='buf')",
-            **(
-                {"protoc/svc.proto": "", "protoc/BUILD": "protobuf_sources()"}
-                if with_protoc_target
-                else {}
-            ),
-        }
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['/']",
+            "--python-protobuf-mypy-plugin",
+            f"--python-protobuf-codegen-tool={codegen_tool}",
+        ]
     )
+    rule_runner.write_files({"protos/svc.proto": "", "protos/BUILD": "protobuf_sources()"})
     rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
-    assert ("[python-protobuf].mypy_plugin has no effect" in caplog.text) != with_protoc_target
+    assert ("[python-protobuf].mypy_plugin has no effect" in caplog.text) == (codegen_tool == "buf")
 
 
 def test_buf_target_grpc_plugin_registers_pb2_grpc(rule_runner: RuleRunner) -> None:
     """A grpc-python plugin entry in `buf.gen.yaml` registers `_pb2_grpc` modules."""
     rule_runner.set_options(
         [
+            "--python-protobuf-codegen-tool=buf",
             "--source-root-patterns=['/']",
             "--python-enable-resolves",
         ]
@@ -420,7 +435,7 @@ def test_buf_target_grpc_plugin_registers_pb2_grpc(rule_runner: RuleRunner) -> N
                 "    out: gen\n"
             ),
             "protos/svc.proto": "",
-            "protos/BUILD": "protobuf_sources(grpc=True, codegen_tool='buf')",
+            "protos/BUILD": "protobuf_sources(grpc=True)",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -443,6 +458,7 @@ def test_buf_target_per_target_template_override(rule_runner: RuleRunner) -> Non
     """Two buf targets pointing at different `buf_gen_template`s land at different `out:`s."""
     rule_runner.set_options(
         [
+            "--python-protobuf-codegen-tool=buf",
             "--source-root-patterns=['/']",
             "--python-enable-resolves",
         ]
@@ -454,16 +470,12 @@ def test_buf_target_per_target_template_override(rule_runner: RuleRunner) -> Non
             "a/protos/buf.gen.yaml": (
                 "version: v2\nplugins:\n  - protoc_builtin: python\n    out: gen_a\n"
             ),
-            "a/protos/BUILD": (
-                "protobuf_sources(codegen_tool='buf', buf_gen_template='buf.gen.yaml')"
-            ),
+            "a/protos/BUILD": ("protobuf_sources(buf_gen_template='buf.gen.yaml')"),
             "b/protos/svc.proto": "",
             "b/protos/buf.gen.yaml": (
                 "version: v2\nplugins:\n  - protoc_builtin: python\n    out: gen_b\n"
             ),
-            "b/protos/BUILD": (
-                "protobuf_sources(codegen_tool='buf', buf_gen_template='buf.gen.yaml')"
-            ),
+            "b/protos/BUILD": ("protobuf_sources(buf_gen_template='buf.gen.yaml')"),
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -492,6 +504,7 @@ def test_buf_target_uses_python_template_option(rule_runner: RuleRunner) -> None
     """`[python-protobuf].buf_gen_template` takes precedence over `[buf].gen_template`."""
     rule_runner.set_options(
         [
+            "--python-protobuf-codegen-tool=buf",
             "--source-root-patterns=['/']",
             "--python-enable-resolves",
             "--buf-gen-template=buf.gen.yaml",
@@ -502,7 +515,7 @@ def test_buf_target_uses_python_template_option(rule_runner: RuleRunner) -> None
         {
             "buf.yaml": "version: v2\nmodules:\n  - path: .\n",
             "protos/svc.proto": "",
-            "protos/BUILD": "protobuf_sources(codegen_tool='buf')",
+            "protos/BUILD": "protobuf_sources()",
             # A template for another language, with no Python plugins.
             "buf.gen.yaml": "version: v2\nplugins:\n  - local: protoc-gen-es\n    out: gen_ts\n",
             "buf.gen.python.yaml": (
@@ -527,7 +540,13 @@ def test_buf_target_uses_python_template_option(rule_runner: RuleRunner) -> None
 def test_buf_target_grpc_field_is_no_op(rule_runner: RuleRunner) -> None:
     """`grpc=True` on a buf target has no effect on which suffixes are registered;
     plugin presence in `buf.gen.yaml` is the sole determinant."""
-    rule_runner.set_options(["--source-root-patterns=['/']", "--python-enable-resolves"])
+    rule_runner.set_options(
+        [
+            "--python-protobuf-codegen-tool=buf",
+            "--source-root-patterns=['/']",
+            "--python-enable-resolves",
+        ]
+    )
     rule_runner.write_files(
         {
             "buf.yaml": "version: v2\nmodules:\n  - path: .\n",
@@ -536,7 +555,7 @@ def test_buf_target_grpc_field_is_no_op(rule_runner: RuleRunner) -> None:
             "protos/svc.proto": "",
             # `grpc=True` would normally register `_pb2_grpc`; on the buf path it's
             # ignored and only `_pb2` (matched by the python plugin) is registered.
-            "protos/BUILD": "protobuf_sources(grpc=True, codegen_tool='buf')",
+            "protos/BUILD": "protobuf_sources(grpc=True)",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -554,7 +573,13 @@ def test_buf_target_unpinned_remote_plugin_succeeds_via_registry(
     `remote:` entry whose plugin id is in Pants's built-in registry is matched
     by id, the suffix is found, and the module is registered. (Codegen will
     fill in the registry's default `:vX.Y:revN` pin before invoking buf.)"""
-    rule_runner.set_options(["--source-root-patterns=['/']", "--python-enable-resolves"])
+    rule_runner.set_options(
+        [
+            "--python-protobuf-codegen-tool=buf",
+            "--source-root-patterns=['/']",
+            "--python-enable-resolves",
+        ]
+    )
     rule_runner.write_files(
         {
             "buf.yaml": "version: v2\nmodules:\n  - path: .\n",
@@ -565,7 +590,7 @@ def test_buf_target_unpinned_remote_plugin_succeeds_via_registry(
                 "    out: gen\n"
             ),
             "protos/svc.proto": "",
-            "protos/BUILD": "protobuf_sources(codegen_tool='buf')",
+            "protos/BUILD": "protobuf_sources()",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -581,6 +606,7 @@ def test_buf_target_extra_plugins(rule_runner: RuleRunner) -> None:
     module suffix."""
     rule_runner.set_options(
         [
+            "--python-protobuf-codegen-tool=buf",
             "--source-root-patterns=['/']",
             "--python-enable-resolves",
             (
@@ -599,7 +625,7 @@ def test_buf_target_extra_plugins(rule_runner: RuleRunner) -> None:
                 "    out: gen\n"
             ),
             "protos/svc.proto": "",
-            "protos/BUILD": "protobuf_sources(codegen_tool='buf')",
+            "protos/BUILD": "protobuf_sources()",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -613,13 +639,19 @@ def test_buf_target_extra_plugins(rule_runner: RuleRunner) -> None:
 @pytest.mark.parametrize("plugin", ["protoc-gen-grpclib_python", "protoc-gen-python_grpc"])
 def test_buf_target_grpclib_plugin_names(rule_runner: RuleRunner, plugin: str) -> None:
     """grpclib installs its plugin under both names."""
-    rule_runner.set_options(["--source-root-patterns=['/']", "--python-enable-resolves"])
+    rule_runner.set_options(
+        [
+            "--python-protobuf-codegen-tool=buf",
+            "--source-root-patterns=['/']",
+            "--python-enable-resolves",
+        ]
+    )
     rule_runner.write_files(
         {
             "buf.yaml": "version: v2\nmodules:\n  - path: .\n",
             "buf.gen.yaml": f"version: v2\nplugins:\n  - local: {plugin}\n    out: gen\n",
             "protos/svc.proto": "",
-            "protos/BUILD": "protobuf_sources(codegen_tool='buf')",
+            "protos/BUILD": "protobuf_sources()",
         }
     )
     result = rule_runner.request(FirstPartyPythonMappingImpl, [PythonProtobufMappingMarker()])
@@ -634,6 +666,7 @@ def test_buf_target_grpclib_plugin_names(rule_runner: RuleRunner, plugin: str) -
 def test_buf_target_extra_plugins_rejects_malformed_entry(rule_runner: RuleRunner) -> None:
     rule_runner.set_options(
         [
+            "--python-protobuf-codegen-tool=buf",
             "--source-root-patterns=['/']",
             '--python-protobuf-extra-buf-plugins={"local:protoc-gen-mine": "_pb2"}',
         ]
@@ -642,7 +675,7 @@ def test_buf_target_extra_plugins_rejects_malformed_entry(rule_runner: RuleRunne
         {
             "buf.gen.yaml": "version: v2\nplugins:\n  - local: protoc-gen-mine\n    out: gen\n",
             "protos/svc.proto": "",
-            "protos/BUILD": "protobuf_sources(codegen_tool='buf')",
+            "protos/BUILD": "protobuf_sources()",
         }
     )
     with engine_error(ValueError, contains="has '_pb2' for `local:protoc-gen-mine`"):

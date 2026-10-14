@@ -24,7 +24,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 )
 from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
-    ProtobufCodegenToolField,
+    ProtobufCodegenTool,
     ProtobufGrpcToggleField,
     ProtobufSourceField,
 )
@@ -93,15 +93,16 @@ _PROTOC_ONLY_OPTIONS = ("grpcio_plugin", "grpclib_plugin", "mypy_plugin", "gener
 
 
 def _emit_subsystem_warnings_for_buf(subsystem: PythonProtobufSubsystem) -> None:
-    """Warn about protoc-only options the user set, when no target uses protoc."""
+    """Warn about protoc-only options the user set."""
     for option_name in _PROTOC_ONLY_OPTIONS:
         if subsystem.options.is_default(option_name):
             continue
         logger.warning(
-            "[%s].%s has no effect: every `protobuf_source` uses `codegen_tool='buf'`, "
-            "whose plugins come from `buf.gen.yaml`.",
+            "[%s].%s has no effect when `[%s].codegen_tool` is `buf`; plugins come from "
+            "`buf.gen.yaml`.",
             subsystem.options_scope,
             option_name,
+            subsystem.options_scope,
         )
 
 
@@ -109,15 +110,15 @@ def _emit_per_target_warnings_for_buf(target: Target) -> None:
     """Warn about this target's fields that have no effect with buf."""
     if target.get(ProtobufGrpcToggleField).value:
         logger.warning(
-            "`grpc=True` is set on %s but is ignored for `codegen_tool='buf'` "
-            "targets. Whether `_pb2_grpc.py` / `_grpc.py` / `_connect.py` exist is "
+            "`grpc=True` is set on %s but is ignored when generating with buf. "
+            "Whether `_pb2_grpc.py` / `_grpc.py` / `_connect.py` exist is "
             "determined by the plugins in `buf.gen.yaml`.",
             target.address,
         )
     if target.get(PythonSourceRootField).value is not None:
         logger.warning(
-            "`python_source_root` is set on %s but ignored for "
-            "`codegen_tool='buf'`; output paths come from the `out:` field of "
+            "`python_source_root` is set on %s but ignored when generating with buf; "
+            "output paths come from the `out:` field of "
             "`buf.gen.yaml`.",
             target.address,
         )
@@ -140,14 +141,11 @@ async def map_protobuf_to_python_modules(
 
     protoc_targets: list[Target] = []
     buf_targets: list[Target] = []
-    for tgt in protobuf_targets:
-        if tgt.get(ProtobufCodegenToolField).value == "buf":
-            buf_targets.append(tgt)
-        else:
-            protoc_targets.append(tgt)
-
-    if buf_targets and not protoc_targets:
+    if python_protobuf_subsystem.codegen_tool == ProtobufCodegenTool.buf:
+        buf_targets = list(protobuf_targets)
         _emit_subsystem_warnings_for_buf(python_protobuf_subsystem)
+    else:
+        protoc_targets = list(protobuf_targets)
 
     # ---- protoc path. ----
     stripped_file_per_protoc_target = await concurrently(

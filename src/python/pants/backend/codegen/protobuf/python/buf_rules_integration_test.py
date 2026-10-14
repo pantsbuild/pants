@@ -86,11 +86,13 @@ def _assert_generates(
     *,
     expected_files: set[str],
     source_roots: list[str],
+    extra_args: list[str] | None = None,
 ) -> None:
     rule_runner.set_options(
         [
             f"--source-root-patterns={repr(source_roots)}",
             "--no-python-protobuf-infer-runtime-dependency",
+            *(extra_args or ()),
         ],
         env_inherit={"PATH"},
     )
@@ -113,7 +115,7 @@ def test_buf_generates_python_at_out_directory(rule_runner: RuleRunner) -> None:
             "buf.yaml": BUF_YAML,
             "buf.gen.yaml": BUF_GEN_YAML,
             "idl/proto/foo/person.proto": SIMPLE_PROTO,
-            "idl/proto/foo/BUILD": ("protobuf_sources(codegen_tool='buf')"),
+            "idl/proto/foo/BUILD": "protobuf_sources()",
         }
     )
     _assert_generates(
@@ -121,29 +123,13 @@ def test_buf_generates_python_at_out_directory(rule_runner: RuleRunner) -> None:
         Address("idl/proto/foo", relative_file_path="person.proto"),
         expected_files={"src/proto/foo/person_pb2.py"},
         source_roots=["idl/proto", "src/proto"],
-    )
-
-
-def test_buf_target_without_python_template_generates_nothing(rule_runner: RuleRunner) -> None:
-    """E.g. a target only generated for TypeScript, which `export-codegen` still asks about."""
-    rule_runner.write_files(
-        {
-            "buf.yaml": BUF_YAML,
-            "idl/proto/foo/person.proto": SIMPLE_PROTO,
-            "idl/proto/foo/BUILD": "protobuf_sources(codegen_tool='buf')",
-        }
-    )
-    _assert_generates(
-        rule_runner,
-        Address("idl/proto/foo", relative_file_path="person.proto"),
-        expected_files=set(),
-        source_roots=["idl/proto"],
+        extra_args=["--python-protobuf-codegen-tool=buf"],
     )
 
 
 @pytest.mark.platform_specific_behavior
 def test_default_protoc_path_still_works(rule_runner: RuleRunner) -> None:
-    """Regression: `codegen_tool` unset (default `protoc`) is unchanged."""
+    """Regression: `[python-protobuf].codegen_tool` unset (default `protoc`) is unchanged."""
     rule_runner.write_files(
         {
             "src/protobuf/foo/person.proto": SIMPLE_PROTO,

@@ -226,10 +226,11 @@ protobuf_sources(
 
 Instead of running `protoc` itself, Pants can generate code with [`buf generate`](https://buf.build/docs/generate/overview/). Which plugins run, and where their output goes, comes from a [`buf.gen.yaml`](https://buf.build/docs/configuration/v2/buf-gen-yaml/) template rather than from Pants.
 
-To use Buf for a target, set `codegen_tool="buf"`:
+To use Buf, set `codegen_tool`:
 
-```python title="src/protos/BUILD"
-protobuf_sources(codegen_tool="buf")
+```toml title="pants.toml"
+[python-protobuf]
+codegen_tool = "buf"
 ```
 
 Then add a template, which must be `version: v2`, and a [`buf.yaml`](https://buf.build/docs/configuration/v2/buf-yaml/) saying where your Protobuf module is:
