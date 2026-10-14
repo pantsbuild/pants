@@ -179,3 +179,12 @@ def test_gather_config_files_orphan_behavior(rule_runner: RuleRunner) -> None:
 
     assert gather(OrphanFilepathConfigBehavior.WARN).source_dir_to_config_file == FrozenDict()
     assert gather(OrphanFilepathConfigBehavior.IGNORE).source_dir_to_config_file == FrozenDict()
+
+
+def test_gather_config_files_request_rejects_str_filenames() -> None:
+    with pytest.raises(ValueError, match="must be a tuple of filenames"):
+        GatherConfigFilesByDirectoriesRequest(
+            tool_name="test",
+            config_filenames=TEST_CONFIG_FILENAME,  # type: ignore[arg-type]
+            filepaths=("foo/Foo.x",),
+        )

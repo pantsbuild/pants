@@ -119,6 +119,19 @@ class GatherConfigFilesByDirectoriesRequest:
     orphan_filepath_behavior: OrphanFilepathConfigBehavior = OrphanFilepathConfigBehavior.ERROR
     content_marker_by_filename: FrozenDict[str, bytes] = FrozenDict()
 
+    def __post_init__(self) -> None:
+        if isinstance(self.config_filenames, str):  # type: ignore[unreachable]
+            raise ValueError(
+                softwrap(
+                    f"""
+                    `{self.__class__.__name__}.config_filenames` must be a tuple of filenames, but
+                    got the string {self.config_filenames!r}. The former `config_filename: str`
+                    field was replaced by `config_filenames: tuple[str, ...]`, so pass
+                    `config_filenames=({self.config_filenames!r},)` instead.
+                    """
+                )
+            )
+
 
 @rule
 async def gather_config_files_by_workspace_dir(
