@@ -41,8 +41,8 @@ class ProtobufGrpcToggleField(BoolField):
     help = "Whether to generate gRPC code or not."
 
 
-class ProtobufGeneratorField(StringField):
-    alias = "protobuf_generator"
+class ProtobufCodegenToolField(StringField):
+    alias = "codegen_tool"
     valid_choices = ("protoc", "buf")
     default = "protoc"
     help = help_text(
@@ -61,27 +61,27 @@ class ProtobufGeneratorField(StringField):
     )
 
 
-# A language's codegen rule skips targets whose generator it can't use, returning no files,
+# A language's codegen rule skips targets whose codegen tool it can't use, returning no files,
 # because `export-codegen` asks every language to generate every Protobuf target. Code that
 # depends on such a target fails dependency validation instead.
 
 
-def uses_generator(target: Target, generator: str) -> bool:
-    return target[ProtobufGeneratorField].value == generator
+def uses_codegen_tool(target: Target, tool: str) -> bool:
+    return target[ProtobufCodegenToolField].value == tool
 
 
-async def validate_protobuf_generator(
-    request: ValidateDependenciesRequest, language: str, generator: str
+async def validate_codegen_tool(
+    request: ValidateDependenciesRequest, language: str, tool: str
 ) -> ValidatedDependencies:
     """Raise if `request`'s target depends on Protobuf that `language` can't generate."""
     dependencies = await resolve_targets(**implicitly({request.dependencies: Addresses}))
     for dep in dependencies:
-        if dep.has_field(ProtobufGeneratorField) and not uses_generator(dep, generator):
+        if dep.has_field(ProtobufCodegenToolField) and not uses_codegen_tool(dep, tool):
             raise InvalidFieldException(
                 f"{request.field_set.address} depends on {dep.address}, which has "
-                f"`{ProtobufGeneratorField.alias}='{dep[ProtobufGeneratorField].value}'`, but "
-                f"{language} can only be generated with {generator}. Set "
-                f"`{ProtobufGeneratorField.alias}='{generator}'` on it."
+                f"`{ProtobufCodegenToolField.alias}='{dep[ProtobufCodegenToolField].value}'`, but "
+                f"{language} can only be generated with {tool}. Set "
+                f"`{ProtobufCodegenToolField.alias}='{tool}'` on it."
             )
     return ValidatedDependencies()
 
@@ -111,7 +111,7 @@ class ProtobufSourceTarget(Target):
         ProtobufDependenciesField,
         ProtobufSourceField,
         ProtobufGrpcToggleField,
-        ProtobufGeneratorField,
+        ProtobufCodegenToolField,
     )
     help = help_text(
         f"""
@@ -175,7 +175,7 @@ class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         ProtobufGrpcToggleField,
-        ProtobufGeneratorField,
+        ProtobufCodegenToolField,
         ProtobufDependenciesField,
     )
     settings_request_cls = GeneratorSettingsRequest

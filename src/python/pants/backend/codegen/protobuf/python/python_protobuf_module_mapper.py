@@ -24,7 +24,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
 )
 from pants.backend.codegen.protobuf.target_types import (
     AllProtobufTargets,
-    ProtobufGeneratorField,
+    ProtobufCodegenToolField,
     ProtobufGrpcToggleField,
     ProtobufSourceField,
 )
@@ -98,7 +98,7 @@ def _emit_subsystem_warnings_for_buf(subsystem: PythonProtobufSubsystem) -> None
         if subsystem.options.is_default(option_name):
             continue
         logger.warning(
-            "[%s].%s has no effect: every `protobuf_source` uses `protobuf_generator='buf'`, "
+            "[%s].%s has no effect: every `protobuf_source` uses `codegen_tool='buf'`, "
             "whose plugins come from `buf.gen.yaml`.",
             subsystem.options_scope,
             option_name,
@@ -109,7 +109,7 @@ def _emit_per_target_warnings_for_buf(target: Target) -> None:
     """Warn about this target's fields that have no effect with buf."""
     if target.get(ProtobufGrpcToggleField).value:
         logger.warning(
-            "`grpc=True` is set on %s but is ignored for `protobuf_generator='buf'` "
+            "`grpc=True` is set on %s but is ignored for `codegen_tool='buf'` "
             "targets. Whether `_pb2_grpc.py` / `_grpc.py` / `_connect.py` exist is "
             "determined by the plugins in `buf.gen.yaml`.",
             target.address,
@@ -117,7 +117,7 @@ def _emit_per_target_warnings_for_buf(target: Target) -> None:
     if target.get(PythonSourceRootField).value is not None:
         logger.warning(
             "`python_source_root` is set on %s but ignored for "
-            "`protobuf_generator='buf'`; output paths come from the `out:` field of "
+            "`codegen_tool='buf'`; output paths come from the `out:` field of "
             "`buf.gen.yaml`.",
             target.address,
         )
@@ -141,7 +141,7 @@ async def map_protobuf_to_python_modules(
     protoc_targets: list[Target] = []
     buf_targets: list[Target] = []
     for tgt in protobuf_targets:
-        if tgt.get(ProtobufGeneratorField).value == "buf":
+        if tgt.get(ProtobufCodegenToolField).value == "buf":
             buf_targets.append(tgt)
         else:
             protoc_targets.append(tgt)

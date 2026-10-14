@@ -79,7 +79,7 @@ class BufSubsystem(TemplatedExternalTool):
             f"""
             Path to the `buf.gen.yaml` template used by `buf generate`
             (https://buf.build/docs/configuration/v2/buf-gen-yaml) for targets with
-            `protobuf_generator='buf'`. The template must be `version: v2`.
+            `codegen_tool='buf'`. The template must be `version: v2`.
 
             A language's `buf_gen_template` option (e.g.
             `[python-protobuf].buf_gen_template`) and a target's `buf_gen_template`

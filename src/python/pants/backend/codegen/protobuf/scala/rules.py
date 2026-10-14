@@ -14,8 +14,8 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
-    uses_generator,
-    validate_protobuf_generator,
+    uses_codegen_tool,
+    validate_codegen_tool,
 )
 from pants.backend.scala.target_types import ScalaSourceField
 from pants.backend.scala.util_rules.versions import (
@@ -158,7 +158,7 @@ async def generate_scala_from_protobuf(
     jdk: InternalJdk,
     platform: Platform,
 ) -> GeneratedSources:
-    if not uses_generator(request.protocol_target, "protoc"):
+    if not uses_codegen_tool(request.protocol_target, "protoc"):
         return GeneratedSources(EMPTY_SNAPSHOT)
     output_dir = "_generated_files"
     toolcp_relpath = "__toolcp"
@@ -362,7 +362,7 @@ class ValidateScalaProtobufDependenciesRequest(ValidateDependenciesRequest):
 async def validate_scala_protobuf_dependencies(
     request: ValidateScalaProtobufDependenciesRequest,
 ) -> ValidatedDependencies:
-    return await validate_protobuf_generator(request, "Scala", "protoc")
+    return await validate_codegen_tool(request, "Scala", "protoc")
 
 
 def rules():

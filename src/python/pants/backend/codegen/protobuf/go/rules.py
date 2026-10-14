@@ -18,8 +18,8 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
-    uses_generator,
-    validate_protobuf_generator,
+    uses_codegen_tool,
+    validate_codegen_tool,
 )
 from pants.backend.go import target_type_rules
 from pants.backend.go.dependency_inference import (
@@ -333,10 +333,10 @@ async def setup_full_package_build_request(
     )
 
     for tgt in transitive_targets_for_protobuf_source.roots:
-        if not uses_generator(tgt, "protoc"):
+        if not uses_codegen_tool(tgt, "protoc"):
             raise InvalidFieldException(
-                f"{tgt.address} has `protobuf_generator='buf'`, but Go can only be generated "
-                "with protoc. Set `protobuf_generator='protoc'` on it."
+                f"{tgt.address} has `codegen_tool='buf'`, but Go can only be generated "
+                "with protoc. Set `codegen_tool='protoc'` on it."
             )
 
     go_mod_addr = await find_owning_go_mod(
@@ -643,7 +643,7 @@ async def generate_go_from_protobuf(
     go_protoc_plugin: _SetupGoProtocPlugin,
     platform: Platform,
 ) -> GeneratedSources:
-    if not uses_generator(request.protocol_target, "protoc"):
+    if not uses_codegen_tool(request.protocol_target, "protoc"):
         return GeneratedSources(EMPTY_SNAPSHOT)
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
@@ -855,7 +855,7 @@ class ValidateGoProtobufDependenciesRequest(ValidateDependenciesRequest):
 async def validate_go_protobuf_dependencies(
     request: ValidateGoProtobufDependenciesRequest,
 ) -> ValidatedDependencies:
-    return await validate_protobuf_generator(request, "Go", "protoc")
+    return await validate_codegen_tool(request, "Go", "protoc")
 
 
 def rules():

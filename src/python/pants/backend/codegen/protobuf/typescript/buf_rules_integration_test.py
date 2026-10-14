@@ -95,7 +95,7 @@ def rule_runner() -> RuleRunner:
 
 
 def _write_project(
-    rule_runner: RuleRunner, *, proto_build: str = "protobuf_sources(protobuf_generator='buf')"
+    rule_runner: RuleRunner, *, proto_build: str = "protobuf_sources(codegen_tool='buf')"
 ) -> None:
     rule_runner.write_files(
         {
@@ -184,7 +184,7 @@ def test_buf_runs_plugin_from_node_package(rule_runner: RuleRunner) -> None:
 def test_per_target_template_overrides_typescript_option(rule_runner: RuleRunner) -> None:
     _write_project(
         rule_runner,
-        proto_build="protobuf_sources(protobuf_generator='buf', buf_gen_template='buf.gen.yaml')",
+        proto_build="protobuf_sources(codegen_tool='buf', buf_gen_template='buf.gen.yaml')",
     )
     rule_runner.write_files(
         {
