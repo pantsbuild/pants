@@ -19,7 +19,7 @@ from pants.backend.codegen.protobuf.python.python_protobuf_subsystem import (
     PythonProtobufSubsystem,
 )
 from pants.backend.codegen.protobuf.target_types import (
-    ProtobufCodegenToolField,
+    ProtobufCodegenTool,
     ProtobufGrpcToggleField,
     ProtobufSourceField,
 )
@@ -65,7 +65,7 @@ async def generate_python_from_protobuf(
     pex_environment: PexEnvironment,
     platform: Platform,
 ) -> GeneratedSources:
-    if request.protocol_target.get(ProtobufCodegenToolField).value == "buf":
+    if python_protobuf_subsystem.codegen_tool == ProtobufCodegenTool.buf:
         return await generate_python_from_protobuf_via_buf(
             GeneratePythonFromProtobufViaBufRequest(protocol_target=request.protocol_target),
             **implicitly(),

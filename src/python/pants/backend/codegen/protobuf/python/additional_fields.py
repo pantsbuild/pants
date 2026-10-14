@@ -26,8 +26,8 @@ class PythonSourceRootField(StringField):
 
         If unspecified, the source root the `protobuf_sources` is under will be used.
 
-        Ignored when `codegen_tool='buf'`; in that case the output location
-        is dictated by the `out:` field of the `buf.gen.yaml` template.
+        Ignored when `[python-protobuf].codegen_tool` is `buf`; the output location then
+        comes from the `out:` field of the `buf.gen.yaml` template.
         """
     )
 

@@ -18,8 +18,6 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
-    uses_codegen_tool,
-    validate_codegen_tool,
 )
 from pants.backend.go import target_type_rules
 from pants.backend.go.dependency_inference import (
@@ -89,7 +87,6 @@ from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.engine.fs import (
-    EMPTY_SNAPSHOT,
     AddPrefix,
     CreateDigest,
     Digest,
@@ -114,15 +111,11 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
-    FieldSet,
     GeneratedSources,
     GenerateSourcesRequest,
     HydrateSourcesRequest,
-    InvalidFieldException,
     SourcesPathsRequest,
     TransitiveTargetsRequest,
-    ValidatedDependencies,
-    ValidateDependenciesRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.source.source_root import (
@@ -331,13 +324,6 @@ async def setup_full_package_build_request(
         download_external_tool(protoc.get_request(platform)),
         create_digest(CreateDigest([Directory(output_dir)])),
     )
-
-    for tgt in transitive_targets_for_protobuf_source.roots:
-        if not uses_codegen_tool(tgt, "protoc"):
-            raise InvalidFieldException(
-                f"{tgt.address} has `codegen_tool='buf'`, but Go can only be generated "
-                "with protoc. Set `codegen_tool='protoc'` on it."
-            )
 
     go_mod_addr = await find_owning_go_mod(
         OwningGoModRequest(transitive_targets_for_protobuf_source.roots[0].address), **implicitly()
@@ -643,8 +629,6 @@ async def generate_go_from_protobuf(
     go_protoc_plugin: _SetupGoProtocPlugin,
     platform: Platform,
 ) -> GeneratedSources:
-    if not uses_codegen_tool(request.protocol_target, "protoc"):
-        return GeneratedSources(EMPTY_SNAPSHOT)
     output_dir = "_generated_files"
     protoc_relpath = "__protoc"
     protoc_go_plugin_relpath = "__protoc_gen_go"
@@ -840,29 +824,10 @@ async def setup_go_protoc_plugin() -> _SetupGoProtocPlugin:
     return _SetupGoProtocPlugin(plugin_digest)
 
 
-@dataclass(frozen=True)
-class GoProtobufDependenciesFieldSet(FieldSet):
-    required_fields = (GoPackageSourcesField,)
-
-    sources: GoPackageSourcesField
-
-
-class ValidateGoProtobufDependenciesRequest(ValidateDependenciesRequest):
-    field_set_type = GoProtobufDependenciesFieldSet
-
-
-@rule
-async def validate_go_protobuf_dependencies(
-    request: ValidateGoProtobufDependenciesRequest,
-) -> ValidatedDependencies:
-    return await validate_codegen_tool(request, "Go", "protoc")
-
-
 def rules():
     return (
         *collect_rules(),
         UnionRule(GenerateSourcesRequest, GenerateGoFromProtobufRequest),
-        UnionRule(ValidateDependenciesRequest, ValidateGoProtobufDependenciesRequest),
         UnionRule(GoCodegenBuildRequest, GoCodegenBuildProtobufRequest),
         UnionRule(GoModuleImportPathsMappingsHook, ProtobufGoModuleImportPathsMappingsHook),
         UnionRule(GoCodegenImportRootsRequest, ProtobufGoCodegenImportRootsRequest),

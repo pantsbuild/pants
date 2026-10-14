@@ -14,7 +14,7 @@ from pants.backend.codegen.protobuf.buf.fields import BufGenTemplateField
 from pants.backend.codegen.protobuf.buf.subsystem import BufSubsystem
 from pants.backend.codegen.protobuf.python.additional_fields import ProtobufPythonResolveField
 from pants.backend.codegen.protobuf.target_types import (
-    ProtobufCodegenToolField,
+    ProtobufCodegenTool,
     ProtobufDependenciesField,
     ProtobufGrpcToggleField,
 )
@@ -35,7 +35,7 @@ from pants.engine.intrinsics import get_digest_contents
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import FieldSet, InferDependenciesRequest, InferredDependencies
 from pants.engine.unions import UnionRule
-from pants.option.option_types import BoolOption, DictOption, FileOption
+from pants.option.option_types import BoolOption, DictOption, EnumOption, FileOption
 from pants.option.subsystem import Subsystem
 from pants.source.source_root import SourceRootRequest, get_source_root
 from pants.util.docutil import doc_url
@@ -89,13 +89,28 @@ class PythonProtobufSubsystem(Subsystem):
         """
     )
 
+    codegen_tool = EnumOption(
+        default=ProtobufCodegenTool.protoc,
+        help=softwrap(
+            """
+            Which tool generates Python from Protobuf.
+
+            - `protoc`: Pants runs `protoc`. Output paths follow source roots and the
+              `python_source_root` field.
+            - `buf`: Pants runs `buf generate` with a `buf.gen.yaml` template, which decides
+              the plugins and output paths. See the `buf_gen_template` field for how the
+              template is found.
+            """
+        ),
+    )
+
     buf_gen_template = FileOption(
         default=None,
         advanced=True,
         help=softwrap(
             """
-            Path to the `buf.gen.yaml` template used to generate Python, when a
-            `protobuf_source` opts into `codegen_tool='buf'`.
+            Path to the `buf.gen.yaml` template used to generate Python, when `codegen_tool`
+            is `buf`.
 
             Takes precedence over `[buf].gen_template`. Set this when other languages
             generate from the same protos with plugins that need tooling this language's
@@ -260,14 +275,12 @@ class PythonProtobufDependenciesInferenceFieldSet(FieldSet):
         ProtobufDependenciesField,
         ProtobufPythonResolveField,
         ProtobufGrpcToggleField,
-        ProtobufCodegenToolField,
         BufGenTemplateField,
     )
 
     dependencies: ProtobufDependenciesField
     python_resolve: ProtobufPythonResolveField
     grpc_toggle: ProtobufGrpcToggleField
-    codegen_tool: ProtobufCodegenToolField
     buf_gen_template: BufGenTemplateField
 
 
@@ -331,7 +344,7 @@ async def infer_dependencies(
     disable_option = f"[{python_protobuf.options_scope}].infer_runtime_dependency"
     result = []
 
-    if request.field_set.codegen_tool.value == "buf":
+    if python_protobuf.codegen_tool == ProtobufCodegenTool.buf:
         # Buf path: each runtime comes from a plugin in the template. Subsystem booleans and
         # `grpc=True` are not consulted.
         template_request = gen_template_request_from_fields(

@@ -1,27 +1,23 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from enum import Enum
+
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.engine.addresses import Addresses
-from pants.engine.internals.graph import resolve_targets
-from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     AllTargets,
     BoolField,
     Dependencies,
-    InvalidFieldException,
     MultipleSourcesField,
     OverridesField,
     SingleSourceField,
-    StringField,
     Target,
     TargetFilesGenerator,
     TargetFilesGeneratorSettings,
     TargetFilesGeneratorSettingsRequest,
     Targets,
-    ValidatedDependencies,
-    ValidateDependenciesRequest,
     generate_file_based_overrides_field_help_message,
     generate_multiple_sources_field_help_message,
 )
@@ -29,6 +25,13 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import help_text
+
+
+class ProtobufCodegenTool(Enum):
+    """A tool that generates code from Protobuf, for languages that let you choose one."""
+
+    protoc = "protoc"
+    buf = "buf"
 
 
 class ProtobufDependenciesField(Dependencies):
@@ -39,51 +42,6 @@ class ProtobufGrpcToggleField(BoolField):
     alias = "grpc"
     default = False
     help = "Whether to generate gRPC code or not."
-
-
-class ProtobufCodegenToolField(StringField):
-    alias = "codegen_tool"
-    valid_choices = ("protoc", "buf")
-    default = "protoc"
-    help = help_text(
-        """
-        Which tool generates code from this `.proto`.
-
-        - `protoc` (default): Pants runs `protoc`. Output paths follow source roots and
-          per-language options such as `python_source_root`.
-        - `buf`: Pants runs `buf generate` with a `buf.gen.yaml` template, which decides
-          the plugins and output paths. See the `buf_gen_template` field for how the
-          template is found.
-
-        Python supports both. TypeScript requires `buf`; Go, Java and Scala require
-        `protoc`.
-        """
-    )
-
-
-# A language's codegen rule skips targets whose codegen tool it can't use, returning no files,
-# because `export-codegen` asks every language to generate every Protobuf target. Code that
-# depends on such a target fails dependency validation instead.
-
-
-def uses_codegen_tool(target: Target, tool: str) -> bool:
-    return target[ProtobufCodegenToolField].value == tool
-
-
-async def validate_codegen_tool(
-    request: ValidateDependenciesRequest, language: str, tool: str
-) -> ValidatedDependencies:
-    """Raise if `request`'s target depends on Protobuf that `language` can't generate."""
-    dependencies = await resolve_targets(**implicitly({request.dependencies: Addresses}))
-    for dep in dependencies:
-        if dep.has_field(ProtobufCodegenToolField) and not uses_codegen_tool(dep, tool):
-            raise InvalidFieldException(
-                f"{request.field_set.address} depends on {dep.address}, which has "
-                f"`{ProtobufCodegenToolField.alias}='{dep[ProtobufCodegenToolField].value}'`, but "
-                f"{language} can only be generated with {tool}. Set "
-                f"`{ProtobufCodegenToolField.alias}='{tool}'` on it."
-            )
-    return ValidatedDependencies()
 
 
 class AllProtobufTargets(Targets):
@@ -111,7 +69,6 @@ class ProtobufSourceTarget(Target):
         ProtobufDependenciesField,
         ProtobufSourceField,
         ProtobufGrpcToggleField,
-        ProtobufCodegenToolField,
     )
     help = help_text(
         f"""
@@ -175,7 +132,6 @@ class ProtobufSourcesGeneratorTarget(TargetFilesGenerator):
     copied_fields = COMMON_TARGET_FIELDS
     moved_fields = (
         ProtobufGrpcToggleField,
-        ProtobufCodegenToolField,
         ProtobufDependenciesField,
     )
     settings_request_cls = GeneratorSettingsRequest
