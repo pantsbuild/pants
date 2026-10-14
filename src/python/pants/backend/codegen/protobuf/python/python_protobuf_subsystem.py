@@ -14,8 +14,8 @@ from pants.backend.codegen.protobuf.buf.fields import BufGenTemplateField
 from pants.backend.codegen.protobuf.buf.subsystem import BufSubsystem
 from pants.backend.codegen.protobuf.python.additional_fields import ProtobufPythonResolveField
 from pants.backend.codegen.protobuf.target_types import (
+    ProtobufCodegenToolField,
     ProtobufDependenciesField,
-    ProtobufGeneratorField,
     ProtobufGrpcToggleField,
 )
 from pants.backend.codegen.utils import find_python_runtime_library_or_raise_error
@@ -95,7 +95,7 @@ class PythonProtobufSubsystem(Subsystem):
         help=softwrap(
             """
             Path to the `buf.gen.yaml` template used to generate Python, when a
-            `protobuf_source` opts into `protobuf_generator='buf'`.
+            `protobuf_source` opts into `codegen_tool='buf'`.
 
             Takes precedence over `[buf].gen_template`. Set this when other languages
             generate from the same protos with plugins that need tooling this language's
@@ -260,14 +260,14 @@ class PythonProtobufDependenciesInferenceFieldSet(FieldSet):
         ProtobufDependenciesField,
         ProtobufPythonResolveField,
         ProtobufGrpcToggleField,
-        ProtobufGeneratorField,
+        ProtobufCodegenToolField,
         BufGenTemplateField,
     )
 
     dependencies: ProtobufDependenciesField
     python_resolve: ProtobufPythonResolveField
     grpc_toggle: ProtobufGrpcToggleField
-    generator: ProtobufGeneratorField
+    codegen_tool: ProtobufCodegenToolField
     buf_gen_template: BufGenTemplateField
 
 
@@ -331,7 +331,7 @@ async def infer_dependencies(
     disable_option = f"[{python_protobuf.options_scope}].infer_runtime_dependency"
     result = []
 
-    if request.field_set.generator.value == "buf":
+    if request.field_set.codegen_tool.value == "buf":
         # Buf path: each runtime comes from a plugin in the template. Subsystem booleans and
         # `grpc=True` are not consulted.
         template_request = gen_template_request_from_fields(

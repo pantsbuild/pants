@@ -11,8 +11,8 @@ from pants.backend.codegen.protobuf.buf.generate import BufGenerateRequest, run_
 from pants.backend.codegen.protobuf.buf.generate import rules as buf_generate_rules
 from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
-    uses_generator,
-    validate_protobuf_generator,
+    uses_codegen_tool,
+    validate_codegen_tool,
 )
 from pants.backend.codegen.protobuf.typescript.subsystem import TypeScriptProtobufSubsystem
 from pants.backend.javascript.install_node_package import (
@@ -88,7 +88,7 @@ async def generate_typescript_from_protobuf(
     node_environment: NodeJSProcessEnvironment,
 ) -> GeneratedSources:
     target = request.protocol_target
-    if not uses_generator(target, "buf"):
+    if not uses_codegen_tool(target, "buf"):
         return GeneratedSources(EMPTY_SNAPSHOT)
 
     package_address = typescript_protobuf.buf_node_package_address
@@ -126,7 +126,7 @@ class ValidateTypeScriptProtobufDependenciesRequest(ValidateDependenciesRequest)
 async def validate_typescript_protobuf_dependencies(
     request: ValidateTypeScriptProtobufDependenciesRequest,
 ) -> ValidatedDependencies:
-    return await validate_protobuf_generator(request, "TypeScript", "buf")
+    return await validate_codegen_tool(request, "TypeScript", "buf")
 
 
 def rules() -> Iterable[Rule | UnionRule]:

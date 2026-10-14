@@ -115,7 +115,7 @@ def test_find_protobuf_python_requirement() -> None:
 
 
 def test_buf_target_infers_runtime_deps_from_gen_yaml_plugins() -> None:
-    """For `protobuf_generator='buf'` targets, runtime-dep inference is driven by
+    """For `codegen_tool='buf'` targets, runtime-dep inference is driven by
     the plugins present in `buf.gen.yaml`, not by `grpc=True`. Connect, grpcio,
     and grpclib plugins each contribute their respective runtime requirement."""
     rule_runner = RuleRunner(
@@ -150,7 +150,7 @@ def test_buf_target_infers_runtime_deps_from_gen_yaml_plugins() -> None:
                 """
             ),
             "codegen/dir/f.proto": "",
-            "codegen/dir/BUILD": "protobuf_sources(protobuf_generator='buf')",
+            "codegen/dir/BUILD": "protobuf_sources(codegen_tool='buf')",
             # 3rdparty stand-ins for the runtimes.
             "thirdparty/BUILD": dedent(
                 """\
@@ -200,7 +200,7 @@ def test_buf_target_without_known_plugins_infers_no_runtime() -> None:
         {
             "buf.gen.yaml": "version: v2\nplugins:\n  - local: protoc-gen-python_betterproto\n    out: gen\n",
             "codegen/dir/f.proto": "",
-            "codegen/dir/BUILD": "protobuf_sources(protobuf_generator='buf')",
+            "codegen/dir/BUILD": "protobuf_sources(codegen_tool='buf')",
         }
     )
     proto_tgt = rule_runner.get_target(Address("codegen/dir", relative_file_path="f.proto"))
@@ -228,7 +228,7 @@ def test_buf_target_extra_plugin_runtime() -> None:
         {
             "buf.gen.yaml": "version: v2\nplugins:\n  - local: protoc-gen-python_betterproto\n    out: gen\n",
             "codegen/dir/f.proto": "",
-            "codegen/dir/BUILD": "protobuf_sources(protobuf_generator='buf')",
+            "codegen/dir/BUILD": "protobuf_sources(codegen_tool='buf')",
             "thirdparty/BUILD": "python_requirement(name='betterproto', requirements=['betterproto'])",
         }
     )

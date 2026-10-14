@@ -14,8 +14,8 @@ from pants.backend.codegen.protobuf.target_types import (
     ProtobufSourceField,
     ProtobufSourcesGeneratorTarget,
     ProtobufSourceTarget,
-    uses_generator,
-    validate_protobuf_generator,
+    uses_codegen_tool,
+    validate_codegen_tool,
 )
 from pants.backend.experimental.java.register import rules as java_backend_rules
 from pants.backend.java.target_types import JavaSourceField
@@ -123,7 +123,7 @@ async def generate_java_from_protobuf(
     grpc_plugin: ProtobufJavaGrpcPlugin,  # TODO: Don't access grpc plugin unless gRPC codegen is enabled.
     platform: Platform,
 ) -> GeneratedSources:
-    if not uses_generator(request.protocol_target, "protoc"):
+    if not uses_codegen_tool(request.protocol_target, "protoc"):
         return GeneratedSources(EMPTY_SNAPSHOT)
     download_protoc_request = download_external_tool(protoc.get_request(platform))
 
@@ -226,7 +226,7 @@ class ValidateJavaProtobufDependenciesRequest(ValidateDependenciesRequest):
 async def validate_java_protobuf_dependencies(
     request: ValidateJavaProtobufDependenciesRequest,
 ) -> ValidatedDependencies:
-    return await validate_protobuf_generator(request, "Java", "protoc")
+    return await validate_codegen_tool(request, "Java", "protoc")
 
 
 def rules():

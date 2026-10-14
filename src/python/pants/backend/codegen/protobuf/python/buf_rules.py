@@ -46,7 +46,7 @@ async def generate_python_from_protobuf_via_buf(
 
     if target.get(PythonSourceRootField).value is not None:
         logger.warning(
-            "`python_source_root` is set on %s but `protobuf_generator='buf'`; "
+            "`python_source_root` is set on %s but `codegen_tool='buf'`; "
             "the field is ignored — output paths come from the `out:` field of "
             "`buf.gen.yaml`.",
             target.address,

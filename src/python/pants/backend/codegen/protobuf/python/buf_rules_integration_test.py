@@ -113,7 +113,7 @@ def test_buf_generates_python_at_out_directory(rule_runner: RuleRunner) -> None:
             "buf.yaml": BUF_YAML,
             "buf.gen.yaml": BUF_GEN_YAML,
             "idl/proto/foo/person.proto": SIMPLE_PROTO,
-            "idl/proto/foo/BUILD": ("protobuf_sources(protobuf_generator='buf')"),
+            "idl/proto/foo/BUILD": ("protobuf_sources(codegen_tool='buf')"),
         }
     )
     _assert_generates(
@@ -130,7 +130,7 @@ def test_buf_target_without_python_template_generates_nothing(rule_runner: RuleR
         {
             "buf.yaml": BUF_YAML,
             "idl/proto/foo/person.proto": SIMPLE_PROTO,
-            "idl/proto/foo/BUILD": "protobuf_sources(protobuf_generator='buf')",
+            "idl/proto/foo/BUILD": "protobuf_sources(codegen_tool='buf')",
         }
     )
     _assert_generates(
@@ -143,7 +143,7 @@ def test_buf_target_without_python_template_generates_nothing(rule_runner: RuleR
 
 @pytest.mark.platform_specific_behavior
 def test_default_protoc_path_still_works(rule_runner: RuleRunner) -> None:
-    """Regression: `protobuf_generator` unset (default `protoc`) is unchanged."""
+    """Regression: `codegen_tool` unset (default `protoc`) is unchanged."""
     rule_runner.write_files(
         {
             "src/protobuf/foo/person.proto": SIMPLE_PROTO,

@@ -19,7 +19,7 @@ class BufGenTemplateField(StringField):
     help = help_text(
         """
         Path to the `buf.gen.yaml` template for this target, relative to the BUILD
-        file's directory. Only used when `protobuf_generator='buf'`.
+        file's directory. Only used when `codegen_tool='buf'`.
 
         A target's template is the first of: this field, the language's
         `buf_gen_template` option (e.g. `[python-protobuf].buf_gen_template`),
