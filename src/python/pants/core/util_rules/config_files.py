@@ -116,21 +116,26 @@ class GatherConfigFilesByDirectoriesRequest:
     tool_name: str
     config_filenames: tuple[str, ...]
     filepaths: tuple[str, ...]
-    orphan_filepath_behavior: OrphanFilepathConfigBehavior = OrphanFilepathConfigBehavior.ERROR
-    content_marker_by_filename: FrozenDict[str, bytes] = FrozenDict()
+    orphan_filepath_behavior: OrphanFilepathConfigBehavior
+    content_marker_by_filename: FrozenDict[str, bytes]
 
-    def __post_init__(self) -> None:
-        if isinstance(self.config_filenames, str):  # type: ignore[unreachable]
-            raise ValueError(
-                softwrap(
-                    f"""
-                    `{self.__class__.__name__}.config_filenames` must be a tuple of filenames, but
-                    got the string {self.config_filenames!r}. The former `config_filename: str`
-                    field was replaced by `config_filenames: tuple[str, ...]`, so pass
-                    `config_filenames=({self.config_filenames!r},)` instead.
-                    """
-                )
-            )
+    def __init__(
+        self,
+        tool_name: str,
+        config_filenames: str | Iterable[str],
+        filepaths: tuple[str, ...],
+        orphan_filepath_behavior: OrphanFilepathConfigBehavior = OrphanFilepathConfigBehavior.ERROR,
+        content_marker_by_filename: FrozenDict[str, bytes] = FrozenDict(),
+    ) -> None:
+        object.__setattr__(self, "tool_name", tool_name)
+        object.__setattr__(
+            self,
+            "config_filenames",
+            tuple(ensure_str_list(config_filenames, allow_single_str=True)),
+        )
+        object.__setattr__(self, "filepaths", filepaths)
+        object.__setattr__(self, "orphan_filepath_behavior", orphan_filepath_behavior)
+        object.__setattr__(self, "content_marker_by_filename", content_marker_by_filename)
 
 
 @rule
