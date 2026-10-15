@@ -7,7 +7,7 @@ import inspect
 import logging
 import shlex
 from collections.abc import Mapping, Sequence
-from enum import Enum
+from enum import Enum, EnumType
 from pathlib import Path
 from typing import Any
 
@@ -172,8 +172,7 @@ class NativeOptionParser:
             return "global scope" if scope == GLOBAL_SCOPE else f"scope '{scope}'"
 
         def is_enum(typ):
-            # TODO: When we switch to Python 3.11, use: return isinstance(typ, EnumType)
-            return inspect.isclass(typ) and issubclass(typ, Enum)
+            return isinstance(typ, EnumType)
 
         def apply_callable(callable_type, val_str):
             try:
