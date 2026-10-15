@@ -157,7 +157,7 @@ async def _partition_scalafix(
         gather_config_files_by_workspace_dir(
             GatherConfigFilesByDirectoriesRequest(
                 tool_name="scalafix",
-                config_filename=scalafix.config_file_name,
+                config_filenames=(scalafix.config_file_name,),
                 filepaths=filepaths,
                 orphan_filepath_behavior=scalafix.orphan_files_behavior,
             )
