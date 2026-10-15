@@ -88,7 +88,7 @@ async def partition_scalafmt(
         gather_config_files_by_workspace_dir(
             GatherConfigFilesByDirectoriesRequest(
                 tool_name=tool.name,
-                config_filename=tool.config_file_name,
+                config_filenames=(tool.config_file_name,),
                 filepaths=filepaths,
                 orphan_filepath_behavior=tool.orphan_files_behavior,
             )

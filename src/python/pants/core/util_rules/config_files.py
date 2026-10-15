@@ -99,17 +99,43 @@ class OrphanFilepathConfigBehavior(Enum):
 
 @dataclass(frozen=True)
 class GatheredConfigFilesByDirectories:
-    config_filename: str
+    config_filenames: tuple[str, ...]
     snapshot: Snapshot
     source_dir_to_config_file: FrozenDict[str, str]
 
 
 @dataclass(frozen=True)
 class GatherConfigFilesByDirectoriesRequest:
+    """`config_filenames` are candidate config filenames in priority order. When a directory holds
+    more than one, the earliest wins.
+
+    `content_marker_by_filename` maps from config filename to a byte-string marker required for the
+    file to be considered a valid config (e.g. `pyproject.toml` might not have `[tool.mypy]`).
+    """
+
     tool_name: str
-    config_filename: str
+    config_filenames: tuple[str, ...]
     filepaths: tuple[str, ...]
-    orphan_filepath_behavior: OrphanFilepathConfigBehavior = OrphanFilepathConfigBehavior.ERROR
+    orphan_filepath_behavior: OrphanFilepathConfigBehavior
+    content_marker_by_filename: FrozenDict[str, bytes]
+
+    def __init__(
+        self,
+        tool_name: str,
+        config_filenames: str | Iterable[str],
+        filepaths: tuple[str, ...],
+        orphan_filepath_behavior: OrphanFilepathConfigBehavior = OrphanFilepathConfigBehavior.ERROR,
+        content_marker_by_filename: FrozenDict[str, bytes] = FrozenDict(),
+    ) -> None:
+        object.__setattr__(self, "tool_name", tool_name)
+        object.__setattr__(
+            self,
+            "config_filenames",
+            tuple(ensure_str_list(config_filenames, allow_single_str=True)),
+        )
+        object.__setattr__(self, "filepaths", filepaths)
+        object.__setattr__(self, "orphan_filepath_behavior", orphan_filepath_behavior)
+        object.__setattr__(self, "content_marker_by_filename", content_marker_by_filename)
 
 
 @rule
@@ -117,33 +143,43 @@ async def gather_config_files_by_workspace_dir(
     request: GatherConfigFilesByDirectoriesRequest,
 ) -> GatheredConfigFilesByDirectories:
     """Gathers config files from the workspace and indexes them by the directories relative to
-    them."""
+    them, preferring the nearest ancestor directory and then `config_filenames` order."""
 
     source_dirs = frozenset(os.path.dirname(path) for path in request.filepaths)
     source_dirs_with_ancestors = {"", *source_dirs}
     for source_dir in source_dirs:
-        source_dir_parts = source_dir.split(os.path.sep)
-        source_dir_parts.pop()
-        while source_dir_parts:
-            source_dirs_with_ancestors.add(os.path.sep.join(source_dir_parts))
-            source_dir_parts.pop()
+        ancestor = os.path.dirname(source_dir)
+        while ancestor:
+            source_dirs_with_ancestors.add(ancestor)
+            ancestor = os.path.dirname(ancestor)
 
-    config_file_globs = [
-        os.path.join(dir, request.config_filename) for dir in source_dirs_with_ancestors
+    candidate_globs = [
+        os.path.join(dir, filename)
+        for dir in source_dirs_with_ancestors
+        for filename in request.config_filenames
     ]
-    config_files_snapshot = await digest_to_snapshot(**implicitly(PathGlobs(config_file_globs)))
+    candidate_digest_contents = await get_digest_contents(**implicitly(PathGlobs(candidate_globs)))
+    valid_files = tuple(
+        file_content.path
+        for file_content in candidate_digest_contents
+        if request.content_marker_by_filename.get(os.path.basename(file_content.path), b"")
+        in file_content.content
+    )
+
+    config_files_snapshot = await digest_to_snapshot(**implicitly(PathGlobs(valid_files)))
     config_files_set = set(config_files_snapshot.files)
     source_dir_to_config_file: dict[str, str] = {}
     for source_dir in source_dirs:
         config_file = find_nearest_ancestor_file(
-            config_files_set, source_dir, request.config_filename
+            config_files_set, source_dir, *request.config_filenames
         )
         if config_file:
             source_dir_to_config_file[source_dir] = config_file
         else:
+            filenames = " or ".join(f"`{name}`" for name in request.config_filenames)
             msg = softwrap(
                 f"""
-                No {request.tool_name} file (`{request.config_filename}`) found for
+                No {request.tool_name} file ({filenames}) found for
                 source directory '{source_dir}'.
                 """
             )
@@ -153,7 +189,7 @@ async def gather_config_files_by_workspace_dir(
                 logger.warning(msg)
 
     return GatheredConfigFilesByDirectories(
-        request.config_filename, config_files_snapshot, FrozenDict(source_dir_to_config_file)
+        request.config_filenames, config_files_snapshot, FrozenDict(source_dir_to_config_file)
     )
 
 
