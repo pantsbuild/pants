@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import DefaultDict
@@ -100,6 +101,12 @@ async def infer_thrift_dependencies(
     for import_path in parsed_thrift.imports:
         unambiguous = thrift_mapping.mapping.get(import_path)
         ambiguous = thrift_mapping.ambiguous_modules.get(import_path)
+
+        if not unambiguous and not ambiguous:
+            same_dir_path = os.path.normpath(os.path.join(address.spec_path, import_path))
+            unambiguous = thrift_mapping.mapping.get(same_dir_path)
+            ambiguous = thrift_mapping.ambiguous_modules.get(same_dir_path)
+
         if unambiguous:
             result.add(unambiguous)
         elif ambiguous:
