@@ -107,6 +107,26 @@ def test_resources(rule_runner: RuleRunner) -> None:
 
 
 @maybe_skip_jdk_test
+def test_resources_jar_exports_its_dependencies(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files(
+        {
+            "BUILD": "resources(name='root', sources=['root.txt'], dependencies=['dep'])",
+            "root.txt": "",
+            "dep/BUILD": "resources(sources=['dep.txt'])",
+            "dep/dep.txt": "",
+            "3rdparty/jvm/default.lock": EMPTY_JVM_LOCKFILE,
+        }
+    )
+
+    classpath = rule_runner.request(
+        Classpath,
+        [Addresses([Address(spec_path="", target_name="root", relative_file_path="root.txt")])],
+    )
+
+    assert list(classpath.root_args()) == [".root.txt.root.resources.jar", "dep.resources.jar"]
+
+
+@maybe_skip_jdk_test
 def test_resources_jar_is_deterministic(rule_runner: RuleRunner) -> None:
     rule_runner.write_files(
         {

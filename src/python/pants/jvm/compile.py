@@ -10,7 +10,8 @@ from collections import defaultdict, deque
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import ClassVar
+from functools import cached_property
+from typing import Any, ClassVar
 
 from pants.core.target_types import (
     FilesGeneratingSourcesField,
@@ -260,9 +261,10 @@ async def calculate_jvm_request_types(
 class ClasspathEntry:
     """A JVM classpath entry represented as a series of JAR files, and their dependencies.
 
-    This is a series of JAR files in order to account for "exported" dependencies, when a node
-    and some of its dependencies are indistinguishable (such as for aliases, or potentially
-    explicitly declared or inferred `exported=` lists in the future).
+    `exports` are entries that are part of this one, when a node and some of its dependencies are
+    indistinguishable (such as a target without sources, or a `jvm_artifact` and its transitive
+    jars). `digest` and `filenames` exclude them; `with_exports`, `args`, `immutable_inputs(_args)`
+    and `closure` include them.
 
     This class additionally keeps filenames in order to preserve classpath ordering for the
     `classpath_arg` method: although Digests encode filenames, they are stored sorted.
@@ -281,76 +283,163 @@ class ClasspathEntry:
     digest: Digest
     filenames: tuple[str, ...]
     dependencies: FrozenOrderedSet[ClasspathEntry]
+    exports: FrozenOrderedSet[ClasspathEntry]
 
     def __init__(
         self,
         digest: Digest,
         filenames: Iterable[str] = (),
         dependencies: Iterable[ClasspathEntry] = (),
+        exports: Iterable[ClasspathEntry] = (),
     ):
         object.__setattr__(self, "digest", digest)
         object.__setattr__(self, "filenames", tuple(filenames))
         object.__setattr__(self, "dependencies", FrozenOrderedSet(dependencies))
+        object.__setattr__(self, "exports", FrozenOrderedSet(exports))
 
     @classmethod
     def merge(cls, digest: Digest, entries: Iterable[ClasspathEntry]) -> ClasspathEntry:
-        """After merging the Digests for entries, merge their filenames and dependencies."""
+        """After merging the Digests for entries, merge their filenames, dependencies and exports."""
+        entries = tuple(entries)
         return cls(
             digest,
             (f for cpe in entries for f in cpe.filenames),
             (d for cpe in entries for d in cpe.dependencies),
+            (e for cpe in entries for e in cpe.exports),
         )
 
     @classmethod
-    def args(cls, entries: Iterable[ClasspathEntry], *, prefix: str = "") -> Iterator[str]:
-        """Returns the filenames for the given entries.
+    def args(
+        cls, entries: Iterable[ClasspathEntry], *, prefix: str = "", transitive: bool = False
+    ) -> Iterator[str]:
+        """Returns the filenames for the given entries and their exports.
 
         TODO: See whether this method can be completely eliminated in favor of
         `immutable_inputs(_args)`.
 
-        To compute transitive filenames, first expand the entries with `cls.closure()`.
+        To compute transitive filenames, pass `transitive=True`.
         """
-        return (os.path.join(prefix, f) for cpe in entries for f in cpe.filenames)
+        return iter(
+            FrozenOrderedSet(
+                os.path.join(prefix, f)
+                for cpe in cls._walk(entries, follow_dependencies=transitive)
+                for f in cpe.filenames
+            )
+        )
 
     @classmethod
     def immutable_inputs(
-        cls, entries: Iterable[ClasspathEntry], *, prefix: str = ""
+        cls, entries: Iterable[ClasspathEntry], *, prefix: str = "", transitive: bool = False
     ) -> Iterator[tuple[str, Digest]]:
         """Returns (relpath, Digest) tuples for use with `Process.immutable_input_digests`.
 
-        To compute transitive input tuples, first expand the entries with `cls.closure()`.
+        Includes the entries' exports. To compute transitive input tuples, pass `transitive=True`.
         """
-        return ((os.path.join(prefix, cpe.digest.fingerprint[:12]), cpe.digest) for cpe in entries)
+        return iter(
+            FrozenOrderedSet(
+                (os.path.join(prefix, cpe._immutable_input_dir), cpe.digest)
+                for cpe in cls._walk(entries, follow_dependencies=transitive)
+            )
+        )
 
     @classmethod
     def immutable_inputs_args(
-        cls, entries: Iterable[ClasspathEntry], *, prefix: str = ""
+        cls, entries: Iterable[ClasspathEntry], *, prefix: str = "", transitive: bool = False
     ) -> Iterator[str]:
         """Returns the relative filenames for the given entries to be used as immutable_inputs.
 
-        To compute transitive input tuples, first expand the entries with `cls.closure()`.
+        Includes the entries' exports. To compute transitive filenames, pass `transitive=True`.
         """
-        for cpe in entries:
-            fingerprint_prefix = cpe.digest.fingerprint[:12]
-            for filename in cpe.filenames:
-                yield os.path.join(prefix, fingerprint_prefix, filename)
+        return iter(
+            FrozenOrderedSet(
+                os.path.join(prefix, cpe._immutable_input_dir, filename)
+                for cpe in cls._walk(entries, follow_dependencies=transitive)
+                for filename in cpe.filenames
+            )
+        )
+
+    @classmethod
+    def with_exports(cls, entries: Iterable[ClasspathEntry]) -> Iterator[ClasspathEntry]:
+        """The given entries, each followed by its transitive exports."""
+        return cls._walk(entries, follow_dependencies=False)
 
     @classmethod
     def closure(cls, roots: Iterable[ClasspathEntry]) -> Iterator[ClasspathEntry]:
-        """All ClasspathEntries reachable from the given roots."""
+        """All ClasspathEntries reachable from the given roots, including exports."""
+        return cls._walk(roots, follow_dependencies=True)
 
-        visited = set()
+    @staticmethod
+    def _walk(
+        roots: Iterable[ClasspathEntry], *, follow_dependencies: bool
+    ) -> Iterator[ClasspathEntry]:
+        visited: set[ClasspathEntry] = set()
         queue = deque(roots)
         while queue:
-            ct = queue.popleft()
-            if ct in visited:
-                continue
-            visited.add(ct)
-            yield ct
-            queue.extend(ct.dependencies)
+            stack = [queue.popleft()]
+            while stack:
+                cpe = stack.pop()
+                if cpe in visited:
+                    continue
+                visited.add(cpe)
+                yield cpe
+                stack.extend(reversed(cpe.exports))
+                if follow_dependencies:
+                    queue.extend(cpe.dependencies)
+
+    @cached_property
+    def _immutable_input_dir(self) -> str:
+        return self.digest.fingerprint[:12]
+
+    @cached_property
+    def _hashcode(self) -> int:
+        return hash((self.digest, self.filenames, self.dependencies, self.exports))
+
+    def _eq_helper(self, other: ClasspathEntry, equal_items: set[tuple[int, int]]) -> bool:
+        key = (id(self), id(other))
+        if key[0] == key[1] or key in equal_items:
+            return True
+
+        is_eq = (
+            self.__class__ is other.__class__
+            and self._hashcode == other._hashcode
+            and self.digest == other.digest
+            and self.filenames == other.filenames
+            and len(self.dependencies) == len(other.dependencies)
+            and len(self.exports) == len(other.exports)
+            and all(
+                self._child_eq(l, r, equal_items)
+                for l, r in zip(self.dependencies, other.dependencies)
+            )
+            and all(self._child_eq(l, r, equal_items) for l, r in zip(self.exports, other.exports))
+        )
+
+        # NB: We only track equal items because any non-equal item will cause the entire
+        # operation to shortcircuit.
+        if is_eq:
+            equal_items.add(key)
+        return is_eq
+
+    @staticmethod
+    def _child_eq(
+        left: ClasspathEntry, right: ClasspathEntry, equal_items: set[tuple[int, int]]
+    ) -> bool:
+        if type(left) is type(right) and type(left).__eq__ is ClasspathEntry.__eq__:
+            return left._eq_helper(right, equal_items)
+        return left == right
+
+    def __eq__(self, other: Any) -> bool:
+        if other.__class__ is not self.__class__:
+            return NotImplemented
+        return self._eq_helper(other, set())
+
+    def __hash__(self) -> int:
+        return self._hashcode
 
     def __repr__(self):
-        return f"ClasspathEntry({self.filenames}, dependencies={len(self.dependencies)})"
+        return (
+            f"ClasspathEntry({self.filenames}, dependencies={len(self.dependencies)}, "
+            f"exports={len(self.exports)})"
+        )
 
     def __str__(self) -> str:
         return repr(self)
