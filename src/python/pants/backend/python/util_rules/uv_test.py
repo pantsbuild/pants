@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from pants.backend.python.goals.lockfile import GenerateUvLockfile
 from pants.backend.python.goals.lockfile import rules as lockfile_rules
@@ -30,14 +31,15 @@ from pants.engine.composite_process import CompositeProcess
 from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.native_engine import FrozenOrderedSet
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 RESOLVE_NAME = "test-resolve"
 
 
-def _make_rule_runner(docker_image: str | None) -> RuleRunner:
+def _make_rule_runner(docker_image: str | None, named_caches_dir: Path | None = None) -> RuleRunner:
     rule_runner = RuleRunner(
+        bootstrap_args=[f"--named-caches-dir={named_caches_dir}"] if named_caches_dir else [],
         rules=[
             *uv.rules(),
             *pex_rules(),
@@ -69,7 +71,11 @@ def _make_rule_runner(docker_image: str | None) -> RuleRunner:
     return rule_runner
 
 
-def _create_venv_repository(rule_runner: RuleRunner, python_path: str) -> FallibleProcessResult:
+def _create_venv_repository(
+    rule_runner: RuleRunner,
+    python_path: str,
+    cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+) -> tuple[VenvRepository, FallibleProcessResult]:
     metadata = PythonLockfileMetadataV8(
         valid_for_interpreter_constraints=InterpreterConstraints(["CPython==3.14.*"]),
         requirements=set(),
@@ -133,17 +139,18 @@ def _create_venv_repository(rule_runner: RuleRunner, python_path: str) -> Fallib
             CompositeProcess(
                 [venv_repo.creation_subprocess],
                 description="Create venv from uv lockfile",
+                cache_scope=cache_scope,
             )
         ],
     )
-    return rule_runner.request(FallibleProcessResult, [process])
+    return venv_repo, rule_runner.request(FallibleProcessResult, [process])
 
 
 def test_local_environment() -> None:
     # Locally, flock is used if present (typically Linux), and pants_lock otherwise
     # (typically macOS, which has no flock binary).
     rule_runner = _make_rule_runner(docker_image=None)
-    result = _create_venv_repository(rule_runner, sys.executable)
+    _, result = _create_venv_repository(rule_runner, sys.executable)
     assert result.exit_code == 0, result.stderr.decode()
 
 
@@ -151,5 +158,34 @@ def test_docker_environment_with_flock() -> None:
     # In a docker environment the pants_lock binary is not available in the container, so success
     # proves that the container's flock binary was used.
     rule_runner = _make_rule_runner(docker_image="python:3.14-slim")
-    result = _create_venv_repository(rule_runner, "/usr/local/bin/python3")
+    _, result = _create_venv_repository(rule_runner, "/usr/local/bin/python3")
     assert result.exit_code == 0, result.stderr.decode()
+
+
+def test_existing_venv_is_reused(tmp_path: Path) -> None:
+    named_caches_dir = tmp_path / "named_caches"
+    rule_runner = _make_rule_runner(docker_image=None, named_caches_dir=named_caches_dir)
+
+    venv_repo, result = _create_venv_repository(
+        rule_runner, sys.executable, cache_scope=ProcessCacheScope.PER_SESSION
+    )
+    assert result.exit_code == 0, result.stderr.decode()
+
+    # The venv lives at `<suffix>.venv`, published by a `<suffix>` symlink once it is complete.
+    venv_link = named_caches_dir / VenvRepository.cache_name / venv_repo.venv_path_suffix
+    assert venv_link.is_symlink()
+    venv_dir = venv_link.resolve()
+    assert venv_dir.is_dir()
+
+    # Recreating the venv entails deleting the existing one, so this sentinel survives only if
+    # the second request leaves the venv alone.
+    sentinel = venv_dir / "pants_reuse_sentinel"
+    sentinel.touch()
+
+    # A new session, so that the process actually runs again instead of being memoized.
+    rule_runner.set_session_values({})
+    _, result = _create_venv_repository(
+        rule_runner, sys.executable, cache_scope=ProcessCacheScope.PER_SESSION
+    )
+    assert result.exit_code == 0, result.stderr.decode()
+    assert sentinel.exists(), "The venv was recreated instead of being reused."

@@ -32,15 +32,14 @@ from pants.backend.python.util_rules.pex_requirements import (
     determine_resolve_config,
     generate_uv_index_config,
 )
-from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.core.util_rules.system_binaries import (
-    DirnameBinary,
+    LnBinary,
     MaybeFlockBinary,
-    MkdirBinary,
-    MvBinary,
+    RealpathBinary,
+    RmBinary,
 )
 from pants.engine.composite_process import Subprocess
 from pants.engine.env_vars import EnvironmentVarsRequest
@@ -80,7 +79,7 @@ class VenvRepository:
     """A virtualenv directory that Pex can use as a --venv-repository."""
 
     cache_name: ClassVar[str] = "venv_cache"
-    cache_dir: ClassVar[str] = f".cache/{cache_name}/"
+    cache_dir: ClassVar[str] = f".cache/{cache_name}"
 
     venv_path_suffix: str
     creation_subprocess: Subprocess
@@ -186,10 +185,9 @@ async def create_venv_repository_from_uv_lockfile(
     request: VenvFromUvLockfileRequest,
     downloaded_uv: DownloadedUv,
     uv_env: UvEnvironment,
-    buildroot: BuildRoot,
-    dirname_binary: DirnameBinary,
-    mkdir_binary: MkdirBinary,
-    mv_binary: MvBinary,
+    ln_binary: LnBinary,
+    realpath_binary: RealpathBinary,
+    rm_binary: RmBinary,
     maybe_flock_binary: MaybeFlockBinary,
     level: LogLevel,
 ) -> VenvRepository:
@@ -254,24 +252,20 @@ async def create_venv_repository_from_uv_lockfile(
         )
     )
 
-    # We maintain one cached venv per buildroot+interpreter+resolve+platform+lockfile.
-    buildroot_entropy = hashlib.sha256(buildroot.path.encode()).hexdigest()
+    extra_uv_args = ["--python", request.python.path]
     if request.uv_platform is not None:
-        platform_key = hashlib.sha256(
-            f"{request.uv_platform}:{request.python.fingerprint}".encode()
-        ).hexdigest()[:16]
-        venv_path_suffix = os.path.join(buildroot_entropy, metadata.resolve, platform_key)
-        python_args: tuple[str, ...] = (
-            "--python",
-            request.python.path,
-            "--python-platform",
-            request.uv_platform,
-        )
-    else:
-        venv_path_suffix = os.path.join(
-            buildroot_entropy, metadata.resolve, request.python.fingerprint
-        )
-        python_args = ("--python", request.python.path)
+        extra_uv_args.extend(["--python-platform", request.uv_platform])
+
+    # NB: If adding to extra_uv_args, add to the entropy if necessary.
+    # Note that uv_env.env is not in the entropy to avoid churn due to, e.g., PATH changes.
+    # TODO: Selectively add relevant env vars to the entropy?
+    entropy = hashlib.sha256()
+    entropy.update(request.python.fingerprint.encode())
+    entropy.update(b"\0")
+    entropy.update((request.uv_platform or "").encode())
+    entropy.update(b"\0")
+    entropy.update(input_digest.fingerprint.encode())
+    venv_path_suffix = entropy.hexdigest()
 
     uv_cmd = shlex.join(
         (
@@ -283,7 +277,7 @@ async def create_venv_repository_from_uv_lockfile(
             # TODO: extras can conflict, so we might need to be more selective.
             "--all-extras",
             "--no-progress",
-            *python_args,
+            *extra_uv_args,
         )
     )
     # We use `realpath` to resolve the named cache symlink to an absolute path in whatever
@@ -310,12 +304,14 @@ async def create_venv_repository_from_uv_lockfile(
     pants_lock = pants_lock_bin()
     command = dedent(
         f"""\
-        cache_root={shlex.quote(VenvRepository.cache_dir)}
-        project_env="${{cache_root}}/{venv_path_suffix}"
+        cache_root="$({realpath_binary.path} {shlex.quote(VenvRepository.cache_dir)})"
+        [ -n "${{cache_root}}" ] || exit 1
+        project_env_link="${{cache_root}}/{venv_path_suffix}"
+        project_env="${{project_env_link}}.venv"
 
-        if [ ! -d "${{project_env}}" ]; then
+        # Check if the symlink doesn't exist, or exists but is dangling.
+        if [ ! -L "${{project_env_link}}" ] || [ ! -e "${{project_env_link}}" ]; then
             lock_path="${{project_env}}.lock"
-            {mkdir_binary.path} -p "$({dirname_binary.path} "${{lock_path}}")"
             (
             if [ -x "{flock}" ]; then
                 {flock} 200 || exit 1
@@ -327,14 +323,15 @@ async def create_venv_repository_from_uv_lockfile(
                     "[system-binaries].system_binary_paths." >&2
                 exit 1
             fi
-            # Now that we hold the lock, create the venv if it doesn't already exist.
-            if [ ! -d "${{project_env}}" ]; then
-                # Since this is run under a lock we could just use a fixed suffix. But then we would
-                # have to nuke the tmp venv directory first, and putting `rm -rf` in a script is scary
-                # So instead we use a random suffix.
-                random_suffix=${{RANDOM}}_${{RANDOM}}
-                project_env_tmp="${{project_env}}.${{random_suffix}}"
-                UV_PROJECT_ENVIRONMENT="${{project_env_tmp}}" {uv_cmd} && {mv_binary.path} ${{project_env_tmp}} ${{project_env}}
+            # Now that we hold the lock, create the venv and symlink if it doesn't already exist
+            # (or exists and is dangling).
+            if [ ! -L "${{project_env_link}}" ] || [ ! -e "${{project_env_link}}" ]; then
+                {rm_binary.path} -rf "${{project_env_link}}"
+                {rm_binary.path} -rf "${{project_env}}"
+                # We symlink instead of renaming since absolute paths have been baked into the venv
+                # (see realpath comment above) and we want those to be unbroken.
+                # Note that we know that project_env_link doesn't exist, so `ln -s` is atomic.
+                UV_PROJECT_ENVIRONMENT="${{project_env}}" {uv_cmd} && {ln_binary.path} -s "${{project_env}}" "${{project_env_link}}"
             fi
             ) 200>"${{lock_path}}" || exit $?
         fi
