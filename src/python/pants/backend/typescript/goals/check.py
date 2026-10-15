@@ -58,6 +58,7 @@ from pants.engine.target import (
     AllTargets,
     FieldSet,
     HydrateSourcesRequest,
+    SourcesField,
     Target,
     TransitiveTargetsRequest,
 )
@@ -329,12 +330,24 @@ async def _collect_project_targets(
 async def _hydrate_project_sources(
     project_targets: list[Target],
 ) -> Digest:
+    # Include the transitive closure so codegen dependencies (e.g. protobuf -> TypeScript) are
+    # generated and type-checked. TypeScriptSourceField subclasses JSRuntimeSourceField, so
+    # for_sources_types=(JSRuntimeSourceField,) + enable_codegen picks up both native JS/TS sources
+    # and codegen-produced TypeScript.
+    transitive = await transitive_targets(
+        TransitiveTargetsRequest([t.address for t in project_targets]), **implicitly()
+    )
     workspace_target_sources = await concurrently(
         hydrate_sources(
-            HydrateSourcesRequest(target[JSRuntimeSourceField]),
+            HydrateSourcesRequest(
+                target[SourcesField],
+                for_sources_types=(JSRuntimeSourceField,),
+                enable_codegen=True,
+            ),
             **implicitly(),
         )
-        for target in project_targets
+        for target in transitive.closure
+        if target.has_field(SourcesField)
     )
 
     return await merge_digests(

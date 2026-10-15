@@ -285,7 +285,7 @@ async def _interactive_shell_command(
             shell_command.get(ShellCommandExecutionDependenciesField).value,
             shell_command.get(ShellCommandRunnableDependenciesField).value,
         ),
-        bash,
+        **implicitly(),
     )
     dependencies_digest = execution_environment.digest
 

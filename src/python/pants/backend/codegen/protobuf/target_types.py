@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from enum import Enum
+
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -23,6 +25,13 @@ from pants.engine.unions import UnionRule
 from pants.util.docutil import doc_url
 from pants.util.logging import LogLevel
 from pants.util.strutil import help_text
+
+
+class ProtobufCodegenTool(Enum):
+    """A tool that generates code from Protobuf, for languages that let you choose one."""
+
+    protoc = "protoc"
+    buf = "buf"
 
 
 class ProtobufDependenciesField(Dependencies):
