@@ -17,6 +17,7 @@ from pants.backend.python.util_rules.faas import (
     PythonFaaSHandlerField,
     PythonFaaSKnownRuntime,
     PythonFaaSLayoutField,
+    PythonFaaSLinkPythonField,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
     PythonFaaSRuntimeField,
@@ -268,6 +269,7 @@ class _AWSLambdaBaseTarget(Target):
         PythonFaaSPex3VenvCreateExtraArgsField,
         PythonFaaSPexBuildExtraArgs,
         PythonFaaSLayoutField,
+        PythonFaaSLinkPythonField,
         PythonResolveField,
         EnvironmentField,
     )

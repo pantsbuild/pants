@@ -17,6 +17,7 @@ from pants.backend.python.util_rules.faas import (
     FaaSArchitecture,
     PythonFaaSCompletePlatforms,
     PythonFaaSLayoutField,
+    PythonFaaSLinkPythonField,
     PythonFaaSPex3VenvCreateExtraArgsField,
     PythonFaaSPexBuildExtraArgs,
     PythonFaaSUvPlatforms,
@@ -43,6 +44,7 @@ class PythonGoogleCloudFunctionFieldSet(PackageFieldSet):
     pex3_venv_create_extra_args: PythonFaaSPex3VenvCreateExtraArgsField
     pex_build_extra_args: PythonFaaSPexBuildExtraArgs
     layout: PythonFaaSLayoutField
+    link_python: PythonFaaSLinkPythonField
     type: PythonGoogleCloudFunctionType
     output_path: OutputPathField
     environment: EnvironmentField
@@ -65,6 +67,7 @@ async def package_python_google_cloud_function(
             pex3_venv_create_extra_args=field_set.pex3_venv_create_extra_args,
             pex_build_extra_args=field_set.pex_build_extra_args,
             layout=field_set.layout,
+            link_python=field_set.link_python,
             output_path=field_set.output_path,
             include_requirements=True,
             include_sources=True,

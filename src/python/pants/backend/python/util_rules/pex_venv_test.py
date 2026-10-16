@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import fnmatch
 import io
+import os
 import zipfile
 from pathlib import Path
 from unittest.mock import Mock
@@ -224,6 +225,36 @@ def test_prefix_should_add_path(
             "out/dir/some/prefix/first/party.py",
         ),
     )
+
+
+def test_link_python_should_repoint_the_venv_python(
+    local_pex: Pex,
+    rule_runner: RuleRunner,
+) -> None:
+    # The path need not exist: it only has to be in place by the time the venv is used.
+    link_python = "/var/lang/bin/python3.13"
+
+    venv = rule_runner.request(
+        PexVenv,
+        [
+            PexVenvRequest(
+                pex=local_pex,
+                layout=PexVenvLayout.VENV,
+                link_python=link_python,
+                output_path=Path("out/dir"),
+                description="testing",
+            )
+        ],
+    )
+    rule_runner.write_digest(venv.digest)
+
+    bin_dir = Path(rule_runner.build_root, "out/dir/bin")
+    pythons = list(bin_dir.glob("python*"))
+    assert pythons
+    assert {link_python} == {os.readlink(python) for python in pythons}
+
+    pyvenv_cfg = Path(rule_runner.build_root, "out/dir/pyvenv.cfg").read_text()
+    assert f"home = {os.path.dirname(link_python)}\n" in pyvenv_cfg
 
 
 def test_extra_args_should_be_passed_through(
