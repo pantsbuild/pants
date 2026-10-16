@@ -291,6 +291,8 @@ async def create_venv_repository_from_uv_lockfile(
     if request.uv_platform is not None:
         extra_uv_args.extend(["--python-platform", request.uv_platform])
 
+    sync_env = {"UV_NO_INSTALLER_METADATA": "1"}
+
     # NB: If adding to extra_uv_args, add to the entropy if necessary.
     # Note that uv_env.env is not in the entropy to avoid churn due to, e.g., PATH changes.
     # TODO: Selectively add relevant env vars to the entropy?
@@ -300,6 +302,8 @@ async def create_venv_repository_from_uv_lockfile(
     entropy.update((request.uv_platform or "").encode())
     entropy.update(b"\0")
     entropy.update(input_digest.fingerprint.encode())
+    for name, value in sorted(sync_env.items()):
+        entropy.update(f"\0{name}={value}".encode())
     venv_path_suffix = entropy.hexdigest()
 
     uv_cmd = shlex.join(
@@ -378,7 +382,7 @@ async def create_venv_repository_from_uv_lockfile(
         creation_subprocess=Subprocess(
             command=command,
             input_digest=input_digest,
-            env=uv_env.env,
+            env=FrozenDict({**uv_env.env, **sync_env}),
             append_only_caches={
                 **downloaded_uv.append_only_caches(),
                 **VenvRepository.append_only_caches(),

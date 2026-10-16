@@ -266,3 +266,4 @@ def test_local_find_links_are_portable(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.stderr.decode()
     venv_dir = (named_caches_dir / VenvRepository.cache_name / venv_repo.venv_path_suffix).resolve()
     assert list(venv_dir.glob("lib/python*/site-packages/my_wheel-0.1.0.dist-info"))
+    assert not list(venv_dir.rglob("uv_cache.json"))
