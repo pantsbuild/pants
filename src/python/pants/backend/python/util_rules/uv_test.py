@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import io
 import sys
+import zipfile
 from pathlib import Path
 
 from pants.backend.python.goals.lockfile import GenerateUvLockfile
@@ -21,6 +23,7 @@ from pants.backend.python.util_rules.uv import (
     VenvFromUvLockfileRequest,
     VenvRepository,
     generate_pyproject_toml,
+    relativize_local_find_links,
 )
 from pants.core.environments.target_types import DockerEnvironmentTarget, LocalEnvironmentTarget
 from pants.core.goals.generate_lockfiles import GenerateLockfileResult
@@ -33,11 +36,16 @@ from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.native_engine import FrozenOrderedSet
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.util.pip_requirement import PipRequirement
 
 RESOLVE_NAME = "test-resolve"
 
 
-def _make_rule_runner(docker_image: str | None, named_caches_dir: Path | None = None) -> RuleRunner:
+def _make_rule_runner(
+    docker_image: str | None,
+    named_caches_dir: Path | None = None,
+    local_find_links: tuple[str, ...] = (),
+) -> RuleRunner:
     rule_runner = RuleRunner(
         bootstrap_args=[f"--named-caches-dir={named_caches_dir}"] if named_caches_dir else [],
         rules=[
@@ -58,6 +66,9 @@ def _make_rule_runner(docker_image: str | None, named_caches_dir: Path | None = 
         inherent_environment=EnvironmentName("test-env") if docker_image else EnvironmentName(None),
     )
     args = [f"--python-resolves={{'{RESOLVE_NAME}': 'uv.lock'}}"]
+    if local_find_links:
+        find_links = [f"file://{rule_runner.build_root}/{path}" for path in local_find_links]
+        args.append(f"--python-repos-find-links={find_links}")
     if docker_image:
         rule_runner.write_files(
             {"BUILD": f"docker_environment(name='test-env', image='{docker_image}')"}
@@ -71,14 +82,32 @@ def _make_rule_runner(docker_image: str | None, named_caches_dir: Path | None = 
     return rule_runner
 
 
+def _generate_uv_lockfile(rule_runner: RuleRunner, requirements: tuple[str, ...] = ()) -> bytes:
+    lock_result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GenerateUvLockfile(
+                resolve_name=RESOLVE_NAME,
+                lockfile_dest="test.lock",
+                diff=False,
+                requirements=FrozenOrderedSet(requirements),
+                find_links=FrozenOrderedSet(),
+                interpreter_constraints=InterpreterConstraints.for_fixed_python_version("3.14.*"),
+            )
+        ],
+    )
+    return rule_runner.request(DigestContents, [lock_result.digest])[0].content
+
+
 def _create_venv_repository(
     rule_runner: RuleRunner,
     python_path: str,
     cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+    requirements: tuple[str, ...] = (),
 ) -> tuple[VenvRepository, FallibleProcessResult]:
     metadata = PythonLockfileMetadataV8(
         valid_for_interpreter_constraints=InterpreterConstraints(["CPython==3.14.*"]),
-        requirements=set(),
+        requirements={PipRequirement.parse(requirement) for requirement in requirements},
         manylinux=None,
         requirement_constraints=set(),
         only_binary=set(),
@@ -94,23 +123,10 @@ def _create_venv_repository(
     )
 
     pyproject = generate_pyproject_toml(
-        RESOLVE_NAME, metadata.valid_for_interpreter_constraints, ()
+        RESOLVE_NAME, metadata.valid_for_interpreter_constraints, requirements
     )
     rule_runner.write_files({"pyproject.toml": pyproject, "uv.toml": ""})
-    lock_result = rule_runner.request(
-        GenerateLockfileResult,
-        [
-            GenerateUvLockfile(
-                resolve_name=RESOLVE_NAME,
-                lockfile_dest="test.lock",
-                diff=False,
-                requirements=FrozenOrderedSet(),
-                find_links=FrozenOrderedSet(),
-                interpreter_constraints=InterpreterConstraints.for_fixed_python_version("3.14.*"),
-            )
-        ],
-    )
-    uv_lock_content = rule_runner.request(DigestContents, [lock_result.digest])[0].content
+    uv_lock_content = _generate_uv_lockfile(rule_runner, requirements)
     lockfile_digest = rule_runner.make_snapshot({"test.lock": uv_lock_content.decode()}).digest
     loaded_lockfile = LoadedLockfile(
         lockfile_digest,
@@ -189,3 +205,64 @@ def test_existing_venv_is_reused(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.stderr.decode()
     assert sentinel.exists(), "The venv was recreated instead of being reused."
+
+
+def test_relativize_local_find_links() -> None:
+    assert relativize_local_find_links(
+        [
+            "file:///repo/wheels",
+            "/repo/vendored/wheels",
+            "file:///repository/wheels",
+            "/elsewhere/wheels",
+            "https://example.com/wheels/",
+        ],
+        "/repo",
+    ) == (
+        (
+            "wheels",
+            "vendored/wheels",
+            "file:///repository/wheels",
+            "/elsewhere/wheels",
+            "https://example.com/wheels/",
+        ),
+        ("wheels", "vendored/wheels"),
+    )
+
+
+def _write_local_wheel(rule_runner: RuleRunner, directory: str) -> None:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as wheel:
+        wheel.writestr("my_wheel/__init__.py", "")
+        wheel.writestr(
+            "my_wheel-0.1.0.dist-info/METADATA",
+            "Metadata-Version: 2.1\nName: my-wheel\nVersion: 0.1.0\n",
+        )
+        wheel.writestr(
+            "my_wheel-0.1.0.dist-info/WHEEL",
+            "Wheel-Version: 1.0\nGenerator: pants-test\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        )
+        wheel.writestr("my_wheel-0.1.0.dist-info/RECORD", "")
+    rule_runner.write_files({f"{directory}/my_wheel-0.1.0-py3-none-any.whl": buffer.getvalue()})
+
+
+def test_local_find_links_are_portable(tmp_path: Path) -> None:
+    named_caches_dir = tmp_path / "named_caches"
+    rule_runner = _make_rule_runner(
+        docker_image=None, named_caches_dir=named_caches_dir, local_find_links=("wheels",)
+    )
+    _write_local_wheel(rule_runner, "wheels")
+    requirements = ("my-wheel==0.1.0",)
+
+    uv_lock_content = _generate_uv_lockfile(rule_runner, requirements).decode()
+    assert 'source = { registry = "wheels" }' in uv_lock_content
+    assert rule_runner.build_root not in uv_lock_content
+
+    venv_repo, result = _create_venv_repository(
+        rule_runner,
+        sys.executable,
+        cache_scope=ProcessCacheScope.PER_SESSION,
+        requirements=requirements,
+    )
+    assert result.exit_code == 0, result.stderr.decode()
+    venv_dir = (named_caches_dir / VenvRepository.cache_name / venv_repo.venv_path_suffix).resolve()
+    assert list(venv_dir.glob("lib/python*/site-packages/my_wheel-0.1.0.dist-info"))
