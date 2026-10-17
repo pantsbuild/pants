@@ -44,7 +44,7 @@ from pants.core.goals.package import BuiltPackage
 from pants.core.target_types import FilesGeneratorTarget, FileTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.engine.addresses import Address
-from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, Snapshot
+from pants.engine.fs import EMPTY_DIGEST, EMPTY_SNAPSHOT, DigestContents, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.pytest_util import no_exception
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -251,7 +251,7 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
     assert_build_context(
         rule_runner,
         Address("src/downstream", target_name="image"),
-        expected_files=["src/downstream/Dockerfile", "src.upstream/image.docker-info.json"],
+        expected_files=["src/downstream/Dockerfile", "src.upstream/image.docker-info.stable.json"],
         build_upstream_images=True,
         expected_interpolation_context={
             "tags": {
@@ -264,6 +264,53 @@ def test_from_image_build_arg_dependency(rule_runner: RuleRunner) -> None:
         },
         expected_num_upstream_images=1,
     )
+
+
+def test_upstream_image_tags_are_not_in_build_context(rule_runner: RuleRunner) -> None:
+    """A downstream image's build context must record an upstream image's ID, not its tags.
+
+    Tags commonly embed a timestamp or another per-build value, which would otherwise make the
+    context -- and so `{pants.hash}` -- change on every build.
+    """
+    dynamic_tag = "20240116-123456"
+    rule_runner.write_files(
+        {
+            "src/upstream/BUILD": dedent(
+                f"""\
+                docker_image(
+                  name="image",
+                  repository="upstream/{{name}}",
+                  image_tags=["1.0", "{dynamic_tag}"],
+                  instructions=["FROM alpine:3.16.1"],
+                )
+                """
+            ),
+            "src/downstream/BUILD": "docker_image(name='image')",
+            "src/downstream/Dockerfile": dedent(
+                """\
+                ARG BASE_IMAGE=src/upstream:image
+                FROM $BASE_IMAGE
+                """
+            ),
+        }
+    )
+
+    # The tag-bearing `docker-info.json` is replaced by the redacted `docker-info.stable.json`.
+    context = assert_build_context(
+        rule_runner,
+        Address("src/downstream", target_name="image"),
+        expected_files=[
+            "src/downstream/Dockerfile",
+            "src.upstream/image.docker-info.stable.json",
+        ],
+        build_upstream_images=True,
+        expected_num_upstream_images=1,
+    )
+
+    contents = rule_runner.request(DigestContents, [context.digest])
+    stable_info = next(file for file in contents if file.path.endswith("docker-info.stable.json"))
+    assert stable_info.content.decode() == context.upstream_image_ids[0]
+    assert not any(dynamic_tag.encode() in file.content for file in contents)
 
 
 def test_from_image_build_arg_dependency_overwritten(rule_runner: RuleRunner) -> None:
@@ -367,7 +414,7 @@ def test_from_image_build_arg_unresolvable_address_does_not_misalign(
     assert_build_context(
         rule_runner,
         Address("src/downstream", target_name="image"),
-        expected_files=["src/downstream/Dockerfile", "src.upstream/image.docker-info.json"],
+        expected_files=["src/downstream/Dockerfile", "src.upstream/image.docker-info.stable.json"],
         build_upstream_images=True,
         expected_interpolation_context={
             "tags": {

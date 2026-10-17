@@ -305,7 +305,9 @@ The interpolation context (the available placeholder values) depends on which fi
 See [Setting a repository name](#setting-a-repository-name) for placeholders specific to the `repository` field.
 
 :::note The `{pants.hash}` stability guarantee
-The calculated hash value _may_ change between stable versions of Pants for the otherwise same input sources.
+The calculated hash value _may_ change between stable versions of Pants for the otherwise same input sources. Pants 2.34 is one such change for any image that depends on another `docker_image`: the upstream image's tags are no longer part of the downstream build context, so these hashes change once on upgrade.
+
+For an image that depends on another `docker_image`, the hash tracks the upstream image's ID. Docker does not guarantee a reproducible image ID, so the hash can still change whenever the upstream image is genuinely rebuilt rather than served from Pants' cache.
 :::
 
 ## Retrieving the tags of a packaged image
