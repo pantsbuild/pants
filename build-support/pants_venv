@@ -14,13 +14,15 @@ REQUIREMENTS=(
 platform=$(uname -mps)
 
 function venv_dir() {
-  # Include the entire version string in order to differentiate e.g. PyPy from CPython.
+  # Include the implementation and version to differentiate e.g. PyPy from CPython, and the
+  # abiflags to differentiate free-threaded from GIL builds (`--version` prints "Python 3.14.3"
+  # for both, but their extension ABIs are incompatible).
   # Fingerprinting uname and python output avoids shebang length limits and any odd chars.
   # Include REPO_ROOT so that different checkouts or worktrees don't clobber each other.
   venv_fingerprint=$( (
     echo "${platform}"
     echo "${REPO_ROOT}"
-    ${PY} --version
+    ${PY} -c 'import sys; print(sys.implementation.name, ".".join(map(str, sys.version_info[:3])), sys.abiflags)'
   ) | fingerprint_data)
 
   # NB: We house these outside the working copy to avoid needing to gitignore them, but also to
