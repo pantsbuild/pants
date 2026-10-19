@@ -12,12 +12,22 @@ source "${REPO_ROOT}/build-support/common.sh"
 # + NATIVE_ROOT: The Rust code directory, ie: src/rust.
 # + MODE: Whether to run in debug or release mode.
 # + MODE_FLAG: An array of arguments to pass to Cargo to select the profile to build with.
+# + CARGO_BUILD_CMD: The Cargo subcommand to build with: `build`, or `zigbuild` if $ZIGBUILD is set.
+# + TARGET_FLAG: An array of arguments to pass to Cargo to select the target to build for.
 # Exposes:
 # + calculate_current_hash: Generate a stable hash to determine if we need to rebuild the engine.
 # shellcheck source=build-support/bin/rust/calculate_engine_hash.sh
 source "${REPO_ROOT}/build-support/bin/rust/calculate_engine_hash.sh"
 
-KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
+if [[ -n "${NATIVE_TARGET}" ]]; then
+  case "${NATIVE_TARGET}" in
+    *-linux-*) KERNEL=linux ;;
+    *-apple-darwin*) KERNEL=darwin ;;
+    *) KERNEL="${NATIVE_TARGET}" ;;
+  esac
+else
+  KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
+fi
 case "${KERNEL}" in
   linux)
     readonly LIB_EXTENSION=so
@@ -30,22 +40,38 @@ case "${KERNEL}" in
     ;;
 esac
 
+if [[ -n "${ZIGBUILD}" ]] && ! command -v cargo-zigbuild &> /dev/null; then
+  die "ZIGBUILD is set, but \`cargo-zigbuild\` is not on your PATH. See https://github.com/rust-cross/cargo-zigbuild#installation"
+fi
+if [[ -z "${ZIGBUILD}" && "${NATIVE_TARGET}" == *.* ]]; then
+  die "NATIVE_TARGET=${NATIVE_TARGET} has a glibc version suffix, which is only supported with ZIGBUILD=1."
+fi
+
+if [[ -n "${NATIVE_TARGET}" ]]; then
+  # Cargo writes target-specific output under a directory named for the triple, without any
+  # zigbuild glibc version suffix.
+  readonly NATIVE_TARGET_DIR="${NATIVE_ROOT}/target/${NATIVE_TARGET%%.*}/${MODE}"
+else
+  readonly NATIVE_TARGET_DIR="${NATIVE_ROOT}/target/${MODE}"
+fi
+
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
 export NATIVE_CLIENT_BINARY="${REPO_ROOT}/src/python/pants/bin/native_client"
 export NATIVE_SANDBOXER_BINARY="${REPO_ROOT}/src/python/pants/bin/sandboxer"
 export NATIVE_PANTS_LOCK_BINARY="${REPO_ROOT}/src/python/pants/bin/pants_lock"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
 readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
-readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
-readonly NATIVE_SANDBOXER_TARGET="${NATIVE_ROOT}/target/${MODE}/sandboxer"
-readonly NATIVE_PANTS_LOCK_TARGET="${NATIVE_ROOT}/target/${MODE}/pants_lock"
+readonly NATIVE_CLIENT_TARGET="${NATIVE_TARGET_DIR}/pants"
+readonly NATIVE_SANDBOXER_TARGET="${NATIVE_TARGET_DIR}/sandboxer"
+readonly NATIVE_PANTS_LOCK_TARGET="${NATIVE_TARGET_DIR}/pants_lock"
 
 function _build_native_code() {
   banner "Building native code..."
   # NB: See Cargo.toml with regard to the `extension-module` features.
-  "${REPO_ROOT}/cargo" build \
+  "${REPO_ROOT}/cargo" "${CARGO_BUILD_CMD[@]}" \
     --features=extension-module \
     "${MODE_FLAG[@]}" \
+    "${TARGET_FLAG[@]}" \
     -p engine \
     -p client \
     -p sandboxer \
@@ -70,7 +96,7 @@ function bootstrap_native_code() {
   _build_native_code || die
 
   # If bootstrapping the native engine fails, don't attempt to run Pants afterwards.
-  local -r native_binary="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+  local -r native_binary="${NATIVE_TARGET_DIR}/libengine.${LIB_EXTENSION}"
   if [[ ! -f "${native_binary}" ]]; then
     die "Failed to build native engine, file missing at ${native_binary}."
   fi

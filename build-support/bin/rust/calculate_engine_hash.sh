@@ -21,6 +21,24 @@ case "$MODE" in
   *) MODE_FLAG=(--release) ;;
 esac
 
+# N.B. Set $NATIVE_TARGET to a Rust target triple (e.g. "aarch64-unknown-linux-gnu") to build the
+# native code for that target instead of for the host. Set $ZIGBUILD=1 to compile and link via
+# `cargo zigbuild` (https://github.com/rust-cross/cargo-zigbuild), which uses Zig as the C
+# compiler and linker, and so can cross-link without a target-specific toolchain. With $ZIGBUILD,
+# $NATIVE_TARGET may carry a glibc version suffix (e.g. "x86_64-unknown-linux-gnu.2.17").
+readonly NATIVE_TARGET="${NATIVE_TARGET:-}"
+readonly ZIGBUILD="${ZIGBUILD:-}"
+if [[ -n "${ZIGBUILD}" ]]; then
+  CARGO_BUILD_CMD=(zigbuild)
+else
+  CARGO_BUILD_CMD=(build)
+fi
+if [[ -n "${NATIVE_TARGET}" ]]; then
+  TARGET_FLAG=(--target "${NATIVE_TARGET}")
+else
+  TARGET_FLAG=()
+fi
+
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
   # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
@@ -33,6 +51,7 @@ function calculate_current_hash() {
     cd "${REPO_ROOT}" || exit 1
     (
       echo "${MODE_FLAG[*]}"
+      echo "${CARGO_BUILD_CMD[*]} ${TARGET_FLAG[*]}"
       uname -mps
       # the engine only depends on the implementation and major.minor version, not the patch
       "${PY}" -c 'import sys; print(sys.implementation.name, sys.version_info.major, sys.version_info.minor, sys.abiflags)'
