@@ -22,7 +22,7 @@ use fs::{
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use futures::{FutureExt, TryFutureExt, try_join};
 use hashing::Digest;
-use log::{debug, info};
+use log::{debug, info, warn};
 use nails::execution::ExitCode;
 use sandboxer::Sandboxer;
 use serde::Serialize;
@@ -826,9 +826,25 @@ impl AsyncDropSandbox {
 impl Drop for AsyncDropSandbox {
     fn drop(&mut self) {
         if let Some(sandbox) = self.2.take() {
-            let _background_cleanup = self.0.spawn_blocking(|| std::mem::drop(sandbox));
+            let _background_cleanup = self.0.spawn_blocking(move || {
+                if let Err(e) = remove_sandbox(sandbox) {
+                    warn!("{e}");
+                }
+            });
         }
     }
+}
+
+/// Delete a sandbox directory, reporting failure instead of silently leaking it (which is what
+/// dropping the `TempDir` does).
+pub(crate) fn remove_sandbox(sandbox: TempDir) -> Result<(), String> {
+    let path = sandbox.path().to_owned();
+    sandbox.close().map_err(|e| {
+        format!(
+            "Failed to delete local process execution dir {}: {e}",
+            path.display()
+        )
+    })
 }
 
 /// Create a file called __run.sh with the env, cwd and argv used by Pants to facilitate debugging.

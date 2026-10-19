@@ -32,15 +32,14 @@ from pants.backend.python.util_rules.pex_requirements import (
     determine_resolve_config,
     generate_uv_index_config,
 )
-from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
 from pants.core.util_rules.system_binaries import (
-    DirnameBinary,
+    LnBinary,
     MaybeFlockBinary,
-    MkdirBinary,
     RealpathBinary,
+    RmBinary,
 )
 from pants.engine.composite_process import Subprocess
 from pants.engine.env_vars import EnvironmentVarsRequest
@@ -80,7 +79,7 @@ class VenvRepository:
     """A virtualenv directory that Pex can use as a --venv-repository."""
 
     cache_name: ClassVar[str] = "venv_cache"
-    cache_dir: ClassVar[str] = f".cache/{cache_name}/"
+    cache_dir: ClassVar[str] = f".cache/{cache_name}"
 
     venv_path_suffix: str
     creation_subprocess: Subprocess
@@ -186,10 +185,9 @@ async def create_venv_repository_from_uv_lockfile(
     request: VenvFromUvLockfileRequest,
     downloaded_uv: DownloadedUv,
     uv_env: UvEnvironment,
+    ln_binary: LnBinary,
     realpath_binary: RealpathBinary,
-    buildroot: BuildRoot,
-    dirname_binary: DirnameBinary,
-    mkdir_binary: MkdirBinary,
+    rm_binary: RmBinary,
     maybe_flock_binary: MaybeFlockBinary,
     level: LogLevel,
 ) -> VenvRepository:
@@ -254,26 +252,20 @@ async def create_venv_repository_from_uv_lockfile(
         )
     )
 
-    # We maintain one cached venv per buildroot+interpreter+resolve+platform. uv will efficiently
-    # incrementally update the venv as the lockfile changes, and will handle concurrency of
-    # `uv sync` with appropriate locking.
-    buildroot_entropy = hashlib.sha256(buildroot.path.encode()).hexdigest()
+    extra_uv_args = ["--python", request.python.path]
     if request.uv_platform is not None:
-        platform_key = hashlib.sha256(
-            f"{request.uv_platform}:{request.python.fingerprint}".encode()
-        ).hexdigest()[:16]
-        venv_path_suffix = os.path.join(buildroot_entropy, metadata.resolve, platform_key)
-        python_args: tuple[str, ...] = (
-            "--python",
-            request.python.path,
-            "--python-platform",
-            request.uv_platform,
-        )
-    else:
-        venv_path_suffix = os.path.join(
-            buildroot_entropy, metadata.resolve, request.python.fingerprint
-        )
-        python_args = ("--python", request.python.path)
+        extra_uv_args.extend(["--python-platform", request.uv_platform])
+
+    # NB: If adding to extra_uv_args, add to the entropy if necessary.
+    # Note that uv_env.env is not in the entropy to avoid churn due to, e.g., PATH changes.
+    # TODO: Selectively add relevant env vars to the entropy?
+    entropy = hashlib.sha256()
+    entropy.update(request.python.fingerprint.encode())
+    entropy.update(b"\0")
+    entropy.update((request.uv_platform or "").encode())
+    entropy.update(b"\0")
+    entropy.update(input_digest.fingerprint.encode())
+    venv_path_suffix = entropy.hexdigest()
 
     uv_cmd = shlex.join(
         (
@@ -285,7 +277,7 @@ async def create_venv_repository_from_uv_lockfile(
             # TODO: extras can conflict, so we might need to be more selective.
             "--all-extras",
             "--no-progress",
-            *python_args,
+            *extra_uv_args,
         )
     )
     # We use `realpath` to resolve the named cache symlink to an absolute path in whatever
@@ -293,10 +285,12 @@ async def create_venv_repository_from_uv_lockfile(
     # so that any entry point scripts it creates exec a valid path that doesn't reference
     # the sandbox.
     #
-    # uv claims that you can run sync concurrently on the same venv, but this relies on a
-    # lock on the workspace (not on the target venv), and since each sandbox is its own
-    # uv workspace, these locks don't exclude each other. So instead we use flock (if available)
-    # or pants_lock (otherwise) to provide mutual exclusion on the venv.
+    # We lock around the `uv sync` call for performance: the initial sync is expected to be
+    # expensive, whereas subsequent syncs with the same args and lockfile are very fast no-ops,
+    # so serializing them is possibly preferable to multiple concurrent syncs that may redo a lot
+    # of work (in the optimistic scenario they may use each others' cached work items, but in the
+    # pessimistic scenario they might race on doing the same work items in near lockstep...).
+    #
     # The local platform will always have pants_lock, since we bundle it with Pants.
     # A Linux platform should normally have flock. So the cases where neither binary is available
     # are a remote platform that isn't Linux (unlikely) or a very constrained Linux, that doesn't
@@ -311,22 +305,36 @@ async def create_venv_repository_from_uv_lockfile(
     command = dedent(
         f"""\
         cache_root="$({realpath_binary.path} {shlex.quote(VenvRepository.cache_dir)})"
-        project_env="${{cache_root}}/{venv_path_suffix}"
-        lock_path="${{project_env}}.lock"
-        {mkdir_binary.path} -p "$({dirname_binary.path} "${{lock_path}}")"
-        (
-          if [ -x "{flock}" ]; then
-            {flock} 200 || exit 1
-          elif [ -x "{pants_lock}" ]; then
-            {pants_lock} 200 || exit 1
-          else
-            echo "ERROR: No flock or pants_lock binary found on system executing a uv process. " \
-                 "Please ensure flock is installed on this host and available on " \
-                 "[system-binaries].system_binary_paths." >&2
-            exit 1
-          fi
-          UV_PROJECT_ENVIRONMENT="${{project_env}}" {uv_cmd}
-        ) 200>"${{lock_path}}" || exit $?
+        [ -n "${{cache_root}}" ] || exit 1
+        project_env_link="${{cache_root}}/{venv_path_suffix}"
+        project_env="${{project_env_link}}.venv"
+
+        # Check if the symlink doesn't exist, or exists but is dangling.
+        if [ ! -L "${{project_env_link}}" ] || [ ! -e "${{project_env_link}}" ]; then
+            lock_path="${{project_env}}.lock"
+            (
+            if [ -x "{flock}" ]; then
+                {flock} 200 || exit 1
+            elif [ -x "{pants_lock}" ]; then
+                {pants_lock} 200 || exit 1
+            else
+                echo "ERROR: No flock or pants_lock binary found on system executing a uv process. " \
+                    "Please ensure flock is installed on this host and available on " \
+                    "[system-binaries].system_binary_paths." >&2
+                exit 1
+            fi
+            # Now that we hold the lock, create the venv and symlink if it doesn't already exist
+            # (or exists and is dangling).
+            if [ ! -L "${{project_env_link}}" ] || [ ! -e "${{project_env_link}}" ]; then
+                {rm_binary.path} -rf "${{project_env_link}}"
+                {rm_binary.path} -rf "${{project_env}}"
+                # We symlink instead of renaming since absolute paths have been baked into the venv
+                # (see realpath comment above) and we want those to be unbroken.
+                # Note that we know that project_env_link doesn't exist, so `ln -s` is atomic.
+                UV_PROJECT_ENVIRONMENT="${{project_env}}" {uv_cmd} && {ln_binary.path} -s "${{project_env}}" "${{project_env_link}}"
+            fi
+            ) 200>"${{lock_path}}" || exit $?
+        fi
         """
     )
 

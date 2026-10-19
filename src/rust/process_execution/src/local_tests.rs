@@ -804,3 +804,34 @@ async fn run_command_locally_in_dir(
 fn one_second() -> Option<Duration> {
     Some(Duration::from_millis(1000))
 }
+
+#[test]
+fn remove_sandbox_deletes_dir() {
+    let sandbox = TempDir::new().unwrap();
+    let path = sandbox.path().to_owned();
+    std::fs::write(path.join("file"), "content").unwrap();
+
+    local::remove_sandbox(sandbox).unwrap();
+    assert!(!path.exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn remove_sandbox_reports_undeletable_dir() {
+    use std::os::unix::fs::PermissionsExt;
+
+    // A read-only directory, like the extracted Go module cache, cannot have its entries removed.
+    let sandbox = TempDir::new().unwrap();
+    let path = sandbox.path().to_owned();
+    let read_only = path.join("read_only");
+    std::fs::create_dir(&read_only).unwrap();
+    std::fs::write(read_only.join("file"), "content").unwrap();
+    std::fs::set_permissions(&read_only, std::fs::Permissions::from_mode(0o555)).unwrap();
+
+    let err = local::remove_sandbox(sandbox).unwrap_err();
+    assert!(err.contains(&path.display().to_string()), "{err}");
+    assert!(path.exists());
+
+    std::fs::set_permissions(&read_only, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::remove_dir_all(&path).unwrap();
+}

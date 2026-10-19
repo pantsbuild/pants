@@ -78,7 +78,13 @@ struct ImportCollector<'a> {
     pub explicit_dependencies: HashMap<String, u64>,
     code: &'a str,
     weaken_imports: bool,
+    /// Whether the file contains the `no-infer-dep` pragma anywhere. Looking for the pragma next to
+    /// a node walks the syntax tree (`parent` and `next_named_sibling` are linear in the number of
+    /// siblings), which is wasted work for the vast majority of files, which have none.
+    has_no_infer_pragma: bool,
 }
+
+const NO_INFER_PRAGMA: &str = "# pants: no-infer-dep";
 
 /// Input to `insert_import` to specify the base of an import statement.
 enum BaseNode<'a> {
@@ -94,6 +100,7 @@ impl ImportCollector<'_> {
             explicit_dependencies: HashMap::default(),
             code,
             weaken_imports: false,
+            has_no_infer_pragma: code.contains(NO_INFER_PRAGMA),
         }
     }
 
@@ -159,7 +166,7 @@ impl ImportCollector<'_> {
         let node_range = node.range();
         if node.kind_id() == KindID::COMMENT
             && end_row == node_range.start_point.row
-            && self.code_at(node_range).contains("# pants: no-infer-dep")
+            && self.code_at(node_range).contains(NO_INFER_PRAGMA)
         {
             return true;
         }
@@ -167,6 +174,9 @@ impl ImportCollector<'_> {
     }
 
     fn is_pragma_ignored(&self, node: tree_sitter::Node) -> bool {
+        if !self.has_no_infer_pragma {
+            return false;
+        }
         if let Some(sibling) = node.next_named_sibling() {
             return self.is_pragma_ignored_at_row(sibling, node.range().end_point.row);
         }
@@ -174,6 +184,9 @@ impl ImportCollector<'_> {
     }
 
     fn is_pragma_ignored_recursive(&self, node: tree_sitter::Node) -> bool {
+        if !self.has_no_infer_pragma {
+            return false;
+        }
         let node_end_point = node.range().end_point;
         if let Some(sibling) = node.next_named_sibling()
             && self.is_pragma_ignored_at_row(sibling, node_end_point.row)

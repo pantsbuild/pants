@@ -9,7 +9,10 @@ from textwrap import dedent
 import pytest
 
 from pants.backend.python import target_types_rules
-from pants.backend.python.dependency_inference.module_mapper import PythonModuleOwners
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModuleOwners,
+    find_all_python_targets,
+)
 from pants.backend.python.dependency_inference.parse_python_dependencies import (
     ParsedPythonImportInfo,
     ParsedPythonImports,
@@ -27,6 +30,7 @@ from pants.backend.python.dependency_inference.rules import (
     UnownedImportsPossibleOwnersRequest,
     _find_other_owners_for_unowned_imports,
     _get_imports_info,
+    get_python_source_owners_by_file,
     import_rules,
     infer_python_conftest_dependencies,
     infer_python_init_dependencies,
@@ -45,6 +49,7 @@ from pants.backend.python.target_types import (
     PythonTestUtilsGeneratorTarget,
 )
 from pants.backend.python.util_rules import ancestor_files
+from pants.build_graph.address import ResolveError
 from pants.core.target_types import FilesGeneratorTarget, ResourcesGeneratorTarget
 from pants.core.target_types import rules as core_target_types_rules
 from pants.core.util_rules.unowned_dependency_behavior import (
@@ -372,6 +377,8 @@ def test_infer_python_inits(behavior: InitFilesInference) -> None:
             *target_types_rules.rules(),
             *core_target_types_rules(),
             infer_python_init_dependencies,
+            get_python_source_owners_by_file,
+            find_all_python_targets,
             *PythonInferSubsystem.rules(),
             QueryRule(InferredDependencies, (InferInitDependencies,)),
         ],
@@ -440,6 +447,8 @@ def test_infer_python_conftests() -> None:
             *target_types_rules.rules(),
             *core_target_types_rules(),
             infer_python_conftest_dependencies,
+            get_python_source_owners_by_file,
+            find_all_python_targets,
             *PythonInferSubsystem.rules(),
             QueryRule(InferredDependencies, (InferConftestDependencies,)),
         ],
@@ -488,6 +497,115 @@ def test_infer_python_conftests() -> None:
             Address("src/python/root/mid/leaf", relative_file_path="conftest.py"),
         ],
     )
+
+
+def test_infer_python_inits_ignores_non_python_owners() -> None:
+    # An `__init__.py` owned only by a non-Python target is not inferred as a dependency.
+    rule_runner = PythonRuleRunner(
+        rules=[
+            *ancestor_files.rules(),
+            *target_types_rules.rules(),
+            *core_target_types_rules(),
+            infer_python_init_dependencies,
+            get_python_source_owners_by_file,
+            find_all_python_targets,
+            *PythonInferSubsystem.rules(),
+            QueryRule(InferredDependencies, (InferInitDependencies,)),
+        ],
+        target_types=[PythonSourcesGeneratorTarget, ResourcesGeneratorTarget],
+    )
+    rule_runner.set_options([], env_inherit=PYTHON_BOOTSTRAP_ENV)
+    rule_runner.write_files(
+        {
+            "src/python/root/__init__.py": "content",
+            "src/python/root/BUILD": "resources(name='res', sources=['__init__.py'])",
+            "src/python/root/leaf/__init__.py": "content",
+            "src/python/root/leaf/f.py": "",
+            "src/python/root/leaf/BUILD": "python_sources()",
+        }
+    )
+    target = rule_runner.get_target(Address("src/python/root/leaf", relative_file_path="f.py"))
+    result = rule_runner.request(
+        InferredDependencies,
+        [InferInitDependencies(InitDependenciesInferenceFieldSet.create(target))],
+    )
+    assert result == InferredDependencies(
+        [Address("src/python/root/leaf", relative_file_path="__init__.py")]
+    )
+
+
+def _conftest_rule_runner() -> PythonRuleRunner:
+    rule_runner = PythonRuleRunner(
+        rules=[
+            *ancestor_files.rules(),
+            *target_types_rules.rules(),
+            *core_target_types_rules(),
+            infer_python_conftest_dependencies,
+            get_python_source_owners_by_file,
+            find_all_python_targets,
+            *PythonInferSubsystem.rules(),
+            QueryRule(InferredDependencies, (InferConftestDependencies,)),
+        ],
+        target_types=[
+            PythonTestsGeneratorTarget,
+            PythonTestUtilsGeneratorTarget,
+            ResourcesGeneratorTarget,
+        ],
+    )
+    rule_runner.set_options(
+        ["--source-root-patterns=src/python"], env_inherit={"PATH", "PYENV_ROOT", "HOME"}
+    )
+    return rule_runner
+
+
+def _infer_conftests(rule_runner: PythonRuleRunner, address: Address) -> InferredDependencies:
+    target = rule_runner.get_target(address)
+    return rule_runner.request(
+        InferredDependencies,
+        [InferConftestDependencies(ConftestDependenciesInferenceFieldSet.create(target))],
+    )
+
+
+def test_infer_python_conftests_ignores_non_python_owners() -> None:
+    # A `conftest.py` owned only by a non-Python target is not inferred as a dependency, while a
+    # Python-owned one in another ancestor directory still is.
+    rule_runner = _conftest_rule_runner()
+    rule_runner.write_files(
+        {
+            "src/python/root/conftest.py": "",
+            "src/python/root/BUILD": "python_test_utils()",
+            "src/python/root/mid/conftest.py": "",
+            "src/python/root/mid/BUILD": "resources(name='res', sources=['conftest.py'])",
+            "src/python/root/mid/leaf/this_is_a_test.py": "",
+            "src/python/root/mid/leaf/BUILD": "python_tests(name='tests')",
+        }
+    )
+    assert _infer_conftests(
+        rule_runner,
+        Address(
+            "src/python/root/mid/leaf", target_name="tests", relative_file_path="this_is_a_test.py"
+        ),
+    ) == InferredDependencies([Address("src/python/root", relative_file_path="conftest.py")])
+
+
+def test_infer_python_conftests_unowned_conftest_errors() -> None:
+    # A `conftest.py` with no owning target is an error, because conftest files effectively always
+    # have content.
+    rule_runner = _conftest_rule_runner()
+    rule_runner.write_files(
+        {
+            "src/python/root/conftest.py": "",
+            "src/python/root/leaf/this_is_a_test.py": "",
+            "src/python/root/leaf/BUILD": "python_tests(name='tests')",
+        }
+    )
+    with engine_error(ResolveError, contains="src/python/root/conftest.py"):
+        _infer_conftests(
+            rule_runner,
+            Address(
+                "src/python/root/leaf", target_name="tests", relative_file_path="this_is_a_test.py"
+            ),
+        )
 
 
 @pytest.fixture

@@ -124,7 +124,7 @@ arc-swap = "1.9.1"
 async-lock = "3.4.2"
 async-oncecell = "0.2"
 async-stream = "0.3"
-async-trait = "0.1.89"
+async-trait = "0.1.92"
 axum = "0.8.8"
 axum-server = "0.8.0"
 bincode = "=1.3.3"
@@ -199,8 +199,8 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.14"
 prost-build = "0.14"
 prost-types = "0.14"
-pyo3 = { version = "0.29.2", features = ["parking_lot"] }
-pyo3-build-config = "0.29.2"
+pyo3 = { version = "0.29.3", features = ["parking_lot"] }
+pyo3-build-config = "0.29.3"
 rand = "0.10.0"
 regex = "1.12.3"
 reqwest = { version = "0.13", default-features = false }

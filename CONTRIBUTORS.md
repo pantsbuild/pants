@@ -7,6 +7,7 @@ Created as part of the release process.
 + Adam Chainz
 + Adam Retter
 + Aditya Raj Verma
++ Aegis
 + Affan Amir Mir
 + Alan Paulin
 + Alan Velasco
@@ -330,11 +331,13 @@ Created as part of the release process.
 + Ryan Loader
 + Ryan Scott Brown
 + Ryan Williams
++ Rylo
 + Sameer Arora
 + Sameer Brenn
 + Sara Solano
 + Scott Lessans
 + Scott Searcy
++ Scott Venier
 + Senthil Kumaran
 + SergeKireev
 + Sergey Serebryakov
@@ -352,6 +355,7 @@ Created as part of the release process.
 + Stefan Sauer
 + Stephan Erb
 + Stephen Hopper
++ Steve Rice
 + Stu Hood
 + Subin Kim
 + Suresh Joshi
@@ -406,6 +410,7 @@ Created as part of the release process.
 + Yuhan GUO
 + Yujie Chen
 + Yusuf Jabri
++ Zhaoqi Xu
 + achrafmam2
 + andreaimprovised
 + azban
