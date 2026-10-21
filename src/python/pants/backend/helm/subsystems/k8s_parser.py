@@ -49,6 +49,7 @@ class HelmKubeParserSubsystem(PythonToolRequirementsBase):
         "hikaru-model-25",
         "hikaru-model-24",
         "hikaru-model-23",
+        "certifi>=2026.10.19",  # See https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
     ]
 
     register_interpreter_constraints = True

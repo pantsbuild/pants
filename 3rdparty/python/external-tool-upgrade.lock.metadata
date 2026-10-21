@@ -4,6 +4,7 @@
     "CPython==3.14.*"
   ],
   "generated_with_requirements": [
+    "certifi>=2026.10.19",
     "packaging==26.0",
     "pytest==9.0.2",
     "requests==2.32.5",

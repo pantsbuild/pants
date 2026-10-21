@@ -5,6 +5,7 @@
 # Consider pinging us on Slack if you're thinking a new dependency might be needed.
 
 ansicolors==1.1.8
+certifi>=2026.10.19  # See https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
 chevron==0.14.0
 fasteners==0.20.0
 freezegun==1.5.5

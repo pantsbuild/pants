@@ -114,19 +114,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2227dcbaafe0d2f59279d1762ddddc37783ed4354594f194ffc31d20f41fc3db",
-              "url": "https://files.pythonhosted.org/packages/ef/2f/c5464532e965badff2f4c4c1a3a83f5697f0d7c407ed0cda44aaa99bb451/certifi-2026.6.17-py3-none-any.whl"
+              "hash": "42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b",
+              "url": "https://files.pythonhosted.org/packages/c4/51/29046e48f693c54e5b7412216d447a1d8362c9653148d98c02cdf65fa733/certifi-2026.10.19-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "024c88eeec92ca068db80f02b8b07c9cef7b9fe261d1d535abfd5abd6f6af432",
-              "url": "https://files.pythonhosted.org/packages/c9/c7/424b75da314c1045981bd9777432fad05a9e0c69daa4ed7e308bbaffe405/certifi-2026.6.17.tar.gz"
+              "hash": "035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae",
+              "url": "https://files.pythonhosted.org/packages/a6/bd/1436c50cc46699de0230fbaacc1d1de7bfec413176099949e9d5112e88f2/certifi-2026.10.19.tar.gz"
             }
           ],
           "project_name": "certifi",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "2026.6.17"
+          "version": "2026.10.19"
         },
         {
           "artifacts": [
@@ -756,13 +756,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0b3e35ff41e9adba53021ab0cef475eb18f57c7f53f0f2ca55567fbf3c537ea0",
-              "url": "https://files.pythonhosted.org/packages/00/15/b92b4e1d88d02c6eff9733c9eea21846ab435cc4d813d84ccc5d335955df/graphql_core-3.2.11-py3-none-any.whl"
+              "hash": "b0eb04f2c31556b2310a77c8fb53c74e8b56570f8fea594d89c6ef7827dbb497",
+              "url": "https://files.pythonhosted.org/packages/1f/b4/b52a324b0b297ddc49b8ea31a51d39fae63132f694a267b9381d94e2e0af/graphql_core-3.2.13-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e7e156d10beb127cab5c89ff0da71416fc73d27c484a4757d3b2d35633774802",
-              "url": "https://files.pythonhosted.org/packages/4d/90/f2aff026ab4aebd80eb71905106a0885f4cfde85dcf965543f45bed0d9ee/graphql_core-3.2.11.tar.gz"
+              "hash": "bb81dd266d4ab7b591bd976f1b23639d97776cb9ac1a896b4a93c271e11ed618",
+              "url": "https://files.pythonhosted.org/packages/4e/5e/aa0d4e701b50db0bab71b125dd19ddb0f98c638d008d6f7e3d8ce9cbc92e/graphql_core-3.2.13.tar.gz"
             }
           ],
           "project_name": "graphql-core",
@@ -770,7 +770,7 @@
             "typing-extensions<5,>=4.7; python_version < \"3.10\""
           ],
           "requires_python": "<4,>=3.7",
-          "version": "3.2.11"
+          "version": "3.2.13"
         },
         {
           "artifacts": [
@@ -3181,20 +3181,22 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.97.1",
-  "pip_version": "26.1.2",
+  "pex_version": "2.103.5",
+  "pip_version": "26.2.1",
   "prefer_older_binary": false,
   "requirements": [
     "PyGithub==2.8.1",
     "PyYAML<7.0,>=6.0",
     "ansicolors==1.1.8",
     "beautifulsoup4==4.11.1",
+    "certifi>=2026.10.19",
     "chevron==0.14.0",
     "debugpy==1.8.20",
     "elfdeps==0.2.0",
     "fastapi==0.120.1",
     "fasteners==0.20.0",
     "freezegun==1.5.5",
+    "graphql-core<3.3.0",
     "ijson==3.4.0.post0",
     "mypy-typing-asserts==0.1.1",
     "mypy~=1.19.1",
