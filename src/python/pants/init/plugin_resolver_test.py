@@ -32,9 +32,9 @@ from pants.init.options_initializer import create_bootstrap_scheduler
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.python_interpreter_selection import (
-    PY_38,
-    PY_39,
-    skip_unless_python38_and_python39_present,
+    PY_310,
+    PY_311,
+    skip_unless_python310_and_python311_present,
 )
 from pants.testutil.rule_runner import EXECUTOR, QueryRule, RuleRunner
 from pants.util.contextutil import temporary_dir
@@ -70,7 +70,7 @@ def _create_pex(
     request = PexRequest(
         output_filename="setup-py-runner.pex",
         internal_only=True,
-        requirements=PexRequirements(["setuptools==66.1.0", "wheel==0.37.0"]),
+        requirements=PexRequirements(["setuptools==84.2.1", "wheel==0.48.0"]),
         interpreter_constraints=interpreter_constraints,
     )
     return rule_runner.request(Pex, [request])
@@ -231,7 +231,8 @@ def plugin_resolution(
                 )
 
         env.update(
-            PANTS_PYTHON_REPOS_FIND_LINKS=f"['file://{repo_dir}/']",
+            # We don't want to test against all of pypi, but we do need to provide a setuptools.
+            PANTS_PYTHON_REPOS_FIND_LINKS=f"['file://{repo_dir}/', 'https://pypi.org/simple/setuptools/']",
             PANTS_PYTHON_RESOLVER_CACHE_TTL="1",
         )
         if not use_pypi:
@@ -360,12 +361,12 @@ def test_range_deps(rule_runner: RuleRunner) -> None:
         assert "2.27.1" == dist.version
 
 
-@skip_unless_python38_and_python39_present
+@skip_unless_python310_and_python311_present
 @pytest.mark.parametrize("sdist", (False, True), ids=("bdist", "sdist"))
 def test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: bool) -> None:
     with plugin_resolution(
         rule_runner,
-        python_version=PY_38,
+        python_version=PY_310,
         plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         sdist=sdist,
     ) as results:
@@ -375,7 +376,7 @@ def test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: b
         with pytest.raises(ExecutionError):
             with plugin_resolution(
                 rule_runner,
-                python_version=PY_39,
+                python_version=PY_311,
                 chroot=chroot,
                 plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
             ):
@@ -392,7 +393,7 @@ def test_exact_requirements_interpreter_change(rule_runner: RuleRunner, sdist: b
         # directly from the still in-tact cache.
         with plugin_resolution(
             rule_runner,
-            python_version=PY_38,
+            python_version=PY_310,
             chroot=chroot,
             plugins=[Plugin("jake", "1.2.3"), Plugin("jane", "3.4.5")],
         ) as results2:
