@@ -4,6 +4,7 @@
     "CPython<3.15,>=3.10"
   ],
   "generated_with_requirements": [
+    "certifi>=2026.10.19",
     "colorama>=0.4.3",
     "importlib-metadata<8",
     "twine<5,>=3.7.1"

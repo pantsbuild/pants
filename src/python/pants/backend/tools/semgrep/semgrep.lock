@@ -67,19 +67,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2227dcbaafe0d2f59279d1762ddddc37783ed4354594f194ffc31d20f41fc3db",
-              "url": "https://files.pythonhosted.org/packages/ef/2f/c5464532e965badff2f4c4c1a3a83f5697f0d7c407ed0cda44aaa99bb451/certifi-2026.6.17-py3-none-any.whl"
+              "hash": "42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b",
+              "url": "https://files.pythonhosted.org/packages/c4/51/29046e48f693c54e5b7412216d447a1d8362c9653148d98c02cdf65fa733/certifi-2026.10.19-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "024c88eeec92ca068db80f02b8b07c9cef7b9fe261d1d535abfd5abd6f6af432",
-              "url": "https://files.pythonhosted.org/packages/c9/c7/424b75da314c1045981bd9777432fad05a9e0c69daa4ed7e308bbaffe405/certifi-2026.6.17.tar.gz"
+              "hash": "035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae",
+              "url": "https://files.pythonhosted.org/packages/a6/bd/1436c50cc46699de0230fbaacc1d1de7bfec413176099949e9d5112e88f2/certifi-2026.10.19.tar.gz"
             }
           ],
           "project_name": "certifi",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "2026.6.17"
+          "version": "2026.10.19"
         },
         {
           "artifacts": [
@@ -2275,10 +2275,11 @@
   "only_wheels": [],
   "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.96.1",
-  "pip_version": "26.1.2",
+  "pex_version": "2.104.1",
+  "pip_version": "26.2.2",
   "prefer_older_binary": false,
   "requirements": [
+    "certifi>=2026.10.19",
     "opentelemetry-api~=1.34.1",
     "opentelemetry-exporter-otlp-proto-http~=1.34.1",
     "opentelemetry-instrumentation-requests~=0.55b1",

@@ -670,7 +670,7 @@ def test_uv_lockfile_generation(
                     ]
                 ),
                 find_links=FrozenOrderedSet([]),
-                interpreter_constraints=InterpreterConstraints(["CPython==3.14"]),
+                interpreter_constraints=InterpreterConstraints(["CPython==3.14.*"]),
                 resolve_name="test",
                 lockfile_dest="test.lock",
                 diff=False,
@@ -718,7 +718,7 @@ def test_uv_lockfile_generation(
     metadata = json.loads(by_path["test.lock.metadata"].content.decode())
     assert metadata["version"] == 8
     assert metadata["lockfile_format"] == LockfileFormat.UV
-    assert metadata["valid_for_interpreter_constraints"] == ["CPython==3.14"]
+    assert metadata["valid_for_interpreter_constraints"] == ["CPython==3.14.*"]
     assert metadata["generated_with_requirements"] == [
         "ansicolors==1.1.8",
         "cowsay @ git+https://github.com/VaasuDevanS/cowsay-python@dcf7236f0b5ece9ed56e91271486e560526049cf",
@@ -751,7 +751,7 @@ def test_uv_lockfile_generation_with_sources(rule_runner: PythonRuleRunner) -> N
                     ]
                 ),
                 find_links=FrozenOrderedSet([]),
-                interpreter_constraints=InterpreterConstraints(["CPython==3.14"]),
+                interpreter_constraints=InterpreterConstraints(["CPython==3.14.*"]),
                 resolve_name="test",
                 lockfile_dest="test.lock",
                 diff=False,
@@ -858,7 +858,7 @@ def test_uv_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
         req = GenerateUvLockfile(
             requirements=reqs,
             find_links=FrozenOrderedSet([]),
-            interpreter_constraints=InterpreterConstraints(["CPython==3.14"]),
+            interpreter_constraints=InterpreterConstraints(["CPython==3.14.*"]),
             resolve_name="test",
             lockfile_dest="test.lock",
             diff=False,
