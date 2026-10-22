@@ -645,6 +645,10 @@ impl Core {
         } else {
             StoreCliOpt {
                 local_store_path: Some(local_store_options.store_dir.clone()),
+                local_store_files_max_size_bytes: None,
+                local_store_directories_max_size_bytes: None,
+                local_store_shard_count: None,
+                local_store_lease_time_secs: None,
                 remote_instance_name: remoting_opts.instance_name.clone(),
                 cas_server: remoting_opts.store_address.clone(),
                 cas_root_ca_cert_file: remoting_opts.root_ca_certs_path.clone(),
@@ -662,7 +666,10 @@ impl Core {
                     .map(|(k, v)| format!("{k}={v}"))
                     .collect(),
             }
-        };
+        }
+        // The sandboxer opens this same local store, so it must use the same settings: the same
+        // shard count to find digests, and the same sizes so that both agree on the LMDB map size.
+        .with_local_options(&(&local_store_options).into());
 
         let sandboxer = if exec_strategy_opts.use_sandboxer {
             let sandboxer_bin = get_sandboxer_binary()?;
