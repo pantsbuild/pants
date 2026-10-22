@@ -28,11 +28,11 @@ class Uv(TemplatedExternalTool):
     name = "uv"
     help = "The uv Python package manager (https://github.com/astral-sh/uv)."
 
-    default_version = "0.11.6"
+    default_version = "0.13.4"
     default_known_versions = [
-        "0.11.6|macos_arm64 |4b69a4e366ec38cd5f305707de95e12951181c448679a00dce2a78868dfc9f5b|20807020",
-        "0.11.6|linux_x86_64|aa342a53abe42364093506d7704214d2cdca30b916843e520bc67759a5d20132|24460747",
-        "0.11.6|linux_arm64 |d14ebd6f200047264152daaf97b8bd36c7885a5033e9e8bba8366cb0049c0d00|22576913",
+        "0.13.4|macos_arm64 |e0b1d4743ce64c55d9f0f4a444afa6b81125680070ee04e853fcd0f6c1ebf8f1|14326193",
+        "0.13.4|linux_x86_64|28d4385f9f9d1d1c7654d85b3855e0e2615b2f6cc13136a2edff858bbdc16ff1|18450841",
+        "0.13.4|linux_arm64 |253a17cadcb659ae77a0fe3b9a2f1c14297528d480c421899e61e64d64f24e8f|17045416",
     ]
     version_constraints = ">=0.7.4,<1.0"
 

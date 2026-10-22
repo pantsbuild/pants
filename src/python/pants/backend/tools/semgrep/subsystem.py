@@ -55,6 +55,7 @@ class SemgrepSubsystem(PythonToolBase):
         "opentelemetry-sdk~=1.34.1",
         "opentelemetry-exporter-otlp-proto-http~=1.34.1",
         "opentelemetry-instrumentation-requests~=0.55b1",
+        "certifi>=2026.10.19",  # See https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
     ]
 
     register_interpreter_constraints = True
