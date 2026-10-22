@@ -40,6 +40,45 @@ readonly NATIVE_CLIENT_TARGET="${NATIVE_ROOT}/target/${MODE}/pants"
 readonly NATIVE_SANDBOXER_TARGET="${NATIVE_ROOT}/target/${MODE}/sandboxer"
 readonly NATIVE_PANTS_LOCK_TARGET="${NATIVE_ROOT}/target/${MODE}/pants_lock"
 
+# Previously built native code, keyed by engine hash, so that returning to a previously built
+# state of the repo doesn't require recompiling or relinking.
+readonly NATIVE_CODE_CACHE="${HOME}/.cache/pants/native_code"
+readonly NATIVE_CODE_CACHE_MAX_ENTRIES="${PANTS_NATIVE_CODE_CACHE_MAX_ENTRIES:-20}"
+
+function _native_code_cached() {
+  local -r cache_entry="$1"
+  [[ -f "${cache_entry}/${NATIVE_ENGINE_BINARY}" && -f "${cache_entry}/native_client" &&
+    -f "${cache_entry}/sandboxer" && -f "${cache_entry}/pants_lock" ]]
+}
+
+function _cache_native_code() {
+  local -r cache_entry="$1"
+  local -r native_binary="$2"
+  mkdir -p "${NATIVE_CODE_CACHE}"
+  # Populate a temporary dir and then rename it into place, so that concurrent bootstraps never
+  # see a partially populated cache entry.
+  local tmp_entry
+  # NB: The dot prefix hides it from the eviction listing below.
+  tmp_entry="$(mktemp -d "${NATIVE_CODE_CACHE}/.tmp.XXXXXX")" || die
+  cp "${native_binary}" "${tmp_entry}/${NATIVE_ENGINE_BINARY}" || die
+  cp "${NATIVE_CLIENT_TARGET}" "${tmp_entry}/native_client" || die
+  cp "${NATIVE_SANDBOXER_TARGET}" "${tmp_entry}/sandboxer" || die
+  cp "${NATIVE_PANTS_LOCK_TARGET}" "${tmp_entry}/pants_lock" || die
+  if [[ -d "${cache_entry}" ]]; then
+    # A concurrent bootstrap already created this entry.
+    rm -rf "${tmp_entry}"
+  else
+    mv "${tmp_entry}" "${cache_entry}"
+  fi
+
+  # Evict the least recently used entries beyond the limit (cache hits touch their entry).
+  # shellcheck disable=SC2012
+  ls -1t "${NATIVE_CODE_CACHE}" | tail -n +"$((NATIVE_CODE_CACHE_MAX_ENTRIES + 1))" |
+    while read -r stale_entry; do
+      rm -rf "${NATIVE_CODE_CACHE:?}/${stale_entry}"
+    done
+}
+
 function _build_native_code() {
   banner "Building native code..."
   # NB: See Cargo.toml with regard to the `extension-module` features.
@@ -67,31 +106,39 @@ function bootstrap_native_code() {
     return 0
   fi
 
-  _build_native_code || die
+  local cache_entry="${NATIVE_CODE_CACHE}/${engine_version_calculated}"
+  if _native_code_cached "${cache_entry}"; then
+    banner "Using cached native code from ${cache_entry}"
+    touch "${cache_entry}"
+  else
+    _build_native_code || die
 
-  # If bootstrapping the native engine fails, don't attempt to run Pants afterwards.
-  local -r native_binary="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
-  if [[ ! -f "${native_binary}" ]]; then
-    die "Failed to build native engine, file missing at ${native_binary}."
+    # If bootstrapping the native engine fails, don't attempt to run Pants afterwards.
+    local -r native_binary="${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+    if [[ ! -f "${native_binary}" ]]; then
+      die "Failed to build native engine, file missing at ${native_binary}."
+    fi
+
+    # If bootstrapping the native client fails, don't attempt to run Pants afterwards.
+    if [[ ! -f "${NATIVE_CLIENT_TARGET}" ]]; then
+      die "Failed to build native client, file missing at ${NATIVE_CLIENT_TARGET}."
+    fi
+
+    # If bootstrapping the sandboxer fails, don't attempt to run Pants afterwards.
+    if [[ ! -f "${NATIVE_SANDBOXER_TARGET}" ]]; then
+      die "Failed to build native sandboxer, file missing at ${NATIVE_SANDBOXER_TARGET}."
+    fi
+
+    # If bootstrapping the pants_lock fails, don't attempt to run Pants afterwards.
+    if [[ ! -f "${NATIVE_PANTS_LOCK_TARGET}" ]]; then
+      die "Failed to build native pants_lock, file missing at ${NATIVE_PANTS_LOCK_TARGET}."
+    fi
+
+    # Pick up Cargo.lock changes if any caused by the `cargo build`.
+    engine_version_calculated="$(calculate_current_hash)"
+    cache_entry="${NATIVE_CODE_CACHE}/${engine_version_calculated}"
+    _cache_native_code "${cache_entry}" "${native_binary}"
   fi
-
-  # If bootstrapping the native client fails, don't attempt to run Pants afterwards.
-  if [[ ! -f "${NATIVE_CLIENT_TARGET}" ]]; then
-    die "Failed to build native client, file missing at ${NATIVE_CLIENT_TARGET}."
-  fi
-
-  # If bootstrapping the sandboxer fails, don't attempt to run Pants afterwards.
-  if [[ ! -f "${NATIVE_SANDBOXER_TARGET}" ]]; then
-    die "Failed to build native sandboxer, file missing at ${NATIVE_SANDBOXER_TARGET}."
-  fi
-
-  # If bootstrapping the pants_lock fails, don't attempt to run Pants afterwards.
-  if [[ ! -f "${NATIVE_PANTS_LOCK_TARGET}" ]]; then
-    die "Failed to build native pants_lock, file missing at ${NATIVE_PANTS_LOCK_TARGET}."
-  fi
-
-  # Pick up Cargo.lock changes if any caused by the `cargo build`.
-  engine_version_calculated="$(calculate_current_hash)"
 
   # Create the native engine resource.
   # NB: Remove the old files rather than copying over them:
@@ -99,11 +146,12 @@ function bootstrap_native_code() {
   #    process to be killed when recompiling.
   #  * For the sandboxer, we needed to delete it to void copying over a
   #    running binary, which could ironically fail with ETXTBSY
-  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_BINARY}" "${NATIVE_SANDBOXER_BINARY}"
-  cp "${native_binary}" "${NATIVE_ENGINE_RESOURCE}"
-  cp "${NATIVE_CLIENT_TARGET}" "${NATIVE_CLIENT_BINARY}"
-  cp "${NATIVE_SANDBOXER_TARGET}" "${NATIVE_SANDBOXER_BINARY}"
-  cp "${NATIVE_PANTS_LOCK_TARGET}" "${NATIVE_PANTS_LOCK_BINARY}"
+  rm -f "${NATIVE_ENGINE_RESOURCE}" "${NATIVE_CLIENT_BINARY}" "${NATIVE_SANDBOXER_BINARY}" \
+    "${NATIVE_PANTS_LOCK_BINARY}"
+  cp "${cache_entry}/${NATIVE_ENGINE_BINARY}" "${NATIVE_ENGINE_RESOURCE}"
+  cp "${cache_entry}/native_client" "${NATIVE_CLIENT_BINARY}"
+  cp "${cache_entry}/sandboxer" "${NATIVE_SANDBOXER_BINARY}"
+  cp "${cache_entry}/pants_lock" "${NATIVE_PANTS_LOCK_BINARY}"
 
   # Create the accompanying metadata file.
   local -r metadata_file=$(mktemp -t pants.native_engine.metadata.XXXXXX)
