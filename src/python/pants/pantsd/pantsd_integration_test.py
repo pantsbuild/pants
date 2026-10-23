@@ -189,7 +189,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             third_stderr, third_pid = run_auth_plugin()
             assert "Remote cache/execution options updated" in third_stderr
-            assert "execution_headers: {}" in third_stderr and "'custom': 'foo'" in third_stderr
+            # Header values are redacted in options-diff logs (#23685 / PR #23686).
+            assert "execution_headers: <redacted> -> <redacted>" in third_stderr
+            assert "'custom': 'foo'" not in third_stderr
             assert "Reinitializing scheduler" in third_stderr
             assert second_pid == third_pid
 

@@ -10,7 +10,7 @@ import pytest
 from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.core.util_rules.external_tool import rules as external_tool_rules
 from pants.core.util_rules.system_binaries import BashBinary
-from pants.engine.fs import CreateDigest, Digest, FileContent
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
@@ -65,6 +65,24 @@ def javac_version_proc(rule_runner: RuleRunner) -> Process:
     )
 
 
+def javac_version_proc_with_nailgun(rule_runner: RuleRunner) -> Process:
+    jdk = rule_runner.request(InternalJdk, [])
+    return rule_runner.request(
+        Process,
+        [
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=(),
+                argv=[
+                    "-version",
+                ],
+                input_digest=EMPTY_DIGEST,
+                description="",
+            )
+        ],
+    )
+
+
 def run_javac_version(rule_runner: RuleRunner) -> str:
     process_result = rule_runner.request(
         ProcessResult,
@@ -73,6 +91,12 @@ def run_javac_version(rule_runner: RuleRunner) -> str:
     return "\n".join(
         [process_result.stderr.decode("utf-8"), process_result.stdout.decode("utf-8")],
     )
+
+
+def get_jvm_argfile(rule_runner: RuleRunner, proc: Process) -> str:
+    digest_contents = rule_runner.request(DigestContents, [proc.input_digest])
+    argfile = next(fc for fc in digest_contents if fc.path == "__jvm_args.txt")
+    return argfile.content.decode("utf-8")
 
 
 @maybe_skip_jdk_test
@@ -140,6 +164,89 @@ def test_include_child_mem_constraint_in_jvm_options(rule_runner: RuleRunner) ->
     )
     proc = javac_version_proc(rule_runner)
     assert "-Xmx1g" in proc.argv
+
+
+@maybe_skip_jdk_test
+def test_uses_nailgun_instead_of_jvm_argfile_for_java_9_plus(rule_runner: RuleRunner) -> None:
+    # Nailgun sends the classpath and args to the running server over a socket rather than via
+    # argv, so it isn't subject to the argument-length limit the argfile works around: prefer it
+    # over the argfile whenever it's requested (the default), even on a Java 9+ JDK.
+    proc = javac_version_proc_with_nailgun(rule_runner)
+    assert proc.argv[-1] == "-version"
+    assert proc.use_nailgun
+
+
+@maybe_skip_jdk_test
+def test_short_argv_stays_inline_below_threshold(rule_runner: RuleRunner) -> None:
+    # Under the argfile length threshold a `use_nailgun=False` process must stay on the command
+    # line exactly as it did before argfiles were introduced, and must not materialize an argfile.
+    jdk = rule_runner.request(InternalJdk, [])
+    proc = rule_runner.request(
+        Process,
+        [
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=("tool.jar",),
+                argv=["com.example.Main", "hello world"],
+                input_digest=EMPTY_DIGEST,
+                description="",
+                use_nailgun=False,
+            )
+        ],
+    )
+
+    assert proc.argv == (
+        rule_runner.request(BashBinary, []).path,
+        "__jdk/jdk.sh",
+        "__java_home/bin/java",
+        "-cp",
+        f"{jdk.nailgun_jar}:tool.jar",
+        "-Xmx512m",
+        "com.example.Main",
+        "hello world",
+    )
+    digest_contents = rule_runner.request(DigestContents, [proc.input_digest])
+    assert not any(fc.path == "__jvm_args.txt" for fc in digest_contents)
+
+
+@maybe_skip_jdk_test
+def test_uses_jvm_argfile_for_java_arguments(rule_runner: RuleRunner) -> None:
+    jdk = rule_runner.request(InternalJdk, [])
+    # A classpath entry long enough to push the total command line past the argfile length
+    # threshold, so this exercises the actual trigger (over `_JVM_ARGUMENT_FILE_MAX_CMD_LEN`) as
+    # well as the escaping of the shorter arguments.
+    long_entry = "x" * 70_000
+    proc = rule_runner.request(
+        Process,
+        [
+            JvmProcess(
+                jdk=jdk,
+                classpath_entries=("tool.jar", "another tool.jar", long_entry),
+                argv=["com.example.Main", "hello world", "a#b", r"a\b", 'a"b', "@literal"],
+                input_digest=EMPTY_DIGEST,
+                description="",
+                use_nailgun=False,
+            )
+        ],
+    )
+
+    assert proc.argv == (
+        rule_runner.request(BashBinary, []).path,
+        "__jdk/jdk.sh",
+        "__java_home/bin/java",
+        "@__jvm_args.txt",
+    )
+    assert get_jvm_argfile(rule_runner, proc).splitlines() == [
+        '"-cp"',
+        f'"{jdk.nailgun_jar}:tool.jar:another tool.jar:{long_entry}"',
+        '"-Xmx512m"',
+        '"com.example.Main"',
+        '"hello world"',
+        '"a#b"',
+        r'"a\\b"',
+        r'"a\"b"',
+        '"@literal"',
+    ]
 
 
 @maybe_skip_jdk_test

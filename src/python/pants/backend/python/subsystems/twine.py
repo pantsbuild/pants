@@ -30,6 +30,7 @@ class TwineSubsystem(PythonToolBase):
 
     default_requirements = [
         "twine>=5.1.1,<8",
+        "certifi>=2026.10.19",  # See https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576
     ]
 
     register_interpreter_constraints = True

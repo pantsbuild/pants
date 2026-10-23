@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from textwrap import dedent
 
@@ -136,6 +137,33 @@ def test_find_binary_file_component_on_path(rule_runner: RuleRunner, tmp_path: P
         [BinaryPathRequest(binary_name=MyBin.binary_name, search_path=[str(bogus_path)])],
     )
     assert binary_paths.first_path is None
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="chmod does not yield EPERM on Windows")
+def test_find_binary_permission_denied_path_entry(rule_runner: RuleRunner, tmp_path: Path) -> None:
+    # Regression test for https://github.com/pantsbuild/pants/issues/23366:
+    # a PATH directory that returns EPERM/EACCES on metadata of its children
+    # should be skipped, not crash with IntrinsicError.
+    denied = tmp_path / "denied"
+    denied.mkdir()
+    MyBin.create(denied)
+    denied.chmod(0o000)
+    try:
+        good_dir = tmp_path / "bin"
+        good_path = MyBin.create(good_dir)
+        binary_paths = rule_runner.request(
+            BinaryPaths,
+            [
+                BinaryPathRequest(
+                    binary_name=MyBin.binary_name,
+                    search_path=[str(denied), str(good_dir)],
+                )
+            ],
+        )
+        assert binary_paths.first_path is not None
+        assert binary_paths.first_path.path == str(good_path)
+    finally:
+        denied.chmod(0o755)
 
 
 def test_find_binary_respects_search_path_order(rule_runner: RuleRunner, tmp_path: Path) -> None:

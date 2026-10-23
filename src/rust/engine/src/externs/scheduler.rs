@@ -125,6 +125,12 @@ impl PyExecutor {
         PyExecutor(self.0.to_borrowed())
     }
 
+    /// The actual blocking-pool thread count, possibly lower than the `max_threads` passed to
+    /// `__new__` (see `task_executor::MAX_BLOCKING_THREADS_LMDB_SAFE`).
+    fn max_blocking_threads(&self) -> Option<usize> {
+        self.0.max_blocking_threads()
+    }
+
     /// Shut down this executor, waiting for all tasks to exit. Any tasks which have not exited at
     /// the end of the timeout will be leaked.
     fn shutdown(&self, py: Python, duration_secs: f64) {

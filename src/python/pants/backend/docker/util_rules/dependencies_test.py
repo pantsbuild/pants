@@ -11,6 +11,8 @@ from pants.backend.docker.target_types import DockerImageDependenciesField, Dock
 from pants.backend.docker.util_rules import docker_build_args, dockerfile
 from pants.backend.docker.util_rules.dependencies import (
     InferDockerDependencies,
+    get_packageable_output_paths,
+    get_packageable_target_positions,
     infer_docker_dependencies,
 )
 from pants.backend.go.goals import package_binary as package_go_binary
@@ -42,6 +44,8 @@ def rule_runner() -> RuleRunner:
             *package_go_binary.rules(),
             *pex.rules(),
             infer_docker_dependencies,
+            get_packageable_output_paths,
+            get_packageable_target_positions,
             py_target_types_rules.generate_targets_from_pex_binaries,
             UnionRule(GenerateTargetsRequest, py_target_types_rules.GenerateTargetsFromPexBinaries),
             QueryRule(InferredDependencies, (InferDockerDependencies,)),

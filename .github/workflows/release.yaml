@@ -45,7 +45,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.98.1
+        rustup default 1.99.1
         cargo version
     - name: Expose Pythons
       run: |
@@ -68,8 +68,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
-        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | sha256sum -c -
+        https://github.com/pex-tool/pex/releases/download/v2.104.1/pex
+        echo "09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b  /tmp/pex.pex" | sha256sum -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[gil]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -184,7 +184,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.98.1
+        rustup default 1.99.1
         cargo version
     - name: Expose Pythons
       run: |
@@ -215,8 +215,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
-        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | sha256sum -c -
+        https://github.com/pex-tool/pex/releases/download/v2.104.1/pex
+        echo "09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b  /tmp/pex.pex" | sha256sum -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[gil]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -345,7 +345,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.98.1-*
+          ~/.rustup/toolchains/1.99.1-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -372,8 +372,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
-        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | shasum -a 256 -c -
+        https://github.com/pex-tool/pex/releases/download/v2.104.1/pex
+        echo "09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b  /tmp/pex.pex" | shasum -a 256 -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[gil]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -490,7 +490,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.98.1
+        rustup default 1.99.1
         cargo version
     - name: Expose Pythons
       run: |
@@ -513,8 +513,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
-        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | sha256sum -c -
+        https://github.com/pex-tool/pex/releases/download/v2.104.1/pex
+        echo "09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b  /tmp/pex.pex" | sha256sum -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[free-threaded]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -629,7 +629,7 @@ jobs:
     - name: Install Rust toolchain
       run: |
         # Set the default toolchain. Installs the toolchain if it is not already installed.
-        rustup default 1.98.1
+        rustup default 1.99.1
         cargo version
     - name: Expose Pythons
       run: |
@@ -660,8 +660,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
-        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | sha256sum -c -
+        https://github.com/pex-tool/pex/releases/download/v2.104.1/pex
+        echo "09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b  /tmp/pex.pex" | sha256sum -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[free-threaded]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -805,7 +805,7 @@ jobs:
       with:
         key: macOS14-ARM64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.98.1-*
+          ~/.rustup/toolchains/1.99.1-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo
@@ -832,8 +832,8 @@ jobs:
     - name: Select the distribution interpreter
       run: |
         curl -fL -o /tmp/pex.pex \
-        https://github.com/pex-tool/pex/releases/download/v2.100.5/pex
-        echo "533ca442cf4cf802e966b3c7f866746c775176a6d32d9d96c9a777b6c13bdbd1  /tmp/pex.pex" | shasum -a 256 -c -
+        https://github.com/pex-tool/pex/releases/download/v2.104.1/pex
+        echo "09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b  /tmp/pex.pex" | shasum -a 256 -c -
         PY="$(python3.14 /tmp/pex.pex --interpreter-constraint 'CPython[free-threaded]==3.14.*' \
         -- -c 'import os, sys; print(os.path.realpath(sys.executable))')"
         echo "PY=$PY" >> "$GITHUB_ENV"
@@ -954,7 +954,7 @@ jobs:
       with:
         key: Linux-x86_64-rustup-${{ hashFiles('src/rust/rust-toolchain') }}-v2
         path: |
-          ~/.rustup/toolchains/1.98.1-*
+          ~/.rustup/toolchains/1.99.1-*
           ~/.rustup/update-hashes
           ~/.rustup/settings.toml
     - name: Cache Cargo

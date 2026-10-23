@@ -275,6 +275,7 @@ DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
     "sseclient-py": ("sseclient",),
     "strawberry-graphql": ("strawberry",),
     "streamlit-aggrid": ("st_aggrid",),
+    "testcontainers-opensearch": ("testcontainers.opensearch",),
     "umap-learn": ("umap",),
     "unittest-xml-reporting": ("xmlrunner",),
     "unleashclient": ("UnleashClient",),
