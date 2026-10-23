@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pants.backend.go.go_sources.load_go_binary import LoadedGoBinaryRequest, setup_go_binary
@@ -16,7 +17,7 @@ from pants.backend.go.util_rules.build_pkg import (
     BuildGoPackageRequest,
     FallibleBuildGoPackageRequest,
 )
-from pants.backend.go.util_rules.coverage import GoCoverMode
+from pants.backend.go.util_rules.coverage import SYNC_ATOMIC_IMPORT_PATH, GoCoverMode
 from pants.backend.go.util_rules.embedcfg import EmbedConfig
 from pants.backend.go.util_rules.goroot import GoRoot
 from pants.backend.go.util_rules.import_analysis import (
@@ -246,6 +247,45 @@ async def setup_build_go_package_target_request_for_stdlib(
             embed_config=embed_config,
         ),
         import_path=request.import_path,
+    )
+
+
+async def maybe_setup_sync_atomic_dependency(
+    with_coverage: bool,
+    build_opts: GoBuildOptions,
+    direct_dependencies: Iterable[BuildGoPackageRequest],
+) -> FallibleBuildGoPackageRequest | None:
+    """A `sync/atomic` build request for a package instrumented in `atomic` cover mode, if needed.
+
+    `go tool cover -mode=atomic` rewrites each covered statement to call `sync/atomic.AddUint32`,
+    adding an import the package's own sources never declared. Pants builds each package's
+    `importcfg` from its direct dependencies, so unless `sync/atomic` is added explicitly the
+    package fails to compile with "could not import sync/atomic". Packages which happen to import
+    `sync/atomic` already are unaffected, which is why this only breaks some of them.
+
+    Returns `None` when nothing needs adding. A returned request whose `.request` is `None` is a
+    dependency failure and must be propagated by the caller.
+
+    NB: stdlib packages deliberately do not go through this. A covered stdlib package which
+    `sync/atomic` itself depends on would gain a dependency cycle;
+    `_is_coverage_enabled_for_stdlib_package` already declines to instrument `sync/atomic` under
+    `atomic` mode for the same family of reasons.
+    """
+    coverage_config = build_opts.coverage_config
+    if (
+        not with_coverage
+        or coverage_config is None
+        or coverage_config.cover_mode != GoCoverMode.ATOMIC
+        or any(dep.import_path == SYNC_ATOMIC_IMPORT_PATH for dep in direct_dependencies)
+    ):
+        return None
+
+    return await setup_build_go_package_target_request_for_stdlib(
+        BuildGoPackageRequestForStdlibRequest(
+            import_path=SYNC_ATOMIC_IMPORT_PATH,
+            build_opts=build_opts,
+        ),
+        **implicitly(),
     )
 
 

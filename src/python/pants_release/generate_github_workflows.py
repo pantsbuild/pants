@@ -429,6 +429,11 @@ def install_go() -> list[Step]:
             "with": {"go-version": go_version, "cache": False},
         }
 
+    # Both a Go v1.25+ and a Go v1.24 toolchain are installed on purpose: Pants registers Go
+    # coverage counters through `testing/internal/testdeps` from Go v1.25 and through
+    # `testing.RegisterCover` before it, and `src/python/pants/backend/go/conftest.py` runs the
+    # coverage tests once against each. Go tests which do not pin a toolchain use whichever `go`
+    # lands first on `PATH`, i.e. the one installed last.
     return [go_cfg(go_version) for go_version in ("1.25.3", "1.24.9")]
 
 
