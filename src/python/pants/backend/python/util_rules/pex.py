@@ -724,6 +724,9 @@ async def _setup_pex_requirements(
             concurrency_available,
         )
 
+    if not reqs_info.req_strings:
+        return _BuildPexRequirementsSetup([], [], concurrency_available)
+
     # We use pip to perform a normal resolve.
     digests = []
     argv = [

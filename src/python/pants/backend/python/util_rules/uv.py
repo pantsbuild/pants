@@ -32,6 +32,7 @@ from pants.backend.python.util_rules.pex_requirements import (
     determine_resolve_config,
     generate_uv_index_config,
 )
+from pants.base.build_root import BuildRoot
 from pants.core.util_rules import system_binaries
 from pants.core.util_rules.env_vars import environment_vars_subset
 from pants.core.util_rules.subprocess_environment import SubprocessEnvironmentVars
@@ -47,11 +48,13 @@ from pants.engine.fs import (
     CreateDigest,
     FileContent,
     MergeDigests,
+    PathGlobs,
 )
 from pants.engine.intrinsics import (
     create_digest,
     get_digest_contents,
     merge_digests,
+    path_globs_to_digest,
 )
 from pants.engine.pants_lock import pants_lock_bin
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -91,6 +94,32 @@ class VenvRepository:
     @classmethod
     def append_only_caches(cls) -> FrozenDict[str, str]:
         return FrozenDict({cls.cache_name: cls.cache_dir})
+
+
+def relativize_local_find_links(
+    find_links: Iterable[str], buildroot: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Rewrite find-links dirs under the buildroot to buildroot-relative paths.
+
+    uv records find-links paths verbatim in uv.lock, so absolute paths would tie the lockfile (and
+    every process that consumes it) to one checkout location. Returns the rewritten find-links and
+    the relative dirs, whose contents must be in the uv process sandbox.
+    """
+    rewritten: list[str] = []
+    local_dirs: list[str] = []
+    for find_link in find_links:
+        path = find_link.removeprefix("file://")
+        if os.path.isabs(path) and os.path.commonpath((path, buildroot)) == buildroot:
+            relative_dir = os.path.relpath(path, buildroot)
+            rewritten.append(relative_dir)
+            local_dirs.append(relative_dir)
+        else:
+            rewritten.append(find_link)
+    return tuple(rewritten), tuple(local_dirs)
+
+
+def local_find_links_globs(local_dirs: Iterable[str]) -> PathGlobs:
+    return PathGlobs(os.path.join(local_dir, "*") for local_dir in local_dirs)
 
 
 @dataclass(frozen=True)
@@ -189,6 +218,7 @@ async def create_venv_repository_from_uv_lockfile(
     realpath_binary: RealpathBinary,
     rm_binary: RmBinary,
     maybe_flock_binary: MaybeFlockBinary,
+    buildroot: BuildRoot,
     level: LogLevel,
 ) -> VenvRepository:
     """Install all packages from a uv lockfile into a virtualenv."""
@@ -209,6 +239,9 @@ async def create_venv_repository_from_uv_lockfile(
         ResolveConfigRequest(metadata.resolve), **implicitly()
     )
 
+    find_links, local_find_links_dirs = relativize_local_find_links(
+        resolve_config.find_links, buildroot.path
+    )
     pyproject_content = generate_pyproject_toml(
         metadata.resolve,
         metadata.valid_for_interpreter_constraints,
@@ -222,7 +255,7 @@ async def create_venv_repository_from_uv_lockfile(
         # they don't involve auth, so they are not strictly needed after lockfile generation.
         # TODO: Get rid of "extra find_links" entirely, and simply hard-code an explicit
         #  source for pants_requirements.
-        find_links=resolve_config.find_links,
+        find_links=find_links,
         sources=resolve_config.sources,
     )
 
@@ -238,8 +271,9 @@ async def create_venv_repository_from_uv_lockfile(
         ),
         get_digest_contents(request.lockfile.lockfile_digest),
     )
-    uv_lock_digest = await create_digest(
-        CreateDigest([FileContent("uv.lock", uv_lock_contents[0].content)])
+    uv_lock_digest, find_links_digest = await concurrently(
+        create_digest(CreateDigest([FileContent("uv.lock", uv_lock_contents[0].content)])),
+        path_globs_to_digest(local_find_links_globs(local_find_links_dirs)),
     )
 
     input_digest = await merge_digests(
@@ -248,6 +282,7 @@ async def create_venv_repository_from_uv_lockfile(
                 downloaded_uv.digest,
                 uv_config_digest,
                 uv_lock_digest,
+                find_links_digest,
             )
         )
     )
@@ -255,6 +290,8 @@ async def create_venv_repository_from_uv_lockfile(
     extra_uv_args = ["--python", request.python.path]
     if request.uv_platform is not None:
         extra_uv_args.extend(["--python-platform", request.uv_platform])
+
+    sync_env = {"UV_NO_INSTALLER_METADATA": "1"}
 
     # NB: If adding to extra_uv_args, add to the entropy if necessary.
     # Note that uv_env.env is not in the entropy to avoid churn due to, e.g., PATH changes.
@@ -265,6 +302,8 @@ async def create_venv_repository_from_uv_lockfile(
     entropy.update((request.uv_platform or "").encode())
     entropy.update(b"\0")
     entropy.update(input_digest.fingerprint.encode())
+    for name, value in sorted(sync_env.items()):
+        entropy.update(f"\0{name}={value}".encode())
     venv_path_suffix = entropy.hexdigest()
 
     uv_cmd = shlex.join(
@@ -343,7 +382,7 @@ async def create_venv_repository_from_uv_lockfile(
         creation_subprocess=Subprocess(
             command=command,
             input_digest=input_digest,
-            env=uv_env.env,
+            env=FrozenDict({**uv_env.env, **sync_env}),
             append_only_caches={
                 **downloaded_uv.append_only_caches(),
                 **VenvRepository.append_only_caches(),
