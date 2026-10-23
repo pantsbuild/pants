@@ -108,7 +108,7 @@ class PythonSetup(Subsystem):
             #  We'll probably want to find and modify all those tests to set an explicit IC, but
             #  that will take time.
             if "PYTEST_CURRENT_TEST" in os.environ:
-                return (">=3.9,<3.15",)
+                return (">=3.10,<3.15",)
             raise OptionsError(
                 softwrap(
                     f"""\
@@ -298,7 +298,7 @@ class PythonSetup(Subsystem):
         ),
     )
     pip_version = StrOption(
-        default="24.2",
+        default="26.2.2",
         help=softwrap(
             f"""
             Use this version of Pip for resolving requirements and generating lockfiles.

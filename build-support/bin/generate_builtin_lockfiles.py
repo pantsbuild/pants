@@ -70,7 +70,7 @@ from pants.util.dirutil import touch
 logger = logging.getLogger(__name__)
 
 
-default_python_interpreter_constraints = "CPython>=3.9,<3.15"
+default_python_interpreter_constraints = "CPython>=3.10,<3.15"
 
 
 ToolBaseT = TypeVar("ToolBaseT")
@@ -252,7 +252,7 @@ def generate_python_tool_lockfiles(
             "--python-pip-version=latest",
             f"--python-interpreter-constraints=['{default_python_interpreter_constraints}']",
             "--python-enable-resolves",
-            "--python-resolver=uv",
+            "--python-resolver=pex",
             # Unset any existing resolve names in the Pants repo, and set to just our temporary ones.
             f"--python-resolves={resolves}",
             f"--python-resolves-to-interpreter-constraints={resolves_to_ics}",
