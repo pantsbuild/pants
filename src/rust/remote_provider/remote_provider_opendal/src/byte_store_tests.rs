@@ -297,3 +297,62 @@ async fn list_missing_digests_empty_never_missing() {
         Ok(HashSet::new())
     )
 }
+
+fn new_fs_provider(root: &std::path::Path) -> Provider {
+    Provider::fs(root.to_str().unwrap(), BASE.to_owned(), remote_options()).unwrap()
+}
+
+#[tokio::test]
+async fn fs_store_file_round_trip() {
+    let root = tempfile::TempDir::new().unwrap();
+    let testdata = TestData::all_the_henries();
+    let provider = new_fs_provider(root.path());
+
+    provider
+        .store_file(
+            testdata.digest(),
+            mk_tempfile(Some(&testdata.bytes())).await,
+        )
+        .await
+        .unwrap();
+    assert_store(&provider, &testdata).await;
+
+    // The temporary file was renamed into place, not left behind.
+    let leftovers = std::fs::read_dir(root.path().join(crate::ATOMIC_WRITE_DIR_NAME))
+        .unwrap()
+        .count();
+    assert_eq!(leftovers, 0);
+}
+
+#[tokio::test]
+async fn fs_partial_write_is_not_visible() {
+    let root = tempfile::TempDir::new().unwrap();
+    let testdata = TestData::all_the_henries();
+    let provider = new_fs_provider(root.path());
+    let path = test_path(&testdata);
+
+    // Start a write and stop partway, as happens when the process is killed mid-upload.
+    let mut writer = provider.operator.writer(&path).await.unwrap();
+    writer.write(testdata.bytes().slice(..1024)).await.unwrap();
+
+    // A truncated blob must never be visible under the digest's name.
+    assert!(!root.path().join(&path).exists());
+    let mut destination = Vec::new();
+    assert!(
+        !provider
+            .load(testdata.digest(), &mut destination)
+            .await
+            .unwrap()
+    );
+    assert_eq!(
+        provider
+            .list_missing_digests(&mut vec![testdata.digest()].into_iter())
+            .await,
+        Ok(HashSet::from([testdata.digest()]))
+    );
+
+    // Once the write completes, the whole blob appears at once.
+    writer.write(testdata.bytes().slice(1024..)).await.unwrap();
+    writer.close().await.unwrap();
+    assert_store(&provider, &testdata).await;
+}
