@@ -11,7 +11,7 @@ This project provides a *Development Container* (or [Dev Container](https://cont
 ## Features
 
 - [Rust](https://www.rust-lang.org/) engine and common Rust utilities
-- [Python](https://www.python.org/) 3.11
+- [Python](https://www.python.org/) 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14 and 3.14t (free-threaded), installed via [uv](https://docs.astral.sh/uv/)
 - [Docker-in-Docker](https://github.com/devcontainers/features/tree/main/src/docker-in-docker) (DinD)
 - [Shell History](https://github.com/stuartleeks/dev-container-features/tree/main/src/shell-history)
 - [Local Git hooks](https://www.pantsbuild.org/stable/docs/contributions/development/setting-up-pants#step-3-set-up-a-pre-push-git-hook)
