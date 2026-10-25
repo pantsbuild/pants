@@ -618,7 +618,6 @@ impl Globs {
     name = "Filespec",
     frozen,
     module = "pants.engine.internals.native_engine",
-    skip_from_py_object
 )]
 #[derive(Debug)]
 pub struct PyFilespec {
