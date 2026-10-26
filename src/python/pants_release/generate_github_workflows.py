@@ -999,7 +999,9 @@ def build_wheels_job(
             "volumes": ["/:/mnt/host-root"],
         }
     elif platform == Platform.LINUX_ARM64:
-        container = {"image": "quay.io/pypa/manylinux_2_28_aarch64@sha256:e2808351a165aa85913d79f1f8457b4f6d74047b47fba07b5b9a5e6c0055a017"}
+        container = {
+            "image": "quay.io/pypa/manylinux_2_28_aarch64@sha256:743e05864cdd8dc63dbf568898abd7ff616d121440770fda36263294c6f711c6"
+        }
     else:
         container = None
 
