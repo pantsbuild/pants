@@ -5,17 +5,17 @@
       "dockerfile": "./Dockerfile"
     },
     "features": {
-      "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-      "ghcr.io/devcontainers/features/go:1": {},
-      "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "ghcr.io/devcontainers/features/docker-in-docker:4.1.3": {},
+      "ghcr.io/devcontainers/features/go:1.4.0": {},
+      "ghcr.io/devcontainers/features/kubectl-helm-minikube:1.3.1": {
         "minikube": "none"
       },
-      "ghcr.io/devcontainers/features/rust:1": {
+      "ghcr.io/devcontainers/features/rust:1.6.0": {
         "profile": "complete"
       },
       "ghcr.io/devcontainers/features/node:2.1.1": {},
-      "ghcr.io/devcontainers/features/github-cli:1": {},
-      "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
+      "ghcr.io/devcontainers/features/github-cli:1.1.3": {},
+      "ghcr.io/stuartleeks/dev-container-features/shell-history:0.0.6": {}
     },
     "customizations": {
       "vscode": {
