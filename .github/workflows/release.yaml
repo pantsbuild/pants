@@ -6,7 +6,7 @@
 jobs:
   build_wheels_cp314_linux_arm64:
     container:
-      image: quay.io/pypa/manylinux_2_28_aarch64@sha256:e2808351a165aa85913d79f1f8457b4f6d74047b47fba07b5b9a5e6c0055a017
+      image: quay.io/pypa/manylinux_2_28_aarch64@sha256:743e05864cdd8dc63dbf568898abd7ff616d121440770fda36263294c6f711c6
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       MODE: dist
@@ -451,7 +451,7 @@ jobs:
     timeout-minutes: 90
   build_wheels_linux_arm64:
     container:
-      image: quay.io/pypa/manylinux_2_28_aarch64@sha256:e2808351a165aa85913d79f1f8457b4f6d74047b47fba07b5b9a5e6c0055a017
+      image: quay.io/pypa/manylinux_2_28_aarch64@sha256:743e05864cdd8dc63dbf568898abd7ff616d121440770fda36263294c6f711c6
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
       MODE: dist
