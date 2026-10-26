@@ -25,7 +25,6 @@ from pants_release.common import die
 
 from pants.backend.python.util_rules.pex_cli import PEX_BINARY_HASH, PEX_VERSION
 
-
 # Actions are referenced by tag here, and pinned to SHAs for security (see
 # https://docs.zizmor.sh/) via the lockfile at `.github/workflows/actions.lock`,
 # which is updated by running `gh actions-lock` after generating the workflows.
