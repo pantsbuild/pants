@@ -13,7 +13,7 @@
       "ghcr.io/devcontainers/features/rust:1": {
         "profile": "complete"
       },
-      "ghcr.io/devcontainers/features/node:2": {},
+      "ghcr.io/devcontainers/features/node:2.1.1": {},
       "ghcr.io/devcontainers/features/github-cli:1": {},
       "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
     },
