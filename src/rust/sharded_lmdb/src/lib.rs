@@ -618,10 +618,10 @@ impl ShardedLmdb {
     ///
     /// Extends the lease on `fingerprint` to `lease_time` from now.
     ///
-    /// A lease with more than half of `lease_time` left is not rewritten. pantsd re-leases
-    /// everything its graph references far more often than that, so the entry is still renewed
-    /// long before it could expire, and an idle pantsd does not rewrite every lease it holds on
-    /// every pass.
+    /// A lease with more than half of `lease_time` left is not rewritten. pantsd renews the leases
+    /// of everything its graph references more often than that, so the entry is still renewed
+    /// before it could expire, and an idle pantsd does not rewrite every lease it holds on every
+    /// pass.
     ///
     pub async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
         let store = self.clone();

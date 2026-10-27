@@ -566,6 +566,8 @@ struct InnerStore {
     directory_lmdb: Result<Arc<ShardedLmdb>, String>,
     file_fsdb: ShardedFSDB,
     file_source: FileSource,
+    lease_time: Duration,
+    renewed_at: Mutex<HashMap<Digest, Instant>>,
 }
 
 impl ByteStore {
@@ -623,6 +625,8 @@ impl ByteStore {
                 file_source: FileSource {
                     open_files: Semaphore::new(1024),
                 },
+                lease_time: options.lease_time,
+                renewed_at: Mutex::default(),
             }),
         })
     }
@@ -656,6 +660,34 @@ impl ByteStore {
             (_, _, true) => Ok(Some(EntryType::File)),
             (false, false, false) => Ok(None),
         }
+    }
+
+    ///
+    /// The digests among `digests` that were not passed to `record_renewed` within the last
+    /// quarter of the lease time.
+    ///
+    /// `lease_all` leaves every lease it is given with at least half of the lease time left (see
+    /// `ShardedLmdb::lease`), so a digest renewed more recently than that, and everything below it,
+    /// still has at least a quarter of the lease time left: enough to wait for a later pass.
+    ///
+    pub(crate) fn digests_to_renew(
+        &self,
+        digests: impl Iterator<Item = Digest>,
+        now: Instant,
+    ) -> Vec<Digest> {
+        let renew_after = self.inner.lease_time / 4;
+        let mut renewed_at = self.inner.renewed_at.lock();
+        renewed_at.retain(|_, at| now.duration_since(*at) < renew_after);
+        digests
+            .filter(|digest| !renewed_at.contains_key(digest))
+            .collect()
+    }
+
+    pub(crate) fn record_renewed(&self, digests: &[Digest], at: Instant) {
+        self.inner
+            .renewed_at
+            .lock()
+            .extend(digests.iter().map(|digest| (*digest, at)));
     }
 
     pub async fn lease_all(
