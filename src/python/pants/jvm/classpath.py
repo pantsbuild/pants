@@ -140,7 +140,7 @@ async def loose_classfiles(
                 )
             )
         )
-        for cpe in ClasspathEntry.with_exports([classpath_entry])
+        for cpe in ClasspathEntry.export_closure([classpath_entry])
         for filename in cpe.filenames
     )
 

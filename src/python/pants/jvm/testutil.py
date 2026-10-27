@@ -66,7 +66,7 @@ async def render_classpath_entry(
     dest_dir = "dest"
     jars = [
         (cpe.digest, filename)
-        for cpe in ClasspathEntry.with_exports([classpath_entry])
+        for cpe in ClasspathEntry.export_closure([classpath_entry])
         for filename in cpe.filenames
     ]
     process_results = await concurrently(

@@ -153,7 +153,7 @@ async def collect_thirdparty_modules(
     )
 
     resolve_digest = await merge_digests(
-        MergeDigests(cpe.digest for cpe in ClasspathEntry.with_exports(classpath_entries))
+        MergeDigests(cpe.digest for cpe in ClasspathEntry.export_closure(classpath_entries))
     )
 
     return ThirdpartyModules(

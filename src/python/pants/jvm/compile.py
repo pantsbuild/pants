@@ -263,8 +263,8 @@ class ClasspathEntry:
 
     `exports` are entries that are part of this one, when a node and some of its dependencies are
     indistinguishable (such as a target without sources, or a `jvm_artifact` and its transitive
-    jars). `digest` and `filenames` exclude them; `with_exports`, `args`, `immutable_inputs(_args)`
-    and `closure` include them.
+    jars). `digest` and `filenames` exclude them; `export_closure`, `args`,
+    `immutable_inputs(_args)` and `closure` include them.
 
     This class additionally keeps filenames in order to preserve classpath ordering for the
     `classpath_arg` method: although Digests encode filenames, they are stored sorted.
@@ -359,7 +359,7 @@ class ClasspathEntry:
         )
 
     @classmethod
-    def with_exports(cls, entries: Iterable[ClasspathEntry]) -> Iterator[ClasspathEntry]:
+    def export_closure(cls, entries: Iterable[ClasspathEntry]) -> Iterator[ClasspathEntry]:
         """The given entries, each followed by its transitive exports."""
         return cls._walk(entries, follow_dependencies=False)
 

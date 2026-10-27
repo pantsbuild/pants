@@ -592,7 +592,7 @@ def test_exports_are_transitive_and_their_dependencies_are_not_root() -> None:
     bundle = _jar("bundle", exports=[api])
     user = _jar("user", dependencies=[bundle])
 
-    assert list(ClasspathEntry.with_exports([bundle])) == [bundle, api, core]
+    assert list(ClasspathEntry.export_closure([bundle])) == [bundle, api, core]
     assert list(ClasspathEntry.closure([user])) == [user, bundle, api, core, runtime_dep]
 
 
