@@ -363,8 +363,16 @@ impl UnderlyingByteStore for ShardedFSDB {
 
     async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
         let path = self.get_path(fingerprint);
+        // As in `ShardedLmdb::lease`: a lease with more than half its time left is not rewritten.
+        let renew_before = SystemTime::now() - self.lease_time / 2;
         self.executor
             .spawn_blocking(move || {
+                if std::fs::metadata(&path)
+                    .and_then(|metadata| metadata.modified())
+                    .is_ok_and(|mtime| mtime > renew_before)
+                {
+                    return Ok(());
+                }
                 fs_set_times::set_mtime(&path, fs_set_times::SystemTimeSpec::SymbolicNow)
                     .map_err(|e| format!("Failed to extend mtime of {path:?}: {e}"))
             })
