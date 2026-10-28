@@ -107,10 +107,6 @@ def macos_major_version() -> None | int:
     return int(version.split(".", 1)[0])
 
 
-def is_macos_big_sur() -> bool:
-    return macos_major_version() == 11
-
-
 def getuser() -> str:
     try:
         return getpass.getuser()
