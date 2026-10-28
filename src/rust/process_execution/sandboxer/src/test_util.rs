@@ -7,13 +7,13 @@ use hashing::Digest;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use store::StoreCliOpt;
+use store::{LocalOptions, StoreCliOpt};
 
 pub async fn prep_store(dir_path: &Path) -> (StoreCliOpt, DirectoryDigest) {
     let local_store_path: PathBuf = dir_path.join("lmdb_store");
     fs::create_dir(&local_store_path).unwrap();
 
-    let store_cli_opt = StoreCliOpt::new_local_only(local_store_path);
+    let store_cli_opt = StoreCliOpt::new_local_only(local_store_path, &LocalOptions::default());
     let store = store_cli_opt
         .create_store(task_executor::Executor::new())
         .await

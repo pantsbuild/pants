@@ -88,13 +88,13 @@ pub struct StoreCliOpt {
 }
 
 impl StoreCliOpt {
-    pub fn new_local_only(local_store_path: PathBuf) -> Self {
+    pub fn new_local_only(local_store_path: PathBuf, local_options: &LocalOptions) -> Self {
         Self {
             local_store_path: Some(local_store_path),
-            local_store_files_max_size_bytes: None,
-            local_store_directories_max_size_bytes: None,
-            local_store_shard_count: None,
-            local_store_lease_time_secs: None,
+            local_store_files_max_size_bytes: Some(local_options.files_max_size_bytes),
+            local_store_directories_max_size_bytes: Some(local_options.directories_max_size_bytes),
+            local_store_shard_count: Some(local_options.shard_count),
+            local_store_lease_time_secs: Some(local_options.lease_time.as_secs()),
             cas_server: None,
             remote_instance_name: None,
             cas_root_ca_cert_file: None,
@@ -108,16 +108,6 @@ impl StoreCliOpt {
             store_batch_load_enabled: false,
             header: vec![],
         }
-    }
-
-    /// Record the local store's settings, so that a process created from these options opens the
-    /// local store exactly the way the caller did.
-    pub fn with_local_options(mut self, options: &LocalOptions) -> Self {
-        self.local_store_files_max_size_bytes = Some(options.files_max_size_bytes);
-        self.local_store_directories_max_size_bytes = Some(options.directories_max_size_bytes);
-        self.local_store_shard_count = Some(options.shard_count);
-        self.local_store_lease_time_secs = Some(options.lease_time.as_secs());
-        self
     }
 
     /// The local store's settings, falling back to the defaults for any that were not set.

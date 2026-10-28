@@ -54,7 +54,8 @@ fn test_to_cli_args() {
 
 #[test]
 fn local_options_default_when_unset() {
-    let opts = StoreCliOpt::new_local_only(PathBuf::from("some/path"));
+    // A sandboxer started without the local store flags falls back to the defaults.
+    let opts = StoreCliOpt::parse_from(["dummy_bin_name", "--local-store-path", "some/path"]);
     let defaults = LocalOptions::default();
     let local = opts.local_options();
     assert_eq!(local.files_max_size_bytes, defaults.files_max_size_bytes);
@@ -67,16 +68,14 @@ fn local_options_default_when_unset() {
 }
 
 #[test]
-fn with_local_options_roundtrips() {
+fn new_local_only_roundtrips_local_options() {
     let options = LocalOptions {
         files_max_size_bytes: 3001,
         directories_max_size_bytes: 3002,
         lease_time: Duration::from_secs(3003),
         shard_count: 2,
     };
-    let local = StoreCliOpt::new_local_only(PathBuf::from("some/path"))
-        .with_local_options(&options)
-        .local_options();
+    let local = StoreCliOpt::new_local_only(PathBuf::from("some/path"), &options).local_options();
     assert_eq!(local.files_max_size_bytes, 3001);
     assert_eq!(local.directories_max_size_bytes, 3002);
     assert_eq!(local.lease_time, Duration::from_secs(3003));
@@ -103,8 +102,7 @@ async fn create_store_uses_local_options() {
         .await
         .unwrap();
 
-    let reader = StoreCliOpt::new_local_only(dir.path().to_owned())
-        .with_local_options(&options())
+    let reader = StoreCliOpt::new_local_only(dir.path().to_owned(), &options())
         .create_store(executor)
         .await
         .unwrap();
