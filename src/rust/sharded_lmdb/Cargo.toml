@@ -8,6 +8,7 @@ edition = "2024"
 bytes = { workspace = true }
 hashing = { path = "../hashing" }
 lmdb-rkv = { workspace = true }
+lmdb-rkv-sys = { workspace = true }
 log = { workspace = true }
 task_executor = { path = "../task_executor" }
 tempfile = { workspace = true }

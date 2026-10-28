@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -108,19 +108,30 @@ async fn test_orphaned_sandboxer_exits() {
     let socket_path = dir_path.join("sandboxer.sock");
 
     // Spawn the sandboxer via an intermediate shell that exits shortly after, orphaning it.
-    let mut shell = Command::new("sh")
+    // Note that the shell may exit before the sandboxer has even started up.
+    let shell = Command::new("sh")
         .arg("-c")
-        .arg("\"$@\" & sleep 1")
+        .arg("\"$@\" --parent-pid $$ & echo $!; sleep 1")
         .arg("sh")
         .arg(sandboxer_bin())
         .arg("--socket-path")
         .arg(&socket_path)
         .args(store_cli_opt.to_cli_args())
+        .stdout(Stdio::piped())
         .spawn()
         .unwrap();
+    let output = shell.wait_with_output().unwrap();
+    let sandboxer_pid = String::from_utf8(output.stdout).unwrap().trim().to_owned();
 
-    wait_for("sandboxer to start", || socket_path.exists());
-    shell.wait().unwrap();
     // The orphaned sandboxer should notice its parent exited, shut down, and clean up its socket.
-    wait_for("orphaned sandboxer to exit", || !socket_path.exists());
+    wait_for("orphaned sandboxer to exit", || {
+        !Command::new("kill")
+            .arg("-0")
+            .arg(&sandboxer_pid)
+            .stderr(Stdio::null())
+            .status()
+            .unwrap()
+            .success()
+    });
+    assert!(!socket_path.exists());
 }

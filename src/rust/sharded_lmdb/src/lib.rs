@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{HashMap, HashSet};
+use std::ffi::c_int;
 use std::fmt;
 use std::fmt::Debug;
 use std::io::{self, Read};
@@ -15,7 +16,7 @@ use lmdb::{
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
     RwTransaction, Transaction, WriteFlags,
 };
-use log::trace;
+use log::{debug, trace, warn};
 use tempfile::TempDir;
 
 ///
@@ -215,7 +216,7 @@ impl ShardedLmdb {
     }
 
     fn make_env(dir: &Path, max_size_per_shard: usize) -> Result<Environment, String> {
-        Environment::new()
+        let env = Environment::new()
             // NO_SYNC
             // =======
             //
@@ -261,7 +262,29 @@ impl ShardedLmdb {
             .set_max_readers(ShardedLmdb::MAX_READERS)
             .set_map_size(max_size_per_shard)
             .open(dir)
-            .map_err(|e| format!("Error making env for store at {dir:?}: {e}"))
+            .map_err(|e| format!("Error making env for store at {dir:?}: {e}"))?;
+        // Reclaim any reader slots left behind by processes that died without releasing them
+        // (e.g., due to SIGKILL), so that they don't accumulate across runs.
+        match Self::reader_check(&env) {
+            Ok(0) => {}
+            Ok(dead) => debug!("Cleared {dead} stale reader slots in store at {dir:?}"),
+            Err(e) => warn!("Failed to check for stale reader slots in store at {dir:?}: {e}"),
+        }
+        Ok(env)
+    }
+
+    // Clears any reader slots in the given Environment's reader table that are held by dead
+    // processes, and returns the number of slots cleared.
+    fn reader_check(env: &Environment) -> Result<usize, lmdb::Error> {
+        let mut dead: c_int = 0;
+        // SAFETY: The env pointer is valid for the lifetime of `env`, and `dead` is a valid out
+        // pointer.
+        let rc = unsafe { lmdb_sys::mdb_reader_check(env.env(), &mut dead) };
+        if rc == 0 {
+            Ok(dead as usize)
+        } else {
+            Err(lmdb::Error::from_err_code(rc))
+        }
     }
 
     // First Database is content, second is leases.

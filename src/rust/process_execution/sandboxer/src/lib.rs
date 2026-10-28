@@ -107,6 +107,8 @@ fn ensure_parent_dir(path: &Path) -> Result<(), String> {
 pub struct SandboxerService {
     socket_path: PathBuf,
     store_cli_opt: StoreCliOpt,
+    // The pid of the process that spawned us, if known.
+    parent_pid: Option<u32>,
 }
 
 impl SandboxerService {
@@ -119,10 +121,11 @@ impl SandboxerService {
     const ALLOWED_IDLE_BEATS: usize =
         Self::ALLOWED_IDLE_TIME.div_duration_f32(Self::POLLING_INTERVAL) as usize;
 
-    pub fn new(socket_path: PathBuf, store_cli_opt: StoreCliOpt) -> Self {
+    pub fn new(socket_path: PathBuf, store_cli_opt: StoreCliOpt, parent_pid: Option<u32>) -> Self {
         Self {
             socket_path,
             store_cli_opt,
+            parent_pid,
         }
     }
 
@@ -140,7 +143,9 @@ impl SandboxerService {
         let listener = UnixListener::bind(&self.socket_path)?;
         let socket_ino = fs::metadata(&self.socket_path)?.ino();
         // If our parent exits we'll be reparented, so a change in parent pid means we're orphaned.
-        let initial_parent_id = parent_id();
+        // The spawner should tell us its pid, since if it exits before we get here then our
+        // current parent will already be the one we were reparented to.
+        let initial_parent_id = self.parent_pid.unwrap_or_else(parent_id);
         // `bind()` creates the socket file, so now we can poll it to check if it has
         // been deleted by the user. If it has, existing connections will continue to
         // work (via the underlying inode) but new connections will not be possible,
@@ -298,6 +303,11 @@ impl SandboxerClient {
         })
     }
 
+    // How long to wait for a newly spawned server to start accepting connections. Startup is
+    // usually fast, but can take a second or more on a loaded machine (or, e.g., while macOS
+    // scans a newly built binary on its first exec), so we're generous here.
+    const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
     pub async fn connect_with_retries(socket_path: &Path) -> Result<Self, String> {
         // TODO: POLLING_INTERVAL seems to be a good time quantum to use when waiting
         //  for server startup (since we know the server sleeps that long on startup)
@@ -306,7 +316,7 @@ impl SandboxerClient {
         let mut slept = Duration::ZERO;
         let mut maybe_client: Result<Self, String> = Err("Not connected yet".to_string());
 
-        for _ in 0..20 {
+        while slept < Self::CONNECT_TIMEOUT {
             tokio::time::sleep(sleep_time).await;
             slept += sleep_time;
             debug!("Waited {slept:?} to connect to sandboxer at {socket_path:?}");
@@ -474,6 +484,8 @@ impl Sandboxer {
         let mut cmd = Command::new(&self.sandboxer_bin);
         cmd.arg("--socket-path");
         cmd.arg(self.socket_path.as_os_str());
+        cmd.arg("--parent-pid");
+        cmd.arg(std::process::id().to_string());
         cmd.args(self.store_cli_opt.to_cli_args());
         // Pass the calling code's global log level to the sandboxer process.
         // TODO: Check for a relevant per-target log level?
