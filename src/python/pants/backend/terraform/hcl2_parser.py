@@ -33,7 +33,14 @@ def extract_module_source_paths(path: PurePath, raw_content: bytes) -> Set[str]:
     import hcl2  # type: ignore[import-not-found]  # pants: no-infer-dep
 
     content = raw_content.decode("utf-8")
-    parsed_content = hcl2.loads(content)
+    # python-hcl2 8.0+ keeps the quotes around string values (e.g. `"./foo"`) unless asked to strip
+    # them. Earlier versions always strip them and have no `SerializationOptions`.
+    serialization_options = getattr(hcl2, "SerializationOptions", None)
+    parsed_content = (
+        hcl2.loads(content, serialization_options=serialization_options(strip_string_quotes=True))
+        if serialization_options
+        else hcl2.loads(content)
+    )
 
     # Note: The `module` key is a list where each entry is a dict with a single entry where the key is the
     # module name and the values are a dict for that module's actual values.
