@@ -138,10 +138,7 @@ async def compile_scala_source(
 
     if not component_members_and_scala_source_files:
         # Is a generator, and so exports all of its direct deps.
-        exported_digest = await merge_digests(
-            MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
-        )
-        classpath_entry = ClasspathEntry.merge(exported_digest, direct_dependency_classpath_entries)
+        classpath_entry = ClasspathEntry(EMPTY_DIGEST, exports=direct_dependency_classpath_entries)
         return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,

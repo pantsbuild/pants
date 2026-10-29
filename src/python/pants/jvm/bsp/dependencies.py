@@ -152,7 +152,9 @@ async def collect_thirdparty_modules(
         required_classfiles(fce) for fce in fallible_classpath_entries
     )
 
-    resolve_digest = await merge_digests(MergeDigests(cpe.digest for cpe in classpath_entries))
+    resolve_digest = await merge_digests(
+        MergeDigests(cpe.digest for cpe in ClasspathEntry.export_closure(classpath_entries))
+    )
 
     return ThirdpartyModules(
         resolve,
@@ -407,7 +409,7 @@ async def _jvm_bsp_dependency_modules(
                             f".pants.d/bsp/jvm/resolves/{resolve.name}/lib/{filename}"
                         ).as_uri()
                     )
-                    for filename in cp_entry.filenames
+                    for filename in ClasspathEntry.args([cp_entry])
                 ),
             ),
         )

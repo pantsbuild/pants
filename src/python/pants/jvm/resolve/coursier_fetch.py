@@ -672,15 +672,18 @@ async def fetch_with_coursier(request: CoursierFetchRequest) -> FallibleClasspat
         requirement.coordinate,
     )
 
-    classpath_entries = await concurrently(
+    root_classpath_entry, *transitive_classpath_entries = await concurrently(
         coursier_fetch_one_coord(entry) for entry in (root_entry, *transitive_entries)
     )
-    exported_digest = await merge_digests(MergeDigests(cpe.digest for cpe in classpath_entries))
 
     return FallibleClasspathEntry(
         description=str(request.component),
         result=CompileResult.SUCCEEDED,
-        output=ClasspathEntry.merge(exported_digest, classpath_entries),
+        output=ClasspathEntry(
+            root_classpath_entry.digest,
+            root_classpath_entry.filenames,
+            exports=transitive_classpath_entries,
+        ),
         exit_code=0,
     )
 

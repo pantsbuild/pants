@@ -64,6 +64,11 @@ async def render_classpath_entry(
     classpath_entry: ClasspathEntry, unzip_binary: UnzipBinary
 ) -> RenderedClasspath:
     dest_dir = "dest"
+    jars = [
+        (cpe.digest, filename)
+        for cpe in ClasspathEntry.export_closure([classpath_entry])
+        for filename in cpe.filenames
+    ]
     process_results = await concurrently(
         execute_process_or_raise(
             **implicitly(
@@ -74,13 +79,13 @@ async def render_classpath_entry(
                         dest_dir,
                         filename,
                     ],
-                    input_digest=classpath_entry.digest,
+                    input_digest=digest,
                     output_directories=(dest_dir,),
                     description=f"Extract {filename}",
                 ),
             )
         )
-        for filename in classpath_entry.filenames
+        for digest, filename in jars
     )
 
     listing_snapshots = await concurrently(
@@ -89,10 +94,7 @@ async def render_classpath_entry(
     )
 
     return RenderedClasspath(
-        {
-            path: set(listing.files)
-            for path, listing in zip(classpath_entry.filenames, listing_snapshots)
-        }
+        {filename: set(listing.files) for (_, filename), listing in zip(jars, listing_snapshots)}
     )
 
 

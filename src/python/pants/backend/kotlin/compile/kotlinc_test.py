@@ -13,6 +13,7 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
 from pants.backend.kotlin.compile import kotlinc_plugins
 from pants.backend.kotlin.compile.kotlinc import CompileKotlinSourceRequest
 from pants.backend.kotlin.compile.kotlinc import rules as kotlinc_rules
+from pants.backend.kotlin.compile.kotlinc_plugins import KotlincPlugins, KotlincPluginsRequest
 from pants.backend.kotlin.compile.testutil import _KOTLIN_VERSION, KOTLIN_STDLIB_REQUIREMENTS
 from pants.backend.kotlin.dependency_inference.rules import rules as kotlin_dep_inf_rules
 from pants.backend.kotlin.goals.check import KotlincCheckRequest
@@ -23,7 +24,8 @@ from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import config_files, source_files, system_binaries
 from pants.engine.addresses import Addresses
-from pants.engine.target import CoarsenedTargets
+from pants.engine.fs import Digest, Snapshot
+from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.resolve import jvm_tool
@@ -63,6 +65,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleClasspathEntry, (CompileKotlinSourceRequest,)),
             QueryRule(RenderedClasspath, (CompileKotlinSourceRequest,)),
             QueryRule(ClasspathEntry, (CompileKotlinSourceRequest,)),
+            QueryRule(KotlincPlugins, (KotlincPluginsRequest,)),
+            QueryRule(Snapshot, (Digest,)),
         ],
         target_types=[JvmArtifactTarget, KotlinSourcesGeneratorTarget, KotlincPluginTarget],
     )
@@ -455,3 +459,51 @@ def test_compile_with_kotlinc_plugin(
     fallible_result = rule_runner.request(FallibleClasspathEntry, [request])
     print(f"stdout:\n{fallible_result.stdout}\nstderr:\n{fallible_result.stderr}")
     assert fallible_result.result == CompileResult.SUCCEEDED
+
+
+@maybe_skip_jdk_test
+def test_plugin_classpath_lists_a_jar_shared_by_two_plugins_once(
+    rule_runner: RuleRunner, kotlinc_allopen_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "lib/BUILD": dedent(
+                """\
+                kotlinc_plugin(
+                    name="reflect",
+                    plugin_id="reflect",
+                    artifact="3rdparty/jvm:org.jetbrains.kotlin_kotlin-reflect",
+                )
+
+                kotlinc_plugin(
+                    name="stdlib",
+                    plugin_id="stdlib",
+                    artifact="3rdparty/jvm:org.jetbrains.kotlin_kotlin-stdlib",
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD": kotlinc_allopen_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": kotlinc_allopen_lockfile.serialized_lockfile,
+        }
+    )
+    plugins = [
+        rule_runner.get_target(Address("lib", target_name=name)) for name in ("reflect", "stdlib")
+    ]
+    artifacts = [
+        rule_runner.get_target(Address("3rdparty/jvm", target_name=name))
+        for name in ("org.jetbrains.kotlin_kotlin-reflect", "org.jetbrains.kotlin_kotlin-stdlib")
+    ]
+
+    plugins_classpath = rule_runner.request(
+        KotlincPlugins,
+        [KotlincPluginsRequest(Targets(plugins), Targets(artifacts), make_resolve(rule_runner))],
+    ).classpath
+
+    assert sorted(plugins_classpath.filenames) == [
+        "org.jetbrains.kotlin_kotlin-reflect_1.6.20.jar",
+        "org.jetbrains.kotlin_kotlin-stdlib-common_1.6.20.jar",
+        "org.jetbrains.kotlin_kotlin-stdlib_1.6.20.jar",
+        "org.jetbrains_annotations_13.0.jar",
+    ]
+    snapshot = rule_runner.request(Snapshot, [plugins_classpath.digest])
+    assert set(snapshot.files) == set(plugins_classpath.filenames)

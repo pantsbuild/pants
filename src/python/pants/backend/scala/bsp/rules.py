@@ -78,7 +78,7 @@ from pants.jvm.bsp.dependencies import rules as jvm_dependencies_rules
 from pants.jvm.bsp.resources import _jvm_bsp_resources
 from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import JvmBuildTarget
-from pants.jvm.compile import ClasspathEntryRequestFactory
+from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequestFactory
 from pants.jvm.jdk_rules import DefaultJdk, JdkRequest, prepare_jdk_environment
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import (
@@ -338,8 +338,7 @@ async def handle_bsp_scalac_options_request(
         build_root.pathlib_path.joinpath(
             f".pants.d/bsp/{thirdparty_modules_prefix}/{filename}"
         ).as_uri()
-        for cp_entry in thirdparty_modules.entries.values()
-        for filename in cp_entry.filenames
+        for filename in ClasspathEntry.args(thirdparty_modules.entries.values())
     )
 
     return HandleScalacOptionsResult(

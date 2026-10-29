@@ -239,8 +239,9 @@ async def fetch_plugins(request: ScalaPluginsRequest) -> ScalaPlugins:
         failed = [i for i in fallible_artifacts if i.exit_code != 0]
         raise Exception(f"Fetching local scala plugins failed: {failed}")
 
-    merged_classpath_digest = await merge_digests(MergeDigests(i.digest for i in artifacts))
-    merged = ClasspathEntry.merge(merged_classpath_digest, artifacts)
+    entries = list(ClasspathEntry.closure(artifacts))
+    merged_classpath_digest = await merge_digests(MergeDigests(entry.digest for entry in entries))
+    merged = ClasspathEntry(merged_classpath_digest, ClasspathEntry.args(entries))
 
     names = tuple(_plugin_name(target) for target in request.plugins)
 
