@@ -9,6 +9,8 @@ from typing import Any
 
 import pytest
 
+from pants.backend.adhoc.run_system_binary import rules as run_system_binary_rules
+from pants.backend.adhoc.target_types import SystemBinaryTarget
 from pants.backend.codegen.protobuf.lint.buf.lint_rules import BufFieldSet, BufLintRequest
 from pants.backend.codegen.protobuf.lint.buf.lint_rules import rules as buf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
@@ -29,10 +31,11 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *stripped_source_files.rules(),
             *target_types_rules(),
+            *run_system_binary_rules(),
             QueryRule(Partitions, [BufLintRequest.PartitionRequest]),
             QueryRule(LintResult, [BufLintRequest.Batch]),
         ],
-        target_types=[ProtobufSourcesGeneratorTarget],
+        target_types=[ProtobufSourcesGeneratorTarget, SystemBinaryTarget],
     )
 
 
@@ -260,3 +263,30 @@ def test_config_file_submitted(rule_runner: RuleRunner) -> None:
         tgt,
         extra_args=["--buf-config=foo/buf.yaml"],
     )
+
+
+def test_check_plugin(rule_runner: RuleRunner) -> None:
+    # `true` doesn't speak Buf's plugin protocol, so Buf fails the handshake; reaching the
+    # handshake shows Pants put the plugin on PATH and Buf ran it.
+    rule_runner.write_files(
+        {
+            "foo/v1/f.proto": GOOD_FILE,
+            "foo/v1/BUILD": "protobuf_sources(name='t')",
+            "plugins/BUILD": "system_binary(name='check-plugin', binary_name='true')",
+            "buf.yaml": dedent(
+                """\
+                version: v2
+                plugins:
+                  - plugin: check-plugin
+                """
+            ),
+        }
+    )
+    tgt = rule_runner.get_target(Address("foo/v1", target_name="t", relative_file_path="f.proto"))
+
+    result = run_buf(rule_runner, [tgt], extra_args=["--buf-plugins=['plugins:check-plugin']"])
+    assert len(result) == 1
+    assert result[0].exit_code != 0
+    # Failing to find or start it would be an `exec:` error instead.
+    assert "check-plugin" in result[0].stderr
+    assert 'exec: "check-plugin"' not in result[0].stderr

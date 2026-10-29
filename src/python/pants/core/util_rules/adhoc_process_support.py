@@ -18,6 +18,7 @@ from typing import TypeVar
 from pants.base.glob_match_error_behavior import GlobMatchErrorBehavior
 from pants.build_graph.address import Address
 from pants.core.environments.rules import EnvironmentNameRequest, resolve_environment_name
+from pants.core.goals import package, run
 from pants.core.goals.package import (
     EnvironmentAwarePackageRequest,
     PackageFieldSet,
@@ -152,6 +153,19 @@ class RunnableDependencies:
 
 
 @dataclass(frozen=True)
+class ResolveRunnableDependenciesRequest:
+    """Runnable targets to put on a process's `PATH`, each under its target name."""
+
+    addresses: UnparsedAddressInputs
+
+
+@dataclass(frozen=True)
+class ResolvedRunnableDependencies:
+    digest: Digest
+    runnable_dependencies: RunnableDependencies | None
+
+
+@dataclass(frozen=True)
 class ToolRunnerRequest:
     runnable_address_str: str
     args: tuple[str, ...]
@@ -242,20 +256,14 @@ async def convert_fallible_adhoc_process_result(
     )
 
 
-async def _resolve_runnable_dependencies(
-    bash: BashBinary, deps: tuple[str, ...] | None, owning: Address, origin: str
-) -> tuple[Digest, RunnableDependencies | None]:
-    if not deps:
-        return EMPTY_DIGEST, None
+@rule
+async def resolve_runnable_dependencies(
+    request: ResolveRunnableDependenciesRequest, bash: BashBinary
+) -> ResolvedRunnableDependencies:
+    if not request.addresses.values:
+        return ResolvedRunnableDependencies(EMPTY_DIGEST, None)
 
-    addresses = await resolve_unparsed_address_inputs(
-        UnparsedAddressInputs(
-            (dep for dep in deps),
-            owning_address=owning,
-            description_of_origin=origin,
-        ),
-        **implicitly(),
-    )
+    addresses = await resolve_unparsed_address_inputs(request.addresses, **implicitly())
 
     targets = await resolve_targets(**implicitly({addresses: Addresses}))
     fspt = await find_valid_field_sets(
@@ -267,8 +275,8 @@ async def _resolve_runnable_dependencies(
             raise ValueError(
                 dedent(
                     f"""\
-                    Address `{address.spec}` was specified as a runnable dependency, but is not
-                    runnable.
+                    Address `{address.spec}` was specified in
+                    {request.addresses.description_of_origin}, but is not runnable.
                     """
                 )
             )
@@ -308,7 +316,7 @@ async def _resolve_runnable_dependencies(
     immutable_input_digests = {shim_digest_path: shim_digest}
     _safe_update(immutable_input_digests, merged_extras.immutable_input_digests)
 
-    return (
+    return ResolvedRunnableDependencies(
         merged_extras.digest,
         RunnableDependencies(
             shim_digest_path,
@@ -322,7 +330,6 @@ async def _resolve_runnable_dependencies(
 @rule
 async def resolve_execution_environment(
     request: ResolveExecutionDependenciesRequest,
-    bash: BashBinary,
 ) -> ResolvedExecutionDependencies:
     target_address = request.address
     raw_execution_dependencies = request.execution_dependencies
@@ -368,16 +375,24 @@ async def resolve_execution_environment(
         for field_set in pkgs_per_target.field_sets
     )
 
-    _descr = f"the `runnable_dependencies` from the target {target_address}"
-    runnables_digest, runnable_dependencies = await _resolve_runnable_dependencies(
-        bash, request.runnable_dependencies, target_address, _descr
+    runnables = await resolve_runnable_dependencies(
+        ResolveRunnableDependenciesRequest(
+            UnparsedAddressInputs(
+                request.runnable_dependencies or (),
+                owning_address=target_address,
+                description_of_origin=(
+                    f"the `runnable_dependencies` from the target {target_address}"
+                ),
+            )
+        ),
+        **implicitly(),
     )
 
     dependencies_digest = await merge_digests(
-        MergeDigests([sources.snapshot.digest, runnables_digest, *(pkg.digest for pkg in packages)])
+        MergeDigests([sources.snapshot.digest, runnables.digest, *(pkg.digest for pkg in packages)])
     )
 
-    return ResolvedExecutionDependencies(dependencies_digest, runnable_dependencies)
+    return ResolvedExecutionDependencies(dependencies_digest, runnables.runnable_dependencies)
 
 
 K = TypeVar("K")
@@ -941,4 +956,6 @@ def rules():
     return (
         *collect_rules(),
         *process.rules(),
+        *package.rules(),
+        *run.rules(),
     )
