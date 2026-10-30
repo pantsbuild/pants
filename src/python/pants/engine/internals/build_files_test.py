@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import logging
 import re
+from collections import Counter
 from collections.abc import Mapping
 from textwrap import dedent
 from typing import Any
+from unittest import mock
 
 import pytest
 
@@ -28,7 +30,7 @@ from pants.engine.internals.build_files import (
 )
 from pants.engine.internals.defaults import BuildFileDefaults, ParametrizeDefault
 from pants.engine.internals.dep_rules import MaybeBuildFileDependencyRulesImplementation
-from pants.engine.internals.mapper import AddressFamily
+from pants.engine.internals.mapper import AddressFamily, AddressMap
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.parser import BuildFilePreludeSymbols, BuildFileSymbolInfo, Parser
 from pants.engine.internals.scheduler import ExecutionError
@@ -972,6 +974,32 @@ def test_default_plugin_field_bootstrap() -> None:
     # Parse the root BUILD file.
     address_family = rule_runner.request(AddressFamily, [AddressFamilyDir("")])
     assert dict(tags=("ok",)) == dict(address_family.defaults["mock_tgt"])
+
+
+def test_each_build_file_parsed_once() -> None:
+    # A directory's family is requested for its own targets, and again as a parent of its
+    # subdirectories (which inherit its `__defaults__` and dependency rules): both requests must
+    # reach the same memoized parse. (The root is left out: it is requested as `.` by the parent
+    # lookup, and as `""` for its own targets.)
+    rule_runner = RuleRunner(
+        rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
+        target_types=[MockTgt],
+    )
+    rule_runner.write_files(
+        {
+            "BUILD": "__defaults__(all=dict(tags=['root']))",
+            "a/BUILD": "mock_tgt()",
+            "a/b/BUILD": "mock_tgt()",
+        }
+    )
+    with mock.patch.object(AddressMap, "parse", wraps=AddressMap.parse) as parse:
+        for directory in ("a/b", "a"):
+            rule_runner.request(AddressFamily, [AddressFamilyDir(directory)])
+    assert Counter(call.args[0] for call in parse.call_args_list) == {
+        "BUILD": 1,
+        "a/BUILD": 1,
+        "a/b/BUILD": 1,
+    }
 
 
 def test_environment_target_macro_field_value() -> None:
