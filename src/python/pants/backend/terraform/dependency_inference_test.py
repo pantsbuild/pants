@@ -244,6 +244,59 @@ def test_hcl_parser_wrapper_runs(rule_runner: RuleRunner, major_minor_interprete
     assert lines == {"grok", "foo/hello/world"}
 
 
+def test_hcl_parser_handles_keywords_and_multiline_conditionals(rule_runner: RuleRunner) -> None:
+    """python-hcl2 4.3.0 and earlier failed to parse each of these constructs."""
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "terraform_module(name='t')\n",
+            "foo/main.tf": textwrap.dedent(
+                """\
+                # `for` as an attribute name: https://github.com/pantsbuild/pants/issues/21845
+                resource "grafana_rule_group" "example" {
+                  rule {
+                    name = "example"
+                    for  = "5m"
+                  }
+                }
+
+                # `in` as a block name: https://github.com/pantsbuild/pants/issues/22401
+                data "snowflake_schemas" "in" {
+                  in {
+                    database = "example"
+                  }
+                }
+
+                # A conditional expression split over multiple lines.
+                locals {
+                  flavor = (
+                    var.enabled
+                    ? "on"
+                    : "off"
+                  )
+                }
+
+                module "foo" {
+                  source = "../grok"
+                }
+                """
+            ),
+        }
+    )
+    target = rule_runner.get_target(Address("foo", target_name="t"))
+    sources = rule_runner.request(HydratedSources, [HydrateSourcesRequest(target[SourcesField])])
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            ParseTerraformModuleSources(
+                sources_digest=sources.snapshot.digest, paths=("foo/main.tf",)
+            )
+        ],
+    )
+
+    lines = {line for line in result.stdout.decode("utf-8").splitlines() if line}
+    assert lines == {"grok"}
+
+
 def test_generate_lockfile_without_python_backend() -> None:
     """Regression test for https://github.com/pantsbuild/pants/issues/14876."""
     run_pants(

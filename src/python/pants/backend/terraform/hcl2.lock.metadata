@@ -4,7 +4,7 @@
     "CPython<3.15,>=3.10"
   ],
   "generated_with_requirements": [
-    "python-hcl2<=4.3.0,>=3.0.5"
+    "python-hcl2<9,>=3.0.5"
   ],
   "manylinux": "manylinux2014",
   "requirement_constraints": [],
