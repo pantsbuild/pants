@@ -358,7 +358,11 @@ async def parse_address_family(
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
         maybe_parents = await concurrently(
-            parse_address_family(**implicitly(AddressFamilyDir(str(parent_dir))))
+            # The last parent is `PurePath(".")`: spell the root `""`, as `Address.spec_path` does,
+            # so that it is requested (and parsed) under one key.
+            parse_address_family(
+                **implicitly(AddressFamilyDir(str(parent_dir) if parent_dir.parts else ""))
+            )
             for parent_dir in parent_dirs
         )
         for maybe_parent in maybe_parents:
