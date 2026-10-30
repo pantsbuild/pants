@@ -21,7 +21,10 @@ from pants.backend.python.macros.common_fields import (
     RequirementsOverrideField,
     TypeStubsModuleMappingField,
 )
-from pants.backend.python.macros.common_requirements_rule import _generate_requirements
+from pants.backend.python.macros.common_requirements_rule import (
+    ParsedRequirement,
+    _generate_requirements,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementTarget
 from pants.base.build_root import BuildRoot
@@ -412,14 +415,17 @@ def parse_pyproject_toml(pyproject_toml: PyProjectToml) -> set[PipRequirement]:
 
 def parse_poetry_requirements(
     build_root: BuildRoot, file_contents: bytes, file_path: str
-) -> set[PipRequirement]:
-    return parse_pyproject_toml(
-        PyProjectToml(
-            build_root=PurePath(build_root.path),
-            toml_relpath=PurePath(file_path),
-            toml_contents=file_contents.decode(),
+) -> set[ParsedRequirement]:
+    return {
+        ParsedRequirement(requirement)
+        for requirement in parse_pyproject_toml(
+            PyProjectToml(
+                build_root=PurePath(build_root.path),
+                toml_relpath=PurePath(file_path),
+                toml_contents=file_contents.decode(),
+            )
         )
-    )
+    }
 
 
 # ---------------------------------------------------------------------------------

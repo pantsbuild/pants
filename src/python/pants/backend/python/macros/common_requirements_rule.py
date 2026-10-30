@@ -3,10 +3,10 @@
 
 from __future__ import annotations
 
-import itertools
 import logging
 import os
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from typing import cast
 
 from packaging.utils import canonicalize_name as canonicalize_project_name
@@ -39,13 +39,22 @@ from pants.engine.target import (
     GenerateTargetsRequest,
     InvalidFieldException,
     SingleSourceField,
+    Tags,
 )
 from pants.engine.unions import UnionMembership
 from pants.util.pip_requirement import PipRequirement
 from pants.util.strutil import softwrap
 
 logger = logging.getLogger(__name__)
-ParseRequirementsCallback = Callable[[bytes, str], Iterable[PipRequirement]]
+
+
+@dataclass(frozen=True)
+class ParsedRequirement:
+    requirement: PipRequirement
+    tags: tuple[str, ...] = ()
+
+
+ParseRequirementsCallback = Callable[[bytes, str], Iterable[ParsedRequirement]]
 
 
 async def _generate_requirements(
@@ -126,8 +135,10 @@ async def _generate_requirements(
     stubs_mapping = generator[TypeStubsModuleMappingField].value
 
     def generate_tgt(
-        project_name: str, parsed_reqs: Iterable[PipRequirement]
+        project_name: str,
+        parsed_reqs: Iterable[ParsedRequirement],
     ) -> PythonRequirementTarget:
+        parsed_reqs = tuple(parsed_reqs)
         normalized_proj_name = canonicalize_project_name(project_name)
         tgt_overrides = overrides.pop(normalized_proj_name, {})
         if Dependencies.alias in tgt_overrides:
@@ -135,10 +146,29 @@ async def _generate_requirements(
                 Dependencies.alias: list(tgt_overrides[Dependencies.alias]) + req_deps
             }
 
+        inferred_tags = tuple(
+            dict.fromkeys(tag for parsed_req in parsed_reqs for tag in parsed_req.tags)
+        )
+        if inferred_tags:
+            tgt_overrides = {
+                **tgt_overrides,
+                Tags.alias: tuple(
+                    dict.fromkeys(
+                        (
+                            *request.template.get(Tags.alias, ()),
+                            *inferred_tags,
+                            *tgt_overrides.get(Tags.alias, ()),
+                        )
+                    )
+                ),
+            }
+
         return PythonRequirementTarget(
             {
                 **request.template,
-                PythonRequirementsField.alias: list(parsed_reqs),
+                PythonRequirementsField.alias: [
+                    parsed_req.requirement for parsed_req in parsed_reqs
+                ],
                 PythonRequirementModulesField.alias: module_mapping.get(normalized_proj_name),
                 PythonRequirementTypeStubModulesField.alias: stubs_mapping.get(
                     normalized_proj_name
@@ -152,11 +182,17 @@ async def _generate_requirements(
             union_membership,
         )
 
-    requirements = parse_requirements_callback(digest_contents[0].content, requirements_full_path)
-    grouped_requirements = itertools.groupby(requirements, lambda parsed_req: parsed_req.name)
+    parsed_requirements = parse_requirements_callback(
+        digest_contents[0].content, requirements_full_path
+    )
+    requirements_by_project: dict[str, list[ParsedRequirement]] = {}
+    for parsed_requirement in parsed_requirements:
+        requirements_by_project.setdefault(parsed_requirement.requirement.name, []).append(
+            parsed_requirement
+        )
     result = tuple(
-        generate_tgt(project_name, parsed_reqs_)
-        for project_name, parsed_reqs_ in grouped_requirements
+        generate_tgt(project_name, parsed_reqs)
+        for project_name, parsed_reqs in requirements_by_project.items()
     ) + (file_tgt,)
 
     if overrides:
