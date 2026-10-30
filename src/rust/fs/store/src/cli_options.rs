@@ -7,12 +7,32 @@ use clap::Parser;
 use remote_provider::{RemoteProvider, RemoteStoreOptions};
 use task_executor::Executor;
 
-use crate::Store;
+use crate::{LocalOptions, Store, local};
+
 #[derive(Debug, Clone, Eq, PartialEq, Parser)]
 pub struct StoreCliOpt {
     ///Path to lmdb directory used for local file storage.
     #[arg(long)]
     pub local_store_path: Option<PathBuf>,
+
+    /// Maximum size of the local file store, in bytes. Every process that opens the same local
+    /// store must use the same value, so that they agree on the LMDB map size.
+    #[arg(long)]
+    pub local_store_files_max_size_bytes: Option<usize>,
+
+    /// Maximum size of the local directory store, in bytes. See `local_store_files_max_size_bytes`.
+    #[arg(long)]
+    pub local_store_directories_max_size_bytes: Option<usize>,
+
+    /// Number of shards in the local store. Every process that opens the same local store must use
+    /// the same value, or they will look for digests in different shards.
+    #[arg(long)]
+    pub local_store_shard_count: Option<u8>,
+
+    /// How long, in seconds, newly stored or read blobs are leased (protected from garbage
+    /// collection) in the local store.
+    #[arg(long)]
+    pub local_store_lease_time_secs: Option<u64>,
 
     /// The host:port of the gRPC CAS server to connect to.
     #[arg(long)]
@@ -68,9 +88,13 @@ pub struct StoreCliOpt {
 }
 
 impl StoreCliOpt {
-    pub fn new_local_only(local_store_path: PathBuf) -> Self {
+    pub fn new_local_only(local_store_path: PathBuf, local_options: &LocalOptions) -> Self {
         Self {
             local_store_path: Some(local_store_path),
+            local_store_files_max_size_bytes: Some(local_options.files_max_size_bytes),
+            local_store_directories_max_size_bytes: Some(local_options.directories_max_size_bytes),
+            local_store_shard_count: Some(local_options.shard_count),
+            local_store_lease_time_secs: Some(local_options.lease_time.as_secs()),
             cas_server: None,
             remote_instance_name: None,
             cas_root_ca_cert_file: None,
@@ -83,6 +107,24 @@ impl StoreCliOpt {
             store_batch_api_size_limit: 0,
             store_batch_load_enabled: false,
             header: vec![],
+        }
+    }
+
+    /// The local store's settings, falling back to the defaults for any that were not set.
+    pub fn local_options(&self) -> LocalOptions {
+        let defaults = LocalOptions::default();
+        LocalOptions {
+            files_max_size_bytes: self
+                .local_store_files_max_size_bytes
+                .unwrap_or(defaults.files_max_size_bytes),
+            directories_max_size_bytes: self
+                .local_store_directories_max_size_bytes
+                .unwrap_or(defaults.directories_max_size_bytes),
+            shard_count: self.local_store_shard_count.unwrap_or(defaults.shard_count),
+            lease_time: self
+                .local_store_lease_time_secs
+                .map(Duration::from_secs)
+                .unwrap_or(defaults.lease_time),
         }
     }
 
@@ -121,6 +163,28 @@ impl StoreCliOpt {
         }
 
         maybe_push_arg(&mut ret, "--local-store-path", &self.local_store_path);
+        maybe_push_arg(
+            &mut ret,
+            "--local-store-files-max-size-bytes",
+            &self.local_store_files_max_size_bytes.map(|v| v.to_string()),
+        );
+        maybe_push_arg(
+            &mut ret,
+            "--local-store-directories-max-size-bytes",
+            &self
+                .local_store_directories_max_size_bytes
+                .map(|v| v.to_string()),
+        );
+        maybe_push_arg(
+            &mut ret,
+            "--local-store-shard-count",
+            &self.local_store_shard_count.map(|v| v.to_string()),
+        );
+        maybe_push_arg(
+            &mut ret,
+            "--local-store-lease-time-secs",
+            &self.local_store_lease_time_secs.map(|v| v.to_string()),
+        );
         maybe_push_arg(&mut ret, "--cas-server", &self.cas_server);
         maybe_push_arg(
             &mut ret,
@@ -193,7 +257,15 @@ impl StoreCliOpt {
             .clone()
             .unwrap_or_else(Store::default_path);
 
-        let local_only_store = Store::local_only(executor.clone(), local_store_path)?;
+        let local_only_store = Store {
+            local: local::ByteStore::new_with_options(
+                executor.clone(),
+                local_store_path,
+                self.local_options(),
+            )?,
+            remote: None,
+            immutable_inputs_base: None,
+        };
 
         if let Some(cas_server) = &self.cas_server {
             let tls_config = grpc_util::tls::Config::new_from_files(
