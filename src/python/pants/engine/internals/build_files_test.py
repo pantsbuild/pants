@@ -979,7 +979,8 @@ def test_default_plugin_field_bootstrap() -> None:
 def test_each_build_file_parsed_once() -> None:
     # A directory's family is requested for its own targets, and again as a parent of its
     # subdirectories (which inherit its `__defaults__` and dependency rules): both requests must
-    # reach the same memoized parse.
+    # reach the same memoized parse. (The root is left out: it is requested as `.` by the parent
+    # lookup, and as `""` for its own targets.)
     rule_runner = RuleRunner(
         rules=[QueryRule(AddressFamily, [AddressFamilyDir])],
         target_types=[MockTgt],
@@ -992,7 +993,7 @@ def test_each_build_file_parsed_once() -> None:
         }
     )
     with mock.patch.object(AddressMap, "parse", wraps=AddressMap.parse) as parse:
-        for directory in ("a/b", "a", ""):
+        for directory in ("a/b", "a"):
             rule_runner.request(AddressFamily, [AddressFamilyDir(directory)])
     assert Counter(call.args[0] for call in parse.call_args_list) == {
         "BUILD": 1,

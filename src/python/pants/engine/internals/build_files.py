@@ -358,11 +358,11 @@ async def parse_address_family(
     parent_dirs = tuple(PurePath(directory.path).parents)
     if parent_dirs:
         maybe_parents = await concurrently(
-            # The last parent is `PurePath(".")`: spell the root `""`, as `Address.spec_path` does,
-            # so that it is requested (and parsed) under one key.
-            parse_address_family(
-                **implicitly(AddressFamilyDir(str(parent_dir) if parent_dir.parts else ""))
-            )
+            # NB: The last parent is the root, spelled `.` here but `""` by `Address.spec_path`, so
+            # the root's BUILD files are parsed twice. Spelling it `""` here would request
+            # per-directory synthetic targets for `""`, which is
+            # `SyntheticTargetsRequest.SINGLE_REQUEST_FOR_ALL_TARGETS`.
+            parse_address_family(**implicitly(AddressFamilyDir(str(parent_dir))))
             for parent_dir in parent_dirs
         )
         for maybe_parent in maybe_parents:
