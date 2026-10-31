@@ -513,7 +513,8 @@ class PantsDaemonProcessManager(ProcessManager, metaclass=ABCMeta):
         """Returns the options fingerprint for the pantsd process.
 
         This should cover all options consumed by the pantsd process itself in order to start: also
-        known as the "micro-bootstrap" options. These options are marked `daemon=True` in the global
+        known as the "micro-bootstrap" options. It should also cover options for state that every
+        Scheduler in the process shares. These options are marked `daemon=True` in the global
         options.
 
         The `daemon=True` options are a small subset of the bootstrap options. Independently, the

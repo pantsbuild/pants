@@ -4553,6 +4553,7 @@ version = "0.0.1"
 dependencies = [
  "bytes",
  "hashing",
+ "libc",
  "lmdb-rkv",
  "lmdb-rkv-sys",
  "log",

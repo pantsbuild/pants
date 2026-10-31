@@ -168,6 +168,26 @@ def test_plugins_is_daemon_fingerprinted() -> None:
     assert "plugins" in daemon_fingerprinted
 
 
+def test_local_store_sizing_options_are_daemon_fingerprinted() -> None:
+    ob = OptionsBootstrapper.create(
+        args=["--pants-config-files=[]"],
+        env={},
+        allow_pantsrc=False,
+    )
+    daemon_fingerprinted = {
+        name
+        for name, _, _ in ob.bootstrap_options.get_fingerprintable_for_scope(
+            GLOBAL_SCOPE, daemon_only=True
+        )
+    }
+    assert {
+        "local_store_shard_count",
+        "local_store_processes_max_size_bytes",
+        "local_store_files_max_size_bytes",
+        "local_store_directories_max_size_bytes",
+    } <= daemon_fingerprinted
+
+
 @pytest.mark.parametrize(
     ("provider", "address", "expect_raises"),
     [

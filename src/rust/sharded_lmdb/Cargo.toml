@@ -10,11 +10,12 @@ hashing = { path = "../hashing" }
 lmdb-rkv = { workspace = true }
 lmdb-rkv-sys = { workspace = true }
 log = { workspace = true }
+parking_lot = { workspace = true }
 task_executor = { path = "../task_executor" }
 tempfile = { workspace = true }
 
 [dev-dependencies]
-parking_lot = { workspace = true }
+libc = { workspace = true }
 tokio = { workspace = true, features = ["macros"] }
 
 [lints]
