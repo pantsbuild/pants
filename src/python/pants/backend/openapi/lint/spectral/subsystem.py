@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase, bundled_lockfiles
 from pants.option.option_types import ArgsListOption, SkipOption
 
 
@@ -13,6 +13,7 @@ class SpectralSubsystem(NodeJSToolBase):
     help = "A flexible JSON/YAML linter for creating automated style guides (https://github.com/stoplightio/spectral)."
 
     default_version = "@stoplight/spectral-cli@6.5.1"
+    default_lockfile_resources = bundled_lockfiles(__package__, "spectral")
 
     skip = SkipOption("lint")
     args = ArgsListOption(example="--fail-severity=warn")

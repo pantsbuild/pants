@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase, bundled_lockfiles
 
 
 class Redocly(NodeJSToolBase):
@@ -12,3 +12,4 @@ class Redocly(NodeJSToolBase):
     help = "Redocly CLI toolbox with rich validation and bundling features (https://github.com/Redocly/redocly-cli)."
 
     default_version = "@redocly/cli@1.10.5"
+    default_lockfile_resources = bundled_lockfiles(__package__, "redocly")
