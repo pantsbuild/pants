@@ -6,7 +6,8 @@ use sandboxer::SandboxerService;
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -18,17 +19,33 @@ use sandboxer::Sandboxer;
 #[path = "../src/test_util.rs"]
 mod test_util;
 
-#[tokio::test]
-async fn test_sandboxer_process() {
-    // Tests the process management wrapping. Implemented as an integration test under `tests/`
-    // because cargo will automatically build the sandboxer binary, which this test needs,
-    // for integration tests, but not for unit tests under `src/`.
-    let sandboxer_bin = env::current_exe()
+fn sandboxer_bin() -> PathBuf {
+    // Cargo will automatically build the sandboxer binary for integration tests under `tests/`,
+    // but not for unit tests under `src/`.
+    env::current_exe()
         .unwrap()
         .parent()
         .and_then(Path::parent)
         .unwrap()
-        .join("sandboxer");
+        .join("sandboxer")
+}
+
+fn wait_for(desc: &str, cond: impl Fn() -> bool) {
+    let mut n = 100;
+    while !cond() {
+        n -= 1;
+        thread::sleep(SandboxerService::POLLING_INTERVAL);
+        if n == 0 {
+            panic!("Waited too long for {desc}.");
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_sandboxer_process() {
+    // Tests the process management wrapping. Implemented as an integration test under `tests/`
+    // because it needs the sandboxer binary.
+    let sandboxer_bin = sandboxer_bin();
 
     let dir = TempDir::new().unwrap();
     let dir_path = dir.path();
@@ -81,4 +98,40 @@ async fn test_sandboxer_process() {
     thread::sleep(SandboxerService::POLLING_INTERVAL * 10);
 
     assert!(!sandboxer.is_alive().await.unwrap());
+}
+
+#[tokio::test]
+async fn test_orphaned_sandboxer_exits() {
+    let dir = TempDir::new().unwrap();
+    let dir_path = dir.path();
+    let (store_cli_opt, _) = test_util::prep_store(dir_path).await;
+    let socket_path = dir_path.join("sandboxer.sock");
+
+    // Spawn the sandboxer via an intermediate shell that exits shortly after, orphaning it.
+    // Note that the shell may exit before the sandboxer has even started up.
+    let shell = Command::new("sh")
+        .arg("-c")
+        .arg("\"$@\" --parent-pid $$ & echo $!; sleep 1")
+        .arg("sh")
+        .arg(sandboxer_bin())
+        .arg("--socket-path")
+        .arg(&socket_path)
+        .args(store_cli_opt.to_cli_args())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let output = shell.wait_with_output().unwrap();
+    let sandboxer_pid = String::from_utf8(output.stdout).unwrap().trim().to_owned();
+
+    // The orphaned sandboxer should notice its parent exited, shut down, and clean up its socket.
+    wait_for("orphaned sandboxer to exit", || {
+        !Command::new("kill")
+            .arg("-0")
+            .arg(&sandboxer_pid)
+            .stderr(Stdio::null())
+            .status()
+            .unwrap()
+            .success()
+    });
+    assert!(!socket_path.exists());
 }

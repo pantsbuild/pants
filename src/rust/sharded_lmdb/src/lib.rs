@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{HashMap, HashSet};
+use std::ffi::c_int;
 use std::fmt;
 use std::fmt::Debug;
 use std::io::{self, Read};
@@ -15,7 +16,7 @@ use lmdb::{
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
     RwTransaction, Transaction, WriteFlags,
 };
-use log::trace;
+use log::{debug, trace, warn};
 use tempfile::TempDir;
 
 ///
@@ -105,6 +106,12 @@ impl ShardedLmdb {
     // of pants on one schema version will not conflict with data stored
     // with a different version of pants on a different schema version.
     pub const SCHEMA_VERSION: u8 = 2;
+
+    // See the MAX_READERS note in `make_env`. Each reader slot costs 64 bytes of lock file.
+    // Each process is capped at 120 readers (see MAX_BLOCKING_THREADS_LMDB_SAFE in
+    // task_executor/src/lib.rs) so this allows ~34 concurrent processes in a single
+    // build root, which is probably a lot more than anyone should ever need.
+    const MAX_READERS: u32 = 4096;
 
     // max_size is the maximum size the databases together will be allowed to grow to.
     // When calling this function, we will attempt to allocate that much virtual (not resident) memory
@@ -209,7 +216,7 @@ impl ShardedLmdb {
     }
 
     fn make_env(dir: &Path, max_size_per_shard: usize) -> Result<Environment, String> {
-        Environment::new()
+        let env = Environment::new()
             // NO_SYNC
             // =======
             //
@@ -243,9 +250,41 @@ impl ShardedLmdb {
             .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
             // 2 DBs; one for file contents, one for leases.
             .set_max_dbs(2)
+            // MAX_READERS
+            // ===========
+            //
+            // The reader table is shared by every process using the store: pantsd and any
+            // --no-pantsd runs, plus one sandboxer per such process. Each process may have up
+            // to MAX_BLOCKING_THREADS_LMDB_SAFE concurrent reads, so LMDB's default of 126 slots
+            // is easily exhausted (MDB_READERS_FULL) by a handful of concurrent Pants processes.
+            // NB: The table is sized by whichever process creates the lock file, so this only
+            // takes effect for a store that no process has open at the time.
+            .set_max_readers(ShardedLmdb::MAX_READERS)
             .set_map_size(max_size_per_shard)
             .open(dir)
-            .map_err(|e| format!("Error making env for store at {dir:?}: {e}"))
+            .map_err(|e| format!("Error making env for store at {dir:?}: {e}"))?;
+        // Reclaim any reader slots left behind by processes that died without releasing them
+        // (e.g., due to SIGKILL), so that they don't accumulate across runs.
+        match Self::reader_check(&env) {
+            Ok(0) => {}
+            Ok(dead) => debug!("Cleared {dead} stale reader slots in store at {dir:?}"),
+            Err(e) => warn!("Failed to check for stale reader slots in store at {dir:?}: {e}"),
+        }
+        Ok(env)
+    }
+
+    // Clears any reader slots in the given Environment's reader table that are held by dead
+    // processes, and returns the number of slots cleared.
+    fn reader_check(env: &Environment) -> Result<usize, lmdb::Error> {
+        let mut dead: c_int = 0;
+        // SAFETY: The env pointer is valid for the lifetime of `env`, and `dead` is a valid out
+        // pointer.
+        let rc = unsafe { lmdb_sys::mdb_reader_check(env.env(), &mut dead) };
+        if rc == 0 {
+            Ok(dead as usize)
+        } else {
+            Err(lmdb::Error::from_err_code(rc))
+        }
     }
 
     // First Database is content, second is leases.

@@ -15,7 +15,7 @@ use protos::pb::pants::sandboxer::{
 use std::process::Stdio;
 use std::{
     env,
-    os::unix::{ffi::OsStrExt, net::SocketAddr},
+    os::unix::{ffi::OsStrExt, fs::MetadataExt, net::SocketAddr, process::parent_id},
     path::{Path, PathBuf},
 };
 
@@ -69,7 +69,11 @@ mod test_util;
 // - The SandboxerProcess struct, which encapsulates a server process and a client connection to it.
 // - The Sandboxer struct, which manages a SandboxerProcess, respawning it as needed.
 //
-// We use a Unix domain socket primarily because it's easy to pick a unique socket path per repo.
+// We use a Unix domain socket primarily because it's easy to pick a unique socket path.
+//
+// The socket path is unique per controlling Pants process (e.g., pantsd, or a --no-pantsd run),
+// so that concurrent Pants processes in the same repo each get their own sandboxer, rather
+// than preempting each other's sandboxer (and aborting its in-flight requests).
 
 fn ensure_socket_file_removed(socket_path: &Path) -> Result<(), String> {
     let mut ret = fs::remove_file(socket_path);
@@ -83,17 +87,28 @@ fn ensure_socket_file_removed(socket_path: &Path) -> Result<(), String> {
     ret.map_err(|e| e.to_string())
 }
 
+// Remove the socket file, but only if it's still the one with the given inode, i.e., the one
+// that we bound, and not one that some newer sandboxer process has since bound at that path.
+fn remove_socket_file_if_owned(socket_path: &Path, ino: u64) {
+    if fs::metadata(socket_path).is_ok_and(|m| m.ino() == ino) {
+        let _ = fs::remove_file(socket_path);
+    }
+}
+
 fn ensure_parent_dir(path: &Path) -> Result<(), String> {
     std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())
 }
 
 // The service that the spawned sandboxer process runs.
 // The process exits if anything goes wrong, since it's easy and cheap to respawn it.
-// It also exits if it's been idle for a while, so that orphaned processes don't pile up.
+// It also exits if its parent process exits, or if it's been idle for a while, so that orphaned
+// processes don't pile up.
 #[derive(Debug)]
 pub struct SandboxerService {
     socket_path: PathBuf,
     store_cli_opt: StoreCliOpt,
+    // The pid of the process that spawned us, if known.
+    parent_pid: Option<u32>,
 }
 
 impl SandboxerService {
@@ -106,10 +121,11 @@ impl SandboxerService {
     const ALLOWED_IDLE_BEATS: usize =
         Self::ALLOWED_IDLE_TIME.div_duration_f32(Self::POLLING_INTERVAL) as usize;
 
-    pub fn new(socket_path: PathBuf, store_cli_opt: StoreCliOpt) -> Self {
+    pub fn new(socket_path: PathBuf, store_cli_opt: StoreCliOpt, parent_pid: Option<u32>) -> Self {
         Self {
             socket_path,
             store_cli_opt,
+            parent_pid,
         }
     }
 
@@ -125,6 +141,11 @@ impl SandboxerService {
 
         ensure_parent_dir(&self.socket_path)?;
         let listener = UnixListener::bind(&self.socket_path)?;
+        let socket_ino = fs::metadata(&self.socket_path)?.ino();
+        // If our parent exits we'll be reparented, so a change in parent pid means we're orphaned.
+        // The spawner should tell us its pid, since if it exits before we get here then our
+        // current parent will already be the one we were reparented to.
+        let initial_parent_id = self.parent_pid.unwrap_or_else(parent_id);
         // `bind()` creates the socket file, so now we can poll it to check if it has
         // been deleted by the user. If it has, existing connections will continue to
         // work (via the underlying inode) but new connections will not be possible,
@@ -147,6 +168,11 @@ impl SandboxerService {
                 thread::sleep(SandboxerService::POLLING_INTERVAL);
                 if !fs::exists(&socket_path).unwrap_or(false) {
                     warn!("Socket file {} deleted. Exiting.", socket_path.display());
+                    let _ = graceful_shutdown_tx.send(());
+                    break;
+                }
+                if parent_id() != initial_parent_id {
+                    warn!("Parent process {initial_parent_id} exited. Exiting.");
                     let _ = graceful_shutdown_tx.send(());
                     break;
                 }
@@ -186,9 +212,11 @@ impl SandboxerService {
                 drop(graceful_shutdown_rx.await);
             }) => {}
             _ = abrupt_shutdown_rx => {
+                remove_socket_file_if_owned(&self.socket_path, socket_ino);
                 std::process::exit(22);
             }
         }
+        remove_socket_file_if_owned(&self.socket_path, socket_ino);
         Ok(())
     }
 }
@@ -275,6 +303,11 @@ impl SandboxerClient {
         })
     }
 
+    // How long to wait for a newly spawned server to start accepting connections. Startup is
+    // usually fast, but can take a second or more on a loaded machine (or, e.g., while macOS
+    // scans a newly built binary on its first exec), so we're generous here.
+    const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
     pub async fn connect_with_retries(socket_path: &Path) -> Result<Self, String> {
         // TODO: POLLING_INTERVAL seems to be a good time quantum to use when waiting
         //  for server startup (since we know the server sleeps that long on startup)
@@ -283,7 +316,7 @@ impl SandboxerClient {
         let mut slept = Duration::ZERO;
         let mut maybe_client: Result<Self, String> = Err("Not connected yet".to_string());
 
-        for _ in 0..20 {
+        while slept < Self::CONNECT_TIMEOUT {
             tokio::time::sleep(sleep_time).await;
             slept += sleep_time;
             debug!("Waited {slept:?} to connect to sandboxer at {socket_path:?}");
@@ -367,7 +400,9 @@ impl Sandboxer {
             } else {
                 base.join(&workdir_hash)
             };
-            let socket_path = run_dir.join("sandboxer.sock");
+            // Each Pants process gets its own sandboxer, so that concurrent Pants processes
+            // don't preempt each other's sandboxer.
+            let socket_path = run_dir.join(format!("sandboxer-{}.sock", std::process::id()));
             debug!("Trying sandboxer socket path {}", socket_path.display());
 
             match SocketAddr::from_pathname(&socket_path) {
@@ -449,6 +484,8 @@ impl Sandboxer {
         let mut cmd = Command::new(&self.sandboxer_bin);
         cmd.arg("--socket-path");
         cmd.arg(self.socket_path.as_os_str());
+        cmd.arg("--parent-pid");
+        cmd.arg(std::process::id().to_string());
         cmd.args(self.store_cli_opt.to_cli_args());
         // Pass the calling code's global log level to the sandboxer process.
         // TODO: Check for a relevant per-target log level?
@@ -555,4 +592,5 @@ impl Sandboxer {
 // attempt to kill it asynchronously for us. This may leave a zombie process, as tokio doesn't
 // guarantee timely reaping. But since we expect the Sandboxer to be dropped only when pantsd
 // (or any other controlling process) is about to exit, at which point any of its child zombies
-// will be reaped by the system, this should be fine.
+// will be reaped by the system, this should be fine. And if the controlling process exits without
+// killing the sandboxer, the sandboxer will notice that it's been orphaned, and exit.
