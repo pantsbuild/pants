@@ -30,6 +30,12 @@ pub const DEFAULT_LEASE_TIME: Duration = Duration::from_secs(2 * 60 * 60);
 
 const VERSIONED_FINGERPRINT_SIZE: usize = FINGERPRINT_SIZE + 1;
 
+fn lease_from_bytes(bytes: &[u8]) -> u64 {
+    let mut array = [0_u8; 8];
+    array.copy_from_slice(bytes);
+    u64::from_le_bytes(array)
+}
+
 /// VersionedFingerprint is a byte buffer one longer than the number of bytes stored in a
 /// Fingerprint. It is just the byte pattern of a Fingerprint with the version number concatenated
 /// onto the end of it.
@@ -395,11 +401,7 @@ impl ShardedLmdb {
                         // when we delete from lmdb to track how much we've freed).
                         let lease_until_unix_timestamp = txn
                             .get(*lease_database, &key)
-                            .map(|b| {
-                                let mut array = [0_u8; 8];
-                                array.copy_from_slice(b);
-                                u64::from_le_bytes(array)
-                            })
+                            .map(lease_from_bytes)
                             .unwrap_or_else(|e| match e {
                                 lmdb::Error::NotFound => 0,
                                 e => panic!("Error reading lease, probable lmdb corruption: {e:?}"),
@@ -613,17 +615,36 @@ impl ShardedLmdb {
             .flatten()
     }
 
+    ///
+    /// Extends the lease on `fingerprint` to `lease_time` from now.
+    ///
+    /// A lease with more than half of `lease_time` left is not rewritten. pantsd renews the leases
+    /// of everything its graph references more often than that, so the entry is still renewed
+    /// before it could expire, and an idle pantsd does not rewrite every lease it holds on every
+    /// pass.
+    ///
     pub async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
         let store = self.clone();
         self.executor
             .spawn_blocking(move || {
                 let until_secs_since_epoch: u64 = store.lease_until_secs_since_epoch();
                 let (env, _, lease_database) = store.get(&fingerprint);
-                env.begin_rw_txn()
-                    .and_then(|mut txn| {
+                let key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
+                store
+                    .lease_outlasts(
+                        &env,
+                        lease_database,
+                        &key,
+                        until_secs_since_epoch - store.lease_time.as_secs() / 2,
+                    )
+                    .and_then(|fresh| {
+                        if fresh {
+                            return Ok(());
+                        }
+                        let mut txn = env.begin_rw_txn()?;
                         store.lease_inner(
                             lease_database,
-                            &VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION),
+                            &key,
                             until_secs_since_epoch,
                             &mut txn,
                         )?;
@@ -634,6 +655,21 @@ impl ShardedLmdb {
             .await
             .map_err(|e| format!("`lease` task failed: {e}"))
             .flatten()
+    }
+
+    fn lease_outlasts(
+        &self,
+        env: &Environment,
+        lease_database: Database,
+        versioned_fingerprint: &VersionedFingerprint,
+        secs_since_epoch: u64,
+    ) -> Result<bool, lmdb::Error> {
+        let txn = env.begin_ro_txn()?;
+        match txn.get(lease_database, &versioned_fingerprint.as_ref()) {
+            Ok(bytes) => Ok(lease_from_bytes(bytes) > secs_since_epoch),
+            Err(lmdb::Error::NotFound) => Ok(false),
+            Err(e) => Err(e),
+        }
     }
 
     fn lease_inner(
