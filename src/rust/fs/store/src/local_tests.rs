@@ -799,11 +799,13 @@ async fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest 
 fn get_directory_size(path: &Path) -> usize {
     let mut len: usize = 0;
     for entry in WalkDir::new(path) {
-        len += entry
-            .expect("Error walking directory")
-            .metadata()
-            .expect("Error reading metadata")
-            .len() as usize;
+        let entry = entry.expect("Error walking directory");
+        // LMDB lock files are a fixed size (proportional to the max readers), unrelated to the
+        // amount of data stored.
+        if entry.file_name() == "lock.mdb" {
+            continue;
+        }
+        len += entry.metadata().expect("Error reading metadata").len() as usize;
     }
     len
 }

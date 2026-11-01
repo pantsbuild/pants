@@ -4554,6 +4554,7 @@ dependencies = [
  "bytes",
  "hashing",
  "lmdb-rkv",
+ "lmdb-rkv-sys",
  "log",
  "parking_lot 0.12.5",
  "task_executor",
