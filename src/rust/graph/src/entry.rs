@@ -58,7 +58,7 @@ impl Generation {
 #[derive(Debug)]
 pub(crate) enum NodeInterrupt<N: Node> {
     Dirtied,
-    Aborted(NodeResult<N>),
+    Aborted(N::Error),
 }
 
 ///
@@ -488,9 +488,9 @@ impl<N: Node> Entry<N> {
         tokio::select! {
           interrupt_item = sender.interrupted() => {
             match interrupt_item {
-              Some(NodeInterrupt::Aborted(res)) => {
-                  // We were aborted via terminate: complete with the given res.
-                  break (Some(res.result), context2.complete(entry2.node()))
+              Some(NodeInterrupt::Aborted(err)) => {
+                  // We were aborted via terminate: complete with the given error.
+                  break (Some(Err(err)), context2.complete(entry2.node()))
               }
               Some(NodeInterrupt::Dirtied) => {
                   // Attempt to clean the Node, and cancel it if we fail.
@@ -953,17 +953,8 @@ impl<N: Node> Entry<N> {
         let inner = &mut *self.state.lock();
         test_trace_log!("Terminating node {:?} with {:?}", self.node, err);
         for state in inner.states_mut() {
-            if let EntryState::Running {
-                pending_value,
-                generation,
-                ..
-            } = state
-            {
-                let _ = pending_value.try_interrupt(NodeInterrupt::Aborted(NodeResult {
-                    result: Err(err.clone()),
-                    generation: generation.next(),
-                    run_scope: None,
-                }));
+            if let EntryState::Running { pending_value, .. } = state {
+                let _ = pending_value.try_interrupt(NodeInterrupt::Aborted(err.clone()));
             };
         }
     }
