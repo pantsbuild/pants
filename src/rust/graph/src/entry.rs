@@ -105,8 +105,8 @@ impl<N: Node> EntryResult<N> {
         }
     }
 
-    /// The Run which may consume this result, if it is confined to one.
-    fn uncacheable_run_id(&self) -> Option<RunId> {
+    /// The Run which produced this result, if it may only be consumed within that Run.
+    fn run_scope(&self) -> Option<RunId> {
         match self {
             EntryResult::Uncacheable(_, run_id)
             | EntryResult::UncacheableDependencies(_, run_id) => Some(*run_id),
@@ -180,7 +180,7 @@ impl<N: Node> NodeResult<N> {
         NodeResult {
             result: Ok(result.as_ref().clone()),
             generation,
-            run_scope: result.uncacheable_run_id(),
+            run_scope: result.run_scope(),
         }
     }
 
