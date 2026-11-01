@@ -12,7 +12,7 @@ use futures::future;
 use parking_lot::Mutex;
 use rand::RngExt;
 use task_executor::Executor;
-use tokio::sync::watch;
+use tokio::sync::oneshot;
 use tokio::time::{error::Elapsed, sleep, timeout};
 
 use crate::context::Context;
@@ -474,7 +474,7 @@ async fn uncacheable_node_reruns_for_concurrent_run() {
     uncacheable.insert(TNode::new(1));
 
     // Run A blocks in the uncacheable node so run B observes its attempt in flight.
-    let (gate, mut entered, release) = TGate::new();
+    let (gate, entered, release) = TGate::new();
     let context_a = {
         let mut gates = HashMap::new();
         gates.insert(TNode::new(1), gate);
@@ -489,7 +489,7 @@ async fn uncacheable_node_reruns_for_concurrent_run() {
     let graph_a = graph.clone();
     let context_a2 = context_a.clone();
     let fut_a = tokio::spawn(async move { graph_a.create(TNode::new(2), &context_a2).await });
-    entered.wait_for(|entered| *entered).await.unwrap();
+    entered.await.unwrap();
 
     let graph_b = graph.clone();
     let context_b2 = context_b.clone();
@@ -499,7 +499,7 @@ async fn uncacheable_node_reruns_for_concurrent_run() {
     }
     // Yields are not synchronization: assert B is still pending, i.e. attached to A.
     assert!(!fut_b.is_finished());
-    release.send(true).unwrap();
+    release.send(()).unwrap();
 
     let expected = vec![T(0, 0), T(1, 0), T(2, 0)];
     assert_eq!(fut_a.await.unwrap(), Ok(expected.clone()));
@@ -1003,27 +1003,37 @@ struct TContext {
 }
 
 ///
-/// A gate for a TNode: when the node runs, it signals `entered` and then blocks until
-/// `release` becomes true.
+/// A gate for a TNode: the first time the node runs, it signals `entered` and then blocks until
+/// `release` fires.
 ///
 struct TGate {
-    entered: watch::Sender<bool>,
-    release: watch::Receiver<bool>,
+    entered: Mutex<Option<oneshot::Sender<()>>>,
+    release: Mutex<Option<oneshot::Receiver<()>>>,
 }
 
 impl TGate {
     /// Returns a TGate, a handle to await its entry, and a handle to release it.
-    fn new() -> (TGate, watch::Receiver<bool>, watch::Sender<bool>) {
-        let (entered_tx, entered_rx) = watch::channel(false);
-        let (release_tx, release_rx) = watch::channel(false);
+    fn new() -> (TGate, oneshot::Receiver<()>, oneshot::Sender<()>) {
+        let (entered_tx, entered_rx) = oneshot::channel();
+        let (release_tx, release_rx) = oneshot::channel();
         (
             TGate {
-                entered: entered_tx,
-                release: release_rx,
+                entered: Mutex::new(Some(entered_tx)),
+                release: Mutex::new(Some(release_rx)),
             },
             entered_rx,
             release_tx,
         )
+    }
+
+    async fn pass(&self) {
+        if let Some(entered) = self.entered.lock().take() {
+            let _ = entered.send(());
+        }
+        let release = self.release.lock().take();
+        if let Some(release) = release {
+            release.await.unwrap();
+        }
     }
 }
 
@@ -1113,9 +1123,7 @@ impl TContext {
 
     async fn maybe_delay_pre(&self, node: &TNode) {
         if let Some(gate) = self.gates.get(node) {
-            let _ = gate.entered.send(true);
-            let mut release = gate.release.clone();
-            release.wait_for(|released| *released).await.unwrap();
+            gate.pass().await;
         }
         if let Some(delay) = self.delays_pre.get(node) {
             sleep(*delay).await;
