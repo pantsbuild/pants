@@ -167,12 +167,31 @@ impl<N: Node> AsRef<N::Item> for EntryResult<N> {
     }
 }
 
-/// A Node result, its Generation, and the Run it is confined to, if any.
-pub type NodeResult<N> = (
-    Result<<N as Node>::Item, <N as Node>::Error>,
-    Generation,
-    Option<RunId>,
-);
+#[derive(Clone, Debug)]
+pub(crate) struct NodeResult<N: Node> {
+    pub(crate) result: Result<N::Item, N::Error>,
+    pub(crate) generation: Generation,
+    /// The Run which produced this result, if it may only be consumed within that Run.
+    pub(crate) run_scope: Option<RunId>,
+}
+
+impl<N: Node> NodeResult<N> {
+    fn completed(result: &EntryResult<N>, generation: Generation) -> Self {
+        NodeResult {
+            result: Ok(result.as_ref().clone()),
+            generation,
+            run_scope: result.uncacheable_run_id(),
+        }
+    }
+
+    fn invalidated(generation: Generation) -> Self {
+        NodeResult {
+            result: Err(N::Error::invalidated()),
+            generation: generation.next(),
+            run_scope: None,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub(crate) enum EntryState<N: Node> {
@@ -471,7 +490,7 @@ impl<N: Node> Entry<N> {
             match interrupt_item {
               Some(NodeInterrupt::Aborted(res)) => {
                   // We were aborted via terminate: complete with the given res.
-                  break (Some(res.0), context2.complete(entry2.node()))
+                  break (Some(res.result), context2.complete(entry2.node()))
               }
               Some(NodeInterrupt::Dirtied) => {
                   // Attempt to clean the Node, and cancel it if we fail.
@@ -556,15 +575,18 @@ impl<N: Node> Entry<N> {
                     let entry = self.clone();
                     let context = context.clone();
                     return async move {
-                        let result = receiver.recv().await.unwrap_or_else(|| {
-                            (Err(N::Error::invalidated()), generation.next(), None)
-                        });
-                        match result {
-                            (Ok(_), _, Some(run_id)) if run_id != context.run_id() => {
+                        let node_result = receiver
+                            .recv()
+                            .await
+                            .unwrap_or_else(|| NodeResult::invalidated(generation));
+                        match node_result.run_scope {
+                            Some(run_id)
+                                if node_result.result.is_ok() && run_id != context.run_id() =>
+                            {
                                 // We attached to another Run's attempt: re-enter for our own value.
                                 entry.get_node_result(&context, entry_id).await
                             }
-                            result => result,
+                            _ => node_result,
                         }
                     }
                     .boxed();
@@ -576,12 +598,7 @@ impl<N: Node> Entry<N> {
                 generation,
                 ..
             } if result.is_clean(context) => {
-                return future::ready((
-                    Ok(result.as_ref().clone()),
-                    generation,
-                    result.uncacheable_run_id(),
-                ))
-                .boxed();
+                return future::ready(NodeResult::completed(result, generation)).boxed();
             }
             _ => (),
         };
@@ -656,7 +673,7 @@ impl<N: Node> Entry<N> {
             receiver
                 .recv()
                 .await
-                .unwrap_or_else(|| (Err(N::Error::invalidated()), generation.next(), None))
+                .unwrap_or_else(|| NodeResult::invalidated(generation))
         }
         .boxed()
     }
@@ -744,7 +761,11 @@ impl<N: Node> Entry<N> {
                     previous_result.dirty();
                 }
                 generation = generation.next();
-                sender.send((Err(e), generation, Some(context.run_id())));
+                sender.send(NodeResult {
+                    result: Err(e),
+                    generation,
+                    run_scope: Some(context.run_id()),
+                });
                 EntryState::NotStarted {
                     run_token,
                     generation,
@@ -760,11 +781,7 @@ impl<N: Node> Entry<N> {
                     // Node was re-executed (ie not cleaned) and had a different result value.
                     generation = generation.next()
                 };
-                sender.send((
-                    Ok(next_result.as_ref().clone()),
-                    generation,
-                    next_result.uncacheable_run_id(),
-                ));
+                sender.send(NodeResult::completed(&next_result, generation));
                 EntryState::Completed {
                     result: next_result,
                     pollers: Vec::new(),
@@ -783,11 +800,7 @@ impl<N: Node> Entry<N> {
                     self.cacheable_with_output(Some(result.as_ref())),
                     has_uncacheable_deps,
                 );
-                sender.send((
-                    Ok(result.as_ref().clone()),
-                    generation,
-                    result.uncacheable_run_id(),
-                ));
+                sender.send(NodeResult::completed(&result, generation));
                 EntryState::Completed {
                     result,
                     pollers: Vec::new(),
@@ -946,11 +959,11 @@ impl<N: Node> Entry<N> {
                 ..
             } = state
             {
-                let _ = pending_value.try_interrupt(NodeInterrupt::Aborted((
-                    Err(err.clone()),
-                    generation.next(),
-                    None,
-                )));
+                let _ = pending_value.try_interrupt(NodeInterrupt::Aborted(NodeResult {
+                    result: Err(err.clone()),
+                    generation: generation.next(),
+                    run_scope: None,
+                }));
             };
         }
     }
