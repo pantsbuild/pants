@@ -229,7 +229,8 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
     * module_mapping works regardless of capitalization.
     * Projects get normalized thanks to Requirement.parse().
     * Overrides works, including for dependencies and optional-dependencies
-    * Tags from multiple optional-dependency groups are merged with configured tags.
+    * Tags from multiple optional-dependency groups are merged with generator tags.
+    * Explicit tag overrides replace generator and inferred tags, including empty overrides.
     """
     file_addr = Address("", target_name="reqs", relative_file_path="pyproject.toml")
     assert_python_requirements(
@@ -245,6 +246,7 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                   "ansicolors": {"tags": ["overridden"]},
                   "Django": {"dependencies": ["#Django-types"]},
                   "notebook": {"tags": ["another-tag"]},
+                  "sphinx": {"tags": []},
                 },
                 source='pyproject.toml',
             )
@@ -270,6 +272,9 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             ]
             testing = [
                 "pytest<9",
+            ]
+            docs = [
+                "sphinx",
             ]
             """
         ),
@@ -328,9 +333,17 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                 {
                     "requirements": ["notebook>=6.1.0"],
                     "dependencies": [file_addr.spec],
-                    "tags": ["generator", "jupyter", "another-tag"],
+                    "tags": ["another-tag"],
                 },
                 Address("", target_name="reqs", generated_name="notebook"),
+            ),
+            PythonRequirementTarget(
+                {
+                    "requirements": ["sphinx"],
+                    "dependencies": [file_addr.spec],
+                    "tags": [],
+                },
+                Address("", target_name="reqs", generated_name="sphinx"),
             ),
             TargetGeneratorSourcesHelperTarget({"source": "pyproject.toml"}, file_addr),
         },

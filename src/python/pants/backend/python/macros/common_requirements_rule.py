@@ -149,7 +149,7 @@ async def _generate_requirements(
         inferred_tags = tuple(
             dict.fromkeys(tag for parsed_req in parsed_reqs for tag in parsed_req.tags)
         )
-        if inferred_tags:
+        if inferred_tags and Tags.alias not in tgt_overrides:
             tgt_overrides = {
                 **tgt_overrides,
                 Tags.alias: tuple(
@@ -157,7 +157,6 @@ async def _generate_requirements(
                         (
                             *request.template.get(Tags.alias, ()),
                             *inferred_tags,
-                            *tgt_overrides.get(Tags.alias, ()),
                         )
                     )
                 ),
