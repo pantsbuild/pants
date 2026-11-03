@@ -12,9 +12,7 @@ from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import strip_source_roots
 from pants.core.util_rules.system_binaries import BashBinary, TouchBinary, ZipBinary
-from pants.engine.fs import MergeDigests
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import merge_digests
 from pants.engine.process import Process, execute_process_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import SourcesField
@@ -131,17 +129,9 @@ async def assemble_resources_jar(
             **implicitly(StripJarRequest(output_digest, tuple(output_files)))
         )
 
-    cpe = ClasspathEntry(output_digest, output_files, [])
+    cpe = ClasspathEntry(output_digest, output_files, exports=direct_dependency_classpath_entries)
 
-    merged_cpe_digest = await merge_digests(
-        MergeDigests(chain((cpe.digest,), (i.digest for i in direct_dependency_classpath_entries)))
-    )
-
-    merged_cpe = ClasspathEntry.merge(
-        digest=merged_cpe_digest, entries=[cpe, *direct_dependency_classpath_entries]
-    )
-
-    return FallibleClasspathEntry(output_filename, CompileResult.SUCCEEDED, merged_cpe, 0)
+    return FallibleClasspathEntry(output_filename, CompileResult.SUCCEEDED, cpe, 0)
 
 
 def rules():

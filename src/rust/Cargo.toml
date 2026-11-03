@@ -168,6 +168,7 @@ internment = { version = "0.8", features = ["deepsize"] }
 itertools = "0.14"
 libc = "0.2.182"
 lmdb-rkv = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
+lmdb-rkv-sys = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "6ae7a552aa2c932c3ddf652a68cdde2fed547cbc" }
 log = "0.4.29"
 maplit = "1.0.1"
 nails = "0.13"
@@ -199,8 +200,8 @@ prodash = { git = "https://github.com/stuhood/prodash", rev = "stuhood/raw-messa
 prost = "0.14"
 prost-build = "0.14"
 prost-types = "0.14"
-pyo3 = { version = "0.29.3", features = ["parking_lot"] }
-pyo3-build-config = "0.29.3"
+pyo3 = { version = "0.30.1", features = ["parking_lot"] }
+pyo3-build-config = "0.30.1"
 rand = "0.10.0"
 regex = "1.12.3"
 reqwest = { version = "0.13", default-features = false }

@@ -1,14 +1,16 @@
 // Copyright 2022 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use bytes::{Buf, Bytes};
-use hashing::Digest;
+use hashing::{Digest, Fingerprint};
+use lmdb::Transaction;
 use parking_lot::Mutex;
 use task_executor::Executor;
 use tempfile::TempDir;
 
-use crate::{DEFAULT_LEASE_TIME, ShardedLmdb};
+use crate::{DEFAULT_LEASE_TIME, ShardedLmdb, VersionedFingerprint, lease_from_bytes};
 
 fn new_store(shard_count: u8) -> (ShardedLmdb, TempDir) {
     let tempdir = TempDir::new().unwrap();
@@ -94,4 +96,76 @@ async fn store_failure() {
 
 fn bytes(content: u8) -> Bytes {
     Bytes::from(vec![content; 100])
+}
+
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+fn versioned(fingerprint: Fingerprint) -> VersionedFingerprint {
+    VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION)
+}
+
+fn set_lease(s: &ShardedLmdb, fingerprint: Fingerprint, until_secs_since_epoch: u64) {
+    let (env, _, lease_database) = s.get(&fingerprint);
+    let mut txn = env.begin_rw_txn().unwrap();
+    s.lease_inner(
+        lease_database,
+        &versioned(fingerprint),
+        until_secs_since_epoch,
+        &mut txn,
+    )
+    .unwrap();
+    txn.commit().unwrap();
+}
+
+fn stored_lease(s: &ShardedLmdb, fingerprint: Fingerprint) -> u64 {
+    let (env, _, lease_database) = s.get(&fingerprint);
+    let txn = env.begin_ro_txn().unwrap();
+    lease_from_bytes(
+        txn.get(lease_database, &versioned(fingerprint).as_ref())
+            .unwrap(),
+    )
+}
+
+#[tokio::test]
+async fn lease_creates_missing_lease() {
+    let (s, _tempdir) = new_store(1);
+    let fingerprint = Digest::of_bytes(&bytes(0)).hash;
+
+    let before = now_secs();
+    s.lease(fingerprint).await.unwrap();
+
+    assert!(stored_lease(&s, fingerprint) >= before + DEFAULT_LEASE_TIME.as_secs());
+}
+
+#[tokio::test]
+async fn lease_renews_lease_with_less_than_half_left() {
+    let (s, _tempdir) = new_store(1);
+    let fingerprint = Digest::of_bytes(&bytes(0)).hash;
+    set_lease(
+        &s,
+        fingerprint,
+        now_secs() + DEFAULT_LEASE_TIME.as_secs() / 2 - 60,
+    );
+
+    let before = now_secs();
+    s.lease(fingerprint).await.unwrap();
+
+    assert!(stored_lease(&s, fingerprint) >= before + DEFAULT_LEASE_TIME.as_secs());
+}
+
+#[tokio::test]
+async fn lease_keeps_lease_with_more_than_half_left() {
+    let (s, _tempdir) = new_store(1);
+    let fingerprint = Digest::of_bytes(&bytes(0)).hash;
+    let until = now_secs() + DEFAULT_LEASE_TIME.as_secs() / 2 + 60;
+    set_lease(&s, fingerprint, until);
+
+    s.lease(fingerprint).await.unwrap();
+
+    assert_eq!(stored_lease(&s, fingerprint), until);
 }

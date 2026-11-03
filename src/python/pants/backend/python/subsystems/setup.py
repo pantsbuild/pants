@@ -841,6 +841,8 @@ class PythonSetup(Subsystem):
             """
         ),
         advanced=True,
+        removal_version="2.36.0.dev0",
+        removal_hint="We no longer support macOS Big Sur.",
     )
     enable_lockfile_targets = BoolOption(
         default=True,

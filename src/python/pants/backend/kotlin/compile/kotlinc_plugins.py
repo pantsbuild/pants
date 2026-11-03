@@ -184,7 +184,7 @@ async def fetch_kotlinc_plugins(request: KotlincPluginsRequest) -> KotlincPlugin
 
     entries = list(ClasspathEntry.closure(artifacts))
     merged_classpath_digest = await merge_digests(MergeDigests(entry.digest for entry in entries))
-    merged = ClasspathEntry.merge(merged_classpath_digest, entries)
+    merged = ClasspathEntry(merged_classpath_digest, ClasspathEntry.args(entries))
 
     ids = tuple(_plugin_id(target) for target in request.plugins)
 

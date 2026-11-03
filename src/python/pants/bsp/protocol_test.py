@@ -33,6 +33,7 @@ from pants.bsp.spec.lifecycle import (
 )
 from pants.bsp.spec.resources import ResourcesParams
 from pants.bsp.spec.targets import (
+    DependencyModulesParams,
     DependencySourcesParams,
     SourcesParams,
     SourcesResult,
@@ -262,9 +263,27 @@ def test_intellij_test(jvm_rule_runner: RuleRunner, jvm_lockfile: JVMLockfileFix
                 "buildTarget/scalacOptions", ScalacOptionsParams(target_ids).to_json_dict()
             ).result(timeout=timeout)
         )
-        assert scalac_options.items[0].classpath
+        classpath = [Path(urlparse(uri).path) for uri in scalac_options.items[0].classpath]
+        assert len(classpath) == len(set(classpath))
+        assert all(jar.is_file() for jar in classpath)
+        assert any(jar.name.startswith("org.scalactic_scalactic_2.13") for jar in classpath)
         class_directory = Path(urlparse(scalac_options.items[0].class_directory).path)
         assert not class_directory.exists()
+
+        # buildTarget/dependencyModules
+        dependency_modules = endpoint.request(
+            "buildTarget/dependencyModules",
+            DependencyModulesParams(target_ids).to_json_dict(),
+        ).result(timeout=timeout)
+        (dependency_modules_item,) = dependency_modules["items"]
+        modules = {module["name"]: module for module in dependency_modules_item["modules"]}
+        scalatest_jars = [
+            Path(urlparse(artifact["uri"]).path)
+            for artifact in modules["org.scalatest:scalatest_2.13"]["data"]["artifacts"]
+        ]
+        assert scalatest_jars[0].name == "org.scalatest_scalatest_2.13_3.2.10.jar"
+        assert len(scalatest_jars) == len(set(scalatest_jars))
+        assert set(scalatest_jars) <= set(classpath)
 
         # buildTarget/compile
         compile_result = CompileResult.from_json_dict(

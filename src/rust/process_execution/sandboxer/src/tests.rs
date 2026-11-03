@@ -50,7 +50,7 @@ async fn test_sandboxer_service() {
     let socket_path = dir_path.join("sandboxer.sock");
     let sandbox_path = dir_path.join("sandbox");
 
-    let mut sandboxer_service = SandboxerService::new(socket_path.clone(), store_cli_opt);
+    let mut sandboxer_service = SandboxerService::new(socket_path.clone(), store_cli_opt, None);
     tokio::spawn(async move { sandboxer_service.serve().await.unwrap() });
 
     let mut client = SandboxerClient::connect_with_retries(&socket_path)

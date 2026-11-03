@@ -640,11 +640,18 @@ impl Core {
 
         // Create the CLI opts to pass to the sandboxer process so it can create an
         // appropriately-configured Store.
+        let local_options: store::LocalOptions = (&local_store_options).into();
         let store_cli_opt = if store.is_local_only() {
-            StoreCliOpt::new_local_only(local_store_options.store_dir.to_owned())
+            StoreCliOpt::new_local_only(local_store_options.store_dir.to_owned(), &local_options)
         } else {
             StoreCliOpt {
                 local_store_path: Some(local_store_options.store_dir.clone()),
+                local_store_files_max_size_bytes: Some(local_options.files_max_size_bytes),
+                local_store_directories_max_size_bytes: Some(
+                    local_options.directories_max_size_bytes,
+                ),
+                local_store_shard_count: Some(local_options.shard_count),
+                local_store_lease_time_secs: Some(local_options.lease_time.as_secs()),
                 remote_instance_name: remoting_opts.instance_name.clone(),
                 cas_server: remoting_opts.store_address.clone(),
                 cas_root_ca_cert_file: remoting_opts.root_ca_certs_path.clone(),

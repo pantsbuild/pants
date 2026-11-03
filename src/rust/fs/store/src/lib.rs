@@ -1088,11 +1088,21 @@ impl Store {
         }
     }
 
+    ///
+    /// Leases `digests` and everything below them that exists locally.
+    ///
+    /// A digest this method leased within the last quarter of the lease time is skipped, along with
+    /// everything below it: those leases are still long enough to wait for a later call, and
+    /// expanding and re-leasing every digest a long-lived graph holds is most of the cost of pantsd's
+    /// periodic lease extension.
+    ///
     pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(
         &self,
         digests: Ds,
     ) -> Result<(), StoreError> {
-        let reachable_digests_and_types = self.expand_local_digests(digests).await?;
+        let started = Instant::now();
+        let digests = self.local.digests_to_renew(digests.copied(), started);
+        let reachable_digests_and_types = self.expand_local_digests(digests.iter()).await?;
         // Lease all Digests which existed (ignoring any that didn't).
         self.local
             .lease_all(
@@ -1101,6 +1111,7 @@ impl Store {
                     .flat_map(|(digest, maybe_type)| maybe_type.map(|t| (digest, t))),
             )
             .await?;
+        self.local.record_renewed(&digests, started);
         Ok(())
     }
 

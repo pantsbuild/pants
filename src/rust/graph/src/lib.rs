@@ -5,7 +5,7 @@ mod context;
 mod entry;
 mod node;
 
-use crate::entry::{Entry, Generation, RunToken};
+use crate::entry::{Entry, Generation, NodeResult, RunToken};
 
 use std::collections::VecDeque;
 use std::fs::File;
@@ -528,9 +528,11 @@ impl<N: Node> Graph<N> {
 
         // Return the state of the destination, retrying the dst to handle Node invalidation.
         let context = context.clone();
-        let (result, generation, uncacheable) = loop {
+        let node_result = loop {
             match entry.get_node_result(&context, entry_id).await {
-                (Err(err), _, _) if err == N::Error::invalidated() => {
+                NodeResult {
+                    result: Err(err), ..
+                } if err == N::Error::invalidated() => {
                     let node = {
                         let inner = self.inner.lock();
                         inner.unsafe_entry_for_id(entry_id).node().clone()
@@ -547,12 +549,16 @@ impl<N: Node> Graph<N> {
         };
 
         if src_id.is_some()
-            && let Err(e) = context.dep_record(entry_id, generation, uncacheable)
+            && let Err(e) = context.dep_record(
+                entry_id,
+                node_result.generation,
+                node_result.run_scope.is_some(),
+            )
         {
-            return (Err(e), generation);
+            return (Err(e), node_result.generation);
         }
 
-        (result, generation)
+        (node_result.result, node_result.generation)
     }
 
     ///
@@ -625,11 +631,10 @@ impl<N: Node> Graph<N> {
                         .clone();
 
                     async move {
-                        let (_, generation, uncacheable) =
-                            dep_entry.get_node_result(context, dep_id).await;
-                        if generation == previous_dep_generation {
+                        let node_result = dep_entry.get_node_result(context, dep_id).await;
+                        if node_result.generation == previous_dep_generation {
                             // Matched.
-                            Ok(uncacheable)
+                            Ok(node_result.run_scope.is_some())
                         } else {
                             // Did not match. We error here to trigger fail-fast in `try_join_all`.
                             log::debug!(

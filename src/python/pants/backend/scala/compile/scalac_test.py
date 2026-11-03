@@ -14,6 +14,7 @@ from internal_plugins.test_lockfile_fixtures.lockfile_fixture import (
 )
 from pants.backend.scala.compile.scalac import CompileScalaSourceRequest
 from pants.backend.scala.compile.scalac import rules as scalac_rules
+from pants.backend.scala.compile.scalac_plugins import ScalaPlugins, ScalaPluginsRequest
 from pants.backend.scala.dependency_inference.rules import rules as scala_dep_inf_rules
 from pants.backend.scala.goals.check import ScalacCheckRequest
 from pants.backend.scala.goals.check import rules as scalac_check_rules
@@ -28,9 +29,10 @@ from pants.build_graph.address import Address
 from pants.core.goals.check import CheckResults
 from pants.core.util_rules import source_files, stripped_source_files, system_binaries
 from pants.engine.addresses import Addresses
+from pants.engine.fs import Digest, Snapshot
 from pants.engine.internals.parametrize import Parametrize
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.target import CoarsenedTargets
+from pants.engine.target import CoarsenedTargets, Targets
 from pants.jvm import jdk_rules, testutil
 from pants.jvm.compile import ClasspathEntry, CompileResult, FallibleClasspathEntry
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
@@ -68,6 +70,8 @@ def rule_runner() -> RuleRunner:
             QueryRule(FallibleClasspathEntry, (CompileScalaSourceRequest,)),
             QueryRule(RenderedClasspath, (CompileScalaSourceRequest,)),
             QueryRule(ClasspathEntry, (CompileScalaSourceRequest,)),
+            QueryRule(ScalaPlugins, (ScalaPluginsRequest,)),
+            QueryRule(Snapshot, (Digest,)),
         ],
         target_types=[
             JvmArtifactTarget,
@@ -728,6 +732,60 @@ def test_compile_with_multiple_scalac_plugins(
         resolve=make_resolve(rule_runner),
     )
     rule_runner.request(RenderedClasspath, [request])
+
+
+@maybe_skip_jdk_test
+def test_plugin_classpath_includes_each_transitive_jar_once(
+    rule_runner: RuleRunner, multiple_scala_plugins_jvm_lockfile: JVMLockfileFixture
+) -> None:
+    rule_runner.write_files(
+        {
+            "lib/BUILD": dedent(
+                """\
+                scalac_plugin(
+                    name="kind-projector",
+                    plugin_name="kind-projector",
+                    artifact="3rdparty/jvm:org.typelevel_kind-projector_2.13.8",
+                )
+
+                scalac_plugin(
+                    name="better-monadic-for",
+                    plugin_name="bm4",
+                    artifact="3rdparty/jvm:com.olegpy_better-monadic-for_2.13",
+                )
+                """
+            ),
+            "3rdparty/jvm/BUILD": multiple_scala_plugins_jvm_lockfile.requirements_as_jvm_artifact_targets(),
+            "3rdparty/jvm/default.lock": multiple_scala_plugins_jvm_lockfile.serialized_lockfile,
+        }
+    )
+    plugins = [
+        rule_runner.get_target(Address("lib", target_name=name))
+        for name in ("kind-projector", "better-monadic-for")
+    ]
+    artifacts = [
+        rule_runner.get_target(Address("3rdparty/jvm", target_name=name))
+        for name in ("org.typelevel_kind-projector_2.13.8", "com.olegpy_better-monadic-for_2.13")
+    ]
+
+    scala_plugins = rule_runner.request(
+        ScalaPlugins,
+        [ScalaPluginsRequest(Targets(plugins), Targets(artifacts), make_resolve(rule_runner))],
+    )
+
+    filenames = scala_plugins.classpath.filenames
+    assert len(filenames) == len(set(filenames))
+    assert set(filenames) == {
+        "org.typelevel_kind-projector_2.13.8_0.13.2.jar",
+        "com.olegpy_better-monadic-for_2.13_0.3.1.jar",
+        "net.java.dev.jna_jna_5.9.0.jar",
+        "org.jline_jline_3.21.0.jar",
+        "org.scala-lang_scala-compiler_2.13.8.jar",
+        "org.scala-lang_scala-library_2.13.8.jar",
+        "org.scala-lang_scala-reflect_2.13.8.jar",
+    }
+    snapshot = rule_runner.request(Snapshot, [scala_plugins.classpath.digest])
+    assert set(snapshot.files) == set(filenames)
 
 
 @pytest.fixture
