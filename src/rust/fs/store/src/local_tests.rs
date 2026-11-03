@@ -6,7 +6,7 @@ use crate::{EntryType, LocalOptions, ShrinkBehavior};
 use std::collections::HashSet;
 use std::io::Write;
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use bytes::{BufMut, Bytes, BytesMut};
 use hashing::{Digest, Fingerprint};
@@ -748,6 +748,40 @@ async fn get_missing_digests() {
         missing,
         HashSet::from([hashing::Digest::of_bytes("1".as_bytes())])
     )
+}
+
+async fn large_file_mtime_after_lease(file_age: Duration) -> (SystemTime, SystemTime) {
+    let dir = TempDir::new().unwrap();
+    let store = new_store(dir.path());
+    let large_testdata = TestData::new("123456789".repeat(1000 * 512).as_str());
+    let digest = prime_store_with_file_bytes(&store, large_testdata.bytes()).await;
+    let path = WalkDir::new(dir.path())
+        .into_iter()
+        .map(|entry| entry.unwrap().into_path())
+        .find(|path| path.file_name() == Some(digest.hash.to_hex().as_ref()))
+        .expect("large file should be stored in the fsdb");
+    let aged_mtime = SystemTime::now() - file_age;
+    fs_set_times::set_mtime(&path, fs_set_times::SystemTimeSpec::Absolute(aged_mtime)).unwrap();
+
+    store
+        .lease_all(vec![(digest, EntryType::File)].into_iter())
+        .await
+        .expect("Error leasing");
+
+    let mtime = std::fs::metadata(&path).unwrap().modified().unwrap();
+    (aged_mtime, mtime)
+}
+
+#[tokio::test]
+async fn lease_renews_large_file_with_less_than_half_left() {
+    let (aged_mtime, mtime) = large_file_mtime_after_lease(Duration::from_secs(90 * 60)).await;
+    assert!(mtime > aged_mtime);
+}
+
+#[tokio::test]
+async fn lease_keeps_large_file_with_more_than_half_left() {
+    let (aged_mtime, mtime) = large_file_mtime_after_lease(Duration::from_secs(30 * 60)).await;
+    assert_eq!(mtime, aged_mtime);
 }
 
 pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {

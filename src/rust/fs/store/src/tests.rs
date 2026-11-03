@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 
@@ -22,8 +22,8 @@ use workunit_store::WorkunitStore;
 
 use crate::local::ByteStore;
 use crate::{
-    EntryType, FileContent, MEGABYTES, RemoteProvider, RemoteStoreOptions, Snapshot, Store,
-    StoreError, StoreFileByDigest, UploadSummary,
+    EntryType, FileContent, LocalOptions, MEGABYTES, RemoteProvider, RemoteStoreOptions, Snapshot,
+    Store, StoreError, StoreFileByDigest, UploadSummary,
 };
 
 pub(crate) const STORE_BATCH_API_SIZE_LIMIT: usize = 4 * 1024 * 1024;
@@ -1842,4 +1842,65 @@ async fn big_file_mutable_root_dir() {
         assert_path(&materialize_dir.path().join("file"));
         assert_path(&materialize_dir.path().join("nested").join("file"));
     }
+}
+
+async fn store_large_file(store: &Store, dir: &Path) -> (Digest, PathBuf) {
+    let large_testdata = TestData::new("123456789".repeat(1000 * 512).as_str());
+    let digest = store
+        .store_file_bytes(large_testdata.bytes(), true)
+        .await
+        .unwrap();
+    let path = walkdir::WalkDir::new(dir)
+        .into_iter()
+        .map(|entry| entry.unwrap().into_path())
+        .find(|path| path.file_name() == Some(digest.hash.to_hex().as_ref()))
+        .expect("large file should be stored in the fsdb");
+    (digest, path)
+}
+
+fn set_mtime(path: &Path, mtime: SystemTime) {
+    fs_set_times::set_mtime(path, fs_set_times::SystemTimeSpec::Absolute(mtime)).unwrap();
+}
+
+fn mtime(path: &Path) -> SystemTime {
+    std::fs::metadata(path).unwrap().modified().unwrap()
+}
+
+#[tokio::test]
+async fn lease_all_recursively_skips_recently_renewed_digest() {
+    let dir = TempDir::new().unwrap();
+    let store = new_local_store(dir.path());
+    let (digest, path) = store_large_file(&store, dir.path()).await;
+    store.lease_all_recursively([digest].iter()).await.unwrap();
+
+    let aged_mtime = SystemTime::now() - Duration::from_secs(90 * 60);
+    set_mtime(&path, aged_mtime);
+    store.lease_all_recursively([digest].iter()).await.unwrap();
+
+    assert_eq!(mtime(&path), aged_mtime);
+}
+
+#[tokio::test]
+async fn lease_all_recursively_renews_digest_after_a_quarter_of_the_lease_time() {
+    let dir = TempDir::new().unwrap();
+    let lease_time = Duration::from_secs(4);
+    let store = Store::local_only_with_options(
+        task_executor::Executor::new(),
+        dir.path(),
+        dir.path(),
+        LocalOptions {
+            lease_time,
+            ..LocalOptions::default()
+        },
+    )
+    .unwrap();
+    let (digest, path) = store_large_file(&store, dir.path()).await;
+    store.lease_all_recursively([digest].iter()).await.unwrap();
+
+    let aged_mtime = SystemTime::now() - lease_time;
+    set_mtime(&path, aged_mtime);
+    tokio::time::sleep(lease_time / 4 + Duration::from_millis(100)).await;
+    store.lease_all_recursively([digest].iter()).await.unwrap();
+
+    assert!(mtime(&path) > aged_mtime);
 }
