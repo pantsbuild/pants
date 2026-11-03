@@ -7,6 +7,13 @@ from textwrap import dedent
 
 import pytest
 
+from pants.backend.codegen.protobuf import protobuf_dependency_inference
+from pants.backend.codegen.protobuf import target_types as protobuf_target_types
+from pants.backend.codegen.protobuf.go.rules import rules as go_protobuf_rules
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufSourcesGeneratorTarget,
+    ProtobufSourceTarget,
+)
 from pants.backend.go import target_type_rules
 from pants.backend.go.lint.golangci_lint import skip_field
 from pants.backend.go.lint.golangci_lint.rules import (
@@ -20,6 +27,7 @@ from pants.backend.go.target_types import GoModTarget, GoPackageTarget
 from pants.backend.go.util_rules import (
     assembly,
     build_pkg,
+    build_pkg_target,
     first_party_pkg,
     go_mod,
     import_analysis,
@@ -28,7 +36,13 @@ from pants.backend.go.util_rules import (
     third_party_pkg,
 )
 from pants.core.goals.lint import LintResult, Partitions
-from pants.core.util_rules import config_files, external_tool, source_files, system_binaries
+from pants.core.util_rules import (
+    config_files,
+    external_tool,
+    source_files,
+    stripped_source_files,
+    system_binaries,
+)
 from pants.engine.addresses import Address
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -37,20 +51,30 @@ from pants.testutil.rule_runner import QueryRule, RuleRunner
 @pytest.fixture()
 def rule_runner() -> RuleRunner:
     rule_runner = RuleRunner(
-        target_types=[GoModTarget, GoPackageTarget],
+        target_types=[
+            GoModTarget,
+            GoPackageTarget,
+            ProtobufSourceTarget,
+            ProtobufSourcesGeneratorTarget,
+        ],
         rules=[
             *assembly.rules(),
             *build_pkg.rules(),
+            *build_pkg_target.rules(),
             *config_files.rules(),
             *external_tool.rules(),
             *first_party_pkg.rules(),
             *go_mod.rules(),
+            *go_protobuf_rules(),
             *golangci_lint_rules(),
             *import_analysis.rules(),
             *link.rules(),
+            *protobuf_dependency_inference.rules(),
+            *protobuf_target_types.rules(),
             *sdk.rules(),
             *skip_field.rules(),
             *source_files.rules(),
+            *stripped_source_files.rules(),
             *system_binaries.rules(),
             *target_type_rules.rules(),
             *third_party_pkg.rules(),
@@ -249,3 +273,70 @@ def test_multiple_go_mods(rule_runner: RuleRunner) -> None:
     # Verify the failure is in mod_b
     failing_result = results_by_exit_code[1]
     assert "bad.go" in failing_result.stdout or "bad.go" in failing_result.stderr
+
+
+@pytest.mark.platform_specific_behavior
+def test_generated_go(rule_runner: RuleRunner) -> None:
+    """A package importing Go generated from a `protobuf_sources` target type-checks.
+
+    The proto's `go_package` is not the directory it sits in, so this also checks that the
+    generated files are laid out where `go` resolves the import path, not where codegen wrote
+    them.
+    """
+    rule_runner.write_files(
+        {
+            "go.mod": dedent(
+                """\
+                module example.com/lint
+                go 1.17
+                require google.golang.org/protobuf v1.27.1
+                """
+            ),
+            "go.sum": dedent(
+                """\
+                github.com/golang/protobuf v1.5.0 h1:LUVKkCeviFUMKqHa4tXIIij/lbhnMbP7Fn5wKdKkRh4=
+                github.com/golang/protobuf v1.5.0/go.mod h1:FsONVRAS9T7sI+LIUmWTfcYkHO4aIWwzhcaSAoJOfIk=
+                github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
+                github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+                golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
+                golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
+                google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
+                google.golang.org/protobuf v1.27.1 h1:SnqbnDw1V7RiZcXPx5MEeqPv2s79L9i7BJUlG/+RurQ=
+                google.golang.org/protobuf v1.27.1/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
+                """
+            ),
+            "BUILD": "go_mod(name='mod')\n",
+            "protos/greeting.proto": dedent(
+                """\
+                syntax = "proto3";
+
+                option go_package = "example.com/lint/gen/greeting";
+
+                package greeting;
+
+                message Greeting {
+                  string text = 1;
+                }
+                """
+            ),
+            "protos/BUILD": "protobuf_sources()\n",
+            "app/main.go": dedent(
+                """\
+                package main
+                import (
+                \t"fmt"
+                \t"example.com/lint/gen/greeting"
+                )
+                func main() {
+                \tg := &greeting.Greeting{Text: "Hello World"}
+                \tfmt.Printf("%s", g.GetText())
+                }
+                """
+            ),
+            "app/BUILD": "go_package()\n",
+        }
+    )
+    tgt = rule_runner.get_target(Address("app"))
+    lint_results = run_golangci_lint(rule_runner, [tgt])
+    assert len(lint_results) == 1
+    assert lint_results[0].exit_code == 0, lint_results[0].stdout
