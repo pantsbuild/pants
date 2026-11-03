@@ -58,7 +58,7 @@ impl Generation {
 #[derive(Debug)]
 pub(crate) enum NodeInterrupt<N: Node> {
     Dirtied,
-    Aborted(NodeResult<N>),
+    Aborted(N::Error),
 }
 
 ///
@@ -105,10 +105,12 @@ impl<N: Node> EntryResult<N> {
         }
     }
 
-    fn has_uncacheable_deps(&self) -> bool {
+    /// The Run which produced this result, if it may only be consumed within that Run.
+    fn run_scope(&self) -> Option<RunId> {
         match self {
-            EntryResult::Uncacheable(_, _) | EntryResult::UncacheableDependencies(_, _) => true,
-            EntryResult::Clean(..) | EntryResult::Dirty(..) => false,
+            EntryResult::Uncacheable(_, run_id)
+            | EntryResult::UncacheableDependencies(_, run_id) => Some(*run_id),
+            EntryResult::Clean(..) | EntryResult::Dirty(..) => None,
         }
     }
 
@@ -165,11 +167,31 @@ impl<N: Node> AsRef<N::Item> for EntryResult<N> {
     }
 }
 
-pub type NodeResult<N> = (
-    Result<<N as Node>::Item, <N as Node>::Error>,
-    Generation,
-    bool,
-);
+#[derive(Clone, Debug)]
+pub(crate) struct NodeResult<N: Node> {
+    pub(crate) result: Result<N::Item, N::Error>,
+    pub(crate) generation: Generation,
+    /// The Run which produced this result, if it may only be consumed within that Run.
+    pub(crate) run_scope: Option<RunId>,
+}
+
+impl<N: Node> NodeResult<N> {
+    fn completed(result: &EntryResult<N>, generation: Generation) -> Self {
+        NodeResult {
+            result: Ok(result.as_ref().clone()),
+            generation,
+            run_scope: result.run_scope(),
+        }
+    }
+
+    fn invalidated(generation: Generation) -> Self {
+        NodeResult {
+            result: Err(N::Error::invalidated()),
+            generation: generation.next(),
+            run_scope: None,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub(crate) enum EntryState<N: Node> {
@@ -466,9 +488,9 @@ impl<N: Node> Entry<N> {
         tokio::select! {
           interrupt_item = sender.interrupted() => {
             match interrupt_item {
-              Some(NodeInterrupt::Aborted(res)) => {
-                  // We were aborted via terminate: complete with the given res.
-                  break (Some(res.0), context2.complete(entry2.node()))
+              Some(NodeInterrupt::Aborted(err)) => {
+                  // We were aborted via terminate: complete with the given error.
+                  break (Some(Err(err)), context2.complete(entry2.node()))
               }
               Some(NodeInterrupt::Dirtied) => {
                   // Attempt to clean the Node, and cancel it if we fail.
@@ -550,10 +572,22 @@ impl<N: Node> Entry<N> {
                 ..
             } => {
                 if let Some(receiver) = pending_value.receiver() {
+                    let entry = self.clone();
+                    let context = context.clone();
                     return async move {
-                        receiver.recv().await.unwrap_or_else(|| {
-                            (Err(N::Error::invalidated()), generation.next(), true)
-                        })
+                        let node_result = receiver
+                            .recv()
+                            .await
+                            .unwrap_or_else(|| NodeResult::invalidated(generation));
+                        match node_result.run_scope {
+                            Some(run_id)
+                                if node_result.result.is_ok() && run_id != context.run_id() =>
+                            {
+                                // We attached to another Run's attempt: re-enter for our own value.
+                                entry.get_node_result(&context, entry_id).await
+                            }
+                            _ => node_result,
+                        }
                     }
                     .boxed();
                 }
@@ -564,12 +598,7 @@ impl<N: Node> Entry<N> {
                 generation,
                 ..
             } if result.is_clean(context) => {
-                return future::ready((
-                    Ok(result.as_ref().clone()),
-                    generation,
-                    result.has_uncacheable_deps(),
-                ))
-                .boxed();
+                return future::ready(NodeResult::completed(result, generation)).boxed();
             }
             _ => (),
         };
@@ -644,7 +673,7 @@ impl<N: Node> Entry<N> {
             receiver
                 .recv()
                 .await
-                .unwrap_or_else(|| (Err(N::Error::invalidated()), generation.next(), true))
+                .unwrap_or_else(|| NodeResult::invalidated(generation))
         }
         .boxed()
     }
@@ -732,7 +761,11 @@ impl<N: Node> Entry<N> {
                     previous_result.dirty();
                 }
                 generation = generation.next();
-                sender.send((Err(e), generation, true));
+                sender.send(NodeResult {
+                    result: Err(e),
+                    generation,
+                    run_scope: Some(context.run_id()),
+                });
                 EntryState::NotStarted {
                     run_token,
                     generation,
@@ -748,11 +781,7 @@ impl<N: Node> Entry<N> {
                     // Node was re-executed (ie not cleaned) and had a different result value.
                     generation = generation.next()
                 };
-                sender.send((
-                    Ok(next_result.as_ref().clone()),
-                    generation,
-                    next_result.has_uncacheable_deps(),
-                ));
+                sender.send(NodeResult::completed(&next_result, generation));
                 EntryState::Completed {
                     result: next_result,
                     pollers: Vec::new(),
@@ -771,11 +800,7 @@ impl<N: Node> Entry<N> {
                     self.cacheable_with_output(Some(result.as_ref())),
                     has_uncacheable_deps,
                 );
-                sender.send((
-                    Ok(result.as_ref().clone()),
-                    generation,
-                    result.has_uncacheable_deps(),
-                ));
+                sender.send(NodeResult::completed(&result, generation));
                 EntryState::Completed {
                     result,
                     pollers: Vec::new(),
@@ -928,17 +953,8 @@ impl<N: Node> Entry<N> {
         let inner = &mut *self.state.lock();
         test_trace_log!("Terminating node {:?} with {:?}", self.node, err);
         for state in inner.states_mut() {
-            if let EntryState::Running {
-                pending_value,
-                generation,
-                ..
-            } = state
-            {
-                let _ = pending_value.try_interrupt(NodeInterrupt::Aborted((
-                    Err(err.clone()),
-                    generation.next(),
-                    true,
-                )));
+            if let EntryState::Running { pending_value, .. } = state {
+                let _ = pending_value.try_interrupt(NodeInterrupt::Aborted(err.clone()));
             };
         }
     }

@@ -55,6 +55,12 @@ class GoTestSubsystem(Subsystem):
               * `set`: bool: does this statement run?
               * `count`: int: how many times does this statement run?
               * `atomic`: int: count, but correct in multithreaded tests; significantly more expensive.
+
+            This option is ignored when the race detector is enabled for a package under test, in
+            which case `atomic` is always used: `set` and `count` update their counters without
+            synchronization, so the race detector would report races on the coverage counters
+            themselves. This mirrors `go test`, where "the default is set unless -race is enabled,
+            in which case it is atomic".
             """
         ),
     )

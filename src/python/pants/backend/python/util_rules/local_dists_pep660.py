@@ -44,7 +44,6 @@ from pants.engine.unions import UnionMembership
 from pants.util.docutil import doc_url
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.osutil import is_macos_big_sur
 from pants.util.resources import read_resource
 from pants.util.strutil import softwrap
 
@@ -189,8 +188,6 @@ async def run_pep660_build(
         **(request.extra_build_time_env or {}),
         "PEX_EXTRA_SYS_PATH": os.pathsep.join(request.build_time_source_roots),
     }
-    if python_setup.macos_big_sur_compatibility and is_macos_big_sur():
-        extra_env["MACOSX_DEPLOYMENT_TARGET"] = "10.16"
 
     result = await fallible_to_exec_result_or_raise(
         **implicitly(

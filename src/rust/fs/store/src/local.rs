@@ -363,8 +363,16 @@ impl UnderlyingByteStore for ShardedFSDB {
 
     async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
         let path = self.get_path(fingerprint);
+        // As in `ShardedLmdb::lease`: a lease with more than half its time left is not rewritten.
+        let renew_before = SystemTime::now() - self.lease_time / 2;
         self.executor
             .spawn_blocking(move || {
+                if std::fs::metadata(&path)
+                    .and_then(|metadata| metadata.modified())
+                    .is_ok_and(|mtime| mtime > renew_before)
+                {
+                    return Ok(());
+                }
                 fs_set_times::set_mtime(&path, fs_set_times::SystemTimeSpec::SymbolicNow)
                     .map_err(|e| format!("Failed to extend mtime of {path:?}: {e}"))
             })
@@ -558,6 +566,8 @@ struct InnerStore {
     directory_lmdb: Result<Arc<ShardedLmdb>, String>,
     file_fsdb: ShardedFSDB,
     file_source: FileSource,
+    lease_time: Duration,
+    renewed_at: Mutex<HashMap<Digest, Instant>>,
 }
 
 impl ByteStore {
@@ -615,6 +625,8 @@ impl ByteStore {
                 file_source: FileSource {
                     open_files: Semaphore::new(1024),
                 },
+                lease_time: options.lease_time,
+                renewed_at: Mutex::default(),
             }),
         })
     }
@@ -648,6 +660,34 @@ impl ByteStore {
             (_, _, true) => Ok(Some(EntryType::File)),
             (false, false, false) => Ok(None),
         }
+    }
+
+    ///
+    /// The digests among `digests` that were not passed to `record_renewed` within the last
+    /// quarter of the lease time.
+    ///
+    /// `lease_all` leaves every lease it is given with at least half of the lease time left (see
+    /// `ShardedLmdb::lease`), so a digest renewed more recently than that, and everything below it,
+    /// still has at least a quarter of the lease time left: enough to wait for a later pass.
+    ///
+    pub(crate) fn digests_to_renew(
+        &self,
+        digests: impl Iterator<Item = Digest>,
+        now: Instant,
+    ) -> Vec<Digest> {
+        let renew_after = self.inner.lease_time / 4;
+        let mut renewed_at = self.inner.renewed_at.lock();
+        renewed_at.retain(|_, at| now.duration_since(*at) < renew_after);
+        digests
+            .filter(|digest| !renewed_at.contains_key(digest))
+            .collect()
+    }
+
+    pub(crate) fn record_renewed(&self, digests: &[Digest], at: Instant) {
+        self.inner
+            .renewed_at
+            .lock()
+            .extend(digests.iter().map(|digest| (*digest, at)));
     }
 
     pub async fn lease_all(

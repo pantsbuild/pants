@@ -127,10 +127,7 @@ async def compile_java_source(
     ]
     if not component_members_and_java_source_files:
         # Is a generator, and so exports all of its direct deps.
-        exported_digest = await merge_digests(
-            MergeDigests(cpe.digest for cpe in direct_dependency_classpath_entries)
-        )
-        classpath_entry = ClasspathEntry.merge(exported_digest, direct_dependency_classpath_entries)
+        classpath_entry = ClasspathEntry(EMPTY_DIGEST, exports=direct_dependency_classpath_entries)
         return FallibleClasspathEntry(
             description=str(request.component),
             result=CompileResult.SUCCEEDED,
@@ -233,17 +230,11 @@ async def compile_java_source(
             **implicitly(StripJarRequest(digest=jar_output_digest, filenames=output_files))
         )
     output_classpath = ClasspathEntry(
-        jar_output_digest, output_files, direct_dependency_classpath_entries
+        jar_output_digest,
+        output_files,
+        direct_dependency_classpath_entries,
+        exports=export_classpath_entries,
     )
-
-    if export_classpath_entries:
-        merged_export_digest = await merge_digests(
-            MergeDigests((output_classpath.digest, *(i.digest for i in export_classpath_entries)))
-        )
-        merged_classpath = ClasspathEntry.merge(
-            merged_export_digest, (output_classpath, *export_classpath_entries)
-        )
-        output_classpath = merged_classpath
 
     return FallibleClasspathEntry.from_fallible_process_result(
         str(request.component),

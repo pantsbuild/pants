@@ -14,6 +14,11 @@ struct Opt {
     #[arg(long)]
     socket_path: PathBuf,
 
+    /// The pid of the spawning process. The sandboxer exits if this process exits.
+    /// If unspecified, the sandboxer's parent process at startup is used.
+    #[arg(long)]
+    parent_pid: Option<u32>,
+
     #[command(flatten)]
     store_options: StoreCliOpt,
 }
@@ -41,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("RUST_LOG").unwrap_or("".into()),
         args
     );
-    SandboxerService::new(args.socket_path, args.store_options)
+    SandboxerService::new(args.socket_path, args.store_options, args.parent_pid)
         .serve()
         .await
 }

@@ -146,7 +146,6 @@ emit_warnings = true
 # And update the PythonBuildStandalone version/URL:
 # + src/python/pants/core/subsystems/python_bootstrap.py
 interpreter_constraints = ["==3.14.*"]
-macos_big_sur_compatibility = true
 enable_resolves = true
 pip_version = "latest"
 separate_lockfile_metadata_file = true

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{HashMap, HashSet};
+use std::ffi::c_int;
 use std::fmt;
 use std::fmt::Debug;
 use std::io::{self, Read};
@@ -15,7 +16,7 @@ use lmdb::{
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
     RwTransaction, Transaction, WriteFlags,
 };
-use log::trace;
+use log::{debug, trace, warn};
 use tempfile::TempDir;
 
 ///
@@ -29,6 +30,12 @@ use tempfile::TempDir;
 pub const DEFAULT_LEASE_TIME: Duration = Duration::from_secs(2 * 60 * 60);
 
 const VERSIONED_FINGERPRINT_SIZE: usize = FINGERPRINT_SIZE + 1;
+
+fn lease_from_bytes(bytes: &[u8]) -> u64 {
+    let mut array = [0_u8; 8];
+    array.copy_from_slice(bytes);
+    u64::from_le_bytes(array)
+}
 
 /// VersionedFingerprint is a byte buffer one longer than the number of bytes stored in a
 /// Fingerprint. It is just the byte pattern of a Fingerprint with the version number concatenated
@@ -105,6 +112,12 @@ impl ShardedLmdb {
     // of pants on one schema version will not conflict with data stored
     // with a different version of pants on a different schema version.
     pub const SCHEMA_VERSION: u8 = 2;
+
+    // See the MAX_READERS note in `make_env`. Each reader slot costs 64 bytes of lock file.
+    // Each process is capped at 120 readers (see MAX_BLOCKING_THREADS_LMDB_SAFE in
+    // task_executor/src/lib.rs) so this allows ~34 concurrent processes in a single
+    // build root, which is probably a lot more than anyone should ever need.
+    const MAX_READERS: u32 = 4096;
 
     // max_size is the maximum size the databases together will be allowed to grow to.
     // When calling this function, we will attempt to allocate that much virtual (not resident) memory
@@ -209,7 +222,7 @@ impl ShardedLmdb {
     }
 
     fn make_env(dir: &Path, max_size_per_shard: usize) -> Result<Environment, String> {
-        Environment::new()
+        let env = Environment::new()
             // NO_SYNC
             // =======
             //
@@ -243,9 +256,41 @@ impl ShardedLmdb {
             .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
             // 2 DBs; one for file contents, one for leases.
             .set_max_dbs(2)
+            // MAX_READERS
+            // ===========
+            //
+            // The reader table is shared by every process using the store: pantsd and any
+            // --no-pantsd runs, plus one sandboxer per such process. Each process may have up
+            // to MAX_BLOCKING_THREADS_LMDB_SAFE concurrent reads, so LMDB's default of 126 slots
+            // is easily exhausted (MDB_READERS_FULL) by a handful of concurrent Pants processes.
+            // NB: The table is sized by whichever process creates the lock file, so this only
+            // takes effect for a store that no process has open at the time.
+            .set_max_readers(ShardedLmdb::MAX_READERS)
             .set_map_size(max_size_per_shard)
             .open(dir)
-            .map_err(|e| format!("Error making env for store at {dir:?}: {e}"))
+            .map_err(|e| format!("Error making env for store at {dir:?}: {e}"))?;
+        // Reclaim any reader slots left behind by processes that died without releasing them
+        // (e.g., due to SIGKILL), so that they don't accumulate across runs.
+        match Self::reader_check(&env) {
+            Ok(0) => {}
+            Ok(dead) => debug!("Cleared {dead} stale reader slots in store at {dir:?}"),
+            Err(e) => warn!("Failed to check for stale reader slots in store at {dir:?}: {e}"),
+        }
+        Ok(env)
+    }
+
+    // Clears any reader slots in the given Environment's reader table that are held by dead
+    // processes, and returns the number of slots cleared.
+    fn reader_check(env: &Environment) -> Result<usize, lmdb::Error> {
+        let mut dead: c_int = 0;
+        // SAFETY: The env pointer is valid for the lifetime of `env`, and `dead` is a valid out
+        // pointer.
+        let rc = unsafe { lmdb_sys::mdb_reader_check(env.env(), &mut dead) };
+        if rc == 0 {
+            Ok(dead as usize)
+        } else {
+            Err(lmdb::Error::from_err_code(rc))
+        }
     }
 
     // First Database is content, second is leases.
@@ -395,11 +440,7 @@ impl ShardedLmdb {
                         // when we delete from lmdb to track how much we've freed).
                         let lease_until_unix_timestamp = txn
                             .get(*lease_database, &key)
-                            .map(|b| {
-                                let mut array = [0_u8; 8];
-                                array.copy_from_slice(b);
-                                u64::from_le_bytes(array)
-                            })
+                            .map(lease_from_bytes)
                             .unwrap_or_else(|e| match e {
                                 lmdb::Error::NotFound => 0,
                                 e => panic!("Error reading lease, probable lmdb corruption: {e:?}"),
@@ -613,17 +654,36 @@ impl ShardedLmdb {
             .flatten()
     }
 
+    ///
+    /// Extends the lease on `fingerprint` to `lease_time` from now.
+    ///
+    /// A lease with more than half of `lease_time` left is not rewritten. pantsd renews the leases
+    /// of everything its graph references more often than that, so the entry is still renewed
+    /// before it could expire, and an idle pantsd does not rewrite every lease it holds on every
+    /// pass.
+    ///
     pub async fn lease(&self, fingerprint: Fingerprint) -> Result<(), String> {
         let store = self.clone();
         self.executor
             .spawn_blocking(move || {
                 let until_secs_since_epoch: u64 = store.lease_until_secs_since_epoch();
                 let (env, _, lease_database) = store.get(&fingerprint);
-                env.begin_rw_txn()
-                    .and_then(|mut txn| {
+                let key = VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
+                store
+                    .lease_outlasts(
+                        &env,
+                        lease_database,
+                        &key,
+                        until_secs_since_epoch - store.lease_time.as_secs() / 2,
+                    )
+                    .and_then(|fresh| {
+                        if fresh {
+                            return Ok(());
+                        }
+                        let mut txn = env.begin_rw_txn()?;
                         store.lease_inner(
                             lease_database,
-                            &VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION),
+                            &key,
                             until_secs_since_epoch,
                             &mut txn,
                         )?;
@@ -634,6 +694,21 @@ impl ShardedLmdb {
             .await
             .map_err(|e| format!("`lease` task failed: {e}"))
             .flatten()
+    }
+
+    fn lease_outlasts(
+        &self,
+        env: &Environment,
+        lease_database: Database,
+        versioned_fingerprint: &VersionedFingerprint,
+        secs_since_epoch: u64,
+    ) -> Result<bool, lmdb::Error> {
+        let txn = env.begin_ro_txn()?;
+        match txn.get(lease_database, &versioned_fingerprint.as_ref()) {
+            Ok(bytes) => Ok(lease_from_bytes(bytes) > secs_since_epoch),
+            Err(lmdb::Error::NotFound) => Ok(false),
+            Err(e) => Err(e),
+        }
     }
 
     fn lease_inner(
