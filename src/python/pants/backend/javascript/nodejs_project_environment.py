@@ -111,6 +111,7 @@ class NodeJsProjectEnvironmentProcess:
     project_caches: FrozenDict[str, str] = field(default_factory=FrozenDict)
     timeout_seconds: int | None = None
     extra_env: FrozenDict[str, str] = field(default_factory=FrozenDict)
+    include_workspace_dependencies: bool = False
 
     def targeted_args(self) -> tuple[str, ...]:
         if (
@@ -119,9 +120,15 @@ class NodeJsProjectEnvironmentProcess:
             and self.env.root_dir != self.env.package_dir()
         ):
             target = self.env.ensure_target()
+            package_name = target[NodePackageNameField].value
+            if (
+                self.include_workspace_dependencies
+                and self.env.project.package_manager.name == "pnpm"
+            ):
+                package_name += "..."
             return (
                 self.env.project.workspace_specifier_arg,
-                target[NodePackageNameField].value,
+                package_name,
                 *self.args,
             )
         else:
