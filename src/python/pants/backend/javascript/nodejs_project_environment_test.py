@@ -10,6 +10,7 @@ from pants.backend.javascript import nodejs_project_environment, package_json
 from pants.backend.javascript.nodejs_project import AllNodeJSProjects, NodeJSProject
 from pants.backend.javascript.nodejs_project_environment import (
     NodeJsProjectEnvironment,
+    NodeJsProjectEnvironmentProcess,
     NodeJSProjectEnvironmentRequest,
 )
 from pants.backend.javascript.package_json import PackageJsonTarget
@@ -161,3 +162,51 @@ def test_node_modules_directories_nested_workspaces(rule_runner: RuleRunner) -> 
         "foo/node_modules",
         "foo/bar/node_modules",
     }
+
+
+@pytest.mark.parametrize(
+    "package_manager,selector",
+    [("pnpm", "--filter"), ("npm", "--workspace"), ("yarn", "workspace")],
+)
+@pytest.mark.parametrize("location", ["member", "single", "root"])
+@pytest.mark.parametrize("install", [True, False])
+def test_workspace_process_scope(
+    rule_runner: RuleRunner, package_manager: str, selector: str, location: str, install: bool
+) -> None:
+    rule_runner.set_options([f"--nodejs-package-manager={package_manager}"])
+    root_manifest: dict[str, object] = {"name": "egg", "version": "1.0.0", "private": True}
+    files = {"src/js/BUILD": "package_json()"}
+    if location != "single":
+        root_manifest["workspaces"] = ["foo"]
+        files.update(
+            {
+                "src/js/foo/BUILD": "package_json()",
+                "src/js/foo/package.json": json.dumps({"name": "ham", "version": "1.0.0"}),
+                "src/js/pnpm-workspace.yaml": "packages:\n  - 'foo'\n",
+            }
+        )
+    files["src/js/package.json"] = json.dumps(root_manifest)
+    rule_runner.write_files(files)
+    if location == "root":
+        env = NodeJsProjectEnvironment.from_root(_request_project(rule_runner))
+    else:
+        address = (
+            Address("src/js/foo", generated_name="ham")
+            if location == "member"
+            else Address("src/js", generated_name="egg")
+        )
+        env = rule_runner.request(
+            NodeJsProjectEnvironment, [NodeJSProjectEnvironmentRequest(address)]
+        )
+    args = ("install", "--frozen-lockfile") if install else ("run", "test")
+    process = NodeJsProjectEnvironmentProcess(
+        env,
+        args,
+        description="Check workspace command scope.",
+        include_workspace_dependencies=install,
+    )
+    if location == "member":
+        package = "ham..." if package_manager == "pnpm" and install else "ham"
+        assert process.targeted_args() == (selector, package, *args)
+    else:
+        assert process.targeted_args() == args
