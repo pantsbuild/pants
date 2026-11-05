@@ -2,10 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use ::fs::DirectoryDigest;
+use hashing::Digest;
 use sandboxer::SandboxerService;
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -134,4 +136,45 @@ async fn test_orphaned_sandboxer_exits() {
             .success()
     });
     assert!(!socket_path.exists());
+}
+
+#[tokio::test]
+async fn test_sandboxer_process_keeps_running_on_missing_digest() {
+    let dir = TempDir::new().unwrap();
+    let dir_path = dir.path();
+    let (store_cli_opt, dir_digest) = test_util::prep_store(dir_path).await;
+    let sandbox_path = dir_path.join("sandbox");
+
+    let sandboxer = Sandboxer::new(sandboxer_bin(), dir_path.join("workdir"), store_cli_opt)
+        .await
+        .unwrap();
+    sandboxer
+        .materialize_directory(
+            &sandbox_path,
+            &sandbox_path,
+            &DirectoryDigest::from_persisted_digest(dir_digest.as_digest()),
+            &BTreeSet::new(),
+        )
+        .await
+        .unwrap();
+    let socket_file = socket_file_identity(sandboxer.socket_path());
+
+    let res = sandboxer
+        .materialize_directory(
+            &sandbox_path,
+            &sandbox_path,
+            &DirectoryDigest::from_persisted_digest(Digest::of_bytes(b"not in the store")),
+            &BTreeSet::new(),
+        )
+        .await;
+
+    assert!(res.is_err());
+    // A respawned sandboxer would have bound a new socket file.
+    assert_eq!(socket_file, socket_file_identity(sandboxer.socket_path()));
+}
+
+// Freed inode numbers are reused, so the change time is compared too.
+fn socket_file_identity(path: &Path) -> (u64, i64, i64) {
+    let metadata = fs::metadata(path).unwrap();
+    (metadata.ino(), metadata.ctime(), metadata.ctime_nsec())
 }
