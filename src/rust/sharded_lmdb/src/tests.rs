@@ -99,6 +99,21 @@ async fn store_failure() {
 }
 
 #[tokio::test]
+async fn overwrite_bytes() {
+    let (s, _tempdir) = new_store(1);
+    let fingerprint = Digest::of_bytes(&bytes(0)).hash;
+    s.store_bytes(fingerprint, bytes(1), false).await.unwrap();
+
+    s.overwrite_bytes(fingerprint, bytes(2)).await.unwrap();
+
+    let stored = s
+        .load_bytes_with(fingerprint, |b| Ok(Bytes::copy_from_slice(b)))
+        .await
+        .unwrap();
+    assert_eq!(stored, Some(bytes(2)));
+}
+
+#[tokio::test]
 async fn stores_on_one_directory_share_environments() {
     let tempdir = TempDir::new().unwrap();
     let first = store_at(tempdir.path());

@@ -588,6 +588,33 @@ impl ShardedLmdb {
     }
 
     ///
+    /// Stores the given Bytes under the given Fingerprint, replacing any value already stored
+    /// under it.
+    ///
+    pub async fn overwrite_bytes(
+        &self,
+        fingerprint: Fingerprint,
+        bytes: Bytes,
+    ) -> Result<(), String> {
+        let store = self.clone();
+        self.executor
+            .spawn_blocking(move || {
+                let effective_key =
+                    VersionedFingerprint::new(fingerprint, ShardedLmdb::SCHEMA_VERSION);
+                let (env, db, _) = store.get(&fingerprint);
+                env.begin_rw_txn()
+                    .and_then(|mut txn| {
+                        txn.put(db, &effective_key, &bytes, WriteFlags::empty())?;
+                        txn.commit()
+                    })
+                    .map_err(|e| format!("Error overwriting {fingerprint:?}: {e}"))
+            })
+            .await
+            .map_err(|e| format!("`overwrite_bytes` task failed: {e}"))
+            .flatten()
+    }
+
+    ///
     /// Store the given Bytes instances under the given Fingerprints, or under their computed
     /// Fingerprints. For large/streaming usecases, prefer `Self::store`.
     ///

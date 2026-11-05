@@ -51,7 +51,7 @@ impl PersistentCache {
         // rather than storing the value under its _own_ Fingerprint, the value is stored under the
         // Fingerprint of the CacheKey.
         let fingerprint = Digest::of_bytes(&key.to_bytes()).hash;
-        self.store.store_bytes(fingerprint, value, false).await?;
+        self.store.overwrite_bytes(fingerprint, value).await?;
         Ok(())
     }
 
