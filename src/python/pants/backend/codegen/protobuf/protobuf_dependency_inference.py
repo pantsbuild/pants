@@ -245,36 +245,36 @@ class InferProtobufDependencies(InferDependenciesRequest):
     infer_from = ProtobufDependencyInferenceFieldSet
 
 
-async def get_resolve_key_from_target(address: Address) -> ProtobufMappingResolveKey:
+async def get_resolve_keys_from_target(address: Address) -> tuple[ProtobufMappingResolveKey, ...]:
+    """The key of each resolve the target is in: one per resolve-like field on it."""
     wrapped_target = await resolve_target(
         WrappedTargetRequest(address=address, description_of_origin="protobuf"), **implicitly()
     )
-    resolve_field_type: type[Field] | None = None
-    for field_type in wrapped_target.target.field_types:
-        if issubclass(field_type, ResolveLikeField):
-            if resolve_field_type is not None:
-                raise NotImplementedError(
-                    f"TODO: Multiple resolve-like fields on target at address `{address}`."
-                )
-            resolve_field_type = field_type
-    if resolve_field_type is None:
+    target = wrapped_target.target
+    resolve_field_types = [
+        field_type for field_type in target.field_types if issubclass(field_type, ResolveLikeField)
+    ]
+    if not resolve_field_types:
         raise ValueError(f"Failed to find resolve-like field on target at address `{address}.")
 
-    resolve_request_type = typing.cast(
-        ResolveLikeField, wrapped_target.target[resolve_field_type]
-    ).get_resolve_like_field_to_value_request()
-    resolve_request = resolve_request_type(target=wrapped_target.target)
-    resolve_result = await get_resolve_from_resolve_like_field_request(
-        **implicitly({resolve_request: ResolveLikeFieldToValueRequest})
+    resolve_requests = [
+        typing.cast(ResolveLikeField, target[field_type]).get_resolve_like_field_to_value_request()(
+            target=target
+        )
+        for field_type in resolve_field_types
+    ]
+    resolve_results = await concurrently(
+        get_resolve_from_resolve_like_field_request(
+            **implicitly({resolve_request: ResolveLikeFieldToValueRequest})
+        )
+        for resolve_request in resolve_requests
     )
-
-    # When resolves are disabled, return the sentinel key
-    if resolve_result.value is None:
-        return _NO_RESOLVE_LIKE_FIELDS_DEFINED
-
-    return ProtobufMappingResolveKey(
-        field_type=resolve_field_type,
-        resolve=resolve_result.value,
+    return tuple(
+        # When resolves are disabled, return the sentinel key
+        _NO_RESOLVE_LIKE_FIELDS_DEFINED
+        if resolve_result.value is None
+        else ProtobufMappingResolveKey(field_type=field_type, resolve=resolve_result.value)
+        for field_type, resolve_result in zip(resolve_field_types, resolve_results)
     )
 
 
@@ -287,11 +287,11 @@ async def infer_protobuf_dependencies(
 
     address = request.field_set.address
 
-    resolve_key: ProtobufMappingResolveKey
-    if _NO_RESOLVE_LIKE_FIELDS_DEFINED in protobuf_mapping.mapping:
-        resolve_key = _NO_RESOLVE_LIKE_FIELDS_DEFINED
+    resolve_keys: tuple[ProtobufMappingResolveKey, ...]
+    if set(protobuf_mapping.mapping) <= {_NO_RESOLVE_LIKE_FIELDS_DEFINED}:
+        resolve_keys = (_NO_RESOLVE_LIKE_FIELDS_DEFINED,)
     else:
-        resolve_key = await get_resolve_key_from_target(address)
+        resolve_keys = await get_resolve_keys_from_target(address)
 
     explicitly_provided_deps, hydrated_sources = await concurrently(
         determine_explicitly_provided_dependencies(
@@ -305,17 +305,19 @@ async def infer_protobuf_dependencies(
 
     result: OrderedSet[Address] = OrderedSet()
     for import_path in parse_proto_imports(file_content.content.decode()):
-        mapping_in_resolve = protobuf_mapping.mapping.get(resolve_key)
-        unambiguous = mapping_in_resolve.get(import_path) if mapping_in_resolve else None
+        # A target in several resolves, one per language, can only depend on an owner that is in
+        # all of them, so intersect the owners each resolve has for the import.
+        owners: set[Address] | None = None
+        for resolve_key in resolve_keys:
+            owners_in_resolve = _owners_in_resolve(protobuf_mapping, resolve_key, import_path)
+            owners = owners_in_resolve if owners is None else owners & owners_in_resolve
 
-        ambiguous_modules_in_resolve = protobuf_mapping.ambiguous_modules.get(resolve_key)
-        ambiguous = (
-            ambiguous_modules_in_resolve.get(import_path) if ambiguous_modules_in_resolve else None
-        )
-
-        if unambiguous:
-            result.add(unambiguous)
-        elif ambiguous:
+        if not owners:
+            continue
+        if len(owners) == 1:
+            result.add(next(iter(owners)))
+        else:
+            ambiguous = tuple(sorted(owners))
             explicitly_provided_deps.maybe_warn_of_ambiguous_dependency_inference(
                 ambiguous,
                 address,
@@ -331,6 +333,17 @@ async def infer_protobuf_dependencies(
             if maybe_disambiguated:
                 result.add(maybe_disambiguated)
     return InferredDependencies(sorted(result))
+
+
+def _owners_in_resolve(
+    protobuf_mapping: ProtobufMapping, resolve_key: ProtobufMappingResolveKey, import_path: str
+) -> set[Address]:
+    unambiguous = protobuf_mapping.mapping.get(resolve_key, FrozenDict()).get(import_path)
+    if unambiguous:
+        return {unambiguous}
+    return set(
+        protobuf_mapping.ambiguous_modules.get(resolve_key, FrozenDict()).get(import_path, ())
+    )
 
 
 def rules():
