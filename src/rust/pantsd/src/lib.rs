@@ -314,9 +314,9 @@ pub fn fingerprint_compute(
 /// The options which are fingerprinted to decide when to restart `pantsd`.
 ///
 /// These options are a subset of the bootstrap options which are consumed during `pantsd` startup,
-/// but _before_ creating a Scheduler. The options used to create a Scheduler are fingerprinted
-/// using a different mechanism in `PantsDaemonCore`, to decide when to create new Schedulers
-/// (without restarting `pantsd`).
+/// but _before_ creating a Scheduler, or which configure state that every Scheduler in the process
+/// shares. The options used to create a Scheduler are fingerprinted using a different mechanism in
+/// `PantsDaemonCore`, to decide when to create new Schedulers (without restarting `pantsd`).
 ///
 /// TODO: This list is exposed to Python in order to validate that it matches actual existing
 /// options (because we have redundancy of options definitions between `global_options.py` and what
@@ -359,5 +359,18 @@ pub fn fingerprinted_options(build_root: &BuildRoot) -> Result<Vec<Fingerprinted
         FingerprintedOption::new(option_id!("pantsd", "pailgun", "port"), 0),
         FingerprintedOption::new(option_id!("pantsd", "invalidation", "globs"), vec![]),
         FingerprintedOption::new(option_id!("enable", "stack", "trampoline"), "<none>"),
+        FingerprintedOption::new(option_id!("local", "store", "shard", "count"), 16),
+        FingerprintedOption::new(
+            option_id!("local", "store", "processes", "max", "size", "bytes"),
+            16_000_000_000,
+        ),
+        FingerprintedOption::new(
+            option_id!("local", "store", "files", "max", "size", "bytes"),
+            256_000_000_000,
+        ),
+        FingerprintedOption::new(
+            option_id!("local", "store", "directories", "max", "size", "bytes"),
+            16_000_000_000,
+        ),
     ])
 }
