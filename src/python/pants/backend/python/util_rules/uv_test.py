@@ -32,7 +32,7 @@ from pants.core.util_rules.env_vars import rules as env_vars_rules
 from pants.engine import composite_process
 from pants.engine.composite_process import CompositeProcess
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import Digest, DigestContents
+from pants.engine.fs import Digest, DigestContents, PathGlobs
 from pants.engine.internals.native_engine import FrozenOrderedSet
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
 from pants.testutil.rule_runner import QueryRule, RuleRunner
@@ -225,7 +225,7 @@ def test_relativize_local_find_links() -> None:
             "/elsewhere/wheels",
             "https://example.com/wheels/",
         ),
-        ("wheels", "vendored/wheels"),
+        PathGlobs(["wheels/*", "vendored/wheels/*"]),
     )
 
 

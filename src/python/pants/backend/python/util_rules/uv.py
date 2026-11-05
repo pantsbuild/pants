@@ -98,28 +98,31 @@ class VenvRepository:
 
 def relativize_local_find_links(
     find_links: Iterable[str], buildroot: str
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
+) -> tuple[tuple[str, ...], PathGlobs]:
     """Rewrite find-links dirs under the buildroot to buildroot-relative paths.
 
     uv records find-links paths verbatim in uv.lock, so absolute paths would tie the lockfile (and
     every process that consumes it) to one checkout location. Returns the rewritten find-links and
-    the relative dirs, whose contents must be in the uv process sandbox.
+    the globs for the files of those dirs, which must be in the uv process sandbox.
     """
     rewritten: list[str] = []
-    local_dirs: list[str] = []
+    local_globs: list[str] = []
     for find_link in find_links:
-        path = find_link.removeprefix("file://")
+        if find_link.startswith("file://"):
+            path = find_link[len("file://") :]
+        elif os.path.isabs(find_link):
+            path = find_link
+        else:
+            rewritten.append(find_link)
+            continue
+        path = os.path.normpath(path)
         if os.path.isabs(path) and os.path.commonpath((path, buildroot)) == buildroot:
             relative_dir = os.path.relpath(path, buildroot)
             rewritten.append(relative_dir)
-            local_dirs.append(relative_dir)
+            local_globs.append(os.path.join(relative_dir, "*"))
         else:
             rewritten.append(find_link)
-    return tuple(rewritten), tuple(local_dirs)
-
-
-def local_find_links_globs(local_dirs: Iterable[str]) -> PathGlobs:
-    return PathGlobs(os.path.join(local_dir, "*") for local_dir in local_dirs)
+    return tuple(rewritten), PathGlobs(local_globs)
 
 
 @dataclass(frozen=True)
@@ -239,7 +242,7 @@ async def create_venv_repository_from_uv_lockfile(
         ResolveConfigRequest(metadata.resolve), **implicitly()
     )
 
-    find_links, local_find_links_dirs = relativize_local_find_links(
+    find_links, local_find_links_globs = relativize_local_find_links(
         resolve_config.find_links, buildroot.path
     )
     pyproject_content = generate_pyproject_toml(
@@ -273,7 +276,7 @@ async def create_venv_repository_from_uv_lockfile(
     )
     uv_lock_digest, find_links_digest = await concurrently(
         create_digest(CreateDigest([FileContent("uv.lock", uv_lock_contents[0].content)])),
-        path_globs_to_digest(local_find_links_globs(local_find_links_dirs)),
+        path_globs_to_digest(local_find_links_globs),
     )
 
     input_digest = await merge_digests(
@@ -291,8 +294,6 @@ async def create_venv_repository_from_uv_lockfile(
     if request.uv_platform is not None:
         extra_uv_args.extend(["--python-platform", request.uv_platform])
 
-    sync_env = {"UV_NO_INSTALLER_METADATA": "1"}
-
     # NB: If adding to extra_uv_args, add to the entropy if necessary.
     # Note that uv_env.env is not in the entropy to avoid churn due to, e.g., PATH changes.
     # TODO: Selectively add relevant env vars to the entropy?
@@ -302,8 +303,7 @@ async def create_venv_repository_from_uv_lockfile(
     entropy.update((request.uv_platform or "").encode())
     entropy.update(b"\0")
     entropy.update(input_digest.fingerprint.encode())
-    for name, value in sorted(sync_env.items()):
-        entropy.update(f"\0{name}={value}".encode())
+    entropy.update(b"\0UV_NO_INSTALLER_METADATA=1")
     venv_path_suffix = entropy.hexdigest()
 
     uv_cmd = shlex.join(
@@ -382,7 +382,7 @@ async def create_venv_repository_from_uv_lockfile(
         creation_subprocess=Subprocess(
             command=command,
             input_digest=input_digest,
-            env=FrozenDict({**uv_env.env, **sync_env}),
+            env=FrozenDict({**uv_env.env, "UV_NO_INSTALLER_METADATA": "1"}),
             append_only_caches={
                 **downloaded_uv.append_only_caches(),
                 **VenvRepository.append_only_caches(),

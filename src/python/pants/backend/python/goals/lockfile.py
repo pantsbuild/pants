@@ -46,7 +46,6 @@ from pants.backend.python.util_rules.pex_requirements import (
 from pants.backend.python.util_rules.uv import (
     UvEnvironment,
     generate_pyproject_toml,
-    local_find_links_globs,
     relativize_local_find_links,
 )
 from pants.base.build_root import BuildRoot
@@ -371,10 +370,10 @@ async def generate_uv_lockfile(
     )
     resolve_config.validate_for_uv(req.resolve_name)
 
-    resolve_find_links, resolve_local_find_links_dirs = relativize_local_find_links(
+    resolve_find_links, resolve_local_find_links_globs = relativize_local_find_links(
         resolve_config.find_links, buildroot.path
     )
-    extra_find_links, extra_local_find_links_dirs = relativize_local_find_links(
+    extra_find_links, extra_local_find_links_globs = relativize_local_find_links(
         req.find_links, buildroot.path
     )
     pyproject_content = generate_pyproject_toml(
@@ -432,9 +431,8 @@ async def generate_uv_lockfile(
         )
     )
     find_links_digest = await path_globs_to_digest(
-        local_find_links_globs((*resolve_local_find_links_dirs, *extra_local_find_links_dirs))
+        PathGlobs((*resolve_local_find_links_globs.globs, *extra_local_find_links_globs.globs))
     )
-
     input_digest = await merge_digests(
         MergeDigests(
             [downloaded_uv.digest, uv_config_digest, existing_uv_lock_digest, find_links_digest]
