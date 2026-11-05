@@ -461,6 +461,8 @@ impl Store {
     ///
     /// A convenience method for storing batches of small files.
     ///
+    /// With `initial_lease`, also renews stale leases of small files already stored.
+    ///
     /// NB: This method should not be used for large blobs: prefer to stream them from their source
     /// using `store_file`.
     ///
@@ -469,9 +471,15 @@ impl Store {
         items: Vec<(Fingerprint, Bytes)>,
         initial_lease: bool,
     ) -> Result<(), String> {
-        self.local
-            .store_bytes_batch(EntryType::File, items, initial_lease)
-            .await?;
+        if initial_lease {
+            self.local
+                .store_file_bytes_batch_renewing_leases(items)
+                .await?;
+        } else {
+            self.local
+                .store_bytes_batch(EntryType::File, items, false)
+                .await?;
+        }
         Ok(())
     }
 

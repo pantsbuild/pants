@@ -351,3 +351,64 @@ async fn lease_keeps_lease_with_more_than_half_left() {
 
     assert_eq!(stored_lease(&s, fingerprint), until);
 }
+
+#[tokio::test]
+async fn store_bytes_batch_renewing_leases_creates_missing_lease() {
+    let (s, _tempdir) = new_store(1);
+    let fingerprint = Digest::of_bytes(&bytes(0)).hash;
+    s.store_bytes(fingerprint, bytes(0), false).await.unwrap();
+
+    let before = now_secs();
+    s.store_bytes_batch_renewing_leases(vec![(fingerprint, bytes(0))])
+        .await
+        .unwrap();
+
+    assert!(stored_lease(&s, fingerprint) >= before + DEFAULT_LEASE_TIME.as_secs());
+}
+
+#[tokio::test]
+async fn store_bytes_batch_renewing_leases_renews_lease_with_less_than_half_left() {
+    let (s, _tempdir) = new_store(1);
+    let fingerprint = Digest::of_bytes(&bytes(0)).hash;
+    s.store_bytes(fingerprint, bytes(0), true).await.unwrap();
+    set_lease(
+        &s,
+        fingerprint,
+        now_secs() + DEFAULT_LEASE_TIME.as_secs() / 2 - 60,
+    );
+
+    let before = now_secs();
+    s.store_bytes_batch_renewing_leases(vec![(fingerprint, bytes(0))])
+        .await
+        .unwrap();
+
+    assert!(stored_lease(&s, fingerprint) >= before + DEFAULT_LEASE_TIME.as_secs());
+}
+
+#[tokio::test]
+async fn store_bytes_batch_renewing_leases_keeps_lease_with_more_than_half_left() {
+    let (s, _tempdir) = new_store(1);
+    let fingerprint = Digest::of_bytes(&bytes(0)).hash;
+    s.store_bytes(fingerprint, bytes(0), true).await.unwrap();
+    let until = now_secs() + DEFAULT_LEASE_TIME.as_secs() / 2 + 60;
+    set_lease(&s, fingerprint, until);
+
+    s.store_bytes_batch_renewing_leases(vec![(fingerprint, bytes(0))])
+        .await
+        .unwrap();
+
+    assert_eq!(stored_lease(&s, fingerprint), until);
+}
+
+#[tokio::test]
+async fn store_bytes_batch_keeps_lease_with_less_than_half_left() {
+    let (s, _tempdir) = new_store(1);
+    let fingerprint = Digest::of_bytes(&bytes(0)).hash;
+    s.store_bytes(fingerprint, bytes(0), true).await.unwrap();
+    let until = now_secs() + DEFAULT_LEASE_TIME.as_secs() / 2 - 60;
+    set_lease(&s, fingerprint, until);
+
+    s.store_bytes(fingerprint, bytes(0), true).await.unwrap();
+
+    assert_eq!(stored_lease(&s, fingerprint), until);
+}

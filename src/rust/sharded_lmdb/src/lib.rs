@@ -91,6 +91,13 @@ impl AsRef<[u8]> for VersionedFingerprint {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 struct EnvironmentId(u8);
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Leasing {
+    None,
+    New,
+    NewAndStale,
+}
+
 type SharedEnvironment = (Arc<Environment>, Database, Database);
 
 /// Identifies an LMDB environment by its lock file: LMDB's locks are per file, not per path.
@@ -625,9 +632,36 @@ impl ShardedLmdb {
         items: Vec<(Fingerprint, Bytes)>,
         initial_lease: bool,
     ) -> Result<(), String> {
+        let leasing = if initial_lease {
+            Leasing::New
+        } else {
+            Leasing::None
+        };
+        self.store_bytes_batch_with(items, leasing).await
+    }
+
+    ///
+    /// Like `Self::store_bytes_batch` with an initial lease, but also renews the lease of Bytes
+    /// already stored when no more than half of the lease time is left.
+    ///
+    pub async fn store_bytes_batch_renewing_leases(
+        &self,
+        items: Vec<(Fingerprint, Bytes)>,
+    ) -> Result<(), String> {
+        self.store_bytes_batch_with(items, Leasing::NewAndStale)
+            .await
+    }
+
+    async fn store_bytes_batch_with(
+        &self,
+        items: Vec<(Fingerprint, Bytes)>,
+        leasing: Leasing,
+    ) -> Result<(), String> {
         let store = self.clone();
         self.executor
             .spawn_blocking(move || {
+                let leased_until = store.lease_until_secs_since_epoch();
+                let renew_before = store.renew_before(leased_until);
                 // Group the items by the Environment that they will be applied to.
                 let mut items_by_env = HashMap::new();
                 let mut fingerprints = Vec::new();
@@ -653,14 +687,31 @@ impl ShardedLmdb {
                                     txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE);
                                 match put_res {
                                     Ok(()) => (),
-                                    Err(lmdb::Error::KeyExist) => continue,
+                                    Err(lmdb::Error::KeyExist) => {
+                                        if leasing == Leasing::NewAndStale
+                                            && ShardedLmdb::lease_is_stale(
+                                                lease_database,
+                                                effective_key,
+                                                renew_before,
+                                                &txn,
+                                            )?
+                                        {
+                                            store.lease_inner(
+                                                lease_database,
+                                                effective_key,
+                                                leased_until,
+                                                &mut txn,
+                                            )?;
+                                        }
+                                        continue;
+                                    }
                                     Err(err) => return Err(err),
                                 }
-                                if initial_lease {
+                                if leasing != Leasing::None {
                                     store.lease_inner(
                                         lease_database,
                                         effective_key,
-                                        store.lease_until_secs_since_epoch(),
+                                        leased_until,
                                         &mut txn,
                                     )?;
                                 }
@@ -802,7 +853,7 @@ impl ShardedLmdb {
                         &env,
                         lease_database,
                         &key,
-                        until_secs_since_epoch - store.lease_time.as_secs() / 2,
+                        store.renew_before(until_secs_since_epoch),
                     )
                     .and_then(|fresh| {
                         if fresh {
@@ -832,11 +883,12 @@ impl ShardedLmdb {
         secs_since_epoch: u64,
     ) -> Result<bool, lmdb::Error> {
         let txn = env.begin_ro_txn()?;
-        match txn.get(lease_database, &versioned_fingerprint.as_ref()) {
-            Ok(bytes) => Ok(lease_from_bytes(bytes) > secs_since_epoch),
-            Err(lmdb::Error::NotFound) => Ok(false),
-            Err(e) => Err(e),
-        }
+        Ok(!ShardedLmdb::lease_is_stale(
+            lease_database,
+            versioned_fingerprint,
+            secs_since_epoch,
+            &txn,
+        )?)
     }
 
     fn lease_inner(
@@ -854,11 +906,28 @@ impl ShardedLmdb {
         )
     }
 
+    fn lease_is_stale(
+        database: Database,
+        versioned_fingerprint: &VersionedFingerprint,
+        renew_before: u64,
+        txn: &impl Transaction,
+    ) -> Result<bool, lmdb::Error> {
+        match txn.get(database, &versioned_fingerprint.as_ref()) {
+            Ok(bytes) => Ok(lease_from_bytes(bytes) <= renew_before),
+            Err(lmdb::Error::NotFound) => Ok(true),
+            Err(e) => Err(e),
+        }
+    }
+
     fn lease_until_secs_since_epoch(&self) -> u64 {
         let now_since_epoch = time::SystemTime::now()
             .duration_since(time::UNIX_EPOCH)
             .expect("Surely you're not before the unix epoch?");
         (now_since_epoch + self.lease_time).as_secs()
+    }
+
+    fn renew_before(&self, leased_until: u64) -> u64 {
+        leased_until - self.lease_time.as_secs() / 2
     }
 
     pub async fn load_bytes_with<
