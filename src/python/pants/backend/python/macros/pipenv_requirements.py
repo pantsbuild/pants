@@ -10,7 +10,10 @@ from pants.backend.python.macros.common_fields import (
     RequirementsOverrideField,
     TypeStubsModuleMappingField,
 )
-from pants.backend.python.macros.common_requirements_rule import _generate_requirements
+from pants.backend.python.macros.common_requirements_rule import (
+    ParsedRequirement,
+    _generate_requirements,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import PythonRequirementResolveField, PythonRequirementTarget
 from pants.engine.rules import collect_rules, rule
@@ -70,7 +73,7 @@ async def generate_from_pipenv_requirements(
 
 def parse_pipenv_requirements(
     file_contents: bytes, file_path: str = ""
-) -> tuple[PipRequirement, ...]:
+) -> tuple[ParsedRequirement, ...]:
     lock_info = json.loads(file_contents)
 
     def _parse_pipenv_requirement(raw_req: str, info: dict) -> PipRequirement:
@@ -83,7 +86,7 @@ def parse_pipenv_requirements(
         return PipRequirement.parse(raw_req)
 
     return tuple(
-        _parse_pipenv_requirement(req, info)
+        ParsedRequirement(_parse_pipenv_requirement(req, info))
         for req, info in {**lock_info.get("default", {}), **lock_info.get("develop", {})}.items()
     )
 
