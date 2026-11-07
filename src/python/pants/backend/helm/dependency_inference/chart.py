@@ -17,6 +17,7 @@ from pants.backend.helm.target_types import (
     HelmChartDependenciesField,
     HelmChartMetaSourceField,
     HelmChartTarget,
+    HelmChartValuesField,
 )
 from pants.backend.helm.target_types import rules as helm_target_types_rules
 from pants.backend.helm.util_rules import chart_metadata
@@ -25,7 +26,9 @@ from pants.backend.helm.util_rules.chart_metadata import (
     parse_chart_metadata_from_field,
 )
 from pants.engine.addresses import Address
+from pants.engine.internals.build_files import maybe_resolve_address
 from pants.engine.internals.graph import determine_explicitly_provided_dependencies
+from pants.engine.internals.native_engine import AddressInput
 from pants.engine.internals.selectors import concurrently
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import (
@@ -166,6 +169,50 @@ async def infer_chart_dependencies_via_metadata(
     return InferredDependencies(dependencies)
 
 
+@dataclass(frozen=True)
+class HelmChartValuesDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (HelmChartValuesField,)
+
+    values: HelmChartValuesField
+    dependencies: HelmChartDependenciesField
+
+
+class InferHelmChartValuesDependenciesRequest(InferDependenciesRequest):
+    infer_from = HelmChartValuesDependenciesInferenceFieldSet
+
+
+@rule(desc="Inferring Helm chart dependencies from values", level=LogLevel.DEBUG)
+async def infer_chart_values_dependencies(
+    request: InferHelmChartValuesDependenciesRequest,
+) -> InferredDependencies:
+    values = request.field_set.values.value
+    if not values:
+        return InferredDependencies([])
+
+    address = request.field_set.address
+    dependencies: OrderedSet[Address] = OrderedSet()
+
+    for value in values.values():
+        try:
+            address_input = AddressInput.parse(
+                value,
+                relative_to=address.spec_path,
+                description_of_origin=f"the `values` field of the `helm_chart` target {address}",
+            )
+        except Exception:
+            continue
+
+        maybe_addr = await maybe_resolve_address(address_input)
+        if isinstance(maybe_addr.val, Address):
+            dependencies.add(maybe_addr.val)
+
+    logger.debug(
+        f"Inferred {pluralize(len(dependencies), 'dependency')} from values "
+        f"for target at address: {address}"
+    )
+    return InferredDependencies(dependencies)
+
+
 def rules():
     return [
         *collect_rules(),
@@ -173,4 +220,5 @@ def rules():
         *helm_target_types_rules(),
         *chart_metadata.rules(),
         UnionRule(InferDependenciesRequest, InferHelmChartDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferHelmChartValuesDependenciesRequest),
     ]
