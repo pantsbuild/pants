@@ -56,6 +56,6 @@ relocated_files(
 
 run_shell_command(
     name="gh",
-    command="{chroot}/3rdparty/tools/gh/bin/gh",
+    command="{chroot}/3rdparty/tools/gh/bin/gh $@",
     execution_dependencies=[":relocated-gh"],
 )
