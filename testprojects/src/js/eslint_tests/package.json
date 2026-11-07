@@ -1,0 +1,28 @@
+{
+  "name": "eslint-tests",
+  "version": "1.0.0",
+  "description": "Jest tests for ESLint integration functionality",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "jest": "^29.5.0",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "src/**/*.{js,ts}",
+      "!src/**/*.test.{js,ts}",
+      "!src/test-fixtures/**"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"]
+  }
+}
