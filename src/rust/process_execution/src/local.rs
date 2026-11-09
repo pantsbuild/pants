@@ -717,6 +717,10 @@ pub async fn prepare_workdir(
         let mut mutable_paths = req.output_files.clone();
         mutable_paths.extend(req.output_directories.clone());
 
+        let materialize_error = |se: StoreError| {
+            CapturedWorkdirError::from(se.enrich(format!("An error occurred when attempting to materialize a working directory at {workdir_path:#?}").as_str()))
+        };
+
         if let Some(sandboxer) = sandboxer {
             debug!(
                 "Materializing via sandboxer to {:?}: {:#?}",
@@ -733,7 +737,7 @@ pub async fn prepare_workdir(
                     .record_digest_trie(digest_trie, true)
                     .await?;
             }
-            sandboxer
+            if sandboxer
                 .materialize_directory(
                     &workdir_path,
                     workdir_root_path,
@@ -741,11 +745,31 @@ pub async fn prepare_workdir(
                     &mutable_paths,
                 )
                 .await
-                .map_err(|e| {
-                    format!(
-                        "materialize_directory() request to sandboxer process failed: {e}"
+                .is_err()
+            {
+                // The sandboxer's error is text, so ask the store for the typed `MissingDigest`
+                // that backtracking needs. If nothing is missing, the input was stored since the
+                // failure, so retry once.
+                if let Err(se @ StoreError::MissingDigest(..)) = store
+                    .ensure_downloaded(HashSet::new(), HashSet::from([persisted_digest.clone()]))
+                    .await
+                {
+                    return Err(materialize_error(se));
+                }
+                sandboxer
+                    .materialize_directory(
+                        &workdir_path,
+                        workdir_root_path,
+                        &persisted_digest,
+                        &mutable_paths,
                     )
-                })?;
+                    .await
+                    .map_err(|e| {
+                        format!(
+                            "materialize_directory() request to sandboxer process failed: {e}"
+                        )
+                    })?;
+            }
         } else {
             debug!(
                 "Materializing directly to {:?}: {:#?}",
@@ -761,7 +785,7 @@ pub async fn prepare_workdir(
                     Permissions::Writable,
                 )
                 .await
-                .map_err(|se| CapturedWorkdirError::from(se.enrich(format!("An error occurred when attempting to materialize a working directory at {workdir_path:#?}").as_str())))?;
+                .map_err(materialize_error)?;
         }
 
         if let Some(executable_path) = maybe_executable_path {

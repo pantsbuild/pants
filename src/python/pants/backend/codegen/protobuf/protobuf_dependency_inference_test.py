@@ -13,11 +13,19 @@ from pants.backend.codegen.protobuf.protobuf_dependency_inference import (
     ProtobufMapping,
     parse_proto_imports,
 )
-from pants.backend.codegen.protobuf.target_types import ProtobufSourcesGeneratorTarget
+from pants.backend.codegen.protobuf.python import additional_fields as python_fields
+from pants.backend.codegen.protobuf.target_types import (
+    ProtobufSourcesGeneratorTarget,
+    ProtobufSourceTarget,
+)
 from pants.backend.codegen.protobuf.target_types import rules as target_types_rules
+from pants.backend.python import target_types_rules as python_target_types_rules
 from pants.core.util_rules import stripped_source_files
 from pants.engine.addresses import Address
+from pants.engine.internals.parametrize import Parametrize
 from pants.engine.target import InferredDependencies
+from pants.jvm import target_types as jvm_target_types
+from pants.jvm.target_types import PrefixedJvmResolveField
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 from pants.util.frozendict import FrozenDict
 
@@ -232,3 +240,133 @@ def test_no_resolve_fields_fallback(rule_runner: RuleRunner) -> None:
 
     deps = run_dep_inference(Address("protos", relative_file_path="a.proto"))
     assert deps == InferredDependencies([Address("protos", relative_file_path="b.proto")])
+
+
+@pytest.fixture
+def rule_runner_with_python_and_jvm_resolves() -> RuleRunner:
+    """Both Python's and the JVM's resolve fields on protobuf targets, as when Python and Java or
+    Scala codegen are enabled together."""
+    return RuleRunner(
+        rules=[
+            *stripped_source_files.rules(),
+            *protobuf_dependency_inference.rules(),
+            *target_types_rules(),
+            *python_fields.rules(),
+            *python_target_types_rules.rules(),
+            *jvm_target_types.rules(),
+            ProtobufSourceTarget.register_plugin_field(PrefixedJvmResolveField),
+            ProtobufSourcesGeneratorTarget.register_plugin_field(PrefixedJvmResolveField),
+            QueryRule(ProtobufMapping, []),
+            QueryRule(InferredDependencies, [InferProtobufDependencies]),
+        ],
+        target_types=[ProtobufSourceTarget, ProtobufSourcesGeneratorTarget],
+        objects={"parametrize": Parametrize},
+    )
+
+
+def _infer(rule_runner: RuleRunner, address: Address) -> InferredDependencies:
+    tgt = rule_runner.get_target(address)
+    return rule_runner.request(
+        InferredDependencies,
+        [InferProtobufDependencies(ProtobufDependencyInferenceFieldSet.create(tgt))],
+    )
+
+
+def test_dependency_inference_with_two_resolve_fields(
+    rule_runner_with_python_and_jvm_resolves: RuleRunner,
+) -> None:
+    rule_runner = rule_runner_with_python_and_jvm_resolves
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['protos']",
+            "--python-enable-resolves",
+            "--python-resolves={'a': ''}",
+            "--jvm-resolves={'j': 'j.lock'}",
+            "--jvm-default-resolve=j",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "protos/a.proto": "import 'b.proto';",
+            "protos/b.proto": "",
+            "protos/BUILD": "protobuf_sources(python_resolve='a', jvm_resolve='j')",
+        }
+    )
+    assert _infer(rule_runner, Address("protos", relative_file_path="a.proto")) == (
+        InferredDependencies([Address("protos", relative_file_path="b.proto")])
+    )
+
+
+def test_dependency_inference_with_two_parametrized_resolve_fields(
+    rule_runner_with_python_and_jvm_resolves: RuleRunner, caplog
+) -> None:
+    """The import is owned by one variant per pair of resolves, though by two in each resolve."""
+    rule_runner = rule_runner_with_python_and_jvm_resolves
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['protos']",
+            "--python-enable-resolves",
+            "--python-resolves={'a': '', 'b': ''}",
+            "--jvm-resolves={'j1': 'j1.lock', 'j2': 'j2.lock'}",
+            "--jvm-default-resolve=j1",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "protos/a.proto": "import 'b.proto';",
+            "protos/b.proto": "",
+            "protos/BUILD": dedent(
+                """\
+                for name in ("a", "b"):
+                    protobuf_source(
+                        name=name,
+                        source=f"{name}.proto",
+                        python_resolve=parametrize("a", "b"),
+                        jvm_resolve=parametrize("j1", "j2"),
+                    )
+                """
+            ),
+        }
+    )
+    for python_resolve in ("a", "b"):
+        for jvm_resolve in ("j1", "j2"):
+            parameters = {"python_resolve": python_resolve, "jvm_resolve": jvm_resolve}
+            assert _infer(
+                rule_runner, Address("protos", target_name="a", parameters=parameters)
+            ) == InferredDependencies([Address("protos", target_name="b", parameters=parameters)])
+    assert not caplog.records
+
+
+def test_dependency_inference_with_one_resolve_field_disabled(
+    rule_runner_with_python_and_jvm_resolves: RuleRunner,
+) -> None:
+    """Python's resolves being disabled leaves inference partitioned by the JVM's."""
+    rule_runner = rule_runner_with_python_and_jvm_resolves
+    rule_runner.set_options(
+        [
+            "--source-root-patterns=['protos']",
+            "--jvm-resolves={'j1': 'j1.lock', 'j2': 'j2.lock'}",
+            "--jvm-default-resolve=j1",
+        ]
+    )
+    rule_runner.write_files(
+        {
+            "protos/a.proto": "import 'b.proto';",
+            "protos/b.proto": "",
+            "protos/BUILD": dedent(
+                """\
+                for name in ("a", "b"):
+                    protobuf_source(
+                        name=name,
+                        source=f"{name}.proto",
+                        jvm_resolve=parametrize("j1", "j2"),
+                    )
+                """
+            ),
+        }
+    )
+    for jvm_resolve in ("j1", "j2"):
+        parameters = {"jvm_resolve": jvm_resolve}
+        assert _infer(
+            rule_runner, Address("protos", target_name="a", parameters=parameters)
+        ) == InferredDependencies([Address("protos", target_name="b", parameters=parameters)])

@@ -950,6 +950,9 @@ def test_setup_pex_requirements() -> None:
         ),
     )
 
+    # Nothing to resolve, so no repository args that could make the cache key path-dependent.
+    assert_setup(PexRequirements(), _BuildPexRequirementsSetup([], [], 0))
+
     # Pex lockfile.
     assert_setup(
         EntireLockfile(lockfile_obj, complete_req_strings=reqs),

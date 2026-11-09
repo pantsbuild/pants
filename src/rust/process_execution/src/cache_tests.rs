@@ -42,10 +42,7 @@ fn create_local_runner() -> (Box<dyn CommandRunnerTrait>, Store, TempDir) {
     (runner, store, base_dir)
 }
 
-fn create_cached_runner(
-    local: Box<dyn CommandRunnerTrait>,
-    store: Store,
-) -> (Box<dyn CommandRunnerTrait>, TempDir) {
+fn create_cache() -> (PersistentCache, TempDir) {
     let runtime = task_executor::Executor::new();
     let cache_dir = TempDir::new().unwrap();
     let max_lmdb_size = 50 * 1024 * 1024; //50 MB - I didn't pick that number but it seems reasonable.
@@ -59,15 +56,31 @@ fn create_cached_runner(
     )
     .unwrap();
 
-    let runner = Box::new(crate::cache::CommandRunner::new(
-        local.into(),
+    (cache, cache_dir)
+}
+
+fn create_runner_with_cache(
+    local: Arc<dyn CommandRunnerTrait>,
+    cache: PersistentCache,
+    store: Store,
+    cache_read: bool,
+) -> Box<dyn CommandRunnerTrait> {
+    Box::new(crate::cache::CommandRunner::new(
+        local,
         cache,
         store,
-        true,
+        cache_read,
         CacheContentBehavior::Fetch,
         None,
-    ));
+    ))
+}
 
+fn create_cached_runner(
+    local: Box<dyn CommandRunnerTrait>,
+    store: Store,
+) -> (Box<dyn CommandRunnerTrait>, TempDir) {
+    let (cache, cache_dir) = create_cache();
+    let runner = create_runner_with_cache(local.into(), cache, store, true);
     (runner, cache_dir)
 }
 
@@ -92,6 +105,50 @@ fn create_script(script_exit_code: i8) -> (Process, PathBuf, TempDir) {
     .output_files(relative_paths(&["roland"]).collect());
 
     (process, script_path, script_dir)
+}
+
+fn create_sandbox_path_script() -> (Process, PathBuf, TempDir) {
+    let script_dir = TempDir::new().unwrap();
+    let script_path = script_dir.path().join("script");
+    std::fs::write(&script_path, "pwd > roland").unwrap();
+
+    let process = Process::new(vec![
+        testutil::path::find_bash(),
+        format!("{}", script_path.display()),
+    ])
+    .output_files(relative_paths(&["roland"]).collect());
+
+    (process, script_path, script_dir)
+}
+
+async fn remove_first_output_file(store: &Store, result: &FallibleProcessResultWithPlatform) {
+    let output_dir_digest = result.output_directory.clone();
+    store
+        .ensure_directory_digest_persisted(output_dir_digest.clone())
+        .await
+        .unwrap();
+    let output_dir = store
+        .load_directory(output_dir_digest.as_digest())
+        .await
+        .unwrap();
+    let output_child_digest = output_dir
+        .files
+        .first()
+        .unwrap()
+        .digest
+        .as_ref()
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let removed = store.remove_file(output_child_digest).await.unwrap();
+    assert!(removed);
+    assert!(
+        store
+            .contents_for_directory(output_dir_digest)
+            .await
+            .err()
+            .is_some()
+    )
 }
 
 async fn run_roundtrip(script_exit_code: i8, workunit: &mut RunningWorkunit) -> RoundtripResults {
@@ -154,35 +211,7 @@ async fn recover_from_missing_store_contents() {
 
     // Delete the first child of the output directory parent to confirm that we ensure that more
     // than just the root of the output is present when hitting the cache.
-    {
-        let output_dir_digest = first_result.output_directory;
-        store
-            .ensure_directory_digest_persisted(output_dir_digest.clone())
-            .await
-            .unwrap();
-        let output_dir = store
-            .load_directory(output_dir_digest.as_digest())
-            .await
-            .unwrap();
-        let output_child_digest = output_dir
-            .files
-            .first()
-            .unwrap()
-            .digest
-            .as_ref()
-            .unwrap()
-            .try_into()
-            .unwrap();
-        let removed = store.remove_file(output_child_digest).await.unwrap();
-        assert!(removed);
-        assert!(
-            store
-                .contents_for_directory(output_dir_digest)
-                .await
-                .err()
-                .is_some()
-        )
-    }
+    remove_first_output_file(&store, &first_result).await;
 
     // Ensure that we don't fail if we re-run.
     let second_result = caching
@@ -198,4 +227,76 @@ async fn recover_from_missing_store_contents() {
             .ok()
             .is_some()
     )
+}
+
+#[tokio::test]
+async fn replace_entry_with_missing_store_contents() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+
+    let (local, store, _local_runner_dir) = create_local_runner();
+    let (caching, _cache_dir) = create_cached_runner(local, store.clone());
+    let (process, script_path, _script_dir) = create_sandbox_path_script();
+
+    let first_result = caching
+        .run(Context::default(), &mut workunit, process.clone())
+        .await
+        .unwrap();
+    remove_first_output_file(&store, &first_result).await;
+
+    let second_result = caching
+        .run(Context::default(), &mut workunit, process.clone())
+        .await
+        .unwrap();
+    assert_ne!(
+        first_result.output_directory.as_digest(),
+        second_result.output_directory.as_digest()
+    );
+
+    // Without the script, only a cache hit can succeed.
+    std::fs::remove_file(&script_path).unwrap();
+    let third_result = caching
+        .run(Context::default(), &mut workunit, process)
+        .await
+        .unwrap();
+    assert_eq!(third_result.exit_code, 0);
+    assert_eq!(
+        second_result.output_directory.as_digest(),
+        third_result.output_directory.as_digest()
+    );
+}
+
+#[tokio::test]
+async fn replace_entry_from_runner_without_cache_reads() {
+    let (_, mut workunit) = WorkunitStore::setup_for_tests();
+
+    let (local, store, _local_runner_dir) = create_local_runner();
+    let local: Arc<dyn CommandRunnerTrait> = local.into();
+    let (cache, _cache_dir) = create_cache();
+    let reading = create_runner_with_cache(local.clone(), cache.clone(), store.clone(), true);
+    // Backtracking re-runs a process through a runner that writes the cache without reading it.
+    let writing = create_runner_with_cache(local, cache, store.clone(), false);
+    let (process, script_path, _script_dir) = create_sandbox_path_script();
+
+    let first_result = reading
+        .run(Context::default(), &mut workunit, process.clone())
+        .await
+        .unwrap();
+    remove_first_output_file(&store, &first_result).await;
+
+    let second_result = writing
+        .run(Context::default(), &mut workunit, process.clone())
+        .await
+        .unwrap();
+
+    // Without the script, only a cache hit can succeed.
+    std::fs::remove_file(&script_path).unwrap();
+    let third_result = reading
+        .run(Context::default(), &mut workunit, process)
+        .await
+        .unwrap();
+    assert_eq!(third_result.exit_code, 0);
+    assert_eq!(
+        second_result.output_directory.as_digest(),
+        third_result.output_directory.as_digest()
+    );
 }

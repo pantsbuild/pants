@@ -5,6 +5,7 @@ Created as part of the release process.
 + APL
 + Aaron Mitchell
 + Adam Chainz
++ Adam Crews
 + Adam Retter
 + Aditya Raj Verma
 + Aegis
@@ -12,6 +13,7 @@ Created as part of the release process.
 + Alan Paulin
 + Alan Velasco
 + Aleksandr Artemenkov
++ Alessandro De Maria
 + Alex Bancroft
 + Alex Schmitt
 + Alex Tremblay
@@ -256,6 +258,7 @@ Created as part of the release process.
 + Mark Davis
 + Mark McBride
 + Martim Lobao
++ Martin Ingvaldsen
 + Mateo Rodriguez
 + Mathew Jennings
 + Mathieu Sabourin
@@ -410,6 +413,7 @@ Created as part of the release process.
 + Yuhan GUO
 + Yujie Chen
 + Yusuf Jabri
++ Zach
 + Zhaoqi Xu
 + achrafmam2
 + andreaimprovised

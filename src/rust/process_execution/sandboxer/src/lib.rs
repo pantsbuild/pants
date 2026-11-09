@@ -24,7 +24,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use std::{collections::BTreeSet, io};
 use std::{fs, thread};
-use store::{Store, StoreCliOpt};
+use store::{Store, StoreCliOpt, StoreError};
 use tokio::fs::OpenOptions;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::RwLock;
@@ -32,7 +32,7 @@ use tokio::sync::oneshot;
 use tokio::{process::Command, sync::RwLockWriteGuard};
 use tokio_stream::wrappers::UnixListenerStream;
 use tonic::transport::{Channel, Endpoint, Server, Uri};
-use tonic::{Request, Response, Status};
+use tonic::{Code, Request, Response, Status};
 use tower::service_fn;
 
 #[cfg(test)]
@@ -233,11 +233,14 @@ impl SandboxerGrpcImpl {
     async fn do_materialize_directory(
         &self,
         request: Request<MaterializeDirectoryRequest>,
-    ) -> Result<Response<MaterializeDirectoryResponse>, String> {
+    ) -> Result<Response<MaterializeDirectoryResponse>, StoreError> {
         let r = request.into_inner();
         debug!("Received materialize_directory() request: {:#?}", r);
         let destination_root: PathBuf = r.destination_root.into();
-        let digest: Digest = r.digest.ok_or("No digest provided")?.try_into()?;
+        let digest: Digest = r
+            .digest
+            .ok_or_else(|| "No digest provided".to_owned())?
+            .try_into()?;
         let dir_digest = DirectoryDigest::from_persisted_digest(digest);
         let mutable_paths = r
             .mutable_paths
@@ -253,8 +256,7 @@ impl SandboxerGrpcImpl {
                 &mutable_paths,
                 Permissions::Writable,
             )
-            .await
-            .map_err(|e| e.to_string())?;
+            .await?;
         Ok(Response::new(MaterializeDirectoryResponse {}))
     }
 }
@@ -269,7 +271,10 @@ impl SandboxerGrpc for SandboxerGrpcImpl {
         let ret = self
             .do_materialize_directory(request)
             .await
-            .map_err(Status::failed_precondition);
+            .map_err(|e| match e {
+                StoreError::MissingDigest(..) => Status::not_found(e.to_string()),
+                StoreError::Unclassified(_) => Status::failed_precondition(e.to_string()),
+            });
         debug!("materialize_directory() result: {:#?}", ret);
         ret
     }
@@ -336,20 +341,36 @@ impl SandboxerClient {
         dir_digest: &DirectoryDigest,
         mutable_paths: &[String],
     ) -> Result<(), String> {
+        self.request_materialize_directory(destination, destination_root, dir_digest, mutable_paths)
+            .await
+            .map_err(|status| status.to_string())
+    }
+
+    async fn request_materialize_directory(
+        &mut self,
+        destination: &Path,
+        destination_root: &Path,
+        dir_digest: &DirectoryDigest,
+        mutable_paths: &[String],
+    ) -> Result<(), Status> {
         let request = tonic::Request::new(MaterializeDirectoryRequest {
             destination: destination
                 .to_str()
-                .ok_or(format!(
-                    "workdir_path is not a valid str: {}",
-                    destination.display()
-                ))?
+                .ok_or_else(|| {
+                    Status::invalid_argument(format!(
+                        "workdir_path is not a valid str: {}",
+                        destination.display()
+                    ))
+                })?
                 .to_string(),
             destination_root: destination_root
                 .to_str()
-                .ok_or(format!(
-                    "workdir_root_path is not a valid str: {}",
-                    destination_root.display()
-                ))?
+                .ok_or_else(|| {
+                    Status::invalid_argument(format!(
+                        "workdir_root_path is not a valid str: {}",
+                        destination_root.display()
+                    ))
+                })?
                 .to_string(),
             digest: Some(dir_digest.as_digest().into()),
             mutable_paths: mutable_paths.to_vec(),
@@ -359,7 +380,6 @@ impl SandboxerClient {
             .materialize_directory(request)
             .await
             .map(|_| ())
-            .map_err(|e| e.to_string())
     }
 }
 
@@ -567,20 +587,32 @@ impl Sandboxer {
         let ret = self
             .client()
             .await?
-            .materialize_directory(destination, destination_root, dir_digest, &mutable_paths)
+            .request_materialize_directory(
+                destination,
+                destination_root,
+                dir_digest,
+                &mutable_paths,
+            )
             .await;
-        if ret.is_err() {
-            // The server might be down for some reason (e.g., it has not been initially started
-            // yet, or the socket file was deleted by the user). If this happens, ensure the
-            // server is properly killed, and retry once.
-            self.kill().await;
-            return self
-                .client()
-                .await?
-                .materialize_directory(destination, destination_root, dir_digest, &mutable_paths)
-                .await;
+        match ret {
+            Err(status) if status.code() != Code::NotFound => {
+                // The server might be down for some reason (e.g., it has not been initially started
+                // yet, or the socket file was deleted by the user). If this happens, ensure the
+                // server is properly killed, and retry once. A missing input is not a server
+                // failure.
+                self.kill().await;
+                self.client()
+                    .await?
+                    .materialize_directory(
+                        destination,
+                        destination_root,
+                        dir_digest,
+                        &mutable_paths,
+                    )
+                    .await
+            }
+            ret => ret.map_err(|status| status.to_string()),
         }
-        ret
     }
 }
 

@@ -853,6 +853,30 @@ impl ByteStore {
     }
 
     ///
+    /// Like `Self::store_bytes_batch` for files with an initial lease, but also renews stale leases
+    /// of small files already stored.
+    ///
+    pub async fn store_file_bytes_batch_renewing_leases(
+        &self,
+        items: Vec<(Fingerprint, Bytes)>,
+    ) -> Result<(), String> {
+        let (fsdb_items, lmdb_items): (Vec<_>, Vec<_>) = items
+            .into_iter()
+            .partition(|(_, bytes)| ByteStore::should_use_fsdb(EntryType::File, bytes.len()));
+
+        try_join(
+            self.inner.file_fsdb.store_bytes_batch(fsdb_items, true),
+            self.inner
+                .file_lmdb
+                .clone()?
+                .store_bytes_batch_renewing_leases(lmdb_items),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    ///
     /// Store data in two passes, without buffering it entirely into memory. Prefer
     /// `Self::store_bytes` for small values which fit comfortably in memory.
     ///

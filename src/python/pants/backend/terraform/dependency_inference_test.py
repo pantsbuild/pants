@@ -12,8 +12,10 @@ from pants.backend.terraform.dependency_inference import (
     TerraformDeploymentDependenciesInferenceFieldSet,
     TerraformHcl2Parser,
     TerraformModuleDependenciesInferenceFieldSet,
+    warn_if_legacy_hcl2,
 )
 from pants.backend.terraform.goals.lockfiles import rules as terraform_lockfile_rules
+from pants.backend.terraform.hcl2_parser import LEGACY_HCL2_MARKER
 from pants.backend.terraform.target_types import (
     TerraformBackendTarget,
     TerraformDeploymentTarget,
@@ -242,6 +244,71 @@ def test_hcl_parser_wrapper_runs(rule_runner: RuleRunner, major_minor_interprete
 
     lines = {line for line in result.stdout.decode("utf-8").splitlines() if line}
     assert lines == {"grok", "foo/hello/world"}
+    assert LEGACY_HCL2_MARKER not in result.stderr
+
+
+def test_hcl_parser_handles_keywords_and_multiline_conditionals(rule_runner: RuleRunner) -> None:
+    """python-hcl2 4.3.0 and earlier failed to parse each of these constructs."""
+    rule_runner.write_files(
+        {
+            "foo/BUILD": "terraform_module(name='t')\n",
+            "foo/main.tf": textwrap.dedent(
+                """\
+                # `for` as an attribute name: https://github.com/pantsbuild/pants/issues/21845
+                resource "grafana_rule_group" "example" {
+                  rule {
+                    name = "example"
+                    for  = "5m"
+                  }
+                }
+
+                # `in` as a block name: https://github.com/pantsbuild/pants/issues/22401
+                data "snowflake_schemas" "in" {
+                  in {
+                    database = "example"
+                  }
+                }
+
+                # A conditional expression split over multiple lines.
+                locals {
+                  flavor = (
+                    var.enabled
+                    ? "on"
+                    : "off"
+                  )
+                }
+
+                module "foo" {
+                  source = "../grok"
+                }
+                """
+            ),
+        }
+    )
+    target = rule_runner.get_target(Address("foo", target_name="t"))
+    sources = rule_runner.request(HydratedSources, [HydrateSourcesRequest(target[SourcesField])])
+    result = rule_runner.request(
+        ProcessResult,
+        [
+            ParseTerraformModuleSources(
+                sources_digest=sources.snapshot.digest, paths=("foo/main.tf",)
+            )
+        ],
+    )
+
+    lines = {line for line in result.stdout.decode("utf-8").splitlines() if line}
+    assert lines == {"grok"}
+    assert LEGACY_HCL2_MARKER not in result.stderr
+
+
+def test_warn_if_legacy_hcl2(caplog: pytest.LogCaptureFixture) -> None:
+    warn_if_legacy_hcl2(b"")
+    assert not caplog.records
+
+    warn_if_legacy_hcl2(LEGACY_HCL2_MARKER + b"\n")
+    assert len(caplog.records) == 1
+    assert "DEPRECATED: support for `python-hcl2` versions older than 8.0" in caplog.text
+    assert "[terraform-hcl2-parser].install_from_resolve" in caplog.text
 
 
 def test_generate_lockfile_without_python_backend() -> None:

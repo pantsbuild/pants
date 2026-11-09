@@ -9,6 +9,10 @@ from typing import Set
 # Note: This file is used as a pex entry point in the execution sandbox.
 #
 
+# Printed to stderr when the installed python-hcl2 is older than 8.0, so that Pants can warn that
+# support for it is deprecated.
+LEGACY_HCL2_MARKER = b"__pants_legacy_python_hcl2__"
+
 
 # PurePath does not have the Path.resolve method which resolves ".." components, thus we need to
 # code our own version for PurePath's.
@@ -33,7 +37,17 @@ def extract_module_source_paths(path: PurePath, raw_content: bytes) -> Set[str]:
     import hcl2  # type: ignore[import-not-found]  # pants: no-infer-dep
 
     content = raw_content.decode("utf-8")
-    parsed_content = hcl2.loads(content)
+    if hasattr(hcl2, "SerializationOptions"):
+        # python-hcl2 keeps the quotes around string values (e.g. `"./foo"`) unless asked to strip
+        # them.
+        parsed_content = hcl2.loads(
+            content, serialization_options=hcl2.SerializationOptions(strip_string_quotes=True)
+        )
+    else:
+        # TODO: Remove support for python-hcl2 < 8.0 in Pants 2.35.0.dev0, along with the warning in
+        # `main`. Those versions have no `SerializationOptions`, and strip the quotes around string
+        # values themselves.
+        parsed_content = hcl2.loads(content)
 
     # Note: The `module` key is a list where each entry is a dict with a single entry where the key is the
     # module name and the values are a dict for that module's actual values.
@@ -57,6 +71,12 @@ def extract_module_source_paths(path: PurePath, raw_content: bytes) -> Set[str]:
 
 
 def main(args):
+    import hcl2  # pants: no-infer-dep
+
+    # TODO: Remove in Pants 2.35.0.dev0, along with the fallback in `extract_module_source_paths`.
+    if not hasattr(hcl2, "SerializationOptions"):
+        sys.stderr.buffer.write(LEGACY_HCL2_MARKER + b"\n")
+
     paths = set()
     for filename in args:
         with open(filename, "rb") as f:

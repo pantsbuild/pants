@@ -45,22 +45,13 @@ machine api.github.com
 
 ### `dev` - Check for any deprecations
 
-If this is a dev release, ensure that deprecations set to expire in the released version have been removed. To check for this, search the code for the version you're releasing. For example, `git grep 2.9.0.dev0`.
+If this is a dev release, ensure that deprecations set to expire in the released version have been removed. To check for this, search the code for the version you're releasing. For example, `git grep 2.89.0.dev0`.
 
 If there is deprecated code that must be removed, you can either:
 
 1. Ping the person who made the deprecation to ask them to remove it.
 2. Remove it yourself, in a precursor PR.
 3. Bump the deprecation removal target back by one dev release.
-
-### `a0` - Release notes for next version
-
-When releasing an `a0` version, we need to prepare the release notes for the _next_ version:
-
-1. Create pull request adding the release notes file for the next version in `docs/notes/`, e.g. if you're releasing 2.8.0a0, create `docs/notes/2.9.x.md`.
-   1. Copy and rename the `2.x.y-template.md` to the upcoming version (e.g. `2.33.x.md`).
-   2. Update the primary heading in the Markdown file to the upcoming version.
-2. NB. this can merge after the release pull request, but should be available soon so that pull requests that land in `main` can update it
 
 ### `rc` - Check for cherry-picks
 
@@ -77,7 +68,13 @@ The release commit is the commit that bumps the VERSION string. For `dev`/`a0` r
 
 ### Bump the VERSION
 
-From the `main` branch, run `pants run src/python/pants_release/start_release.py -- --new 2.9.0.dev1 --release-manager your_github_username --publish` with the relevant version and your own GitHub username.
+From the `main` branch, run
+
+```bash
+pants run src/python/pants_release/start_release.py -- --new 2.89.0.dev0 --release-manager your_github_username --publish`
+```
+
+with the relevant version and your own GitHub username.
 
 This will create a pull request that:
 
@@ -97,12 +94,14 @@ If you're releasing an `a0` release, you must:
 
 #### Create new branch
 
-For example, if you're releasing `2.9.0a0`, create the branch `2.9.x` by running the command below. Make sure you are on your release commit before doing this.
+For example, if you're releasing `2.89.0a0`, create the branch `2.89.x` by running the command below. Make sure you are on your release commit before doing this.
 
 ```bash
-$ git checkout -b 2.9.x
-$ git push upstream 2.9.x
+$ git checkout -b 2.89.x
+$ git push upstream 2.89.x
 ```
+
+CI will automatically create blank release notes for the *next* version (e.g., `docs/notes/2.90.x`) from the template at `docs/notes/release-notes-template.md`.
 
 #### Identify pull requests needing changes
 
@@ -110,11 +109,11 @@ Find unmerged pull requests with release notes changes that will now be targetti
 
 1. Use this `gh` CLI command to find pull requests targetting `main` that touch any release notes file:
 
-   ```shell
+   ```bash
    gh pr list --limit 1000 --json url,files --base main | jq 'map(select(.files | map(.path | startswith("docs/notes/")) | any) | .url)'
    ```
 
-2. For each of them, add a "Request changes" review that asks for an update. Suggested review text (replace `$OLD_VERSION` and `$NEW_VERSION` as appropriate, e.g. if you're releasing 2.8.0a0, `OLD_VERSION = 2.8`, `NEW_VERSION = 2.9`):
+2. For each of them, add a "Request changes" review that asks for an update. Suggested review text (replace `$OLD_VERSION` and `$NEW_VERSION` as appropriate, e.g. if you're releasing 2.89.0a0, `OLD_VERSION = 2.89`, `NEW_VERSION = 2.90`):
 
    > Thanks for the contribution. We've just branched for $OLD_VERSION, so merging this pull request now will come out in $NEW_VERSION, please move the release notes updates to `docs/notes/$NEW_VERSION.x.md` if that's appropriate.
 
