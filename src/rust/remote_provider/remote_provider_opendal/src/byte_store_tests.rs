@@ -318,9 +318,7 @@ async fn fs_store_file_round_trip() {
     assert_store(&provider, &testdata).await;
 
     // The temporary file was renamed into place, not left behind.
-    let leftovers = std::fs::read_dir(root.path().join(crate::ATOMIC_WRITE_DIR_NAME))
-        .unwrap()
-        .count();
+    let leftovers = std::fs::read_dir(root.path().join(".tmp")).unwrap().count();
     assert_eq!(leftovers, 0);
 }
 
@@ -355,4 +353,30 @@ async fn fs_partial_write_is_not_visible() {
     writer.write(testdata.bytes().slice(1024..)).await.unwrap();
     writer.close().await.unwrap();
     assert_store(&provider, &testdata).await;
+}
+
+#[tokio::test]
+async fn fs_concurrent_writes_do_not_collide() {
+    let root = tempfile::TempDir::new().unwrap();
+    let testdata = TestData::all_the_henries();
+    let provider = new_fs_provider(root.path());
+    let path = test_path(&testdata);
+
+    // Two writers of the same blob, interleaved, each get their own temporary file.
+    let mut first = provider.operator.writer(&path).await.unwrap();
+    let mut second = provider.operator.writer(&path).await.unwrap();
+    first.write(testdata.bytes().slice(..1024)).await.unwrap();
+    second.write(testdata.bytes().slice(..1024)).await.unwrap();
+    let in_flight = std::fs::read_dir(root.path().join(".tmp")).unwrap().count();
+    assert_eq!(in_flight, 2);
+
+    first.write(testdata.bytes().slice(1024..)).await.unwrap();
+    second.write(testdata.bytes().slice(1024..)).await.unwrap();
+    first.close().await.unwrap();
+    assert_store(&provider, &testdata).await;
+    second.close().await.unwrap();
+    assert_store(&provider, &testdata).await;
+
+    let leftovers = std::fs::read_dir(root.path().join(".tmp")).unwrap().count();
+    assert_eq!(leftovers, 0);
 }

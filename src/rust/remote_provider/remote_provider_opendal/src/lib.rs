@@ -35,10 +35,6 @@ mod byte_store_tests;
 
 const GITHUB_ACTIONS_CACHE_VERSION: &str = "pants-1";
 
-/// The directory, under the root of a `file://` store, that holds blobs while they are being
-/// written.
-const ATOMIC_WRITE_DIR_NAME: &str = ".tmp";
-
 #[derive(Debug, Clone, Copy)]
 pub enum LoadMode {
     Validate,
@@ -84,8 +80,9 @@ impl Provider {
         // Write each blob to a temporary file and rename it into place once complete. Without
         // this, opendal writes directly to the final path, so an interrupted write (e.g. a killed
         // process) leaves a truncated blob under its digest's name. The temporary directory is
-        // inside the root so that the rename never crosses a filesystem boundary.
-        let atomic_write_dir = Path::new(path).join(ATOMIC_WRITE_DIR_NAME);
+        // inside the root so that the rename never crosses a filesystem boundary. opendal gives
+        // each write its own randomly named temporary file, so concurrent writers don't collide.
+        let atomic_write_dir = Path::new(path).join(".tmp");
         let builder = opendal::services::Fs::default()
             .root(path)
             .atomic_write_dir(&atomic_write_dir.to_string_lossy());
