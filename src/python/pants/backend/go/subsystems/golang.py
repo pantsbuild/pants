@@ -302,8 +302,9 @@ class GolangSubsystem(Subsystem):
               * hand-written addresses pointing at an unimported third-party package no longer
                 resolve.
 
-            Imports guarded by build tags, imports for other platforms and the `tools.go` pattern
-            are all treated as imports, so they still generate targets.
+            Imports guarded by build tags, imports for other platforms, the `tools.go` pattern and
+            `tool` directives in `go.mod` are all treated as imports, so they still generate
+            targets.
             """
         ),
     )
