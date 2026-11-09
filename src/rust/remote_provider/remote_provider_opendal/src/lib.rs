@@ -4,6 +4,7 @@
 #![recursion_limit = "256"]
 
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -76,7 +77,15 @@ impl Provider {
     }
 
     pub fn fs(path: &str, scope: String, options: RemoteStoreOptions) -> Result<Provider, String> {
-        let builder = opendal::services::Fs::default().root(path);
+        // Write each blob to a temporary file and rename it into place once complete. Without
+        // this, opendal writes directly to the final path, so an interrupted write (e.g. a killed
+        // process) leaves a truncated blob under its digest's name. The temporary directory is
+        // inside the root so that the rename never crosses a filesystem boundary. opendal gives
+        // each write its own randomly named temporary file, so concurrent writers don't collide.
+        let atomic_write_dir = Path::new(path).join(".tmp");
+        let builder = opendal::services::Fs::default()
+            .root(path)
+            .atomic_write_dir(&atomic_write_dir.to_string_lossy());
         Provider::new(builder, opendal::services::FS_SCHEME, scope, options)
     }
 
