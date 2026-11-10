@@ -1,0 +1,30 @@
+# https://github.com/actions/labeler
+#
+# Adds labels to PRs based on the files they change. The rules are in .github/labeler.yml. Each run
+# looks at the PR's whole diff, so a push that touches a new area adds its label. The labeler keeps no
+# state between runs, so it also re-adds a matching label that someone removed by hand.
+
+name: Label pull requests
+on:
+  # `pull_request_target` rather than `pull_request`, so that PRs from forks get a token that can
+  # add labels. This is safe because nothing from the PR is checked out or run: the labeler lists
+  # the changed files through the API and reads .github/labeler.yml from the base branch.
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions: {}
+
+jobs:
+  label:
+    name: Label from changed files
+    if: github.repository_owner == 'pantsbuild'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read  # read .github/labeler.yml
+      pull-requests: write  # add labels to the PR
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
