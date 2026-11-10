@@ -1,8 +1,9 @@
 # Configuration for .github/workflows/labeler.yaml (https://github.com/actions/labeler).
 #
-# Labels are only ever added, never removed, so a maintainer can always correct them by hand.
-# The release-notes gate label `release-notes:not-required` is deliberately never applied here: that
-# is a human decision.
+# Labels are only ever added, never removed. The labels that satisfy the release-notes check
+# (`release-notes:not-required` and `category:internal`) are deliberately never applied here: whether
+# a change needs release notes is a human decision, and an added label would stay even if later
+# pushes made the PR user-facing.
 
 # If a PR would gain more than this many labels from the rules below, it gains none of them. This
 # keeps tree-wide refactors from collecting a label for every backend they happen to touch.
@@ -110,12 +111,6 @@ changed-files-labels-limit: 3
       - any-glob-to-any-file:
           - src/python/pants/backend/codegen/thrift/**
           - src/python/pants/backend/experimental/codegen/thrift/**
-
-# Only when every changed file is CI, release tooling, or a dependency lockfile.
-"category:internal":
-  - changed-files:
-      - all-globs-to-all-files:
-          - "{.github/**,build-support/**,src/python/pants_release/**,3rdparty/**,src/rust/**/Cargo.toml,src/rust/Cargo.lock}"
 
 # Only when every changed file is user-facing documentation (release notes do not count).
 "category:documentation":
