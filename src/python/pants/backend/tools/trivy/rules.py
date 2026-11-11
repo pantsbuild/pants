@@ -13,7 +13,7 @@ from pants.core.util_rules.external_tool import download_external_tool
 from pants.engine.env_vars import EnvironmentVarsRequest
 from pants.engine.internals.native_engine import Digest, MergeDigests
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import execute_process, merge_digests
+from pants.engine.intrinsics import digest_to_snapshot, execute_process, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -46,7 +46,10 @@ async def run_trivy(
 
     argv.extend(["--cache-dir", trivy.cache_dir])
 
-    config_file = await find_config_file(trivy.config_request())
+    config_file, checks = await concurrently(
+        find_config_file(trivy.config_request()),
+        digest_to_snapshot(**implicitly(trivy.checks_globs())),
+    )
     if trivy.config:
         argv.extend(["--config", trivy.config])
 
@@ -64,6 +67,11 @@ async def run_trivy(
 
     argv.extend(request.command_args)
 
+    if checks.files:
+        argv.append(f"--config-check={','.join(checks.files)}")
+        if trivy.check_namespaces:
+            argv.append(f"--check-namespaces={','.join(trivy.check_namespaces)}")
+
     argv.extend(trivy.args)
 
     if global_options.level > LogLevel.INFO:
@@ -72,7 +80,9 @@ async def run_trivy(
     download_trivy, env, input_digest = await concurrently(
         download_external_tool(trivy.get_request(platform)),
         environment_vars_subset(EnvironmentVarsRequest(trivy.extra_env_vars), **implicitly()),
-        merge_digests(MergeDigests((request.input_digest, config_file.snapshot.digest))),
+        merge_digests(
+            MergeDigests((request.input_digest, config_file.snapshot.digest, checks.digest))
+        ),
     )
 
     immutable_input_digests = {"__trivy": download_trivy.digest}

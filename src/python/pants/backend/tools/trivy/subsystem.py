@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
+from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs
 from pants.engine.target import BoolField
 from pants.option.option_types import (
     ArgsListOption,
@@ -77,6 +78,40 @@ class Trivy(TemplatedExternalTool):
             """
         ),
     )
+
+    checks = StrListOption(
+        help=lambda cls: softwrap(
+            f"""
+            Files or globs of custom Rego checks, relative to the build root, to load in every
+            Trivy run, e.g. `["build-support/trivy-checks/*.rego"]`.
+
+            Pants adds the matched files to the sandbox and passes them to Trivy with
+            `--config-check`, together with `[{cls.options_scope}].check_namespaces`.
+
+            Some checks need further Trivy flags, such as `--raw-config-scanners=terraform` for
+            checks that select the `terraform-raw` input. Set those with
+            `[{cls.options_scope}].args`.
+            """
+        ),
+    )
+    check_namespaces = StrListOption(
+        default=["user"],
+        help=lambda cls: softwrap(
+            f"""
+            Rego namespaces that Trivy evaluates in the checks loaded with
+            `[{cls.options_scope}].checks`, passed as `--check-namespaces`.
+
+            Only used when `[{cls.options_scope}].checks` is set.
+            """
+        ),
+    )
+
+    def checks_globs(self) -> PathGlobs:
+        return PathGlobs(
+            globs=self.checks,
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            description_of_origin=f"the option `[{self.options_scope}].checks`",
+        )
 
     def config_request(self) -> ConfigFilesRequest:
         return ConfigFilesRequest(
