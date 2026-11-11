@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import itertools
 import os.path
+import tomllib
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from operator import itemgetter
@@ -415,9 +416,9 @@ async def generate_uv_lockfile(
                     raise ValueError(
                         f"Expected lockfile entry to be a FileEntry but was a {type(repo_lock_entry)}"
                     )
-        except IntrinsicError:
-            # May fail if the file doesn't exist, which is expected the first time a new lockfile
-            # is generated.
+        except (IntrinsicError, tomllib.TOMLDecodeError):
+            # May fail if the file doesn't exist or is malformed, which is expected the first time
+            # a new lockfile is generated or when the existing one needs to be overwritten.
             pass
 
     uv_config = replace(resolve_config, find_links=resolve_find_links).uv_config()

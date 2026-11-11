@@ -912,3 +912,35 @@ def test_uv_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
     # Regenerate with --sync.
     versions = generate_and_get_versions(updated_requirements, sync=True)
     assert {"ansicolors": "1.1.8", "cowsay": "6.0"} == versions
+
+
+def test_uv_lockfile_generation_ignores_malformed_existing_lockfile(
+    rule_runner: PythonRuleRunner,
+) -> None:
+    # Regression test for https://github.com/pantsbuild/pants/issues/23706.
+    rule_runner.set_options(
+        [
+            "--python-resolves={'test': 'test.lock'}",
+            "--python-separate-lockfile-metadata-file",
+            "--generate-lockfiles-sync",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    req = GenerateUvLockfile(
+        requirements=FrozenOrderedSet(["ansicolors==1.1.8"]),
+        find_links=FrozenOrderedSet([]),
+        interpreter_constraints=InterpreterConstraints(["CPython==3.14.*"]),
+        resolve_name="test",
+        lockfile_dest="test.lock",
+        diff=True,
+    )
+
+    rule_runner.write_digest(rule_runner.request(GenerateLockfileResult, [req]).digest)
+    rule_runner.write_files({"test.lock": "not valid toml [[["})
+
+    result = rule_runner.request(GenerateLockfileResult, [req])
+    digest_contents = rule_runner.request(DigestContents, [result.digest])
+    by_path = {fc.path: fc for fc in digest_contents}
+    lock_data = tomllib.loads(by_path["test.lock"].content.decode())
+    packages = {pkg["name"]: pkg["version"] for pkg in lock_data.get("package", [])}
+    assert packages["ansicolors"] == "1.1.8"
