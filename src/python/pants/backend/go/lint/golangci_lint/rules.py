@@ -9,6 +9,10 @@ from dataclasses import dataclass
 from pants.backend.go.lint.golangci_lint.skip_field import SkipGolangciLintField
 from pants.backend.go.lint.golangci_lint.subsystem import GolangciLint
 from pants.backend.go.subsystems.golang import GolangSubsystem
+from pants.backend.go.target_type_rules import (
+    GoImportPathMappingRequest,
+    map_import_paths_to_packages,
+)
 from pants.backend.go.target_types import GoPackageSourcesField
 from pants.backend.go.util_rules.build_opts import (
     GoBuildOptionsFromTargetRequest,
@@ -29,14 +33,26 @@ from pants.core.util_rules.partitions import Partition, PartitionerType, Partiti
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.core.util_rules.system_binaries import BashBinary
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent, FileEntry, MergeDigests
+from pants.engine.internals.graph import hydrate_sources
 from pants.engine.internals.graph import transitive_targets as transitive_targets_get
 from pants.engine.internals.selectors import concurrently
-from pants.engine.intrinsics import create_digest, execute_process, merge_digests
+from pants.engine.intrinsics import (
+    create_digest,
+    execute_process,
+    get_digest_entries,
+    merge_digests,
+)
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, implicitly, rule
-from pants.engine.target import FieldSet, SourcesField, Target, TransitiveTargetsRequest
+from pants.engine.target import (
+    FieldSet,
+    HydrateSourcesRequest,
+    SourcesField,
+    Target,
+    TransitiveTargetsRequest,
+)
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
@@ -94,6 +110,73 @@ async def partition_golangci_lint(
     )
 
 
+@dataclass(frozen=True)
+class GeneratedGoSourcesRequest:
+    go_mod_address: Address
+    targets: tuple[Target, ...]
+
+
+@dataclass(frozen=True)
+class GeneratedGoSources:
+    digest: Digest
+
+
+@rule(desc="Lay out generated Go for golangci-lint", level=LogLevel.DEBUG)
+async def generated_go_sources(request: GeneratedGoSourcesRequest) -> GeneratedGoSources:
+    """The Go that `targets` generate, at the directory `go` resolves each package's import path to.
+
+    Codegen writes its output beside its own sources (a `.pb.go` beside its `.proto`), but `go`
+    finds a package of the main module at the `go.mod` directory joined with the import path
+    relative to the module path. Generated packages outside the module path are left out: no
+    directory in the module provides them.
+    """
+    go_mod_info, import_paths = await concurrently(
+        determine_go_mod_info(GoModInfoRequest(request.go_mod_address)),
+        map_import_paths_to_packages(
+            GoImportPathMappingRequest(request.go_mod_address), **implicitly()
+        ),
+    )
+    module_path = go_mod_info.import_path
+    package_dirs: dict[Address, str] = {}
+    for tgt in request.targets:
+        if tgt.has_field(GoPackageSourcesField) or not tgt.has_field(SourcesField):
+            continue
+        import_path = import_paths.address_to_import_path.get(tgt.address)
+        if import_path == module_path:
+            package_dirs[tgt.address] = ""
+        elif import_path and import_path.startswith(f"{module_path}/"):
+            package_dirs[tgt.address] = import_path[len(module_path) + 1 :]
+    codegen_targets = [tgt for tgt in request.targets if tgt.address in package_dirs]
+
+    generated = await concurrently(
+        hydrate_sources(
+            HydrateSourcesRequest(
+                tgt[SourcesField],
+                for_sources_types=(GoPackageSourcesField,),
+                enable_codegen=True,
+            ),
+            **implicitly(),
+        )
+        for tgt in codegen_targets
+    )
+    entries = await concurrently(
+        get_digest_entries(sources.snapshot.digest) for sources in generated
+    )
+
+    go_mod_dir = request.go_mod_address.spec_path
+    relocated = [
+        FileEntry(
+            os.path.join(go_mod_dir, package_dirs[tgt.address], os.path.basename(entry.path)),
+            entry.file_digest,
+            entry.is_executable,
+        )
+        for tgt, target_entries in zip(codegen_targets, entries)
+        for entry in target_entries
+        if isinstance(entry, FileEntry)
+    ]
+    return GeneratedGoSources(await create_digest(CreateDigest(relocated)))
+
+
 @rule(desc="Lint with golangci-lint", level=LogLevel.DEBUG)
 async def run_golangci_lint(
     request: GolangciLintRequest.Batch[GolangciLintFieldSet, GolangciLintPartitionMetadata],
@@ -126,6 +209,9 @@ async def run_golangci_lint(
     go_build_opts_request = go_extract_build_options_from_target(
         GoBuildOptionsFromTargetRequest(go_mod_address), **implicitly()
     )
+    generated_go_sources_request = generated_go_sources(
+        GeneratedGoSourcesRequest(go_mod_address, tuple(transitive_targets.closure))
+    )
 
     (
         target_source_files,
@@ -134,6 +220,7 @@ async def run_golangci_lint(
         config_files,
         go_mod_info,
         go_build_opts,
+        generated_go,
     ) = await concurrently(
         target_source_files_request,
         all_source_files_request,
@@ -141,6 +228,7 @@ async def run_golangci_lint(
         config_files_request,
         go_mod_info_request,
         go_build_opts_request,
+        generated_go_sources_request,
     )
 
     cgo_enabled = go_build_opts.cgo_enabled
@@ -195,6 +283,7 @@ async def run_golangci_lint(
                 config_files.snapshot.digest,
                 target_source_files.snapshot.digest,
                 all_source_files.snapshot.digest,
+                generated_go.digest,
                 go_mod_info.digest,
             ]
         )
