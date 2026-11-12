@@ -130,7 +130,7 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
     #   3.14.4 (main, Apr 22 2026, 04:47:40) [GCC 14.2.0]
     #   linux-aarch64
     #   ('glibc', '2.41')
-    fprint_data = f"{}|{}|{}|{}".format(python, sys.version, sysconfig.get_platform(), platform.libc_ver())
+    fprint_data = "{}|{}|{}|{}".format(python, sys.version, sysconfig.get_platform(), platform.libc_ver())
 
     print(python)
     print(hashlib.sha256(fprint_data.encode()).hexdigest())
