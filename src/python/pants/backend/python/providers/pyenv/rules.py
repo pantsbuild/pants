@@ -301,9 +301,24 @@ async def get_python(
         ),
     )
 
+    interpreter_path = result.stdout.decode().splitlines()[-1].strip()
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                argv=(
+                    interpreter_path,
+                    "-c",
+                    PythonExecutable.self_identity_script,
+                ),
+                description=f"Get identity of Python interpreter at {interpreter_path}",
+                level=LogLevel.DEBUG,
+            )
+        )
+    )
+
     return PythonExecutable(
-        path=result.stdout.decode().splitlines()[-1].strip(),
-        fingerprint=None,
+        path=interpreter_path,
+        fingerprint=result.stdout.decode().splitlines()[-1].strip(),
         append_only_caches=PYENV_APPEND_ONLY_CACHES,
     )
 
