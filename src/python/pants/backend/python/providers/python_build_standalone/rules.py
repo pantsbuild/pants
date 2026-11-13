@@ -648,7 +648,7 @@ async def get_python(
     python_path = install_result.stdout.decode().splitlines()[-1].strip()
     return PythonExecutable(
         path=python_path,
-        fingerprint=None,
+        fingerprint=downloaded_python.digest.fingerprint,
         # One would normally set append_only_caches=PBS_APPEND_ONLY_CACHES
         # here, but it is already going to be injected into the pex
         # environment by PythonBuildStandaloneBinary

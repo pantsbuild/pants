@@ -7,6 +7,8 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import PurePath
+from textwrap import dedent  # noqa: PNT20
+from typing import ClassVar
 
 from pants.core.subsystems.python_bootstrap import PythonBootstrap
 from pants.core.util_rules import subprocess_environment, system_binaries
@@ -109,13 +111,42 @@ class PythonExecutable(BinaryPath, EngineAwareReturnType):
 
     append_only_caches: FrozenDict[str, str] = FrozenDict({})
 
+    # A script that can be run against a python executable and prints two lines:
+    # - the full path to that executable.
+    # - the fingerprint of that executable.
+    # This allows us to identify a Python executable even via shim scripts.
+    # N.B.: The following code snippet must be compatible with Python 2.7 and
+    # Python 3.5+.
+    self_identity_script: ClassVar[str] = dedent(
+        # It's important that this is *not* an f-string, so that the embedded curly braces
+        # are treated as literal text.
+        """\
+    import hashlib, os, platform, sys, sysconfig
+
+    python = os.path.realpath(sys.executable)
+
+    # The fprint_data components are, e.g.,
+    #   /usr/local/bin/python3.14
+    #   3.14.4 (main, Apr 22 2026, 04:47:40) [GCC 14.2.0]
+    #   linux-aarch64
+    #   ('glibc', '2.41')
+    fprint_data = "{}|{}|{}|{}".format(python, sys.version, sysconfig.get_platform(), platform.libc_ver())
+
+    print(python)
+    print(hashlib.sha256(fprint_data.encode()).hexdigest())
+    """
+    )
+
     def __init__(
         self,
         path: str,
-        fingerprint: str | None = None,
+        fingerprint: str,
         append_only_caches: Mapping[str, str] = FrozenDict({}),
     ) -> None:
         object.__setattr__(self, "append_only_caches", FrozenDict(append_only_caches))
+        # Typechecking should catch a None fingerprint, but we want to be sure, since in the past
+        # we did allow it.
+        assert fingerprint is not None
         super().__init__(path, fingerprint)
         self.__post_init__()
 
