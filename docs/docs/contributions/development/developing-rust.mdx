@@ -57,6 +57,21 @@ When working on Rust, you typically should set the environment variable `MODE=de
 
 There is also `MODE=dist`, the profile used to build published artifacts. It enables additional optimizations, like link-time optimization, that are usually too slow to be worthwhile for local development.
 
+#### Cross-compiling with `cargo-zigbuild`
+
+The native code can optionally be compiled and linked with [`cargo-zigbuild`](https://github.com/rust-cross/cargo-zigbuild), which uses [Zig](https://ziglang.org/) as the C compiler and linker. This lets you link against an older glibc than the host's, or cross-compile for another target, without installing a target-specific toolchain. Install `cargo-zigbuild` and Zig (for example with `pip install cargo-zigbuild ziglang`), then set:
+
+- `ZIGBUILD=1` to build with `cargo zigbuild` instead of `cargo build`.
+- `NATIVE_TARGET=<triple>` to build for a Rust target triple other than the host's. Install the target first with `rustup target add <triple>`. With `ZIGBUILD=1`, a glibc version may be appended to a Linux triple.
+
+For example, to build a native engine that runs on glibc 2.17 and later:
+
+```bash
+ZIGBUILD=1 NATIVE_TARGET=x86_64-unknown-linux-gnu.2.17 pants ...
+```
+
+Note that `pants` runs the native code it bootstraps, so a `NATIVE_TARGET` that the host can't execute is only useful for producing the binaries under `src/rust/target/<triple>/`. When `NATIVE_TARGET` is set, the engine is built against the same Python version as the one Pants runs with (`$PY`, which defaults to Python 3.14t), by setting `PYO3_CROSS_PYTHON_VERSION` accordingly. To build for a different Python, set `PY` to that interpreter (e.g. `PY=python3.14`).
+
 ### Run tests
 
 To run tests for all crates, run:
