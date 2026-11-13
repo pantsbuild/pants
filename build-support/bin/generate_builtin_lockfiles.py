@@ -191,7 +191,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--resolver",
         type=Resolver,
         choices=list(Resolver),
-        default=Resolver.pex,
+        default=Resolver.uv,
         help="The Python resolver (pex or uv) used to generate Python tool lockfiles.",
     )
     parser.add_argument(
