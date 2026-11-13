@@ -25,7 +25,7 @@ jobs:
     - depot-ubuntu-24.04-arm-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -136,7 +136,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -256,7 +256,7 @@ jobs:
     - depot-macos-14
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -560,7 +560,7 @@ jobs:
     - depot-macos-14
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -858,7 +858,7 @@ jobs:
     - depot-macos-14
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -1215,7 +1215,7 @@ jobs:
     - depot-ubuntu-24.04-arm-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -1312,7 +1312,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -1442,7 +1442,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -1572,7 +1572,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -1702,7 +1702,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -1832,7 +1832,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -1962,7 +1962,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -2092,7 +2092,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -2222,7 +2222,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -2352,7 +2352,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -2482,7 +2482,7 @@ jobs:
     - depot-ubuntu-22.04-8
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -2613,7 +2613,7 @@ jobs:
     - depot-macos-14
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
