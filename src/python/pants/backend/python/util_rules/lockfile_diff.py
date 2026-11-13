@@ -144,8 +144,8 @@ async def _generate_lockfile_diff(
         old_content = next(iter(old_content_entries)).content
         old_packages = _parse_lockfile_packages(old_content, loaded.lockfile_format, path)
     except (EngineError, tomllib.TOMLDecodeError):
-        # May fail if the file doesn't exist or is malformed, which is expected the first time a
-        # new lockfile is generated or when the existing one needs to be overwritten.
+        # May fail if the old lockfile doesn't exist or is malformed, which is expected the first
+        # time a new lockfile is generated or when the malformed one was overwritten.
         pass
 
     return LockfileDiff.create(

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import itertools
 import os.path
-import tomllib
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from operator import itemgetter
@@ -396,7 +395,12 @@ async def generate_uv_lockfile(
         # So we just need to make sure it is. There are no special flags to specify.
         lockfile = await get_lockfile_for_resolve(Resolve(req.resolve_name, False), **implicitly())
         try:
-            loaded_lockfile = await load_lockfile(LoadedLockfileRequest(lockfile), **implicitly())
+            # We don't need the num requirements estimate, and computing it requires parsing the TOML,
+            # which may fail if the existing lockfile is malformed. We prefer to pass it through
+            # to uv and let it do with it what it may.
+            loaded_lockfile = await load_lockfile(
+                LoadedLockfileRequest(lockfile, estimate_num_requirements=False), **implicitly()
+            )
             if (
                 isinstance(metadata_v8 := loaded_lockfile.metadata, PythonLockfileMetadataV8)
                 and metadata_v8.lockfile_format == LockfileFormat.UV
@@ -416,9 +420,9 @@ async def generate_uv_lockfile(
                     raise ValueError(
                         f"Expected lockfile entry to be a FileEntry but was a {type(repo_lock_entry)}"
                     )
-        except (IntrinsicError, tomllib.TOMLDecodeError):
-            # May fail if the file doesn't exist or is malformed, which is expected the first time
-            # a new lockfile is generated or when the existing one needs to be overwritten.
+        except IntrinsicError:
+            # May fail if the file doesn't exist, which is expected the first time a new lockfile
+            # is generated.
             pass
 
     uv_config = replace(resolve_config, find_links=resolve_find_links).uv_config()
