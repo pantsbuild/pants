@@ -8,7 +8,6 @@ publish = false
 [dependencies]
 hashing = { path = "../hashing" }
 prost = { workspace = true }
-prost-build = { workspace = true }
 prost-types = { workspace = true }
 tonic = { workspace = true, features = ["transport", "codegen", "tls-aws-lc", "tls-native-roots"] }
 tonic-prost = { workspace = true }
