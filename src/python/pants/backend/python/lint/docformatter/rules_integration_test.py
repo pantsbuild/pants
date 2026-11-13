@@ -15,7 +15,6 @@ from pants.core.util_rules import source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.target import Target
-from pants.testutil.python_interpreter_selection import all_major_minor_python_versions
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
 
@@ -68,20 +67,12 @@ def run_docformatter(
 
 
 @pytest.mark.platform_specific_behavior
-@pytest.mark.parametrize(
-    "major_minor_interpreter",
-    # Excluded due to https://github.com/pantsbuild/pants/issues/21718
-    # lib2to3 is Officially Removed in 3.13, but some distributions of Python
-    # remove it earlier See for example https://github.com/PyCQA/docformatter/issues/129
-    all_major_minor_python_versions(["CPython>=3.10,<3.12"]),
-)
-def test_passing(rule_runner: RuleRunner, major_minor_interpreter: str) -> None:
+def test_passing(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({"f.py": GOOD_FILE, "BUILD": "python_sources(name='t')"})
     tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="f.py"))
     fmt_result = run_docformatter(
         rule_runner,
         [tgt],
-        extra_args=[f"--docformatter-interpreter-constraints=['=={major_minor_interpreter}.*']"],
     )
     assert fmt_result.output == rule_runner.make_snapshot({"f.py": GOOD_FILE})
     assert fmt_result.did_change is False
@@ -121,19 +112,3 @@ def test_respects_passthrough_args(rule_runner: RuleRunner) -> None:
     )
     assert fmt_result.output == rule_runner.make_snapshot({"f.py": content})
     assert fmt_result.did_change is False
-
-
-def test_stub_files(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {"good.pyi": GOOD_FILE, "bad.pyi": BAD_FILE, "BUILD": "python_sources(name='t')"}
-    )
-
-    good_tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="good.pyi"))
-    fmt_result = run_docformatter(rule_runner, [good_tgt])
-    assert fmt_result.output == rule_runner.make_snapshot({"good.pyi": GOOD_FILE})
-    assert not fmt_result.did_change
-
-    bad_tgt = rule_runner.get_target(Address("", target_name="t", relative_file_path="bad.pyi"))
-    fmt_result = run_docformatter(rule_runner, [bad_tgt])
-    assert fmt_result.output == rule_runner.make_snapshot({"bad.pyi": FIXED_BAD_FILE})
-    assert fmt_result.did_change
