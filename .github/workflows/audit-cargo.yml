@@ -21,3 +21,36 @@ jobs:
         cargo install cargo-audit --locked
         cd src/rust
         cargo audit
+
+    - name: Heartbeat to Slack
+      if: success()
+      uses: slackapi/slack-github-action@v2.1.1
+      with:
+        method: chat.postMessage
+        token: ${{ secrets.SLACK_BOT_TOKEN }}
+        payload: |
+          channel: "#audit"
+          text: ":white_check_mark: cargo audit passed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+    - name: Notify Slack
+      if: failure()
+      uses: slackapi/slack-github-action@v2.1.1
+      with:
+        method: chat.postMessage
+        token: ${{ secrets.SLACK_BOT_TOKEN }}
+        payload: |
+          channel: "#audit"
+          text: ":rotating_light: cargo audit failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+    - name: Notify pants-maintainers
+      if: failure()
+      uses: dawidd6/action-send-mail@v3.8.0
+      with:
+        connection_url: ${{ secrets.EMAIL_CONNECTION_URL }}
+        secure: true
+        from: Pants Audit
+        to: pants-maintainers@googlegroups.com
+        subject: cargo audit failed
+        body: |
+          The scheduled cargo audit failed.
+          See ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
