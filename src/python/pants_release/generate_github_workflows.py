@@ -24,7 +24,7 @@ import yaml
 from pants_release.common import die
 
 
-def read_pex_constants(source_path: Path | None = None) -> tuple[str, str]:
+def read_pex_constants(*names: str, source_path: Path | None = None) -> dict[str, str]:
     """Read the Pex download constants without importing the Pants backend."""
     if source_path is None:
         source_path = (
@@ -32,28 +32,27 @@ def read_pex_constants(source_path: Path | None = None) -> tuple[str, str]:
         )
     source = source_path.read_text()
 
-    def string_assignment(name: str) -> str:
-        matches: list[tuple[str, str]] = re.findall(
-            rf"^{name}[ \t]*=[ \t]*([\"'])([^\"'\\\n]+)\1[ \t]*$",
+    values: dict[str, str] = {}
+    for name in names:
+        match = re.search(
+            rf"^{re.escape(name)}[ \t]*=[ \t]*([\"'])([^\"'\\\n]+)\1[ \t]*$",
             source,
             flags=re.MULTILINE,
         )
-        if len(matches) != 1:
+        if match is None:
+            raise ValueError(f"Expected a string literal assignment for {name} in {source_path}")
+        value = match.group(2)
+        if name == "PEX_BINARY_HASH" and not re.fullmatch(r"[0-9a-fA-F]{64}", value):
             raise ValueError(
-                f"Expected exactly one string literal assignment for {name} in {source_path}"
+                f"PEX_BINARY_HASH in {source_path} must be a 64-character SHA-256 hex digest"
             )
-        return matches[0][1]
-
-    version = string_assignment("PEX_VERSION")
-    binary_hash = string_assignment("PEX_BINARY_HASH")
-    if not re.fullmatch(r"[0-9a-fA-F]{64}", binary_hash):
-        raise ValueError(
-            f"PEX_BINARY_HASH in {source_path} must be a 64-character SHA-256 hex digest"
-        )
-    return version, binary_hash
+        values[name] = value
+    return values
 
 
-PEX_VERSION, PEX_BINARY_HASH = read_pex_constants()
+pex_constants = read_pex_constants("PEX_VERSION", "PEX_BINARY_HASH")
+PEX_VERSION = pex_constants["PEX_VERSION"]
+PEX_BINARY_HASH = pex_constants["PEX_BINARY_HASH"]
 
 # Actions are referenced by tag here, and pinned to SHAs for security (see
 # https://docs.zizmor.sh/) via the lockfile at `.github/workflows/actions.lock`,
