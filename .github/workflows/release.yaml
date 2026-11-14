@@ -308,7 +308,7 @@ jobs:
     - depot-macos-14
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false
@@ -768,7 +768,7 @@ jobs:
     - depot-macos-14
     steps:
     - name: Free up disk space
-      uses: jlumbroso/free-disk-space@v1.3.1
+      uses: lumbroso-commons/free-disk-space@v1.3.1
       with:
         android: true
         docker-images: false

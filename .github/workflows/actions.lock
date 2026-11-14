@@ -37,7 +37,7 @@ workflows:
         - 'actions/upload-artifact@v6.0.0'
         - 'benjyw/setup-protoc@node24'
         - 'dawidd6/action-send-mail@v3.8.0'
-        - 'jlumbroso/free-disk-space@v1.3.1'
+        - 'lumbroso-commons/free-disk-space@v1.3.1'
         - 'slackapi/slack-github-action@v2.1.1'
         - 'swatinem/rust-cache@v2.9.1'
     '.github/workflows/test.yaml':
@@ -51,7 +51,7 @@ workflows:
         - 'actions/upload-artifact@v6.0.0'
         - 'benjyw/setup-protoc@node24'
         - 'coverallsapp/github-action@v2.3.7'
-        - 'jlumbroso/free-disk-space@v1.3.1'
+        - 'lumbroso-commons/free-disk-space@v1.3.1'
         - 'mheap/github-action-required-labels@v4.0.0'
         - 'msys2/setup-msys2@v2.30.0'
         - 'swatinem/rust-cache@v2.9.1'
@@ -158,10 +158,10 @@ dependencies:
         commit: 'sha1-c10b8064de6f491fea524254123dbe5e09572f13'
         owner_id: 9919
         repo_id: 259445878
-    'jlumbroso/free-disk-space@v1.3.1':
+    'lumbroso-commons/free-disk-space@v1.3.1':
         ref: 'v1.3.1'
         commit: 'sha1-54081f138730dfa15788a46383842cd2f914a1be'
-        owner_id: 11770469
+        owner_id: 330458550
         repo_id: 506133999
     'mheap/github-action-required-labels@v4.0.0':
         ref: 'v4.0.0'
