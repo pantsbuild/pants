@@ -5,7 +5,6 @@ use ::fs::DirectoryDigest;
 use hashing::Digest;
 use sandboxer::SandboxerService;
 use std::collections::BTreeSet;
-use std::env;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
@@ -22,14 +21,7 @@ use sandboxer::Sandboxer;
 mod test_util;
 
 fn sandboxer_bin() -> PathBuf {
-    // Cargo will automatically build the sandboxer binary for integration tests under `tests/`,
-    // but not for unit tests under `src/`.
-    env::current_exe()
-        .unwrap()
-        .parent()
-        .and_then(Path::parent)
-        .unwrap()
-        .join("sandboxer")
+    PathBuf::from(env!("CARGO_BIN_EXE_sandboxer"))
 }
 
 fn wait_for(desc: &str, cond: impl Fn() -> bool) {

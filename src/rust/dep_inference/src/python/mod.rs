@@ -164,13 +164,10 @@ impl ImportCollector<'_> {
 
     fn is_pragma_ignored_at_row(&self, node: tree_sitter::Node, end_row: usize) -> bool {
         let node_range = node.range();
-        if node.kind_id() == KindID::COMMENT
+
+        node.kind_id() == KindID::COMMENT
             && end_row == node_range.start_point.row
             && self.code_at(node_range).contains(NO_INFER_PRAGMA)
-        {
-            return true;
-        }
-        false
     }
 
     fn is_pragma_ignored(&self, node: tree_sitter::Node) -> bool {
