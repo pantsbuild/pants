@@ -4,14 +4,14 @@
 pub mod directory;
 #[cfg(test)]
 mod directory_tests;
+#[cfg(test)]
+mod fs_tests;
 pub mod gitignore;
 mod glob_matching;
 #[cfg(test)]
 mod glob_matching_tests;
 #[cfg(unix)]
 mod posixfs;
-#[cfg(test)]
-mod posixfs_tests;
 #[cfg(test)]
 mod testutil;
 
