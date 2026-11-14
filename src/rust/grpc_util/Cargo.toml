@@ -37,6 +37,7 @@ axum-server = { workspace = true, features = ["tls-rustls"] }
 async-trait = { workspace = true }
 parking_lot = { workspace = true }
 prost-types = { workspace = true }
+tonic-prost = { workspace = true }
 
 [build-dependencies]
 prost-build = { workspace = true }
