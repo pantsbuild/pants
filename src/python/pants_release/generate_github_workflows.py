@@ -57,7 +57,7 @@ version_map: dict[str, str] = {
     "checkout": "actions/checkout@v6.0.2",
     "coverallsapp": "coverallsapp/github-action@v2.3.7",
     "download-artifact": "actions/download-artifact@v7.0.0",
-    "free-disk-space": "jlumbroso/free-disk-space@v1.3.1",
+    "free-disk-space": "lumbroso-commons/free-disk-space@v1.3.1",
     "github-action-required-labels": "mheap/github-action-required-labels@v4.0.0",
     "msys2": "msys2/setup-msys2@v2.30.0",
     "rust-cache": "Swatinem/rust-cache@v2.9.1",
