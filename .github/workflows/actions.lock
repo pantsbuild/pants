@@ -5,6 +5,8 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/audit-cargo.yml':
         - 'actions/checkout@v6.0.2'
+        - 'dawidd6/action-send-mail@v3.8.0'
+        - 'slackapi/slack-github-action@v2.1.1'
     '.github/workflows/audit-zizmor.yml':
         - 'actions/checkout@v6.0.2'
         - 'zizmorcore/zizmor-action@v0.5.3'
