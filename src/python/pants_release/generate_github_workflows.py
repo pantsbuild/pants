@@ -23,7 +23,37 @@ import toml
 import yaml
 from pants_release.common import die
 
-from pants.backend.python.util_rules.pex_cli import PEX_BINARY_HASH, PEX_VERSION
+
+def read_pex_constants(source_path: Path | None = None) -> tuple[str, str]:
+    """Read the Pex download constants without importing the Pants backend."""
+    if source_path is None:
+        source_path = (
+            Path(__file__).resolve().parents[1] / "pants/backend/python/util_rules/pex_cli.py"
+        )
+    source = source_path.read_text()
+
+    def string_assignment(name: str) -> str:
+        matches: list[tuple[str, str]] = re.findall(
+            rf"^{name}[ \t]*=[ \t]*([\"'])([^\"'\\\n]+)\1[ \t]*$",
+            source,
+            flags=re.MULTILINE,
+        )
+        if len(matches) != 1:
+            raise ValueError(
+                f"Expected exactly one string literal assignment for {name} in {source_path}"
+            )
+        return matches[0][1]
+
+    version = string_assignment("PEX_VERSION")
+    binary_hash = string_assignment("PEX_BINARY_HASH")
+    if not re.fullmatch(r"[0-9a-fA-F]{64}", binary_hash):
+        raise ValueError(
+            f"PEX_BINARY_HASH in {source_path} must be a 64-character SHA-256 hex digest"
+        )
+    return version, binary_hash
+
+
+PEX_VERSION, PEX_BINARY_HASH = read_pex_constants()
 
 # Actions are referenced by tag here, and pinned to SHAs for security (see
 # https://docs.zizmor.sh/) via the lockfile at `.github/workflows/actions.lock`,
