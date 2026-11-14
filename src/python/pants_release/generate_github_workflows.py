@@ -24,35 +24,27 @@ import yaml
 from pants_release.common import die
 
 
-def read_pex_constants(*names: str, source_path: Path | None = None) -> dict[str, str]:
-    """Read the Pex download constants without importing the Pants backend."""
-    if source_path is None:
-        source_path = (
-            Path(__file__).resolve().parents[1] / "pants/backend/python/util_rules/pex_cli.py"
-        )
-    source = source_path.read_text()
-
-    values: dict[str, str] = {}
-    for name in names:
-        match = re.search(
-            rf"^{re.escape(name)}[ \t]*=[ \t]*([\"'])([^\"'\\\n]+)\1[ \t]*$",
-            source,
-            flags=re.MULTILINE,
-        )
-        if match is None:
-            raise ValueError(f"Expected a string literal assignment for {name} in {source_path}")
-        value = match.group(2)
-        if name == "PEX_BINARY_HASH" and not re.fullmatch(r"[0-9a-fA-F]{64}", value):
-            raise ValueError(
-                f"PEX_BINARY_HASH in {source_path} must be a 64-character SHA-256 hex digest"
-            )
-        values[name] = value
-    return values
+def _parse_constant(source: str, name: str) -> str:
+    """Extract the first string literal assignment without importing the backend."""
+    match = re.search(
+        rf"^{re.escape(name)}[ \t]*=[ \t]*([\"'])([^\"'\\\n]+)\1[ \t]*$",
+        source,
+        flags=re.MULTILINE,
+    )
+    if match is None:
+        raise ValueError(f"Expected a string literal assignment for {name} in pex_cli.py")
+    return match.group(2)
 
 
-pex_constants = read_pex_constants("PEX_VERSION", "PEX_BINARY_HASH")
-PEX_VERSION = pex_constants["PEX_VERSION"]
-PEX_BINARY_HASH = pex_constants["PEX_BINARY_HASH"]
+# Importing pex_cli indirectly loads native_engine, which may have been built for Python 3.14t
+# while this script runs under the incompatible standard Python 3.14 ABI.
+_PEX_CLI_SOURCE = (
+    Path(__file__).resolve().parents[1] / "pants/backend/python/util_rules/pex_cli.py"
+).read_text()
+PEX_VERSION = _parse_constant(_PEX_CLI_SOURCE, "PEX_VERSION")
+PEX_BINARY_HASH = _parse_constant(_PEX_CLI_SOURCE, "PEX_BINARY_HASH")
+if not re.fullmatch(r"[0-9a-fA-F]{64}", PEX_BINARY_HASH):
+    raise ValueError("PEX_BINARY_HASH in pex_cli.py must be a 64-character SHA-256 hex digest")
 
 # Actions are referenced by tag here, and pinned to SHAs for security (see
 # https://docs.zizmor.sh/) via the lockfile at `.github/workflows/actions.lock`,
