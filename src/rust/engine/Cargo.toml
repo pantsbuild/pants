@@ -67,7 +67,6 @@ serde_json = { workspace = true }
 task_executor = { path = "../task_executor" }
 tempfile = { workspace = true }
 testutil_mock = { package = "mock", path = "../testutil/mock" }
-time = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 tokio-retry2 = { workspace = true }
 tokio-util = { workspace = true, features = ["io"] }
