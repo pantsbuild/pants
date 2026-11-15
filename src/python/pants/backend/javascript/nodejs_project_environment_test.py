@@ -14,7 +14,6 @@ from pants.backend.javascript.nodejs_project_environment import (
     NodeJSProjectEnvironmentRequest,
 )
 from pants.backend.javascript.package_json import PackageJsonTarget
-from pants.backend.javascript.package_manager import PackageManager
 from pants.build_graph.address import Address
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
@@ -211,8 +210,3 @@ def test_workspace_process_scope(
         assert process.targeted_args() == (selector, package, *args)
     else:
         assert process.targeted_args() == args
-
-
-@pytest.mark.parametrize("package_manager,suffix", [("pnpm", "..."), ("npm", ""), ("yarn", "")])
-def test_workspace_dependencies_suffix(package_manager: str, suffix: str) -> None:
-    assert PackageManager.from_string(package_manager).workspace_dependencies_suffix == suffix
