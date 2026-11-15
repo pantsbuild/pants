@@ -19,7 +19,7 @@ from pants.backend.javascript.package_json import PackageJsonTarget
 from pants.backend.javascript.target_types import JSSourcesGeneratorTarget
 from pants.build_graph.address import Address
 from pants.engine.fs import DigestContents
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -33,7 +33,7 @@ def rule_runner() -> RuleRunner:
             QueryRule(InstalledNodePackage, (InstalledNodePackageRequest,)),
             QueryRule(InstalledNodePackageWithSource, (InstalledNodePackageRequest,)),
             QueryRule(Process, (NodeJsProjectEnvironmentProcess,)),
-            QueryRule(FallibleProcessResult, (Process,)),
+            QueryRule(ProcessResult, (Process,)),
         ],
         target_types=[PackageJsonTarget, JSSourcesGeneratorTarget],
         objects=dict(package_json.build_file_aliases().objects),
@@ -98,79 +98,111 @@ def test_install_node_package_with_extra_env_vars(rule_runner: RuleRunner) -> No
 
 def test_pnpm_installs_transitive_workspace_dependencies(rule_runner: RuleRunner) -> None:
     rule_runner.set_options([], env_inherit={"PATH"})
-    files = {
-        "src/js/BUILD": "package_json()",
-        "src/js/package.json": json.dumps(
-            {
-                "name": "root",
-                "private": True,
-                "packageManager": "pnpm@9.15.4",
-                "workspaces": ["packages/*"],
-            }
-        ),
-        "src/js/pnpm-workspace.yaml": "packages:\n  - 'packages/*'\n",
-        "src/js/pnpm-lock.yaml": dedent("""\
-            lockfileVersion: '9.0'
-            settings:
-              autoInstallPeers: true
-              excludeLinksFromLockfile: false
-            importers:
-              .: {}
-              packages/reader:
-                dependencies:
-                  '@invented/contract':
-                    specifier: workspace:*
-                    version: link:../contract
-              packages/contract:
-                dependencies:
-                  '@invented/leaf':
-                    specifier: workspace:*
-                    version: link:../leaf
-              packages/leaf: {}
-        """),
-    }
-    for name, dependency, source in (
-        ("reader", "contract", "import value from '@invented/contract'; console.log(value);"),
-        ("contract", "leaf", "export {default} from '@invented/leaf';"),
-        ("leaf", None, "export default 42;"),
-    ):
-        directory = f"src/js/packages/{name}"
-        manifest: dict[str, object] = {
-            "name": f"@invented/{name}",
-            "version": "1.0.0",
-            "main": "index.js",
-            "type": "module",
+    rule_runner.write_files(
+        {
+            "src/js/BUILD": "package_json()",
+            "src/js/package.json": json.dumps(
+                {
+                    "name": "root",
+                    "version": "0.0.1",
+                    "private": True,
+                    "packageManager": "pnpm@9.15.4",
+                }
+            ),
+            "src/js/pnpm-workspace.yaml": dedent(
+                """\
+                packages:
+                  - 'ham'
+                  - 'spam'
+                  - 'egg'
+                """
+            ),
+            "src/js/pnpm-lock.yaml": dedent(
+                """\
+                lockfileVersion: '9.0'
+
+                settings:
+                  autoInstallPeers: true
+                  excludeLinksFromLockfile: false
+
+                importers:
+
+                  .: {}
+
+                  egg: {}
+
+                  ham:
+                    dependencies:
+                      spam:
+                        specifier: workspace:*
+                        version: link:../spam
+
+                  spam:
+                    dependencies:
+                      egg:
+                        specifier: workspace:*
+                        version: link:../egg
+                """
+            ),
+            "src/js/ham/BUILD": dedent(
+                """\
+                package_json(dependencies=[":js"])
+                javascript_sources(name="js")
+                """
+            ),
+            "src/js/ham/package.json": json.dumps(
+                {
+                    "name": "ham",
+                    "version": "0.0.1",
+                    "type": "module",
+                    "dependencies": {"spam": "workspace:*"},
+                }
+            ),
+            "src/js/ham/index.js": "import value from 'spam'; console.log(value);",
+            "src/js/spam/BUILD": dedent(
+                """\
+                package_json(dependencies=[":js"])
+                javascript_sources(name="js")
+                """
+            ),
+            "src/js/spam/package.json": json.dumps(
+                {
+                    "name": "spam",
+                    "version": "0.0.1",
+                    "type": "module",
+                    "main": "index.js",
+                    "dependencies": {"egg": "workspace:*"},
+                }
+            ),
+            "src/js/spam/index.js": "export { default } from 'egg';",
+            "src/js/egg/BUILD": dedent(
+                """\
+                package_json(dependencies=[":js"])
+                javascript_sources(name="js")
+                """
+            ),
+            "src/js/egg/package.json": json.dumps(
+                {"name": "egg", "version": "0.0.1", "type": "module", "main": "index.js"}
+            ),
+            "src/js/egg/index.js": "export default 42;",
         }
-        if dependency:
-            manifest["dependencies"] = {f"@invented/{dependency}": "workspace:*"}
-        files[f"{directory}/BUILD"] = (
-            'package_json(dependencies=[":sources"])\njavascript_sources(name="sources")'
-        )
-        files[f"{directory}/package.json"] = json.dumps(manifest)
-        files[f"{directory}/index.js"] = source
-    rule_runner.write_files(files)
-    installed = rule_runner.request(
-        InstalledNodePackageWithSource,
-        [
-            InstalledNodePackageRequest(
-                Address("src/js/packages/reader", generated_name="__invented/reader")
-            )
-        ],
     )
-    contents = rule_runner.request(DigestContents, [installed.digest])
-    paths = {entry.path for entry in contents}
-    assert {f"src/js/packages/{name}/index.js" for name in ("reader", "contract", "leaf")} <= paths
+
+    installed_package = rule_runner.request(
+        InstalledNodePackageWithSource,
+        [InstalledNodePackageRequest(Address("src/js/ham", generated_name="ham"))],
+    )
     process = rule_runner.request(
         Process,
         [
             NodeJsProjectEnvironmentProcess(
-                installed.project_env,
+                installed_package.project_env,
                 ("exec", "node", "index.js"),
-                description="Load a dependency through another workspace package.",
-                input_digest=installed.digest,
+                description="Importing a workspace dependency of a workspace dependency.",
+                input_digest=installed_package.digest,
             )
         ],
     )
-    result = rule_runner.request(FallibleProcessResult, [process])
-    assert result.exit_code == 0, result.stderr.decode()
+    result = rule_runner.request(ProcessResult, [process])
+
     assert result.stdout == b"42\n"
