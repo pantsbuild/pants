@@ -25,6 +25,10 @@ class PackageManager:
     pack_archive_format: str
     extra_caches: FrozenDict[str, str]
 
+    @property
+    def workspace_dependencies_suffix(self) -> str:
+        return "..." if self.name == "pnpm" else ""
+
     @classmethod
     def from_string(cls, string: str) -> PackageManager:
         package_manager_command, *maybe_version = string.split("@")

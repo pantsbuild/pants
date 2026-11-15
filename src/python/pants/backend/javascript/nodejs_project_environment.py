@@ -121,11 +121,8 @@ class NodeJsProjectEnvironmentProcess:
         ):
             target = self.env.ensure_target()
             package_name = target[NodePackageNameField].value
-            if (
-                self.include_workspace_dependencies
-                and self.env.project.package_manager.name == "pnpm"
-            ):
-                package_name += "..."
+            if self.include_workspace_dependencies:
+                package_name += self.env.project.package_manager.workspace_dependencies_suffix
             return (
                 self.env.project.workspace_specifier_arg,
                 package_name,
