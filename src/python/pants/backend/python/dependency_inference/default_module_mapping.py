@@ -124,6 +124,7 @@ DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
     "cloud-sql-python-connector": ("google.cloud.sql.connector",),
     "confluent-kafka": ("confluent_kafka",),
     "coolprop": ("CoolProp",),
+    "cython": ("Cython", "cython"),
     "databricks-connect": ("databricks.connect",),
     "databricks-sdk": ("databricks.sdk",),
     "databricks-sql-connector": (
