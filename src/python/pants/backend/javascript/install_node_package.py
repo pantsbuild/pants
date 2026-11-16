@@ -112,6 +112,7 @@ async def install_node_packages_for_address(
                 project_env,
                 project_env.project.immutable_install_args,
                 description=f"Installing {target[NodePackageNameField].value}@{target[NodePackageVersionField].value}.",
+                include_workspace_dependencies=True,
                 input_digest=package_digest,
                 output_directories=tuple(project_env.node_modules_directories),
             )
