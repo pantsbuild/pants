@@ -417,26 +417,7 @@ async def find_interpreter(
                     *interpreter_constraints.generate_pex_arg_list(),
                     "--",
                     "-c",
-                    # N.B.: The following code snippet must be compatible with Python 2.7 and
-                    # Python 3.5+.
-                    #
-                    # When hashing, we pick 8192 for efficiency of reads and fingerprint updates
-                    # (writes) since it's a common OS buffer size and an even multiple of the
-                    # hash block size.
-                    dedent(
-                        """\
-                    import hashlib, os, sys
-
-                    python = os.path.realpath(sys.executable)
-                    print(python)
-
-                    hasher = hashlib.sha256()
-                    with open(python, "rb") as fp:
-                      for chunk in iter(lambda: fp.read(8192), b""):
-                          hasher.update(chunk)
-                    print(hasher.hexdigest())
-                    """
-                    ),
+                    PythonExecutable.self_identity_script,
                 ),
                 level=LogLevel.DEBUG,
                 cache_scope=env_target.executable_search_path_cache_scope(),

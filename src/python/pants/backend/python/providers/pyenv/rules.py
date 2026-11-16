@@ -143,9 +143,13 @@ async def get_pyenv_install_info(
                             mkdir -p "$DEST" 2>/dev/null || true
                             {bootstrap_python.path} install_python_shim.py $1
                         fi
-                        echo "$DEST"/bin/python
+                        "$DEST"/bin/python self_identity_script.py
                         """
                     ).encode(),
+                ),
+                FileContent(
+                    "self_identity_script.py",
+                    PythonExecutable.self_identity_script.encode(),
                 ),
                 FileContent(
                     "install_python_shim.py",
@@ -301,9 +305,13 @@ async def get_python(
         ),
     )
 
+    output_lines = result.stdout.decode().splitlines()
+    interpreter_path = output_lines[-2].strip()
+    fingerprint = output_lines[-1].strip()
+
     return PythonExecutable(
-        path=result.stdout.decode().splitlines()[-1].strip(),
-        fingerprint=None,
+        path=interpreter_path,
+        fingerprint=fingerprint,
         append_only_caches=PYENV_APPEND_ONLY_CACHES,
     )
 
