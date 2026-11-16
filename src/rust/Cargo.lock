@@ -1345,6 +1345,7 @@ dependencies = [
  "bytes",
  "deepsize",
  "dirs",
+ "dunce",
  "env_logger",
  "futures",
  "glob",
@@ -1361,6 +1362,7 @@ dependencies = [
  "task_executor",
  "tempfile",
  "tokio",
+ "windows-sys 0.61.1",
  "workunit_store",
 ]
 

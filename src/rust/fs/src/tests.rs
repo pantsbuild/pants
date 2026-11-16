@@ -7,8 +7,9 @@ fn relative_path_ok() {
     assert_eq!(Some("a"), RelativePath::new("a").unwrap().to_str());
     assert_eq!(Some("a"), RelativePath::new("./a").unwrap().to_str());
     assert_eq!(Some("a"), RelativePath::new("b/../a").unwrap().to_str());
+    // NB: RelativePath uses the native separator, so this is `a\c` on Windows.
     assert_eq!(
-        Some("a/c"),
+        Some(format!("a{}c", std::path::MAIN_SEPARATOR).as_str()),
         RelativePath::new("b/../a/././c").unwrap().to_str()
     );
 }

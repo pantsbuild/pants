@@ -36,7 +36,7 @@ impl PosixFS {
         root: P,
         ignorer: Arc<GitignoreStyleExcludes>,
         executor: task_executor::Executor,
-    ) -> Result<PosixFS, String> {
+    ) -> Result<Self, String> {
         Self::new_with_symlink_behavior(root, ignorer, executor, SymlinkBehavior::Aware)
     }
 
@@ -45,7 +45,7 @@ impl PosixFS {
         ignorer: Arc<GitignoreStyleExcludes>,
         executor: task_executor::Executor,
         symlink_behavior: SymlinkBehavior,
-    ) -> Result<PosixFS, String> {
+    ) -> Result<Self, String> {
         let root: &Path = root.as_ref();
         let canonical_root = root
             .canonicalize()
@@ -63,7 +63,7 @@ impl PosixFS {
             })
             .map_err(|e| format!("Could not canonicalize root {root:?}: {e:?}"))?;
 
-        Ok(PosixFS {
+        Ok(Self {
             root: canonical_root,
             ignore: ignorer,
             executor: executor,

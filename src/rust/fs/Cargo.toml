@@ -27,7 +27,16 @@ task_executor = { path = "../task_executor" }
 tokio = { workspace = true, features = ["fs"] }
 workunit_store = { path = "../workunit_store" }
 
+[target.'cfg(windows)'.dependencies]
+dunce = { workspace = true }
+windows-sys = { workspace = true, features = [
+  "Win32_Foundation",
+  "Win32_Storage_FileSystem",
+  "Win32_System_SystemServices",
+] }
+
 [dev-dependencies]
+dunce = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt", "macros"] }
 env_logger = { workspace = true }
