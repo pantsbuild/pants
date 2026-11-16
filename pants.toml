@@ -148,6 +148,7 @@ emit_warnings = true
 interpreter_constraints = ["==3.14.*"]
 enable_resolves = true
 pip_version = "latest"
+resolver = "uv"
 separate_lockfile_metadata_file = true
 
 [python.resolves]

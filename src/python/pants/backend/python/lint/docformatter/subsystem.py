@@ -18,7 +18,8 @@ class Docformatter(PythonToolBase):
     help_short = "The Python docformatter tool (https://github.com/myint/docformatter)."
 
     default_main = ConsoleScript("docformatter")
-    default_requirements = ["docformatter>=1.4,<1.5"]
+    # 1.7.8 is the first version to work on Python 3.14.
+    default_requirements = ["docformatter>=1.7.8,<1.8"]
 
     register_interpreter_constraints = True
 
