@@ -26,8 +26,13 @@ from pants.backend.go.util_rules.pkg_analyzer import PackageAnalyzerSetup
 from pants.build_graph.address import Address
 from pants.engine.engine_aware import EngineAwareParameter
 from pants.engine.environment import EnvironmentName
-from pants.engine.fs import MergeDigests, PathGlobs
-from pants.engine.intrinsics import digest_to_snapshot, execute_process, merge_digests
+from pants.engine.fs import GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.intrinsics import (
+    digest_to_snapshot,
+    execute_process,
+    get_digest_contents,
+    merge_digests,
+)
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.unions import union
@@ -118,6 +123,35 @@ def _is_nested_module_path(path: str, base_dir: str, nested_module_dirs: frozens
     return False
 
 
+def _parse_tool_directives(go_mod_content: bytes) -> tuple[str, ...]:
+    """Extract `tool` directives from a go.mod (Go 1.24+).
+
+    A `tool` directive names an executable package the module depends on without any `.go` file
+    importing it, which is precisely the modern replacement for the `tools.go` pattern. Missing
+    these would drop targets the user explicitly asked for.
+
+    Handles both the single-line form (`tool example.com/cmd/foo`) and the block form
+    (`tool (\\n\\texample.com/cmd/foo\\n)`).
+    """
+    tools: list[str] = []
+    in_block = False
+    for raw_line in go_mod_content.decode(errors="replace").splitlines():
+        line = raw_line.split("//", 1)[0].strip()
+        if not line:
+            continue
+        if in_block:
+            if line == ")":
+                in_block = False
+            else:
+                tools.append(line)
+            continue
+        if line == "tool (":
+            in_block = True
+        elif line.startswith("tool ") or line.startswith("tool\t"):
+            tools.append(line[len("tool") :].strip())
+    return tuple(t for t in tools if t)
+
+
 @rule(desc="Scan first-party Go sources for third-party imports", level=LogLevel.DEBUG)
 async def determine_first_party_import_roots(
     request: FirstPartyImportRootsRequest,
@@ -177,6 +211,20 @@ async def determine_first_party_import_roots(
             for pkg_json in ijson.items(result.stdout, "", multiple_values=True):
                 import_paths.update(pkg_json.get("AllImports", ()))
                 import_paths.update(pkg_json.get("AllTestImports", ()))
+
+    go_mod_contents = await get_digest_contents(
+        **implicitly(
+            PathGlobs(
+                [request.go_mod_path],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=(
+                    f"the import-scoped target generation scan for {request.go_mod_address}"
+                ),
+            )
+        )
+    )
+    for entry in go_mod_contents:
+        import_paths.update(_parse_tool_directives(entry.content))
 
     return FirstPartyImportRoots(FrozenOrderedSet(sorted(import_paths)))
 

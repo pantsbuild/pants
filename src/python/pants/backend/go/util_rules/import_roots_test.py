@@ -26,6 +26,7 @@ from pants.backend.go.util_rules.import_roots import (
     FirstPartyImportRootsRequest,
     _is_ignored_by_go_walk,
     _is_nested_module_path,
+    _parse_tool_directives,
 )
 from pants.build_graph.address import Address
 from pants.engine.rules import QueryRule
@@ -53,6 +54,54 @@ def rule_runner() -> RuleRunner:
     )
     rule_runner.set_options(["--golang-cgo-enabled"], env_inherit={"PATH"})
     return rule_runner
+
+
+# ------------------------------------------------------------------------------------------------
+# `tool` directive parsing (Go 1.24+)
+# ------------------------------------------------------------------------------------------------
+
+
+def test_parse_tool_directives_single_line() -> None:
+    go_mod = b"module example.com/m\n\ngo 1.24\n\ntool example.com/cmd/foo\n"
+    assert _parse_tool_directives(go_mod) == ("example.com/cmd/foo",)
+
+
+def test_parse_tool_directives_block() -> None:
+    go_mod = dedent(
+        """\
+        module example.com/m
+
+        go 1.24
+
+        tool (
+        \texample.com/cmd/foo
+        \texample.com/cmd/bar
+        )
+        """
+    ).encode()
+    assert _parse_tool_directives(go_mod) == ("example.com/cmd/foo", "example.com/cmd/bar")
+
+
+def test_parse_tool_directives_ignores_comments_and_lookalikes() -> None:
+    go_mod = dedent(
+        """\
+        module example.com/toolkit
+
+        go 1.24
+
+        // tool example.com/cmd/commented-out
+        require example.com/toolbox v1.0.0
+
+        tool example.com/cmd/real // keep this one
+        """
+    ).encode()
+    # `module example.com/toolkit` and `require example.com/toolbox` both start with "tool" as a
+    # substring; neither is a tool directive.
+    assert _parse_tool_directives(go_mod) == ("example.com/cmd/real",)
+
+
+def test_parse_tool_directives_absent() -> None:
+    assert _parse_tool_directives(b"module example.com/m\n\ngo 1.21\n") == ()
 
 
 # ------------------------------------------------------------------------------------------------
@@ -175,6 +224,32 @@ def test_scan_skips_nested_modules(rule_runner: RuleRunner) -> None:
     roots = _roots(rule_runner)
     assert "github.com/parent/dep" in roots
     assert "github.com/nested/dep" not in roots
+
+
+def test_scan_includes_tool_directives(rule_runner: RuleRunner) -> None:
+    """`tool` directives are roots even though no .go file imports them."""
+    rule_runner.write_files(
+        {
+            "BUILD": "go_mod(name='mod')\n",
+            "go.mod": dedent(
+                """\
+                module example.com/m
+
+                go 1.24
+
+                tool example.com/cmd/generator
+                """
+            ),
+            "main.go": dedent(
+                """\
+                package main
+
+                func main() {}
+                """
+            ),
+        }
+    )
+    assert "example.com/cmd/generator" in _roots(rule_runner)
 
 
 def test_directories_go_list_ignores_are_skipped() -> None:
