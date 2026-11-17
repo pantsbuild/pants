@@ -101,7 +101,13 @@ The `python_requirements()` target generator also supports parsing dependencies 
 python_requirements(source="pyproject.toml")
 ```
 
-Further information about PEP 621 fields can be found in the PEP documentation. Pants will read dependencies from the `project.dependencies` list, as well as the `project.optional-dependencies` mappings. Pants makes no distinction between `dependencies` and `optional-dependencies`, all dependencies are treated in the same manner as though they were listed in the `dependencies` list. For example:
+Further information about PEP 621 fields can be found in the PEP documentation. Pants reads dependencies from both the
+`project.dependencies` list and the `project.optional-dependencies` mappings, and generates a `python_requirement`
+target for each entry. Entries under `project.optional-dependencies` also receive their group name as a tag. If a
+requirement appears in multiple groups, it receives each group name as a tag.
+
+Tags configured on the `python_requirements` target generator are combined with inferred group tags. A per-requirement
+`tags` value in `overrides` replaces both, including when set to an empty list. For example:
 
 ```toml tab={"label":"pyproject.toml"}
 [project]
@@ -134,6 +140,7 @@ python_requirement(
 python_requirement(
     name="dataclasses",
     requirements=["dataclasses ; python_version<'3.7'"],
+    tags=["dataclass"],
 )
 ```
 
