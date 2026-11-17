@@ -21,11 +21,13 @@ itertools = { workspace = true }
 log = { workspace = true }
 parking_lot = { workspace = true }
 protos = { path = "../protos" }
-rlimit = { workspace = true }
 serde = { workspace = true }
 task_executor = { path = "../task_executor" }
 tokio = { workspace = true, features = ["fs"] }
 workunit_store = { path = "../workunit_store" }
+
+[target.'cfg(unix)'.dependencies]
+rlimit = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 dunce = { workspace = true }
