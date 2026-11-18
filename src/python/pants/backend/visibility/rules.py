@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from pants.backend.visibility.rule_types import BuildFileVisibilityRules
 from pants.backend.visibility.subsystem import VisibilitySubsystem
@@ -42,13 +43,30 @@ async def build_file_visibility_implementation(
     return BuildFileDependencyRulesImplementation(BuildFileVisibilityRules)
 
 
+@dataclass(frozen=True)
+class SkipVisibilityValidation:
+    value: bool
+
+
+@rule
+async def skip_visibility_validation(goals: CurrentExecutingGoals) -> SkipVisibilityValidation:
+    # NB: When `lint` is the only goal, the `visibility` linter reports every violation, so
+    # validation is skipped rather than failing on the first. Other goals validate, including during
+    # `lint` in a run such as `pants lint test`.
+    #
+    # This depends only on the requested goals, which don't change while a session runs. So
+    # `visibility_validate_dependencies` gets an equal value in every session that requests the
+    # same goals, and pantsd can reuse its results across sessions.
+    return SkipVisibilityValidation(goals.requested == ("lint",))
+
+
 @rule
 async def visibility_validate_dependencies(
     request: VisibilityValidateDependenciesRequest,
     visibility: VisibilitySubsystem,
-    goals: CurrentExecutingGoals,
+    skip: SkipVisibilityValidation,
 ) -> ValidatedDependencies:
-    if not visibility.enforce or goals.is_running("lint"):
+    if not visibility.enforce or skip.value:
         return ValidatedDependencies()
 
     address = request.field_set.address

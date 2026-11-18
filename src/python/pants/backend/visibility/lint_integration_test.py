@@ -14,6 +14,8 @@ from pants.core.goals.lint import Lint, LintResult
 from pants.core.target_types import GenericTarget
 from pants.core.util_rules.partitions import _EmptyMetadata
 from pants.engine.addresses import Address
+from pants.engine.goal import CurrentExecutingGoals
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Target
 from pants.testutil.rule_runner import QueryRule, RuleRunner
 
@@ -52,12 +54,15 @@ def run_lint(
     targets: list[Target],
     *,
     extra_args: list[str] | None = None,
+    requested_goals: tuple[str, ...] = ("lint",),
 ) -> LintResult:
     rule_runner.set_options(
         ["--backend-packages=pants.backend.experimental.visibilty", *(extra_args or ())],
     )
+    goals = CurrentExecutingGoals(requested=requested_goals)
+    rule_runner.set_session_values({CurrentExecutingGoals: goals})
     field_sets = [VisibilityFieldSet.create(tgt) for tgt in targets]
-    with rule_runner.scheduler._goals._execute(Lint):
+    with goals._execute(Lint):
         lint_result = rule_runner.request(
             LintResult,
             [
@@ -101,3 +106,10 @@ def test_lint_failure(rule_runner: RuleRunner) -> None:
             """
         ).strip()
     )
+
+
+def test_lint_with_other_goals_fails_on_violation(rule_runner: RuleRunner) -> None:
+    # With goals besides `lint`, dependency resolution validates and fails on the violation.
+    tgt = rule_runner.get_target(Address("", target_name="leaf"))
+    with pytest.raises(ExecutionError, match="//:leaf -> target //:root"):
+        run_lint(rule_runner, [tgt], requested_goals=("lint", "test"))

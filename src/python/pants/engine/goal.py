@@ -186,6 +186,8 @@ class LineOriented(Outputting):
 @dataclass(frozen=True)
 class CurrentExecutingGoals(EngineAwareReturnType):
     executing: dict[str, type[Goal]] = field(default_factory=dict)
+    # The goals requested for the session. Unlike `executing`, these don't change while it runs.
+    requested: tuple[str, ...] = ()
 
     def __hash__(self) -> int:
         return hash(tuple(self.executing.keys()))

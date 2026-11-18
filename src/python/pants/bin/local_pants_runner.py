@@ -136,7 +136,9 @@ class LocalPantsRunner:
             session_values_dict = {
                 OptionsBootstrapper: options_bootstrapper,
                 CompleteEnvironmentVars: env,
-                CurrentExecutingGoals: CurrentExecutingGoals(),
+                CurrentExecutingGoals: CurrentExecutingGoals(
+                    requested=cls._requested_goals(options, ng_invocation)
+                ),
             }
             if ng_invocation is not None:
                 session_values_dict[PyNgInvocation] = ng_invocation
@@ -190,6 +192,14 @@ class LocalPantsRunner:
             working_dir=working_dir,
             ng_invocation=ng_invocation,
         )
+
+    @staticmethod
+    def _requested_goals(options: Options, ng_invocation: PyNgInvocation | None) -> tuple[str, ...]:
+        if ng_invocation is not None:
+            return tuple(ng_invocation.goals())
+        if options.builtin_or_auxiliary_goal:
+            return (options.builtin_or_auxiliary_goal,)
+        return tuple(options.goals)
 
     def _perform_run(self, goals: tuple[str, ...]) -> ExitCode:
         global_options = self.options.for_global_scope()
