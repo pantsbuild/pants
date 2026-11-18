@@ -17,6 +17,7 @@ class PackageManager:
     generate_lockfile_args: tuple[str, ...]
     immutable_install_args: tuple[str, ...]
     workspace_specifier_arg: str
+    workspace_dependencies_suffix: str
     run_arg_separator: tuple[str, ...]
     download_and_execute_args_template: tuple[str, ...]
     execute_args: tuple[str, ...]
@@ -55,6 +56,7 @@ class PackageManager:
             generate_lockfile_args=("install", "--lockfile-only"),
             immutable_install_args=("install", "--frozen-lockfile"),
             workspace_specifier_arg="--filter",
+            workspace_dependencies_suffix="...",
             run_arg_separator=(
                 () if version is None or nodesemver.satisfies(version, ">=7") else ("--",)
             ),
@@ -79,6 +81,7 @@ class PackageManager:
                 else ("install", "--immutable")
             ),
             workspace_specifier_arg="workspace",
+            workspace_dependencies_suffix="",
             run_arg_separator=("--",),
             download_and_execute_args_template=(
                 "dlx",
@@ -103,6 +106,7 @@ class PackageManager:
             generate_lockfile_args=("install", "--package-lock-only"),
             immutable_install_args=("clean-install",),
             workspace_specifier_arg="--workspace",
+            workspace_dependencies_suffix="",
             run_arg_separator=("--",),
             download_and_execute_args_template=(
                 "exec",

@@ -1,0 +1,22 @@
+[advisories]
+ignore = [
+  # RUSTSEC-2023-0071 ("Marvin Attack"): a timing side channel in `rsa` 0.9.x
+  # private-key operations that, given an attacker who can repeatedly trigger
+  # and precisely time such operations, could decrypt a ciphertext. No patched
+  # 0.9.x exists; the fix is `rsa` 0.10, which is a major bump.
+  #
+  # `rsa` reaches us only via `opendal` (services-ghac) -> `reqsign-core` and
+  # `reqsign-azure-storage`, which require `rsa = "0.9"`. We believe this is
+  # safe to ignore because:
+  #   * reqsign uses `rsa` solely to sign JWT assertions (RS256) with a
+  #     locally-held PKCS#8 key (reqsign-core `jwt.rs`, and Azure
+  #     client-certificate auth). It never decrypts attacker-supplied data.
+  #   * Signing happens locally in the Pants client, and the signatures are not
+  #     exposed through an oracle that an attacker could time at scale.
+  #   * Our use of opendal is the GitHub Actions cache (ghac) and local fs/memory
+  #     backends, which authenticate with a GitHub-issued token, not an RSA key.
+  #
+  # Upstream tracking issue: https://github.com/apache/reqsign/issues/437
+  # Remove this entry once reqsign moves off `rsa` 0.9 (or to `rsa` >= 0.10).
+  "RUSTSEC-2023-0071",
+]
