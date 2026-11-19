@@ -938,7 +938,6 @@ def windows11_x86_64_test_jobs() -> Jobs:
         "async_latch",
         "async_value",
         "concrete_time",
-        "dep_inference",
         "fs",
         "graph",
         "grpc_util",
