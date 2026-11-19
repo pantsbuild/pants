@@ -236,6 +236,7 @@ DEFAULT_MODULE_MAPPING: dict[str, tuple[str, ...]] = {
     "py-healthcheck": ("healthcheck",),
     "pycrypto": ("Crypto",),
     "pycryptodome": ("Crypto",),
+    "pycryptodomex": ("Cryptodome",),
     "pyerfa": ("erfa",),
     "pygithub": ("github",),
     "pygobject": ("gi",),

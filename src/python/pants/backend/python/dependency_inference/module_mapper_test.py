@@ -429,6 +429,7 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
             req("req1", "req1==1.2"),
             req("un_normalized", "Un-Normalized-Project>3"),
             req("cython", "Cython>=3"),
+            req("pycryptodomex", "pycryptodomex"),
             req("file_dist", "file_dist@ file:///path/to/dist.whl"),
             req("vcs_dist", "vcs_dist@ git+https://github.com/vcs/dist.git"),
             req("modules", "foo==1", modules=["mapped_module"]),
@@ -485,6 +486,12 @@ def test_map_third_party_modules_to_addresses(rule_runner: RuleRunner) -> None:
                 ),
                 "default": FrozenDict(
                     {
+                        "Cryptodome": (
+                            ModuleProvider(
+                                Address("", target_name="pycryptodomex"),
+                                ModuleProviderType.IMPL,
+                            ),
+                        ),
                         "Cython": (
                             ModuleProvider(
                                 Address("", target_name="cython"), ModuleProviderType.IMPL
