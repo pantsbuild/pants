@@ -202,6 +202,41 @@ class HelmChartVersionField(StringField):
     )
 
 
+class HelmChartValuesField(DictStringToStringField, AsyncFieldMixin):
+    alias = "values"
+    required = False
+    help = help_text(
+        """
+        Individual values to inject into the chart's `values.yaml` when packaging.
+
+        Value names should be defined using dot-syntax as in the following example:
+
+            helm_chart(
+                values={
+                    "nameOverride": "my_custom_name",
+                    "image.pullPolicy": "Always",
+                },
+            )
+
+        Values that are valid target addresses pointing to `docker_image` targets will be
+        resolved to the fully qualified Docker image reference (e.g.
+        `myregistry.io/myimage:latest`). All other values are written as-is.
+
+        This is useful when deploying Helm charts via tools like ArgoCD that rely on default
+        values in the chart rather than using `helm_deployment` to set values at deploy time.
+
+        Example:
+
+            helm_chart(
+                values={
+                    "image": "src/docker/helloworld",
+                    "replicas": "3",
+                },
+            )
+        """
+    )
+
+
 class HelmChartTarget(Target):
     alias = "helm_chart"
     core_fields = (
@@ -214,6 +249,7 @@ class HelmChartTarget(Target):
         HelmChartLintQuietField,
         HelmChartRepositoryField,
         HelmChartVersionField,
+        HelmChartValuesField,
         HelmRegistriesField,
         HelmSkipPushField,
         HelmSkipLintField,
@@ -233,6 +269,7 @@ class HelmChartFieldSet(FieldSet):
     dependencies: HelmChartDependenciesField
     description: DescriptionField
     version: HelmChartVersionField
+    values: HelmChartValuesField
 
 
 class AllHelmChartTargets(Targets):
