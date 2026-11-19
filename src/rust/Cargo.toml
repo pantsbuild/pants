@@ -141,6 +141,7 @@ crossbeam-channel = "0.5"
 deepsize = { git = "https://github.com/stuhood/deepsize.git", rev = "5c8bee5443fcafe4aaa9274490d354412d0955c1" }
 derivative = "2.2"
 dirs = "6"
+dunce = "1.0.5"
 docker_credential = "1.3"
 either = "1"
 env_logger = "0.11.10"
@@ -239,6 +240,7 @@ url = "2.5"
 uuid = "1.23.0"
 walkdir = "2"
 whoami = "2.1.2"
+windows-sys = "0.61"
 
 # NB: If a change to these versions requires cache busting, bump the version of
 # `src/rust/dep_inference/Cargo.toml`.

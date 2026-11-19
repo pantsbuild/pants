@@ -21,4 +21,7 @@ pub(crate) fn make_file(path: &Path, contents: &[u8], mode: u32) {
         permissions.set_mode(mode);
         file.set_permissions(permissions).unwrap();
     }
+    // Windows has no permission bits to set.
+    #[cfg(target_os = "windows")]
+    let _ = mode;
 }
