@@ -119,6 +119,7 @@ class LoadedLockfileRequest:
     """A request to load and validate the content of the given lockfile."""
 
     lockfile: Lockfile
+    estimate_num_requirements: bool = True
 
 
 def strip_comments_from_pex_json_lockfile(lockfile_bytes: bytes) -> bytes:
@@ -291,38 +292,41 @@ async def load_lockfile(
             header_delimiter,
         )
 
-    match lockfile_format:
-        case LockfileFormat.UV:
-            # Use the virtual root package's direct dependencies as a rough estimate
-            # of how many packages need resolving.
-            # NB: The uv project recommends not relying on lockfile internals, but
-            # this particular aspect seems relatively stable in practice.
-            lockfile_toml = tomllib.loads(lock_bytes.decode())
-            root_package = next(
-                (
-                    p
-                    for p in lockfile_toml.get("package", [])
-                    if p.get("source", {}).get("virtual") == "."
-                ),
-                None,
-            )
-            deps = root_package.get("dependencies") if root_package else None
-            if deps is None:
-                logger.warning(
-                    f"Couldn't find the virtual root [[package]].dependencies entry in {lockfile_path}. "
-                    "Has the uv lockfile format changed? This will not affect correctness but "
-                    "may affect performance. Please reach out to the Pants team if you encounter "
-                    "this warning."
+    if request.estimate_num_requirements:
+        match lockfile_format:
+            case LockfileFormat.UV:
+                # Use the virtual root package's direct dependencies as a rough estimate
+                # of how many packages need resolving.
+                # NB: The uv project recommends not relying on lockfile internals, but
+                # this particular aspect seems relatively stable in practice.
+                lockfile_toml = tomllib.loads(lock_bytes.decode())
+                root_package = next(
+                    (
+                        p
+                        for p in lockfile_toml.get("package", [])
+                        if p.get("source", {}).get("virtual") == "."
+                    ),
+                    None,
                 )
-            requirement_estimate = 4 if deps is None else len(deps)
-        case LockfileFormat.PEX:
-            requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
-        case LockfileFormat.CONSTRAINTS_DEPRECATED:
-            # Note: this is a very naive heuristic. It will overcount because entries often
-            # have >1 line due to `--hash`.
-            requirement_estimate = len(lock_bytes.splitlines())
-        case _:
-            raise ValueError(f"Unknown lockfile format: {lockfile_format}")
+                deps = root_package.get("dependencies") if root_package else None
+                if deps is None:
+                    logger.warning(
+                        f"Couldn't find the virtual root [[package]].dependencies entry in {lockfile_path}. "
+                        "Has the uv lockfile format changed? This will not affect correctness but "
+                        "may affect performance. Please reach out to the Pants team if you encounter "
+                        "this warning."
+                    )
+                requirement_estimate = 4 if deps is None else len(deps)
+            case LockfileFormat.PEX:
+                requirement_estimate = _pex_lockfile_requirement_count(lock_bytes)
+            case LockfileFormat.CONSTRAINTS_DEPRECATED:
+                # Note: this is a very naive heuristic. It will overcount because entries often
+                # have >1 line due to `--hash`.
+                requirement_estimate = len(lock_bytes.splitlines())
+            case _:
+                raise ValueError(f"Unknown lockfile format: {lockfile_format}")
+    else:
+        requirement_estimate = 0
 
     return LoadedLockfile(
         lockfile_digest,
