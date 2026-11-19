@@ -5,9 +5,14 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::javascript::import_pattern::{Import, Pattern, StarMatch, imports_from_patterns};
+use crate::javascript::util::to_native_separators;
 use crate::javascript::{ImportCollector, JavascriptImportInfo, get_dependencies};
 use javascript_inference_metadata::ImportPattern;
 use protos::pb::pants::cache::{JavascriptInferenceMetadata, javascript_inference_metadata};
+
+fn native(path: &str) -> String {
+    to_native_separators(path).into_owned()
+}
 
 fn assert_imports(code: &str, imports: &[&str]) {
     let mut collector = ImportCollector::new(code);
@@ -38,10 +43,11 @@ fn given_metadata(
             replacements: value.clone(),
         })
         .collect();
+    // The engine passes native paths, so the tests do too.
     JavascriptInferenceMetadata {
-        package_root: root.to_string(),
+        package_root: native(root),
         import_patterns,
-        config_root: config_root.map(str::to_string),
+        config_root: config_root.map(native),
         paths,
     }
 }
@@ -55,7 +61,7 @@ fn assert_dependency_imports<'a>(
 ) {
     let result = get_dependencies(code, PathBuf::from(file_path), metadata).unwrap();
     assert_eq!(
-        HashSet::from_iter(file_imports.into_iter().map(|s| s.to_string())),
+        HashSet::from_iter(file_imports.into_iter().map(native)),
         result
             .imports
             .values()
@@ -315,7 +321,7 @@ fn adds_dir_to_file_imports() -> Result<(), Box<dyn std::error::Error>> {
             .into_values()
             .flat_map(|info| info.file_imports)
             .collect::<HashSet<String>>(),
-        HashSet::from_iter(["dir/file.js".to_string()])
+        HashSet::from_iter([native("dir/file.js")])
     );
     Ok(())
 }
@@ -669,7 +675,7 @@ fn replaces_groups() {
 
     assert_eq!(
         imports,
-        HashSet::from_iter([Import::Matched("dir/src/internal/z.js".to_string())])
+        HashSet::from_iter([Import::Matched(native("dir/src/internal/z.js"))])
     )
 }
 
@@ -690,7 +696,7 @@ fn longest_prefix_wins() {
 
     assert_eq!(
         imports,
-        HashSet::from_iter([Import::Matched("dir/src/stuff/index.js".to_string())])
+        HashSet::from_iter([Import::Matched(native("dir/src/stuff/index.js"))])
     )
 }
 
@@ -705,11 +711,14 @@ fn candidate_imports_from_config_and_imports() {
         [
             (
                 "lib/stuff",
-                JavascriptImportInfo::new(["js/project/src/lib/stuff"], ["lib/stuff"]),
+                JavascriptImportInfo::new([native("js/project/src/lib/stuff")], ["lib/stuff"]),
             ),
             (
                 "#nested/index.js",
-                JavascriptImportInfo::new(["js/project/src/lib/nested/index.js"], [] as [&str; 0]),
+                JavascriptImportInfo::new(
+                    [native("js/project/src/lib/nested/index.js")],
+                    [] as [&str; 0],
+                ),
             ),
         ],
         given_metadata(

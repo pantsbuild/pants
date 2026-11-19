@@ -1,6 +1,19 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::borrow::Cow;
 use std::path::{Component, Path, PathBuf};
+
+/// Converts the `/` separators of a JavaScript import specifier to the platform's separator.
+///
+/// Specifiers always use `/`, but the file paths we return are native paths. Only allocates
+/// when there is something to convert, so never on Unix.
+pub fn to_native_separators(path: &str) -> Cow<'_, str> {
+    if cfg!(windows) && path.contains('/') {
+        Cow::Owned(path.replace('/', std::path::MAIN_SEPARATOR_STR))
+    } else {
+        Cow::Borrowed(path)
+    }
+}
 
 /// Creates a [`PathBuf`], normalizing `.` and `..`.
 ///

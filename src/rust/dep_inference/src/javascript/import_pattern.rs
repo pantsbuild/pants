@@ -9,6 +9,8 @@ use fnv::FnvHashSet as HashSet;
 use fnv::{FnvHashMap as HashMap, FnvHashMap};
 use itertools::Either;
 
+use crate::javascript::util::to_native_separators;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct StarMatch<'a>(pub &'a str);
 
@@ -146,7 +148,11 @@ fn apply_replacements_to_match(
 
 fn add_root_dir_to_dot_slash(root: &str, new_import: String) -> String {
     if let Some(("", rest)) = new_import.split_once("./") {
-        Path::new(root).join(rest).to_str().unwrap().to_string()
+        Path::new(root)
+            .join(&*to_native_separators(rest))
+            .to_str()
+            .unwrap()
+            .to_string()
     } else {
         new_import
     }
