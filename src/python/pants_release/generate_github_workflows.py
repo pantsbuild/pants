@@ -939,10 +939,17 @@ def windows11_x86_64_test_jobs() -> Jobs:
         "async_value",
         "concrete_time",
         "fs",
+        "graph",
         "grpc_util",
         "hashing",
+        "logging",
+        "protos",
+        "remote_provider",
+        "remote_provider_traits",
+        "rule_graph",
         "stdio",
         "task_executor",
+        "tryfuture",
         "workunit_store",
     ]
     ported_crates_args = " -p " + " -p ".join(ported_crates)
