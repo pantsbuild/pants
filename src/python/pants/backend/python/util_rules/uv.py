@@ -13,6 +13,7 @@ from textwrap import dedent  # noqa: PNT20
 from typing import ClassVar, cast
 
 from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 from pants.backend.python.subsystems import uv as uv_subsystem
 from pants.backend.python.subsystems.python_native_code import PythonNativeCodeSubsystem
@@ -72,6 +73,8 @@ class VenvFromUvLockfileRequest:
 
     lockfile: LoadedLockfile
     python: PythonExecutable
+    # Install just these dependency groups into the venv. If empty, install the entire lockfile.
+    dependency_groups: tuple[str, ...] = tuple()
     # If set, install packages for this uv --python-platform value (e.g. "x86_64-unknown-linux-gnu")
     # instead of the local platform. python is still the local interpreter used to create the venv.
     uv_platform: str | None = None
@@ -173,7 +176,8 @@ def generate_pyproject_toml(
         return s.replace('"', '\\"')
 
     requires_python = ",".join(str(constraint.specifier) for constraint in ics)
-    deps_lines = "\n".join(f'    "{escape_double_quotes(r)}",' for r in sorted(reqs))
+    sorted_reqs = sorted(reqs)
+    deps_lines = "\n".join(f'    "{escape_double_quotes(r)}",' for r in sorted_reqs)
 
     content = dedent(
         """
@@ -208,6 +212,27 @@ def generate_pyproject_toml(
         extra_lines.append("")
 
     content += "\n".join(extra_lines)
+
+    # Add a dependency-group for each top-level requirement. This is to support creating
+    # subset venvs when [python].create_venv_repository_from_entire_lockfile=False.
+    # Multiple specifiers for the same package (e.g. different extras) are accumulated
+    # into a single group.
+    #
+    # These dependency-groups are written into the lockfile and consumed from there.
+    #
+    # Note: We generate them regardless of the current state of
+    # create_venv_repository_from_entire_lockfile, to avoid having to regenerate
+    # the lockfile when later setting create_venv_repository_from_entire_lockfile=False.
+    groups: dict[str, list[str]] = {}
+    for r in sorted_reqs:
+        group_name = canonicalize_name(Requirement(r).name)
+        groups.setdefault(group_name, []).append(f'"{escape_double_quotes(r)}"')
+
+    if groups:
+        group_lines = "\n".join(
+            f"{name} = [{', '.join(deps)}]" for name, deps in sorted(groups.items())
+        )
+        content += f"\n[dependency-groups]\n{group_lines}\n"
 
     return content
 
@@ -303,8 +328,20 @@ async def create_venv_repository_from_uv_lockfile(
     entropy.update((request.uv_platform or "").encode())
     entropy.update(b"\0")
     entropy.update(input_digest.fingerprint.encode())
+    entropy.update(b"\0")
+    for group in request.dependency_groups:
+        entropy.update(group.encode())
+        entropy.update(b"\0")
     entropy.update(b"\0UV_NO_INSTALLER_METADATA=1")
     venv_path_suffix = entropy.hexdigest()
+
+    group_flags = [s for group in request.dependency_groups for s in ["--only-group", group]]
+    # The dependency-groups from pyproject.toml are written into the uv lockfile
+    # as [package.dev-dependencies].
+    if group_flags and b"[package.dev-dependencies]" not in uv_lock_contents[0].content:
+        raise ValueError(
+            "To use subset repository venvs you must perform a one-time regeneration of the lockfile."
+        )
 
     uv_cmd = shlex.join(
         (
@@ -313,9 +350,8 @@ async def create_venv_repository_from_uv_lockfile(
             "--frozen",
             *(["--verbose"] if level >= LogLevel.DEBUG else []),  # type: ignore[operator]
             "--no-install-project",
-            # TODO: extras can conflict, so we might need to be more selective.
-            "--all-extras",
             "--no-progress",
+            *group_flags,
             *extra_uv_args,
         )
     )

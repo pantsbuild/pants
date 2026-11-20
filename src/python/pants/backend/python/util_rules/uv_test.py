@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import io
 import sys
+import tomllib
 import zipfile
 from pathlib import Path
+from textwrap import dedent
 
 from pants.backend.python.goals.lockfile import GenerateUvLockfile
 from pants.backend.python.goals.lockfile import rules as lockfile_rules
@@ -35,7 +37,7 @@ from pants.engine.environment import EnvironmentName
 from pants.engine.fs import Digest, DigestContents, PathGlobs
 from pants.engine.internals.native_engine import FrozenOrderedSet
 from pants.engine.process import FallibleProcessResult, Process, ProcessCacheScope
-from pants.testutil.rule_runner import QueryRule, RuleRunner
+from pants.testutil.rule_runner import QueryRule, RuleRunner, engine_error
 from pants.util.pip_requirement import PipRequirement
 
 RESOLVE_NAME = "test-resolve"
@@ -99,12 +101,9 @@ def _generate_uv_lockfile(rule_runner: RuleRunner, requirements: tuple[str, ...]
     return rule_runner.request(DigestContents, [lock_result.digest])[0].content
 
 
-def _create_venv_repository(
-    rule_runner: RuleRunner,
-    python_path: str,
-    cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
-    requirements: tuple[str, ...] = (),
-) -> tuple[VenvRepository, FallibleProcessResult]:
+def _loaded_lockfile(
+    rule_runner: RuleRunner, uv_lock_content: bytes, requirements: tuple[str, ...]
+) -> LoadedLockfile:
     metadata = PythonLockfileMetadataV8(
         valid_for_interpreter_constraints=InterpreterConstraints(["CPython==3.14.*"]),
         requirements={PipRequirement.parse(requirement) for requirement in requirements},
@@ -122,13 +121,8 @@ def _create_venv_repository(
         resolve=RESOLVE_NAME,
     )
 
-    pyproject = generate_pyproject_toml(
-        RESOLVE_NAME, metadata.valid_for_interpreter_constraints, requirements
-    )
-    rule_runner.write_files({"pyproject.toml": pyproject, "uv.toml": ""})
-    uv_lock_content = _generate_uv_lockfile(rule_runner, requirements)
     lockfile_digest = rule_runner.make_snapshot({"test.lock": uv_lock_content.decode()}).digest
-    loaded_lockfile = LoadedLockfile(
+    return LoadedLockfile(
         lockfile_digest,
         "test.lock",
         metadata=metadata,
@@ -140,12 +134,28 @@ def _create_venv_repository(
         ),
     )
 
+
+def _create_venv_repository(
+    rule_runner: RuleRunner,
+    python_path: str,
+    cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL,
+    requirements: tuple[str, ...] = (),
+    dependency_groups: tuple[str, ...] = (),
+) -> tuple[VenvRepository, FallibleProcessResult]:
+    pyproject = generate_pyproject_toml(
+        RESOLVE_NAME, InterpreterConstraints(["CPython==3.14.*"]), requirements
+    )
+    rule_runner.write_files({"pyproject.toml": pyproject, "uv.toml": ""})
+    uv_lock_content = _generate_uv_lockfile(rule_runner, requirements)
+    loaded_lockfile = _loaded_lockfile(rule_runner, uv_lock_content, requirements)
+
     venv_repo = rule_runner.request(
         VenvRepository,
         [
             VenvFromUvLockfileRequest(
                 lockfile=loaded_lockfile,
                 python=PythonExecutable(python_path, fingerprint="00" * 32),
+                dependency_groups=dependency_groups,
             )
         ],
     )
@@ -267,3 +277,104 @@ def test_local_find_links_are_portable(tmp_path: Path) -> None:
     venv_dir = (named_caches_dir / VenvRepository.cache_name / venv_repo.venv_path_suffix).resolve()
     assert list(venv_dir.glob("lib/python*/site-packages/my_wheel-0.1.0.dist-info"))
     assert not list(venv_dir.rglob("uv_cache.json"))
+
+
+def test_generate_pyproject_toml_dependency_groups() -> None:
+    ics = InterpreterConstraints(["CPython==3.14.*"])
+
+    parsed = tomllib.loads(generate_pyproject_toml(RESOLVE_NAME, ics, []))
+    assert "dependency-groups" not in parsed
+
+    parsed = tomllib.loads(
+        generate_pyproject_toml(
+            RESOLVE_NAME,
+            ics,
+            ["foo-bar>=1", 'quux; python_version > "3.8"', "Foo_Bar[baz]>=1"],
+        )
+    )
+    # Specifiers for the same project are accumulated into a single group, keyed by the
+    # canonical project name.
+    assert parsed["dependency-groups"] == {
+        "foo-bar": ["Foo_Bar[baz]>=1", "foo-bar>=1"],
+        "quux": ['quux; python_version > "3.8"'],
+    }
+
+
+def _site_packages_dists(venv_dir: Path) -> set[str]:
+    return {
+        path.name.split("-")[0].lower()
+        for path in venv_dir.glob("lib/python*/site-packages/*.dist-info")
+    }
+
+
+def test_subset_venv_repository(tmp_path: Path) -> None:
+    named_caches_dir = tmp_path / "named_caches"
+    rule_runner = _make_rule_runner(docker_image=None, named_caches_dir=named_caches_dir)
+    # python-dateutil depends on six, so this also verifies that the group's transitive
+    # closure is installed.
+    requirements = ("ansicolors==1.1.8", "python-dateutil==2.9.0.post0")
+
+    uv_lock_content = _generate_uv_lockfile(rule_runner, requirements).decode()
+    assert "[package.dev-dependencies]" in uv_lock_content
+
+    def create_venv(dependency_groups: tuple[str, ...]) -> tuple[VenvRepository, set[str]]:
+        venv_repo, result = _create_venv_repository(
+            rule_runner,
+            sys.executable,
+            cache_scope=ProcessCacheScope.PER_SESSION,
+            requirements=requirements,
+            dependency_groups=dependency_groups,
+        )
+        assert result.exit_code == 0, result.stderr.decode()
+        venv_dir = (
+            named_caches_dir / VenvRepository.cache_name / venv_repo.venv_path_suffix
+        ).resolve()
+        return venv_repo, _site_packages_dists(venv_dir)
+
+    subset_repo, subset_dists = create_venv(("python-dateutil",))
+    assert {"python_dateutil", "six"} <= subset_dists
+    assert "ansicolors" not in subset_dists
+
+    full_repo, full_dists = create_venv(())
+    assert {"ansicolors", "python_dateutil", "six"} <= full_dists
+
+    assert subset_repo.venv_path_suffix != full_repo.venv_path_suffix
+
+
+def test_subset_venv_repository_requires_regenerated_lockfile() -> None:
+    rule_runner = _make_rule_runner(docker_image=None)
+    requirements = ("ansicolors==1.1.8",)
+    # A lockfile generated before Pants wrote dependency-groups into it.
+    uv_lock_content = dedent(
+        f"""\
+        version = 1
+        revision = 3
+        requires-python = "==3.14.*"
+
+        [[package]]
+        name = "ansicolors"
+        version = "1.1.8"
+        source = {{ registry = "https://pypi.org/simple" }}
+
+        [[package]]
+        name = "pants-lockfile-for-{RESOLVE_NAME}"
+        version = "0.0.0"
+        source = {{ virtual = "." }}
+        dependencies = [
+            {{ name = "ansicolors" }},
+        ]
+        """
+    ).encode()
+    loaded_lockfile = _loaded_lockfile(rule_runner, uv_lock_content, requirements)
+
+    with engine_error(ValueError, contains="one-time regeneration of the lockfile"):
+        rule_runner.request(
+            VenvRepository,
+            [
+                VenvFromUvLockfileRequest(
+                    lockfile=loaded_lockfile,
+                    python=PythonExecutable(sys.executable, fingerprint="00" * 32),
+                    dependency_groups=("ansicolors",),
+                )
+            ],
+        )
