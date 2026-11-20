@@ -3,6 +3,8 @@
 
 use std::fs::File;
 use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use bytes::Bytes;
@@ -33,14 +35,15 @@ pub fn make_file(path: &Path, contents: &[u8], mode: u32) {
     let mut file = File::create(path).unwrap();
     file.write_all(contents).unwrap();
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-
         let mut permissions = std::fs::metadata(path).unwrap().permissions();
         permissions.set_mode(mode);
         file.set_permissions(permissions).unwrap();
     }
+    // Windows has no permission bits to set.
+    #[cfg(windows)]
+    let _ = mode;
 }
 
 pub fn append_to_existing_file(path: &Path, contents: &[u8]) {
