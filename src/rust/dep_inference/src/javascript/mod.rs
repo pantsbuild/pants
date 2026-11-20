@@ -1,5 +1,6 @@
 // Copyright 2023 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
+use std::borrow::Cow;
 use std::iter::{Once, once};
 use std::path::{Path, PathBuf};
 
@@ -14,7 +15,7 @@ use protos::pb::pants::cache::{
 };
 
 use crate::javascript::import_pattern::{Import, imports_from_patterns};
-use crate::javascript::util::normalize_path;
+use crate::javascript::util::{normalize_path, to_native_separators};
 
 mod import_pattern;
 mod util;
@@ -68,7 +69,8 @@ fn patterns_as_lookup(patterns: Vec<ImportPattern>) -> HashMap<String, Vec<Strin
 }
 
 fn placed_at_root(package_root: &str, string: &str) -> bool {
-    !package_root.is_empty() && string.starts_with(package_root)
+    !package_root.is_empty()
+        && to_native_separators(string).starts_with(&*to_native_separators(package_root))
 }
 
 fn is_relative_specifier(string: &str) -> bool {
@@ -138,6 +140,10 @@ fn normalize_from_path(
     file_imports
         .into_iter()
         .map(|string| {
+            let string = match to_native_separators(&string) {
+                Cow::Borrowed(_) => string,
+                Cow::Owned(native) => native,
+            };
             let path = Path::new(&string);
             if path.has_root() {
                 string
