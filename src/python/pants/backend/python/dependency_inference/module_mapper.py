@@ -357,13 +357,16 @@ async def map_third_party_modules_to_addresses(
         resolve = tgt[PythonRequirementResolveField].normalized_value(python_setup)
 
         def add_modules(modules: Iterable[str], *, is_type_stub: bool) -> None:
+            provider = ModuleProvider(
+                tgt.address,
+                ModuleProviderType.TYPE_STUB if is_type_stub else ModuleProviderType.IMPL,
+            )
             for module in modules:
-                resolves_to_modules_to_providers[resolve][module].append(
-                    ModuleProvider(
-                        tgt.address,
-                        ModuleProviderType.TYPE_STUB if is_type_stub else ModuleProviderType.IMPL,
-                    )
-                )
+                providers = resolves_to_modules_to_providers[resolve][module]
+                # A target with several entries for one project (e.g. `foo>=1`, `foo<2`) must
+                # only provide the module once, else it looks ambiguous.
+                if provider not in providers:
+                    providers.append(provider)
 
         explicit_modules = tgt.get(PythonRequirementModulesField).value
         if explicit_modules:
