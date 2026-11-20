@@ -42,6 +42,8 @@ pub use crate::glob_matching::{
 #[cfg(unix)]
 use crate::posixfs::PosixFS;
 #[cfg(windows)]
+pub use crate::winfs::EXECUTABLE_EXTENSIONS;
+#[cfg(windows)]
 use crate::winfs::WinFS;
 
 #[cfg(unix)]
