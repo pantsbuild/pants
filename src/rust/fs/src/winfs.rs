@@ -23,7 +23,7 @@ use crate::{Dir, DirectoryListing, File, Link, PathMetadata, PathMetadataKind, S
 /// changed by Group Policy, so the same file could get a different digest on different machines.
 /// (Its default list also includes non-program types such as `.lnk`, `.url` and `.reg`.)
 ///
-const EXECUTABLE_EXTENSIONS: &[&str] = &["exe", "com", "bat", "cmd"];
+pub const EXECUTABLE_EXTENSIONS: &[&str] = &["exe", "com", "bat", "cmd"];
 
 ///
 /// The Windows counterpart of `PosixFS`, with the same API.
