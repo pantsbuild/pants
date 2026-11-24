@@ -70,10 +70,12 @@ To get a list of available JDK versions:
 
 ```sh
 $ coursier java --available
-adoptium:1.11.0.15
-adoptium:1.11.0.16
+adoptium:11.0.15
+adoptium:11.0.16
 ...
 ```
+
+Older versions of Coursier list some of these with a legacy `1.` prefix, such as `adoptium:1.11.0.15`. Pants accepts both forms, and drops the prefix before calling Coursier.
 
 Please note that JDKs later than 17 are not supported by nailgun
 (see [#20603](https://github.com/pantsbuild/pants/issues/20603)), which
@@ -84,7 +86,7 @@ must be disabled manually:
 process_execution_local_enable_nailgun = false
 
 [jvm]
-jdk = "temurin:1.22"
+jdk = "temurin:22"
 ```
 
 #### Scala version

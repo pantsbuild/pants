@@ -32,7 +32,8 @@ class JvmSubsystem(Subsystem):
         """
         Options for general JVM functionality.
 
-        JDK strings will be passed directly to Coursier's `--jvm` parameter.
+        JDK strings will be passed to Coursier's `--jvm` parameter, except that a legacy `1.`
+        prefix on the version is dropped, so `temurin:1.11` is passed as `temurin:11`.
         Run `cs java --available` to see a list of available JVM versions on your platform.
 
         If the string `'system'` is passed, Coursier's `--system-jvm` option will be used
@@ -56,7 +57,7 @@ class JvmSubsystem(Subsystem):
         )
 
     tool_jdk = StrOption(
-        default="temurin:1.11",
+        default="temurin:11",
         help=softwrap(
             """
             The JDK to use when building and running Pants' internal JVM support code and other
@@ -66,12 +67,13 @@ class JvmSubsystem(Subsystem):
         advanced=True,
     )
     jdk = StrOption(
-        default="temurin:1.11",
+        default="temurin:11",
         help=softwrap(
             """
             The JDK to use.
 
-            This string will be passed directly to Coursier's `--jvm` parameter.
+            This string will be passed to Coursier's `--jvm` parameter, except that a legacy
+            `1.` prefix on the version is dropped, so `temurin:1.11` is passed as `temurin:11`.
             Run `cs java --available` to see a list of available JVM versions on your platform.
 
             If the string `'system'` is passed, Coursier's `--system-jvm` option will be used

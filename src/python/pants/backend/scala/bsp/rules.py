@@ -79,7 +79,12 @@ from pants.jvm.bsp.resources import _jvm_bsp_resources
 from pants.jvm.bsp.resources import rules as jvm_resources_rules
 from pants.jvm.bsp.spec import JvmBuildTarget
 from pants.jvm.compile import ClasspathEntry, ClasspathEntryRequestFactory
-from pants.jvm.jdk_rules import DefaultJdk, JdkRequest, prepare_jdk_environment
+from pants.jvm.jdk_rules import (
+    DefaultJdk,
+    JdkRequest,
+    normalize_jdk_id,
+    prepare_jdk_environment,
+)
 from pants.jvm.resolve.common import ArtifactRequirements
 from pants.jvm.resolve.coursier_fetch import (
     ToolClasspathRequest,
@@ -272,7 +277,8 @@ def _jdk_request_sort_key(
         # JdkRequest.SYSTEM here so workspace metadata setup doesn't crash.
         if ":" not in version_str:
             return (-1,)
-        _, version = version_str.split(":", 1)
+        # Drop a legacy `1.` prefix so that e.g. `temurin:1.17` and `temurin:17` sort the same.
+        _, version = normalize_jdk_id(version_str).split(":", 1)
 
         return tuple(int(i) for i in version.split("."))
 

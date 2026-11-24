@@ -45,6 +45,11 @@ def test_normalized_jvm_options(given: list[str], expected: tuple[str, ...]) -> 
     assert subsystem.normalized_jvm_options == expected
 
 
+def test_env_disables_maven_settings_mirrors() -> None:
+    """Mirrors from the user's Maven `settings.xml` must not override `[coursier].repos`."""
+    assert make_coursier().env["COURSIER_MAVEN_SETTINGS"] == "false"
+
+
 def test_args_places_jvm_options_before_subcommand() -> None:
     """Coursier only honors `-J` options that appear before its subcommand."""
     coursier = make_coursier(("-J-Dhttp.proxyHost=127.0.0.1",))

@@ -183,6 +183,20 @@ def parse_jre_major_version(version_lines: str) -> int | None:
     return None
 
 
+# Matches the legacy `1.` version prefix of a JDK id, after an optional `vendor:` or `vendor@`.
+_LEGACY_JDK_VERSION_PREFIX_REGEX = re.compile(r"^((?:[^:@]+[:@])?)1\.(?=\d)")
+
+
+def normalize_jdk_id(jdk: str) -> str:
+    """Strip the legacy `1.` version prefix from a JDK id, e.g. `temurin:1.11` -> `temurin:11`.
+
+    Coursier's JVM index v2 (the default index from Coursier 2.1.27) only lists versions without
+    the prefix, so `temurin:1.11` no longer resolves there. The stripped form is also accepted by
+    older Coursier versions, and by indexes that use the prefix for all of a JDK's versions.
+    """
+    return _LEGACY_JDK_VERSION_PREFIX_REGEX.sub(r"\1", jdk)
+
+
 @rule
 async def fetch_nailgun(jvm: JvmSubsystem) -> Nailgun:
     nailgun = await coursier_fetch_one_coord(
@@ -216,10 +230,16 @@ async def prepare_jdk_environment(
         version = jvm.jdk
 
     # TODO: add support for system JDKs with specific version
+    # NB: Only the id handed to Coursier is normalized: error messages below keep quoting the JDK
+    # as the user wrote it, and note the id Coursier was given when that differs.
+    coursier_jdk_note = ""
     if version is DefaultJdk.SYSTEM:
         coursier_jdk_option = "--system-jvm"
     else:
-        coursier_jdk_option = f"--jvm={version}"
+        coursier_jdk = normalize_jdk_id(version)
+        coursier_jdk_option = f"--jvm={coursier_jdk}"
+        if coursier_jdk != version:
+            coursier_jdk_note = f" (passed to Coursier as `{coursier_jdk}`)"
 
     if not coursier.jvm_index:
         coursier_options = ["java-home", "--quiet", "--quiet", coursier_jdk_option]
@@ -271,7 +291,7 @@ async def prepare_jdk_environment(
 
     if java_version_result.exit_code != 0:
         raise ValueError(
-            f"Failed to locate Java for JDK `{version}`:\n"
+            f"Failed to locate Java for JDK `{version}`{coursier_jdk_note}:\n"
             f"{java_version_result.stderr.decode('utf-8')}"
         )
 
