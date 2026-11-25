@@ -379,12 +379,11 @@ def test_jvm_not_found_when_empty_jvm_index(rule_runner: RuleRunner) -> None:
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-    # NB: Coursier is given, and so reports, the JDK id without the legacy `1.` prefix. Pants' own
-    # message quotes the id as configured, and says which id Coursier was given.
+    # NB: Coursier is given, and so reports, the JDK id without the legacy `1.` prefix. Only
+    # Coursier's own message is matched: which Pants process surfaces it depends on the host.
+    # Where `/bin/java` exists, the `java -version` probe falls through to it and succeeds, and
+    # the failure is reported by the later JDK setup script instead.
     coursier_jdk = normalize_jdk_id(jdk_binary)
-    expected_exception_msg = (
-        rf"(?s)Failed to locate Java for JDK `{jdk_binary}` \(passed to Coursier as "
-        rf"`{coursier_jdk}`\):.*?JVM {coursier_jdk} not found in index"
-    )
+    expected_exception_msg = rf"JVM {coursier_jdk} not found in index"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         run_javac_version(rule_runner)
