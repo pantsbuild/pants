@@ -491,7 +491,7 @@ class Helper:
     def runs_on(self) -> list[str]:
         ret = []
         if self.platform == Platform.MACOS14_ARM64:
-            ret += ["depot-macos-14"]
+            ret += ["depot-macos-15"]
         elif self.platform == Platform.LINUX_X86_64:
             ret += ["depot-ubuntu-22.04-8"]
         elif self.platform == Platform.LINUX_ARM64:
