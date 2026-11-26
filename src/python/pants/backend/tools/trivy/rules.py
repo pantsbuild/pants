@@ -69,7 +69,12 @@ async def run_trivy(
 
     if checks.files:
         argv.append(f"--config-check={','.join(checks.files)}")
-        if trivy.check_namespaces:
+        # Trivy appends repeated values of this flag, so a second one would not override ours.
+        namespaces_in_args = any(
+            arg == "--check-namespaces" or arg.startswith("--check-namespaces=")
+            for arg in trivy.args
+        )
+        if trivy.check_namespaces and not namespaces_in_args:
             argv.append(f"--check-namespaces={','.join(trivy.check_namespaces)}")
 
     argv.extend(trivy.args)

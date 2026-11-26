@@ -201,3 +201,21 @@ def test_custom_checks_unmatched_glob(rule_runner) -> None:
 
     with pytest.raises(ExecutionError, match=r"\[trivy\]\.checks"):
         _lint_module(rule_runner)
+
+
+def test_custom_checks_partly_unmatched_globs(rule_runner) -> None:
+    rule_runner.set_options(["--trivy-checks=['checks/*.rego', 'missing/*.rego']"])
+
+    with pytest.raises(ExecutionError, match=r"\[trivy\]\.checks"):
+        _lint_module(rule_runner)
+
+
+def test_custom_checks_namespace_in_args(rule_runner) -> None:
+    rule_runner.set_options(
+        [
+            "--trivy-checks=['checks/*.rego']",
+            "--trivy-args=--raw-config-scanners=terraform --check-namespaces=other",
+        ]
+    )
+
+    assert "TEST-0001" not in _misconfiguration_ids(_lint_module(rule_runner))

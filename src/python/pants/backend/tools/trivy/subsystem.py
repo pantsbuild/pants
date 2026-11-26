@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.core.util_rules.external_tool import TemplatedExternalTool
-from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs
+from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.target import BoolField
 from pants.option.option_types import (
     ArgsListOption,
@@ -83,10 +83,12 @@ class Trivy(TemplatedExternalTool):
         help=lambda cls: softwrap(
             f"""
             Files or globs of custom Rego checks, relative to the build root, to load in every
-            Trivy run, e.g. `["build-support/trivy-checks/*.rego"]`.
+            Trivy run, e.g. `["build-support/trivy-checks/*.rego"]`. Every entry must match at
+            least one file.
 
             Pants adds the matched files to the sandbox and passes them to Trivy with
-            `--config-check`, together with `[{cls.options_scope}].check_namespaces`.
+            `--config-check`, together with `[{cls.options_scope}].check_namespaces`. Trivy
+            loads them in addition to any `--config-check` in `[{cls.options_scope}].args`.
 
             Some checks need further Trivy flags, such as `--raw-config-scanners=terraform` for
             checks that select the `terraform-raw` input. Set those with
@@ -101,7 +103,8 @@ class Trivy(TemplatedExternalTool):
             Rego namespaces that Trivy evaluates in the checks loaded with
             `[{cls.options_scope}].checks`, passed as `--check-namespaces`.
 
-            Only used when `[{cls.options_scope}].checks` is set.
+            Only used when `[{cls.options_scope}].checks` is set, and not passed when
+            `[{cls.options_scope}].args` already has `--check-namespaces`.
             """
         ),
     )
@@ -110,6 +113,7 @@ class Trivy(TemplatedExternalTool):
         return PathGlobs(
             globs=self.checks,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
+            conjunction=GlobExpansionConjunction.all_match,
             description_of_origin=f"the option `[{self.options_scope}].checks`",
         )
 
