@@ -644,6 +644,27 @@ class PythonSetup(Subsystem):
         ),
         advanced=True,
     )
+    create_venv_repository_from_entire_lockfile = BoolOption(
+        default=True,
+        help=softwrap(
+            """
+            When building a pex from a uv lockfile, Pants creates an intermediate, internal-only
+            venv that pex uses as a wheel repository.
+
+            If this option is enabled (as it is by default) then each "venv repository" will
+            contain all the requirements in the lockfile, including those that the specific pex
+            may not need, resulting in creation of fewer, larger venvs.
+
+            Otherwise a venv repository will include just the requirements the pex is actually
+            going to consume, resulting in creation of more, smaller venvs. This may be useful if
+            you have a lockfile with massive requirements that are not always needed.
+
+            Note that when first setting this option to False you may need to regenerate the
+            lockfile to ensure that it contains enough information to create the subset venv.
+            """
+        ),
+        advanced=True,
+    )
 
     __constraints_deprecation_msg = softwrap(
         f"""

@@ -18,6 +18,7 @@ from typing import TypeVar
 import packaging.specifiers
 import packaging.version
 from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
 
 from pants.backend.python.subsystems import uv as uv_subsystem
 from pants.backend.python.subsystems.setup import PythonSetup
@@ -821,12 +822,20 @@ async def build_pex(
                 )
             )
 
+        if not python_setup.create_venv_repository_from_entire_lockfile and req_strings:
+            dependency_groups = tuple(
+                sorted({canonicalize_name(Requirement(r).name) for r in req_strings})
+            )
+        else:
+            dependency_groups = tuple()
+
         venv_repos = list(
             await concurrently(
                 create_venv_repository_from_uv_lockfile(
                     VenvFromUvLockfileRequest(
                         lockfile=requirements_setup.uv_lockfile,
                         python=python,
+                        dependency_groups=dependency_groups,
                         uv_platform=uv_platform,
                     ),
                     **implicitly(),
