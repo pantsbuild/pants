@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from pants.backend.terraform import dependencies, tool
@@ -22,6 +24,7 @@ from pants.core.goals.lint import LintResult
 from pants.core.util_rules import source_files
 from pants.core.util_rules.partitions import _EmptyMetadata
 from pants.engine.internals.native_engine import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -49,6 +52,7 @@ def rule_runner(standard_deployment: StandardDeployment) -> RuleRunner:
             "src/tf/bad.tf": bad_terraform,
             "src/tf/stg.tfvars": terraform_values,
             "trivy.yaml": trivy_config,
+            "checks/null_resource.rego": custom_check,
         }
     )
     rule_runner.write_files(trivy_deployment.files)
@@ -74,6 +78,53 @@ resource "aws_instance" "this" {
 terraform_values = """\
 encrypted = true
 """
+
+custom_check = """\
+# METADATA
+# title: Test check
+# scope: package
+# schemas:
+#   - input: schema["terraform-raw"]
+# custom:
+#   id: TEST-0001
+#   avd_id: TEST-0001
+#   severity: HIGH
+#   short_code: test
+#   input:
+#     selector:
+#       - type: terraform-raw
+package user.test
+
+import rego.v1
+
+deny contains res if {
+    some module in input.modules
+    some block in module.blocks
+    block.kind == "resource"
+    block.type == "null_resource"
+    res := result.new("null_resource is not allowed", block)
+}
+"""
+
+
+def _misconfiguration_ids(result: LintResult) -> set[str]:
+    return {
+        misconfiguration["ID"]
+        for res in json.loads(result.stdout)["Results"]
+        for misconfiguration in res.get("Misconfigurations", [])
+    }
+
+
+def _lint_module(rule_runner: RuleRunner) -> LintResult:
+    tgt = rule_runner.get_target(Address("src/tf", target_name="mod"))
+    return rule_runner.request(
+        LintResult,
+        [
+            TrivyLintTerraformModuleRequest.Batch(
+                "trivy", (TerraformFieldSet.create(tgt),), partition_metadata=_EmptyMetadata()
+            )
+        ],
+    )
 
 
 def test_lint_deployment(rule_runner) -> None:
@@ -108,3 +159,63 @@ def test_lint_module(rule_runner) -> None:
     )
 
     assert_trivy_output(result, 1, "bad.tf", "config", 2)
+
+
+def test_custom_checks(rule_runner) -> None:
+    rule_runner.set_options(
+        [
+            "--trivy-checks=['checks/*.rego']",
+            "--trivy-args='--raw-config-scanners=terraform'",
+        ]
+    )
+
+    result = _lint_module(rule_runner)
+
+    assert result.exit_code == 1
+    assert "TEST-0001" in _misconfiguration_ids(result)
+
+
+def test_custom_checks_unset(rule_runner) -> None:
+    rule_runner.set_options(["--trivy-args='--raw-config-scanners=terraform'"])
+
+    result = _lint_module(rule_runner)
+
+    assert result.exit_code == 1
+    assert "TEST-0001" not in _misconfiguration_ids(result)
+
+
+def test_custom_checks_other_namespace(rule_runner) -> None:
+    rule_runner.set_options(
+        [
+            "--trivy-checks=['checks/*.rego']",
+            "--trivy-check-namespaces=['other']",
+            "--trivy-args='--raw-config-scanners=terraform'",
+        ]
+    )
+
+    assert "TEST-0001" not in _misconfiguration_ids(_lint_module(rule_runner))
+
+
+def test_custom_checks_unmatched_glob(rule_runner) -> None:
+    rule_runner.set_options(["--trivy-checks=['missing/*.rego']"])
+
+    with pytest.raises(ExecutionError, match=r"\[trivy\]\.checks"):
+        _lint_module(rule_runner)
+
+
+def test_custom_checks_partly_unmatched_globs(rule_runner) -> None:
+    rule_runner.set_options(["--trivy-checks=['checks/*.rego', 'missing/*.rego']"])
+
+    with pytest.raises(ExecutionError, match=r"\[trivy\]\.checks"):
+        _lint_module(rule_runner)
+
+
+def test_custom_checks_namespace_in_args(rule_runner) -> None:
+    rule_runner.set_options(
+        [
+            "--trivy-checks=['checks/*.rego']",
+            "--trivy-args=--raw-config-scanners=terraform --check-namespaces=other",
+        ]
+    )
+
+    assert "TEST-0001" not in _misconfiguration_ids(_lint_module(rule_runner))
