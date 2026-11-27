@@ -13,6 +13,7 @@ permissions: {}
 jobs:
   cargo-audit:
     runs-on: ubuntu-latest
+    if: github.repository_owner == 'pantsbuild'
     steps:
     - uses: actions/checkout@v6.0.2
 
