@@ -33,7 +33,8 @@ class JvmSubsystem(Subsystem):
         Options for general JVM functionality.
 
         JDK strings will be passed to Coursier's `--jvm` parameter, except that a legacy `1.`
-        prefix on the version is dropped, so `temurin:1.11` is passed as `temurin:11`.
+        prefix on the version is dropped, so `temurin:1.11` is passed as `temurin:11`. If
+        `[coursier].jvm_index` is set, the string is tried as written first.
         Run `cs java --available` to see a list of available JVM versions on your platform.
 
         If the string `'system'` is passed, Coursier's `--system-jvm` option will be used
@@ -74,6 +75,7 @@ class JvmSubsystem(Subsystem):
 
             This string will be passed to Coursier's `--jvm` parameter, except that a legacy
             `1.` prefix on the version is dropped, so `temurin:1.11` is passed as `temurin:11`.
+            If `[coursier].jvm_index` is set, the string is tried as written first.
             Run `cs java --available` to see a list of available JVM versions on your platform.
 
             If the string `'system'` is passed, Coursier's `--system-jvm` option will be used

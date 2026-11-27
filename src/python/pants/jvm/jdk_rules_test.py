@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import io
+import json
+import tarfile
 import textwrap
 
 import pytest
@@ -379,7 +382,8 @@ def test_jvm_not_found_when_empty_jvm_index(rule_runner: RuleRunner) -> None:
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-    # NB: Coursier is given, and so reports, the JDK id without the legacy `1.` prefix. Only
+    # NB: With a custom index, the JDK id is tried as written and then without the legacy `1.`
+    # prefix, and Coursier's message for the last of those attempts is what is reported. Only
     # Coursier's own message is matched: which Pants process surfaces it depends on the host.
     # Where `/bin/java` exists, the `java -version` probe falls through to it and succeeds, and
     # the failure is reported by the later JDK setup script instead.
@@ -387,3 +391,61 @@ def test_jvm_not_found_when_empty_jvm_index(rule_runner: RuleRunner) -> None:
     expected_exception_msg = rf"JVM {coursier_jdk} not found in index"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         run_javac_version(rule_runner)
+
+
+def _fake_jdk_archive(marker: str, version: str) -> bytes:
+    """A `.tgz` of a JDK whose `java` only prints a version and the given marker."""
+    java = textwrap.dedent(
+        f"""\
+        #!/bin/sh
+        echo 'openjdk version "{version}"' >&2
+        echo '{marker}' >&2
+        """
+    ).encode()
+    archive = io.BytesIO()
+    with tarfile.open(fileobj=archive, mode="w:gz") as tar:
+        info = tarfile.TarInfo("jdk/bin/java")
+        info.size = len(java)
+        info.mode = 0o755
+        tar.addfile(info, io.BytesIO(java))
+    return archive.getvalue()
+
+
+@maybe_skip_jdk_test
+@pytest.mark.parametrize(
+    "jdk_11_version",
+    [
+        # An index that writes some versions of a JDK with the legacy `1.` prefix and others
+        # without. Coursier only finds the prefixed version if it is asked for as it is written.
+        pytest.param("1.11.0.99", id="index-mixes-prefixed-and-unprefixed-versions"),
+        # An index without the prefix: Coursier only finds the version without the prefix.
+        pytest.param("11.0.99", id="index-without-prefix"),
+    ],
+)
+def test_legacy_jdk_id_with_custom_jvm_index(rule_runner: RuleRunner, jdk_11_version: str) -> None:
+    rule_runner.write_files(
+        {
+            "jdk11.tgz": _fake_jdk_archive("fake-jdk-11", "11.0.99"),
+            "jdk17.tgz": _fake_jdk_archive("fake-jdk-17", "17.0.99"),
+        }
+    )
+    jdks = {
+        "jdk@fakejdk": {
+            jdk_11_version: f"tgz+file://{rule_runner.build_root}/jdk11.tgz",
+            "17.0.99": f"tgz+file://{rule_runner.build_root}/jdk17.tgz",
+        }
+    }
+    index = {
+        os_name: {arch: jdks for arch in ("amd64", "arm64")}
+        for os_name in ("darwin", "linux", "linux-musl")
+    }
+    rule_runner.write_files({"index.json": json.dumps(index)})
+
+    rule_runner.set_options(
+        [
+            f"--coursier-jvm-index={rule_runner.build_root}/index.json",
+            "--jvm-tool-jdk=fakejdk:1.11",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    assert "fake-jdk-11" in run_javac_version(rule_runner)

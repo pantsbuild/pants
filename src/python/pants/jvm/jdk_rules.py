@@ -193,6 +193,10 @@ def normalize_jdk_id(jdk: str) -> str:
     Coursier's JVM index v2 (the default index from Coursier 2.1.27) only lists versions without
     the prefix, so `temurin:1.11` no longer resolves there. The stripped form is also accepted by
     older Coursier versions, and by indexes that use the prefix for all of a JDK's versions.
+
+    An index that uses the prefix for only some of a JDK's versions matches those versions only
+    as they are written, which is why, for a custom index, `prepare_jdk_environment` tries the id
+    as written before the stripped one.
     """
     return _LEGACY_JDK_VERSION_PREFIX_REGEX.sub(r"\1", jdk)
 
@@ -230,28 +234,28 @@ async def prepare_jdk_environment(
         version = jvm.jdk
 
     # TODO: add support for system JDKs with specific version
-    # NB: Only the id handed to Coursier is normalized: error messages below keep quoting the JDK
-    # as the user wrote it, and note the id Coursier was given when that differs.
+    # NB: Error messages below keep quoting the JDK as the user wrote it, and note the id Coursier
+    # was given when that differs.
     coursier_jdk_note = ""
+    # The JDK ids to try, in order: the first one that Coursier finds is used.
+    coursier_jdk_options: tuple[str, ...]
     if version is DefaultJdk.SYSTEM:
-        coursier_jdk_option = "--system-jvm"
+        coursier_jdk_options = ("--system-jvm",)
     else:
         coursier_jdk = normalize_jdk_id(version)
-        coursier_jdk_option = f"--jvm={coursier_jdk}"
-        if coursier_jdk != version:
+        if coursier_jdk == version:
+            coursier_jdk_options = (f"--jvm={version}",)
+        else:
             coursier_jdk_note = f" (passed to Coursier as `{coursier_jdk}`)"
-
-    if not coursier.jvm_index:
-        coursier_options = ["java-home", "--quiet", "--quiet", coursier_jdk_option]
-    else:
-        jvm_index_option = f"--jvm-index={coursier.jvm_index}"
-        coursier_options = [
-            "java-home",
-            "--quiet",
-            "--quiet",
-            jvm_index_option,
-            coursier_jdk_option,
-        ]
+            if coursier.jvm_index:
+                # A custom index may list this version with the legacy prefix, and Coursier only
+                # matches the unprefixed id against it if every version of that JDK has the
+                # prefix. So try the id as written first.
+                coursier_jdk_options = (f"--jvm={version}", f"--jvm={coursier_jdk}")
+            else:
+                coursier_jdk_options = (f"--jvm={coursier_jdk}",)
+    # The last id tried, and so the one that Coursier reports if no id is found.
+    coursier_jdk_option = coursier_jdk_options[-1]
 
     # TODO(#16104) This argument re-writing code should use the native {chroot} support.
     # See also `run` for other argument re-writing code.
@@ -262,10 +266,20 @@ async def prepare_jdk_environment(
         else:
             return quoted
 
-    optionally_prefixed_coursier_args = [prefixed(arg) for arg in coursier.args(coursier_options)]
+    def java_home_invocation(jdk_option: str) -> str:
+        options = ["java-home", "--quiet", "--quiet"]
+        if coursier.jvm_index:
+            options.append(f"--jvm-index={coursier.jvm_index}")
+        options.append(jdk_option)
+        return " ".join(prefixed(arg) for arg in coursier.args(options))
+
     # NB: We `set +e` in the subshell to ensure that it exits as well.
     #  see https://unix.stackexchange.com/a/23099
-    java_home_command = " ".join(("set +e;", *optionally_prefixed_coursier_args))
+    # Only the last attempt reports its errors: an id tried before it not being in the index is
+    # expected.
+    java_home_command = "set +e; " + " 2>/dev/null || ".join(
+        java_home_invocation(jdk_option) for jdk_option in coursier_jdk_options
+    )
 
     env = {
         "PANTS_INTERNAL_ABSOLUTE_PREFIX": "",
