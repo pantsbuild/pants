@@ -112,8 +112,12 @@ class CoursierSubsystem(TemplatedExternalTool):
     name = "coursier"
     help = "A dependency resolver for the Maven ecosystem. (https://get-coursier.io/)"
 
-    default_version = "v2.1.24"
+    default_version = "v2.1.27"
     default_known_versions = [
+        "v2.1.27|linux_arm64 |dc85935416e54047233a9ffa449636b02673c5d8bbb6468e949f2f4350f80df1|29340146",
+        "v2.1.27|linux_x86_64|9bf62b300a043260f39bc738ddb90dd02a1d2cc998931251614e1749d3231e07|30036399",
+        "v2.1.27|macos_arm64 |468a4c08483d77f8896b33bcf474e303f716ad43a3f7fb9639cc1112fca9dc1f|29095465|https://github.com/coursier/coursier/releases/download/v2.1.27/cs-aarch64-apple-darwin.gz",
+        "v2.1.27|macos_x86_64|93ba2bf488a5b5d54fa4d3a3187334420a753fb6c752a54b1586a14a0c55ee6c|29088712",
         "v2.1.24|linux_arm64 |96b4c7580d253b6999a40e94413ca6c4a9bd2339ecce4754ac31a26d1a12fcbf|21534519|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.24/cs-aarch64-pc-linux.gz",
         "v2.1.24|linux_x86_64|d2c0572a17fb6146ea65349b59dd216b38beff60ae22bce6e549867c6ed2eda6|23366878",
         "v2.1.24|macos_arm64 |8f47594eb62dea25af913c8932d1f1d86a3a9c8e1262925b63852635390a3f43|21541383|https://github.com/VirtusLab/coursier-m1/releases/download/v2.1.24/cs-aarch64-apple-darwin.gz",
@@ -137,9 +141,12 @@ class CoursierSubsystem(TemplatedExternalTool):
     default_url_platform_mapping = {
         # By default we pull x86 binaries for Mac, since arm binaries
         # are unavailable for older supported versions of coursier. They work fine with rosetta.
-        # For recent versions, arm binaries for mac and linux are available
-        # at https://github.com/VirtusLab/coursier-m1/
-        # Set the fifth field in known_versions to pull from this alternative source.
+        # For recent versions, the arm binary for mac is selected by setting the fifth field in
+        # known_versions to its URL: the entries for v2.1.6 through v2.1.24 point at
+        # https://github.com/VirtusLab/coursier-m1/, later ones at the main Coursier releases.
+        # The arm binary for linux is pulled from VirtusLab/coursier-m1 in the same way for
+        # v2.1.6 through v2.1.24. From v2.1.25 it is published in the main Coursier releases, so
+        # it needs no such URL.
         "macos_arm64": "x86_64-apple-darwin",
         "macos_x86_64": "x86_64-apple-darwin",
         "linux_arm64": "aarch64-pc-linux",
@@ -276,6 +283,11 @@ class Coursier:
             # extracted JDK tarballs go here
             "COURSIER_ARCHIVE_CACHE": f"{self.cache_dir}/arc",
             "COURSIER_JVM_CACHE": f"{self.cache_dir}/v1",
+            # From v2.1.25, Coursier applies the mirrors of the user's Maven `settings.xml` on
+            # top of the repositories it is given explicitly. The repositories to resolve from
+            # should only come from `[coursier].repos`, so turn that off. Older versions ignore
+            # this variable.
+            "COURSIER_MAVEN_SETTINGS": "false",
         }
 
     @property

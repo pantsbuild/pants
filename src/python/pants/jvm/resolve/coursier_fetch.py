@@ -253,7 +253,7 @@ class CoursierResolvedLockfile:
                 # coord entry of their own — parent POMs with classifier "pom", and
                 # other entries that are dropped by coursier bugs such as
                 # https://github.com/coursier/coursier/issues/2884 (which is still
-                # observable as of v2.1.25-M19, e.g. ("org.apache.curator",
+                # observable as of v2.1.27, e.g. ("org.apache.curator",
                 # "apache-curator", None) when resolving hive-exec). Skip any such
                 # missing entry rather than raising KeyError.
                 if (dependency_entry := entries.get((d.group, d.artifact, d.classifier)))

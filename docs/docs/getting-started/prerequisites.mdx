@@ -32,6 +32,10 @@ Pants for Linux is currently distributed as a manylinux wheel. Alpine Linux is n
 If you need to run Pants on Alpine, [let us know](/community/members), so we can prioritize this work. Meanwhile, you can try [building Pants yourself](./installing-pants.mdx#running-pants-from-sources) on Alpine.
 :::
 
+:::caution The JVM backends' default Coursier needs glibc 2.34 or newer
+The JVM backends use [Coursier](https://get-coursier.io/) to resolve dependencies and to provision JDKs. Its default version requires glibc 2.34 or newer wherever it runs, including in Docker and remote environments. On a system with an older glibc, such as RHEL 8, Debian 11 or Ubuntu 20.04 (including under WSL), set `[coursier].version = "v2.1.24"` in `pants.toml` to use the previous version.
+:::
+
 :::caution Linux on ARM is supported from Pants 2.16
 Pants 2.16 and newer is distributed for Linux x86_64 and ARM64. Earlier versions are only distributed for Linux x86_64.
 
@@ -39,6 +43,10 @@ If you need to run an earlier version of Pants on ARM, you can try [building Pan
 :::
 
 ### macOS
+
+:::caution The JVM backends' default Coursier is built for macOS 15 or newer
+The default version of [Coursier](https://get-coursier.io/), which the JVM backends use to resolve dependencies and to provision JDKs, is built for macOS 15 or newer. If it does not run on an older macOS, set `[coursier].version = "v2.1.24"` in `pants.toml` to use the previous version.
+:::
 
 :::note Apple Silicon (M1/M2) support
 If running Pants inside a Docker container on an Apple Silicon machine you may need to set `--no-watch-filesystem --no-pantsd`. This is because notifications on native macOS files aren't mirrored over to the virtualized Linux system.

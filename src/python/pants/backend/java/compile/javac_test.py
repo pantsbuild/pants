@@ -234,7 +234,8 @@ def test_compile_jdk_17_file_fails_with_jdk_11(rule_runner: RuleRunner) -> None:
         ),
         resolve=make_resolve(rule_runner),
     )
-    with pytest.raises(ExecutionError):
+    # NB: Match on the compile error, so that this cannot pass because the JDK failed to resolve.
+    with pytest.raises(ExecutionError, match="RELEASE_17"):
         rule_runner.request(RenderedClasspath, [request])
 
 

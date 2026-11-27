@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import io
+import json
+import tarfile
 import textwrap
 
 import pytest
@@ -14,7 +17,7 @@ from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent
 from pants.engine.internals.native_engine import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import Process, ProcessResult
-from pants.jvm.jdk_rules import InternalJdk, JvmProcess, parse_jre_major_version
+from pants.jvm.jdk_rules import InternalJdk, JvmProcess, normalize_jdk_id, parse_jre_major_version
 from pants.jvm.jdk_rules import rules as jdk_rules
 from pants.jvm.resolve.coursier_fetch import rules as coursier_fetch_rules
 from pants.jvm.resolve.coursier_setup import rules as coursier_setup_rules
@@ -117,7 +120,7 @@ def test_java_binary_bogus_version_fails(rule_runner: RuleRunner) -> None:
 @pytest.mark.skip(reason="#12293 Coursier JDK bootstrapping is currently flaky in CI")
 @pytest.mark.no_error_if_skipped
 def test_java_binary_versions(rule_runner: RuleRunner) -> None:
-    # default version is 1.11
+    # default version is 11
     assert 'openjdk version "11.0' in run_javac_version(rule_runner)
 
     rule_runner.set_options(["--jvm-tool-jdk=temurin:1.17"], env_inherit=PYTHON_BOOTSTRAP_ENV)
@@ -148,6 +151,38 @@ def test_parse_java_version() -> None:
     """
     )
     assert parse_jre_major_version(version2) == 11
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        # The legacy `1.` prefix is stripped, with or without a vendor, for either separator.
+        ("temurin:1.11", "temurin:11"),
+        ("temurin:1.11.0.23", "temurin:11.0.23"),
+        ("adoptium@1.8", "adoptium@8"),
+        ("zulu:1.8.0.372", "zulu:8.0.372"),
+        ("1.8", "8"),
+        ("1.11+", "11+"),
+        ("temurin:1.11+", "temurin:11+"),
+        # Anything else is left alone.
+        ("temurin:11", "temurin:11"),
+        ("adoptium@17", "adoptium@17"),
+        ("temurin:10", "temurin:10"),
+        ("temurin:17.0.1", "temurin:17.0.1"),
+        ("corretto:11.0.1", "corretto:11.0.1"),
+        ("zulu:8.0.312", "zulu:8.0.312"),
+        ("graalvm-java17:22.3.1", "graalvm-java17:22.3.1"),
+        ("17", "17"),
+        ("1", "1"),
+        ("bogusjdk:999", "bogusjdk:999"),
+        ("system", "system"),
+        # Version ranges and URLs are passed through untouched.
+        ("temurin:[1.11,1.17)", "temurin:[1.11,1.17)"),
+        ("https://example.com/1.8/jdk.tgz", "https://example.com/1.8/jdk.tgz"),
+    ],
+)
+def test_normalize_jdk_id(given: str, expected: str) -> None:
+    assert normalize_jdk_id(given) == expected
 
 
 @maybe_skip_jdk_test
@@ -347,6 +382,70 @@ def test_jvm_not_found_when_empty_jvm_index(rule_runner: RuleRunner) -> None:
         ],
         env_inherit=PYTHON_BOOTSTRAP_ENV,
     )
-    expected_exception_msg = rf".*?JVM {jdk_binary} not found in index.*?"
+    # NB: With a custom index, the JDK id is tried as written and then without the legacy `1.`
+    # prefix, and Coursier's message for the last of those attempts is what is reported. Only
+    # Coursier's own message is matched: which Pants process surfaces it depends on the host.
+    # Where `/bin/java` exists, the `java -version` probe falls through to it and succeeds, and
+    # the failure is reported by the later JDK setup script instead.
+    coursier_jdk = normalize_jdk_id(jdk_binary)
+    expected_exception_msg = rf"JVM {coursier_jdk} not found in index"
     with pytest.raises(ExecutionError, match=expected_exception_msg):
         run_javac_version(rule_runner)
+
+
+def _fake_jdk_archive(marker: str, version: str) -> bytes:
+    """A `.tgz` of a JDK whose `java` only prints a version and the given marker."""
+    java = textwrap.dedent(
+        f"""\
+        #!/bin/sh
+        echo 'openjdk version "{version}"' >&2
+        echo '{marker}' >&2
+        """
+    ).encode()
+    archive = io.BytesIO()
+    with tarfile.open(fileobj=archive, mode="w:gz") as tar:
+        info = tarfile.TarInfo("jdk/bin/java")
+        info.size = len(java)
+        info.mode = 0o755
+        tar.addfile(info, io.BytesIO(java))
+    return archive.getvalue()
+
+
+@maybe_skip_jdk_test
+@pytest.mark.parametrize(
+    "jdk_11_version",
+    [
+        # An index that writes some versions of a JDK with the legacy `1.` prefix and others
+        # without. Coursier only finds the prefixed version if it is asked for as it is written.
+        pytest.param("1.11.0.99", id="index-mixes-prefixed-and-unprefixed-versions"),
+        # An index without the prefix: Coursier only finds the version without the prefix.
+        pytest.param("11.0.99", id="index-without-prefix"),
+    ],
+)
+def test_legacy_jdk_id_with_custom_jvm_index(rule_runner: RuleRunner, jdk_11_version: str) -> None:
+    rule_runner.write_files(
+        {
+            "jdk11.tgz": _fake_jdk_archive("fake-jdk-11", "11.0.99"),
+            "jdk17.tgz": _fake_jdk_archive("fake-jdk-17", "17.0.99"),
+        }
+    )
+    jdks = {
+        "jdk@fakejdk": {
+            jdk_11_version: f"tgz+file://{rule_runner.build_root}/jdk11.tgz",
+            "17.0.99": f"tgz+file://{rule_runner.build_root}/jdk17.tgz",
+        }
+    }
+    index = {
+        os_name: {arch: jdks for arch in ("amd64", "arm64")}
+        for os_name in ("darwin", "linux", "linux-musl")
+    }
+    rule_runner.write_files({"index.json": json.dumps(index)})
+
+    rule_runner.set_options(
+        [
+            f"--coursier-jvm-index={rule_runner.build_root}/index.json",
+            "--jvm-tool-jdk=fakejdk:1.11",
+        ],
+        env_inherit=PYTHON_BOOTSTRAP_ENV,
+    )
+    assert "fake-jdk-11" in run_javac_version(rule_runner)
