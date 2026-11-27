@@ -38,7 +38,6 @@ from pants.core.goals import package
 from pants.core.goals.run import rules as run_rules
 from pants.core.util_rules import source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import ProcessResult
 from pants.engine.rules import QueryRule, rule
 from pants.engine.target import Target
@@ -295,12 +294,9 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
             "src/mychart/templates/configmap.yaml": _TEST_GIVEN_CONFIGMAP_FILE,
             "src/shell/BUILD": dedent(
                 """\
-              shell_sources(name="scripts")
-
               run_shell_command(
                 name="custom_post_renderer",
-                command="src/shell/my-script.sh",
-                execution_dependencies=[":scripts"]
+                command="sed 's/foo_value/modified_by_post_renderer/g'",
               )
               """
             ),
@@ -315,29 +311,6 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
             ),
         }
     )
-
-    # We need to create the post-renderer script as a digest to ensure it has running permissions.
-    post_renderer_script_digest = rule_runner.request(
-        Digest,
-        [
-            CreateDigest(
-                [
-                    FileContent(
-                        path="src/shell/my-script.sh",
-                        content=dedent(
-                            """\
-                            #!/bin/bash
-                            cat <&0
-                            """
-                        ).encode(),
-                        is_executable=True,
-                    )
-                ]
-            )
-        ],
-    )
-
-    rule_runner.write_digest(post_renderer_script_digest)
 
     deployment_addr = Address("src/deployment", target_name="test")
     tgt = rule_runner.get_target(deployment_addr)
@@ -366,4 +339,8 @@ def test_use_simple_extra_post_renderer(rule_runner: RuleRunner) -> None:
         digest=rendered_output.snapshot.digest,
         filename="mychart/templates/configmap.yaml",
     )
-    assert rendered_configmap_file == _TEST_EXPECTED_CONFIGMAP_FILE
+    # The post-renderer should have modified foo_value to modified_by_post_renderer
+    expected_modified_configmap = _TEST_EXPECTED_CONFIGMAP_FILE.replace(
+        "foo_value", "modified_by_post_renderer"
+    )
+    assert rendered_configmap_file == expected_modified_configmap
