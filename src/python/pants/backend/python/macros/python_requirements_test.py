@@ -229,6 +229,8 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
     * module_mapping works regardless of capitalization.
     * Projects get normalized thanks to Requirement.parse().
     * Overrides works, including for dependencies and optional-dependencies
+    * Tags from multiple optional-dependency groups are merged with generator tags.
+    * Explicit tag overrides replace generator and inferred tags, including empty overrides.
     """
     file_addr = Address("", target_name="reqs", relative_file_path="pyproject.toml")
     assert_python_requirements(
@@ -237,12 +239,14 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             """\
             python_requirements(
                 name='reqs',
+                tags=["generator"],
                 module_mapping={'ansiCOLORS': ['colors']},
                 type_stubs_module_mapping={'Django-types': ['django']},
                 overrides={
                   "ansicolors": {"tags": ["overridden"]},
                   "Django": {"dependencies": ["#Django-types"]},
                   "notebook": {"tags": ["another-tag"]},
+                  "sphinx": {"tags": []},
                 },
                 source='pyproject.toml',
             )
@@ -266,6 +270,12 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
             jupyter = [
                 "notebook>=6.1.0",
             ]
+            testing = [
+                "pytest<9",
+            ]
+            docs = [
+                "sphinx",
+            ]
             """
         ),
         expected_targets={
@@ -282,6 +292,7 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                 {
                     "requirements": ["Django==3.2 ; python_version>'3'"],
                     "dependencies": ["#Django-types", file_addr.spec],
+                    "tags": ["generator"],
                 },
                 Address("", target_name="reqs", generated_name="Django"),
             ),
@@ -290,24 +301,31 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                     "requirements": ["Django-types"],
                     "type_stub_modules": ["django"],
                     "dependencies": [file_addr.spec],
+                    "tags": ["generator"],
                 },
                 Address("", target_name="reqs", generated_name="Django-types"),
             ),
             PythonRequirementTarget(
-                {"requirements": ["Un_Normalized_PROJECT"], "dependencies": [file_addr.spec]},
+                {
+                    "requirements": ["Un_Normalized_PROJECT"],
+                    "dependencies": [file_addr.spec],
+                    "tags": ["generator"],
+                },
                 Address("", target_name="reqs", generated_name="Un-Normalized-PROJECT"),
             ),
             PythonRequirementTarget(
                 {
                     "requirements": ["pip@ git+https://github.com/pypa/pip.git"],
                     "dependencies": [file_addr.spec],
+                    "tags": ["generator"],
                 },
                 Address("", target_name="reqs", generated_name="pip"),
             ),
             PythonRequirementTarget(
                 {
-                    "requirements": ["pytest>=5.7.0"],
+                    "requirements": ["pytest>=5.7.0", "pytest<9"],
                     "dependencies": [file_addr.spec],
+                    "tags": ["generator", "test", "testing"],
                 },
                 Address("", target_name="reqs", generated_name="pytest"),
             ),
@@ -318,6 +336,14 @@ def test_pyproject_toml(rule_runner: RuleRunner) -> None:
                     "tags": ["another-tag"],
                 },
                 Address("", target_name="reqs", generated_name="notebook"),
+            ),
+            PythonRequirementTarget(
+                {
+                    "requirements": ["sphinx"],
+                    "dependencies": [file_addr.spec],
+                    "tags": [],
+                },
+                Address("", target_name="reqs", generated_name="sphinx"),
             ),
             TargetGeneratorSourcesHelperTarget({"source": "pyproject.toml"}, file_addr),
         },
