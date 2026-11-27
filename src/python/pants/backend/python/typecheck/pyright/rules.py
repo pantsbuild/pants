@@ -379,6 +379,6 @@ def rules() -> Iterable[Rule | UnionRule]:
         *collect_rules(),
         *config_files.rules(),
         *pex_from_targets.rules(),
-        *nodejs_tool.rules(),
+        *nodejs_tool.rules_for_tool(Pyright),
         UnionRule(CheckRequest, PyrightRequest),
     )

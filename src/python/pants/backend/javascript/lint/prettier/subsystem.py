@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable
 
-from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase
+from pants.backend.javascript.subsystems.nodejs_tool import NodeJSToolBase, bundled_lockfiles
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.option.option_types import ArgsListOption, SkipOption
 from pants.util.strutil import help_text
@@ -23,6 +23,7 @@ class Prettier(NodeJSToolBase):
     )
 
     default_version = "prettier@3.6.2"
+    default_lockfile_resources = bundled_lockfiles(__package__, "prettier")
 
     skip = SkipOption("fmt", "lint")
     args = ArgsListOption(example="--version")
