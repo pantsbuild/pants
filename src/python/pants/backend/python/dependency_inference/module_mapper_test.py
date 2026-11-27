@@ -975,6 +975,49 @@ def test_issue_15111(rule_runner: RuleRunner) -> None:
     )
 
 
+def test_repeated_requirement_registers_module_once(rule_runner: RuleRunner) -> None:
+    """A target with several entries for one project must provide its module only once.
+
+    Otherwise, the module looks ambiguous when a type stub target also provides it.
+    """
+    rule_runner.write_files(
+        {
+            "BUILD": dedent(
+                """\
+                python_requirement(name='req', requirements=['boto3>=1.26', 'boto3<1.36'])
+                python_requirement(name='types', requirements=['types-boto3'])
+                """
+            )
+        }
+    )
+    rule_runner.set_options(["--python-enable-resolves"])
+    result = rule_runner.request(ThirdPartyPythonModuleMapping, [])
+    assert result == ThirdPartyPythonModuleMapping(
+        FrozenDict(
+            {
+                "python-default": FrozenDict(
+                    {
+                        "boto3": (
+                            ModuleProvider(Address("", target_name="req"), ModuleProviderType.IMPL),
+                            ModuleProvider(
+                                Address("", target_name="types"), ModuleProviderType.TYPE_STUB
+                            ),
+                        ),
+                    }
+                )
+            }
+        )
+    )
+    owners = rule_runner.request(
+        PythonModuleOwners, [PythonModuleOwnersRequest("boto3", resolve="python-default")]
+    )
+    assert owners.unambiguous == (
+        Address("", target_name="req"),
+        Address("", target_name="types"),
+    )
+    assert not owners.ambiguous
+
+
 @pytest.mark.parametrize(
     ("proj_name", "expected_modules"),
     [
