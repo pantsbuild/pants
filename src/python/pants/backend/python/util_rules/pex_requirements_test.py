@@ -515,22 +515,37 @@ def test_uv_config_indexes():
     )
     indexes = parsed["tool"]["uv"]["index"]
     assert len(indexes) == 4
-    assert indexes[0]["url"] == "https://primary.example.com/simple"
+    # Find-links come first, so that the last real index is the default.
+    assert indexes[0]["url"] == "https://findlinks.example.com/index"
     assert "name" not in indexes[0]
     assert "default" not in indexes[0]
     assert "explicit" not in indexes[0]
-    assert indexes[1]["url"] == "https://secondary.example.com/simple"
-    assert indexes[1].get("name") == "fallback"
+    assert indexes[0]["format"] == "flat"
+    assert indexes[1]["url"] == "https://findlinks.other.com/index"
+    assert indexes[1].get("name") == "other"
     assert "default" not in indexes[1]
     assert indexes[1]["explicit"] is True
-    assert indexes[2]["url"] == "https://findlinks.example.com/index"
+    assert indexes[2]["url"] == "https://primary.example.com/simple"
     assert "name" not in indexes[2]
     assert "default" not in indexes[2]
     assert "explicit" not in indexes[2]
-    assert indexes[3]["url"] == "https://findlinks.other.com/index"
-    assert indexes[3].get("name") == "other"
+    assert indexes[3]["url"] == "https://secondary.example.com/simple"
+    assert indexes[3].get("name") == "fallback"
     assert indexes[3]["default"] is True
     assert indexes[3]["explicit"] is True
+
+    # Find-links with no indexes must not be dropped.
+    parsed = tomllib.loads(
+        generate_pyproject_toml(
+            "test", ics, [], indexes=[], find_links=["https://findlinks.example.com/index"]
+        )
+    )
+    assert "no-index" not in parsed["tool"]["uv"]
+    indexes = parsed["tool"]["uv"]["index"]
+    assert len(indexes) == 1
+    assert indexes[0]["url"] == "https://findlinks.example.com/index"
+    assert indexes[0]["format"] == "flat"
+    assert indexes[0]["default"] is True
 
 
 def test_uv_config_sources():

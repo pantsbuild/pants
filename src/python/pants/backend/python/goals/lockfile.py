@@ -376,12 +376,13 @@ async def generate_uv_lockfile(
     extra_find_links, extra_local_find_links_globs = relativize_local_find_links(
         req.find_links, buildroot.path
     )
+    find_links = (*resolve_find_links, *extra_find_links)
     pyproject_content = generate_pyproject_toml(
         req.resolve_name,
         req.interpreter_constraints,
         req.requirements,
         indexes=resolve_config.indexes,
-        find_links=(*resolve_find_links, *extra_find_links),
+        find_links=find_links,
         sources=resolve_config.sources,
     )
 
@@ -425,7 +426,7 @@ async def generate_uv_lockfile(
             # is generated.
             pass
 
-    uv_config = replace(resolve_config, find_links=resolve_find_links).uv_config()
+    uv_config = replace(resolve_config, find_links=find_links).uv_config()
 
     uv_config_digest = await create_digest(
         CreateDigest(
