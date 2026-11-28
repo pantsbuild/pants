@@ -417,15 +417,17 @@ class ResolvePexConstraintsFile:
 def generate_uv_index_config(
     indexes: Iterable[str] | None, find_links: Iterable[str] | None, table_name: str
 ) -> Iterable[str]:
-    if not indexes:
+    if not indexes and not find_links:
         return ["no-index = true"]
 
     # List of pairs (index string, is_find_links).
+    # Note that we list find_links first, so they take precedence over "regular" indexes.
+    # This is heuristically sound in the very common case where the last index is PyPI.
     unparsed_indexes = []
-    for index in indexes or []:
-        unparsed_indexes.append((index, False))
     for index in find_links or []:
         unparsed_indexes.append((index, True))
+    for index in indexes or []:
+        unparsed_indexes.append((index, False))
 
     parsed_indexes: list[dict[str, str]] = []
     for index, is_find_links in unparsed_indexes:

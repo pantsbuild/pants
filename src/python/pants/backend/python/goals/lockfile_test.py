@@ -736,7 +736,7 @@ def test_uv_lockfile_generation(
 
 
 def test_uv_lockfile_generation_with_sources(rule_runner: PythonRuleRunner) -> None:
-    # Regression test for https://github.com/pantsbuild/pants/issues/23442.
+    """Regression test for https://github.com/pantsbuild/pants/issues/23442."""
     rule_runner.set_options(
         [
             "--python-resolves={'test': 'test.lock'}",
@@ -773,6 +773,35 @@ def test_uv_lockfile_generation_with_sources(rule_runner: PythonRuleRunner) -> N
     packages = {pkg["name"]: pkg for pkg in lock_data.get("package", []) if "version" in pkg}
     assert "ansicolors" in packages
     assert packages["ansicolors"]["version"] == "1.1.8"
+
+
+def test_uv_lockfile_generation_with_target_find_links(rule_runner: PythonRuleRunner) -> None:
+    """Regression test for https://github.com/pantsbuild/pants/issues/23791."""
+    rule_runner.set_options(
+        ["--python-resolves={'test': 'test.lock'}"], env_inherit=PYTHON_BOOTSTRAP_ENV
+    )
+
+    result = rule_runner.request(
+        GenerateLockfileResult,
+        [
+            GenerateUvLockfile(
+                # Pants releases after 2.17 exist only on wheels.pantsbuild.org, not on PyPI.
+                requirements=FrozenOrderedSet(["pantsbuild.pants==2.29.0"]),
+                find_links=FrozenOrderedSet(["https://wheels.pantsbuild.org/simple"]),
+                interpreter_constraints=InterpreterConstraints(["CPython==3.11.*"]),
+                resolve_name="test",
+                lockfile_dest="test.lock",
+                diff=False,
+            )
+        ],
+    )
+    digest_contents = rule_runner.request(DigestContents, [result.digest])
+    by_path = {fc.path: fc for fc in digest_contents}
+    assert "test.lock" in by_path
+
+    lock_data = tomllib.loads(by_path["test.lock"].content.decode())
+    packages = {pkg["name"]: pkg for pkg in lock_data.get("package", []) if "version" in pkg}
+    assert packages["pantsbuild-pants"]["version"] == "2.29.0"
 
 
 def test_pex_lockfile_sync(rule_runner: PythonRuleRunner) -> None:
